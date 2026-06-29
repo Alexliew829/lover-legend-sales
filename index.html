@@ -286,13 +286,23 @@ function loadDailySales() {
 
 function dateRange(start, end) {
   const arr = [];
-  let d = new Date(start + "T00:00:00");
-  const last = new Date(end + "T00:00:00");
 
-  while (d <= last) {
-    arr.push(d.toISOString().slice(0, 10));
-    d.setDate(d.getDate() + 1);
+  let current = new Date(start);
+  let last = new Date(end);
+
+  while (current <= last) {
+
+    const yyyy = current.getFullYear();
+    const mm = String(current.getMonth() + 1).padStart(2, "0");
+    const dd = String(current.getDate()).padStart(2, "0");
+
+    arr.push(`${yyyy}-${mm}-${dd}`);
+
+    current.setDate(current.getDate() + 1);
   }
+
+  return arr;
+}
   return arr;
 }
 
