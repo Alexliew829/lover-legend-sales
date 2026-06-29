@@ -271,10 +271,17 @@
 
       <div class="summary">
         <div class="box">
-          <b>每日营业额</b>
-          <div class="amount" id="dailyBothTotal">RM 0.00</div>
-          <span class="sub-amount" id="balakongDailyTotal">Balakong：RM 0.00</span>
-          <span class="sub-amount" id="belimbingDailyTotal">Belimbing：RM 0.00</span>
+          <b>Balakong 营业额</b>
+          <div class="amount" id="balakongMonthMain">RM 0.00</div>
+          <span class="sub-amount" id="balakongDailyTotal">每日营业额：RM 0.00</span>
+          <span class="sub-amount" id="balakongMonthTotal">每月营业额：RM 0.00</span>
+        </div>
+
+        <div class="box">
+          <b>Belimbing 营业额</b>
+          <div class="amount" id="belimbingMonthMain">RM 0.00</div>
+          <span class="sub-amount" id="belimbingDailyTotal">每日营业额：RM 0.00</span>
+          <span class="sub-amount" id="belimbingMonthTotal">每月营业额：RM 0.00</span>
         </div>
 
         <div class="box">
@@ -282,22 +289,9 @@
           <div class="amount" id="fairTotal">RM 0.00</div>
           <span class="sub-amount" id="commissionTotal">Salesman 佣金 6%：RM 0.00</span>
         </div>
-
-        <div class="box">
-          <b>两间公司总营业额</b>
-          <div class="amount" id="bothCompaniesGrandTotal">RM 0.00</div>
-          <span class="sub-amount">Balakong + Gardening 总营业额</span>
-        </div>
       </div>
 
       <div class="summary" style="margin-top:10px;">
-        <div class="box">
-          <b>每月营业额</b>
-          <div class="amount" id="monthBothTotal">RM 0.00</div>
-          <span class="sub-amount" id="balakongMonthTotal">Balakong：RM 0.00</span>
-          <span class="sub-amount" id="belimbingMonthTotal">Belimbing：RM 0.00</span>
-        </div>
-
         <div class="box">
           <b>Gardening 总营业额</b>
           <div class="amount" id="gardeningGrandTotal">RM 0.00</div>
@@ -305,7 +299,7 @@
         </div>
 
         <div class="box">
-          <b>两间公司每月总营业额</b>
+          <b>两间公司总营业额</b>
           <div class="amount" id="bothCompaniesMonthTotal">RM 0.00</div>
           <span class="sub-amount">Balakong 每月营业额 + Gardening 总营业额</span>
         </div>
@@ -483,16 +477,38 @@ function createFairDates() {
   const end = document.getElementById("fairEnd").value;
 
   if (!start || !end) {
-    alert("请选择 Fair 开始和结束日期");
+    document.getElementById("fairInputs").innerHTML = "";
     return;
   }
 
   if (new Date(start) > new Date(end)) {
-    alert("开始日期不能迟过结束日期");
+    document.getElementById("fairInputs").innerHTML = "";
     return;
   }
 
+  const company = "gardening";
+  if (!data.fairs[company]) data.fairs[company] = {};
+
   const dates = dateRange(start, end);
+  const allowedDates = new Set(dates);
+
+  /*
+    如果 Fair 日期从 3 天改成 2 天：
+    - 画面会马上变成 2 个输入格
+    - 旧的第 3 天如果属于同一场 Fair，会从测试资料里移除
+  */
+  Object.keys(data.fairs[company]).forEach(date => {
+    const record = data.fairs[company][date];
+    const sameFairPeriod =
+      record &&
+      record.start === start &&
+      record.end === end;
+
+    if (sameFairPeriod && !allowedDates.has(date)) {
+      delete data.fairs[company][date];
+    }
+  });
+
   let html = "<h3>Fair 每日营业额</h3>";
 
   dates.forEach(date => {
@@ -507,6 +523,11 @@ function createFairDates() {
   document.getElementById("fairInputs").innerHTML = html;
   loadFairInputs();
   attachMoneyInputEvents();
+}
+
+function syncFairDates() {
+  createFairDates();
+  renderAll();
 }
 
 function saveFairSales() {
@@ -527,6 +548,18 @@ function saveFairSales() {
   }
 
   if (!data.fairs[company]) data.fairs[company] = {};
+
+  const currentDates = new Set([...inputs].map(input => input.dataset.date));
+
+  Object.keys(data.fairs[company]).forEach(date => {
+    const record = data.fairs[company][date];
+    const sameLocation = (record?.location || "") === location;
+    const overlapsOldFair = record?.start === start || record?.end === end || sameLocation;
+
+    if (sameLocation && !currentDates.has(date)) {
+      delete data.fairs[company][date];
+    }
+  });
 
   inputs.forEach(input => {
     const date = input.dataset.date;
@@ -584,19 +617,18 @@ function renderAll() {
   const gardeningGrandTotal = belimbingDaily + fairTotal;
   const bothCompaniesTotal = balakongDaily + gardeningGrandTotal;
 
-  document.getElementById("dailyBothTotal").textContent = money(balakongDaily + belimbingDaily);
-  document.getElementById("balakongDailyTotal").textContent = "Balakong：" + money(balakongDaily);
-  document.getElementById("belimbingDailyTotal").textContent = "Belimbing：" + money(belimbingDaily);
+  document.getElementById("balakongMonthMain").textContent = money(balakongDaily);
+  document.getElementById("balakongDailyTotal").textContent = "每日营业额：" + money(balakongDaily);
+  document.getElementById("balakongMonthTotal").textContent = "每月营业额：" + money(balakongDaily);
 
-  document.getElementById("monthBothTotal").textContent = money(balakongDaily + belimbingDaily);
-  document.getElementById("balakongMonthTotal").textContent = "Balakong：" + money(balakongDaily);
-  document.getElementById("belimbingMonthTotal").textContent = "Belimbing：" + money(belimbingDaily);
+  document.getElementById("belimbingMonthMain").textContent = money(belimbingDaily);
+  document.getElementById("belimbingDailyTotal").textContent = "每日营业额：" + money(belimbingDaily);
+  document.getElementById("belimbingMonthTotal").textContent = "每月营业额：" + money(belimbingDaily);
 
   document.getElementById("fairTotal").textContent = money(fairTotal);
   document.getElementById("commissionTotal").textContent = "Salesman 佣金 6%：" + money(fairTotal * 0.06);
 
   document.getElementById("gardeningGrandTotal").textContent = money(gardeningGrandTotal);
-  document.getElementById("bothCompaniesGrandTotal").textContent = money(bothCompaniesTotal);
   document.getElementById("bothCompaniesMonthTotal").textContent = money(bothCompaniesTotal);
 
   renderTable();
@@ -712,6 +744,9 @@ document.getElementById("saleDate").addEventListener("change", () => {
 });
 
 document.getElementById("dailySales").addEventListener("blur", moneyBlurHandler);
+
+document.getElementById("fairStart").addEventListener("change", syncFairDates);
+document.getElementById("fairEnd").addEventListener("change", syncFairDates);
 
 attachMoneyInputEvents();
 loadDailySales();
