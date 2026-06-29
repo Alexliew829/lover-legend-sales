@@ -271,13 +271,10 @@
 
       <div class="summary">
         <div class="box">
-          <b>Balakong 每日营业额</b>
-          <div class="amount" id="balakongDailyTotal">RM 0.00</div>
-        </div>
-
-        <div class="box">
-          <b>Belimbing 每日营业额</b>
-          <div class="amount" id="belimbingDailyTotal">RM 0.00</div>
+          <b>每日营业额</b>
+          <div class="amount" id="dailyBothTotal">RM 0.00</div>
+          <span class="sub-amount" id="balakongDailyTotal">Balakong：RM 0.00</span>
+          <span class="sub-amount" id="belimbingDailyTotal">Belimbing：RM 0.00</span>
         </div>
 
         <div class="box">
@@ -285,23 +282,32 @@
           <div class="amount" id="fairTotal">RM 0.00</div>
           <span class="sub-amount" id="commissionTotal">Salesman 佣金 6%：RM 0.00</span>
         </div>
+
+        <div class="box">
+          <b>两间公司总营业额</b>
+          <div class="amount" id="bothCompaniesGrandTotal">RM 0.00</div>
+          <span class="sub-amount">Balakong + Gardening 总营业额</span>
+        </div>
       </div>
 
       <div class="summary" style="margin-top:10px;">
         <div class="box">
-          <b>Balakong 每月营业额</b>
-          <div class="amount" id="balakongMonthTotal">RM 0.00</div>
-        </div>
-
-        <div class="box">
-          <b>Belimbing 每月营业额</b>
-          <div class="amount" id="belimbingMonthTotal">RM 0.00</div>
+          <b>每月营业额</b>
+          <div class="amount" id="monthBothTotal">RM 0.00</div>
+          <span class="sub-amount" id="balakongMonthTotal">Balakong：RM 0.00</span>
+          <span class="sub-amount" id="belimbingMonthTotal">Belimbing：RM 0.00</span>
         </div>
 
         <div class="box">
           <b>Gardening 总营业额</b>
           <div class="amount" id="gardeningGrandTotal">RM 0.00</div>
           <span class="sub-amount">Belimbing 每月营业额 + Fair 营业额</span>
+        </div>
+
+        <div class="box">
+          <b>两间公司每月总营业额</b>
+          <div class="amount" id="bothCompaniesMonthTotal">RM 0.00</div>
+          <span class="sub-amount">Balakong 每月营业额 + Gardening 总营业额</span>
         </div>
       </div>
 
@@ -575,16 +581,23 @@ function renderAll() {
   const belimbingDaily = getMonthlyDailyTotal("gardening");
   const fairTotal = getMonthlyFairTotal();
 
-  document.getElementById("balakongDailyTotal").textContent = money(balakongDaily);
-  document.getElementById("belimbingDailyTotal").textContent = money(belimbingDaily);
+  const gardeningGrandTotal = belimbingDaily + fairTotal;
+  const bothCompaniesTotal = balakongDaily + gardeningGrandTotal;
 
-  document.getElementById("balakongMonthTotal").textContent = money(balakongDaily);
-  document.getElementById("belimbingMonthTotal").textContent = money(belimbingDaily);
+  document.getElementById("dailyBothTotal").textContent = money(balakongDaily + belimbingDaily);
+  document.getElementById("balakongDailyTotal").textContent = "Balakong：" + money(balakongDaily);
+  document.getElementById("belimbingDailyTotal").textContent = "Belimbing：" + money(belimbingDaily);
+
+  document.getElementById("monthBothTotal").textContent = money(balakongDaily + belimbingDaily);
+  document.getElementById("balakongMonthTotal").textContent = "Balakong：" + money(balakongDaily);
+  document.getElementById("belimbingMonthTotal").textContent = "Belimbing：" + money(belimbingDaily);
 
   document.getElementById("fairTotal").textContent = money(fairTotal);
   document.getElementById("commissionTotal").textContent = "Salesman 佣金 6%：" + money(fairTotal * 0.06);
 
-  document.getElementById("gardeningGrandTotal").textContent = money(belimbingDaily + fairTotal);
+  document.getElementById("gardeningGrandTotal").textContent = money(gardeningGrandTotal);
+  document.getElementById("bothCompaniesGrandTotal").textContent = money(bothCompaniesTotal);
+  document.getElementById("bothCompaniesMonthTotal").textContent = money(bothCompaniesTotal);
 
   renderTable();
 }
