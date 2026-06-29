@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lover Legend Sales Record</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+      background: #f4f6f3;
+      color: #111;
+    }
+    .app {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    h1 {
+      text-align: center;
+      color: #b00000;
+      font-weight: 900;
+      margin: 10px 0 18px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    label {
+      font-weight: 700;
+      display: block;
+      margin-bottom: 6px;
+    }
+    select, input, button {
+      width: 100%;
+      padding: 11px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+    button {
+      border: none;
+      background: #111;
+      color: #fff;
+      font-weight: 800;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    button.secondary { background: #b00000; }
+    button.light { background: #666; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .grid3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .box {
+      background: #f8f8f8;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+    }
+    .box b {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+    .amount {
+      font-size: 20px;
+      font-weight: 900;
+      color: #b00000;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: right;
+    }
+    th:first-child, td:first-child,
+    th:nth-child(2), td:nth-child(2) {
+      text-align: left;
+    }
+    th {
+      background: #eee;
+    }
+    .small {
+      font-size: 13px;
+      color: #666;
+      margin-top: 6px;
+    }
+    @media (max-width: 700px) {
+      .grid, .grid3, .summary { grid-template-columns: 1fr; }
+      table { font-size: 12px; }
+      th, td { padding: 6px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Lover Legend Sales Record</h1>
+
+    <div class="card">
+      <div class="grid">
+        <div>
+          <label>公司</label>
+          <select id="company">
+            <option value="adenium">Lover Legend Adenium - Balakong</option>
+            <option value="gardening">Lover Legend Gardening - Belimbing</option>
+          </select>
+        </div>
+        <div>
+          <label>日期</label>
+          <input type="date" id="saleDate">
+        </div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <label>当天营业额 RM</label>
+        <input type="number" id="dailySales" min="0" step="0.01" placeholder="输入当天营业额">
+      </div>
+
+      <button onclick="saveDailySales()">储存当天营业额</button>
+      <p class="small">可以选回过去日期修改，按储存后会覆盖旧金额。</p>
+    </div>
+
+    <div class="card">
+      <h2>Fair / 商场摆档记录</h2>
+
+      <div class="grid3">
+        <div>
+          <label>Fair 地点</label>
+          <input type="text" id="fairLocation" placeholder="例如 Sunway">
+        </div>
+        <div>
+          <label>开始日期</label>
+          <input type="date" id="fairStart">
+        </div>
+        <div>
+          <label>结束日期</label>
+          <input type="date" id="fairEnd">
+        </div>
+      </div>
+
+      <button class="secondary" onclick="createFairDates()">建立 / 更新 Fair 日期</button>
+
+      <div id="fairInputs"></div>
+
+      <button onclick="saveFairSales()">储存 Fair 营业额</button>
+      <p class="small">Fair 会跟随所选公司储存。佣金自动用 Fair 总营业额 × 6%。</p>
+    </div>
+
+    <div class="card">
+      <h2>总计</h2>
+      <div class="summary">
+        <div class="box">
+          <b>Adenium 每日营业额</b>
+          <div class="amount" id="adeniumDailyTotal">RM 0.00</div>
+        </div>
+        <div class="box">
+          <b>Gardening 每日营业额</b>
+          <div class="amount" id="gardeningDailyTotal">RM 0.00</div>
+        </div>
+        <div class="box">
+          <b>Fair 总营业额</b>
+          <div class="amount" id="fairTotal">RM 0.00</div>
+        </div>
+        <div class="box">
+          <b>Salesman 佣金 6%</b>
+          <div class="amount" id="commissionTotal">RM 0.00</div>
+        </div>
+      </div>
+
+      <div class="summary" style="margin-top:10px;">
+        <div class="box">
+          <b>Adenium 总营业额</b>
+          <div class="amount" id="adeniumGrandTotal">RM 0.00</div>
+        </div>
+        <div class="box">
+          <b>Gardening 总营业额</b>
+          <div class="amount" id="gardeningGrandTotal">RM 0.00</div>
+        </div>
+        <div class="box">
+          <b>两间公司总营业额</b>
+          <div class="amount" id="allGrandTotal">RM 0.00</div>
+        </div>
+        <div class="box">
+          <b>目前公司</b>
+          <div class="amount" id="currentCompanyName" style="font-size:15px;">-</div>
+        </div>
+      </div>
+
+      <button class="light" onclick="exportCSV()">导出 Excel / CSV</button>
+    </div>
+
+    <div class="card">
+      <h2>记录明细</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th>公司</th>
+            <th>每日营业额</th>
+            <th>Fair 地点</th>
+            <th>Fair 营业额</th>
+            <th>佣金 6%</th>
+            <th>当天总额</th>
+          </tr>
+        </thead>
+        <tbody id="recordTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+const STORAGE_KEY = "loverLegendSalesData_v1";
+
+let data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
+  daily: {},
+  fairs: {}
+};
+
+const companyNames = {
+  adenium: "Lover Legend Adenium - Balakong",
+  gardening: "Lover Legend Gardening - Belimbing"
+};
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function money(num) {
+  return "RM " + Number(num || 0).toFixed(2);
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  renderAll();
+}
+
+function getCompany() {
+  return document.getElementById("company").value;
+}
+
+function saveDailySales() {
+  const company = getCompany();
+  const date = document.getElementById("saleDate").value;
+  const amount = Number(document.getElementById("dailySales").value || 0);
+
+  if (!date) {
+    alert("请选择日期");
+    return;
+  }
+
+  if (!data.daily[company]) data.daily[company] = {};
+  data.daily[company][date] = amount;
+
+  saveData();
+  alert("已储存当天营业额");
+}
+
+function loadDailySales() {
+  const company = getCompany();
+  const date = document.getElementById("saleDate").value;
+  const amount = data.daily?.[company]?.[date] || "";
+  document.getElementById("dailySales").value = amount;
+  document.getElementById("currentCompanyName").textContent = companyNames[company];
+}
+
+function dateRange(start, end) {
+  const arr = [];
+  let d = new Date(start + "T00:00:00");
+  const last = new Date(end + "T00:00:00");
+
+  while (d <= last) {
+    arr.push(d.toISOString().slice(0, 10));
+    d.setDate(d.getDate() + 1);
+  }
+  return arr;
+}
+
+function createFairDates() {
+  const start = document.getElementById("fairStart").value;
+  const end = document.getElementById("fairEnd").value;
+
+  if (!start || !end) {
+    alert("请选择 Fair 开始和结束日期");
+    return;
+  }
+
+  if (new Date(start) > new Date(end)) {
+    alert("开始日期不能迟过结束日期");
+    return;
+  }
+
+  const dates = dateRange(start, end);
+  let html = "<h3>Fair 每日营业额</h3>";
+
+  dates.forEach(date => {
+    html += `
+      <div style="margin-top:10px;">
+        <label>${date} Fair 营业额 RM</label>
+        <input type="number" class="fairAmount" data-date="${date}" min="0" step="0.01" placeholder="输入 ${date} 营业额">
+      </div>
+    `;
+  });
+
+  document.getElementById("fairInputs").innerHTML = html;
+  loadFairInputs();
+}
+
+function saveFairSales() {
+  const company = getCompany();
+  const location = document.getElementById("fairLocation").value.trim();
+  const start = document.getElementById("fairStart").value;
+  const end = document.getElementById("fairEnd").value;
+  const inputs = document.querySelectorAll(".fairAmount");
+
+  if (!location) {
+    alert("请输入 Fair 地点");
+    return;
+  }
+  if (!start || !end || inputs.length === 0) {
+    alert("请先建立 Fair 日期");
+    return;
+  }
+
+  if (!data.fairs[company]) data.fairs[company] = {};
+
+  inputs.forEach(input => {
+    const date = input.dataset.date;
+    const amount = Number(input.value || 0);
+
+    data.fairs[company][date] = {
+      location,
+      start,
+      end,
+      amount
+    };
+  });
+
+  saveData();
+  alert("已储存 Fair 营业额");
+}
+
+function loadFairInputs() {
+  const company = getCompany();
+  const inputs = document.querySelectorAll(".fairAmount");
+
+  inputs.forEach(input => {
+    const date = input.dataset.date;
+    const record = data.fairs?.[company]?.[date];
+    if (record) {
+      input.value = record.amount || "";
+      document.getElementById("fairLocation").value = record.location || "";
+    }
+  });
+}
+
+function getDailyTotal(company) {
+  return Object.values(data.daily?.[company] || {}).reduce((a, b) => a + Number(b || 0), 0);
+}
+
+function getFairTotal(company) {
+  return Object.values(data.fairs?.[company] || {}).reduce((a, item) => a + Number(item.amount || 0), 0);
+}
+
+function renderAll() {
+  loadDailySales();
+
+  const adeniumDaily = getDailyTotal("adenium");
+  const gardeningDaily = getDailyTotal("gardening");
+  const adeniumFair = getFairTotal("adenium");
+  const gardeningFair = getFairTotal("gardening");
+  const fairTotal = adeniumFair + gardeningFair;
+
+  document.getElementById("adeniumDailyTotal").textContent = money(adeniumDaily);
+  document.getElementById("gardeningDailyTotal").textContent = money(gardeningDaily);
+  document.getElementById("fairTotal").textContent = money(fairTotal);
+  document.getElementById("commissionTotal").textContent = money(fairTotal * 0.06);
+
+  document.getElementById("adeniumGrandTotal").textContent = money(adeniumDaily + adeniumFair);
+  document.getElementById("gardeningGrandTotal").textContent = money(gardeningDaily + gardeningFair);
+  document.getElementById("allGrandTotal").textContent = money(adeniumDaily + gardeningDaily + fairTotal);
+
+  renderTable();
+}
+
+function renderTable() {
+  const rows = [];
+  const allDates = new Set();
+
+  ["adenium", "gardening"].forEach(company => {
+    Object.keys(data.daily?.[company] || {}).forEach(date => allDates.add(date + "|" + company));
+    Object.keys(data.fairs?.[company] || {}).forEach(date => allDates.add(date + "|" + company));
+  });
+
+  [...allDates].sort().forEach(key => {
+    const [date, company] = key.split("|");
+    const daily = Number(data.daily?.[company]?.[date] || 0);
+    const fair = data.fairs?.[company]?.[date];
+    const fairAmount = Number(fair?.amount || 0);
+    const commission = fairAmount * 0.06;
+    const total = daily + fairAmount;
+
+    rows.push(`
+      <tr>
+        <td>${date}</td>
+        <td>${companyNames[company]}</td>
+        <td>${money(daily)}</td>
+        <td>${fair?.location || "-"}</td>
+        <td>${money(fairAmount)}</td>
+        <td>${money(commission)}</td>
+        <td><b>${money(total)}</b></td>
+      </tr>
+    `);
+  });
+
+  document.getElementById("recordTable").innerHTML = rows.join("") || `
+    <tr><td colspan="7" style="text-align:center;">还没有记录</td></tr>
+  `;
+}
+
+function exportCSV() {
+  let csv = "\uFEFF日期,公司,每日营业额,Fair地点,Fair营业额,Salesman佣金6%,当天总额\n";
+  const allDates = new Set();
+
+  ["adenium", "gardening"].forEach(company => {
+    Object.keys(data.daily?.[company] || {}).forEach(date => allDates.add(date + "|" + company));
+    Object.keys(data.fairs?.[company] || {}).forEach(date => allDates.add(date + "|" + company));
+  });
+
+  [...allDates].sort().forEach(key => {
+    const [date, company] = key.split("|");
+    const daily = Number(data.daily?.[company]?.[date] || 0);
+    const fair = data.fairs?.[company]?.[date];
+    const fairAmount = Number(fair?.amount || 0);
+    const commission = fairAmount * 0.06;
+    const total = daily + fairAmount;
+
+    csv += `${date},"${companyNames[company]}",${daily},"${fair?.location || ""}",${fairAmount},${commission.toFixed(2)},${total.toFixed(2)}\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "lover_legend_sales_record.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+document.getElementById("saleDate").value = todayISO();
+document.getElementById("company").addEventListener("change", () => {
+  loadDailySales();
+  loadFairInputs();
+  renderAll();
+});
+document.getElementById("saleDate").addEventListener("change", loadDailySales);
+
+renderAll();
+</script>
+</body>
+</html>
