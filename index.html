@@ -75,9 +75,19 @@
       font-size: 16px;
     }
 
-    input[type="number"] {
-      text-align: right;
+    input.money-input {
+      text-align: left;
       font-weight: 800;
+    }
+
+    input.money-input::-webkit-outer-spin-button,
+    input.money-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    input.money-input {
+      -moz-appearance: textfield;
     }
 
     button {
@@ -221,7 +231,7 @@
 
       <div style="margin-top:12px;">
         <label>当天营业额 RM</label>
-        <input type="number" id="dailySales" min="0" step="0.01" value="0.00">
+        <input type="text" id="dailySales" class="money-input" value="0.00" inputmode="decimal">
       </div>
 
       <button onclick="saveDailySales()">储存 / 更新当天营业额</button>
@@ -248,7 +258,7 @@
         </div>
       </div>
 
-      <button class="secondary" onclick="createFairDates()">建立 / 更新 Fair 日期</button>
+      <button class="secondary" onclick="createFairDates()">输入 Fair 营业额</button>
 
       <div id="fairInputs"></div>
 
@@ -271,9 +281,8 @@
         </div>
 
         <div class="box">
-          <b>Belimbing + Fair 营业额</b>
-          <div class="amount" id="belimbingWithFairTotal">RM 0.00</div>
-          <span class="sub-amount" id="fairTotal">Fair 营业额：RM 0.00</span>
+          <b>Fair 营业额</b>
+          <div class="amount" id="fairTotal">RM 0.00</div>
           <span class="sub-amount" id="commissionTotal">Salesman 佣金 6%：RM 0.00</span>
         </div>
       </div>
@@ -297,6 +306,7 @@
       </div>
 
       <button class="light" onclick="exportCSV()">导出 Excel / CSV</button>
+      <button class="secondary" onclick="clearTestData()">暂时清空测试资料</button>
     </div>
 
     <div class="card">
@@ -356,20 +366,38 @@ function isSameMonth(date) {
 }
 
 function money(num) {
-  return "RM " + Number(num || 0).toFixed(2);
+  return "RM " + Number(num || 0).toLocaleString("en-MY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function cleanAmount(value) {
+  return String(value || "").replace(/,/g, "").trim();
 }
 
 function toAmount(value) {
-  return Number(value || 0);
+  const cleaned = cleanAmount(value);
+  return Number(cleaned || 0);
+}
+
+function formatAmount(value) {
+  return Number(value || 0).toLocaleString("en-MY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
 function formatMoneyInput(input) {
-  if (input.value === "") {
-    input.value = "0.00";
-    return;
-  }
+  const amount = toAmount(input.value);
+  input.value = formatAmount(amount);
+}
 
-  input.value = Number(input.value || 0).toFixed(2);
+function moneyFocusHandler(e) {
+  e.target.value = cleanAmount(e.target.value);
+  if (e.target.value === "0.00" || e.target.value === "0") {
+    e.target.value = "";
+  }
 }
 
 function moneyBlurHandler(e) {
@@ -377,8 +405,10 @@ function moneyBlurHandler(e) {
 }
 
 function attachMoneyInputEvents() {
-  document.querySelectorAll('input[type="number"]').forEach(input => {
+  document.querySelectorAll(".money-input").forEach(input => {
+    input.removeEventListener("focus", moneyFocusHandler);
     input.removeEventListener("blur", moneyBlurHandler);
+    input.addEventListener("focus", moneyFocusHandler);
     input.addEventListener("blur", moneyBlurHandler);
   });
 }
@@ -418,7 +448,7 @@ function loadDailySales() {
   const savedAmount = data.daily?.[company]?.[date];
 
   document.getElementById("dailySales").value =
-    savedAmount === undefined ? "0.00" : Number(savedAmount).toFixed(2);
+    savedAmount === undefined ? "0.00" : formatAmount(savedAmount);
 }
 
 function dateRange(start, end) {
@@ -463,7 +493,7 @@ function createFairDates() {
     html += `
       <div style="margin-top:10px;">
         <label>${date} Fair 营业额 RM</label>
-        <input type="number" class="fairAmount" data-date="${date}" min="0" step="0.01" value="0.00">
+        <input type="text" class="fairAmount money-input" data-date="${date}" value="0.00" inputmode="decimal">
       </div>
     `;
   });
@@ -503,7 +533,7 @@ function saveFairSales() {
       amount
     };
 
-    input.value = amount.toFixed(2);
+    input.value = formatAmount(amount);
   });
 
   saveData();
@@ -520,7 +550,7 @@ function loadFairInputs() {
 
     input.value = record?.amount === undefined
       ? "0.00"
-      : Number(record.amount).toFixed(2);
+      : formatAmount(record.amount);
 
     if (record?.location) {
       document.getElementById("fairLocation").value = record.location;
@@ -551,10 +581,9 @@ function renderAll() {
   document.getElementById("balakongMonthTotal").textContent = money(balakongDaily);
   document.getElementById("belimbingMonthTotal").textContent = money(belimbingDaily);
 
-  document.getElementById("fairTotal").textContent = "Fair 营业额：" + money(fairTotal);
+  document.getElementById("fairTotal").textContent = money(fairTotal);
   document.getElementById("commissionTotal").textContent = "Salesman 佣金 6%：" + money(fairTotal * 0.06);
 
-  document.getElementById("belimbingWithFairTotal").textContent = money(belimbingDaily + fairTotal);
   document.getElementById("gardeningGrandTotal").textContent = money(belimbingDaily + fairTotal);
 
   renderTable();
@@ -598,6 +627,30 @@ function renderTable() {
   document.getElementById("recordTable").innerHTML = rows.join("") || `
     <tr><td colspan="7" style="text-align:center;">这个月份还没有记录</td></tr>
   `;
+}
+
+
+function clearTestData() {
+  const ok = confirm("确定要清空所有测试资料？这个动作会删除本机储存的营业额和 Fair 记录。");
+
+  if (!ok) return;
+
+  data = {
+    daily: {},
+    fairs: {}
+  };
+
+  localStorage.removeItem("loverLegendSalesData_v1");
+  localStorage.removeItem(STORAGE_KEY);
+
+  document.getElementById("dailySales").value = "0.00";
+  document.getElementById("fairLocation").value = "";
+  document.getElementById("fairStart").value = "";
+  document.getElementById("fairEnd").value = "";
+  document.getElementById("fairInputs").innerHTML = "";
+
+  saveData();
+  alert("测试资料已清空");
 }
 
 function exportCSV() {
