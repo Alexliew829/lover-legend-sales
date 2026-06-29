@@ -136,6 +136,26 @@
       .grid, .grid3, .summary { grid-template-columns: 1fr; }
       table { font-size: 12px; }
       th, td { padding: 6px; }
+
+      .header {
+        gap: 8px;
+        margin: 12px 0 18px;
+      }
+
+      .header h1 {
+        font-size: 22px;
+        line-height: 1.1;
+      }
+
+      .logo-left {
+        width: 52px;
+        height: 52px;
+      }
+
+      .logo-right {
+        width: 42px;
+        height: 42px;
+      }
     }
   </style>
 </head>
@@ -156,7 +176,7 @@
           <label>公司</label>
           <select id="company">
             <option value="adenium">Lover Legend Adenium - Balakong</option>
-            <option value="gardening">Lover Legend Gardening - Belimbing</option>
+            <option value="gardening" selected>Lover Legend Gardening - Belimbing</option>
           </select>
         </div>
         <div>
@@ -276,19 +296,31 @@ const companyNames = {
 };
 
 function todayISO() {
-
-    const d = new Date();
-
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth()+1).padStart(2,"0");
-    const dd = String(d.getDate()).padStart(2,"0");
-
-    return `${yyyy}-${mm}-${dd}`;
-
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function money(num) {
   return "RM " + Number(num || 0).toFixed(2);
+}
+
+function formatMoneyInput(input) {
+  if (input.value === "") return;
+  input.value = Number(input.value || 0).toFixed(2);
+}
+
+function moneyBlurHandler(e) {
+  formatMoneyInput(e.target);
+}
+
+function attachMoneyInputEvents() {
+  document.querySelectorAll('input[type="number"]').forEach(input => {
+    input.removeEventListener("blur", moneyBlurHandler);
+    input.addEventListener("blur", moneyBlurHandler);
+  });
 }
 
 function saveData() {
@@ -314,36 +346,37 @@ function saveDailySales() {
   data.daily[company][date] = amount;
 
   saveData();
-  alert("已储存当天营业额");
+  document.getElementById("dailySales").value = amount.toFixed(2);
+  alert("已储存 / 已更新当天营业额");
 }
 
 function loadDailySales() {
   const company = getCompany();
   const date = document.getElementById("saleDate").value;
-  const amount = data.daily?.[company]?.[date] || "";
-  document.getElementById("dailySales").value = amount;
+  const savedAmount = data.daily?.[company]?.[date];
+  document.getElementById("dailySales").value =
+    savedAmount === undefined ? "" : Number(savedAmount).toFixed(2);
   document.getElementById("currentCompanyName").textContent = companyNames[company];
 }
 
 function dateRange(start, end) {
   const arr = [];
 
-  let current = new Date(start);
-  let last = new Date(end);
+  const [sy, sm, sd] = start.split("-").map(Number);
+  const [ey, em, ed] = end.split("-").map(Number);
+
+  let current = new Date(sy, sm - 1, sd);
+  const last = new Date(ey, em - 1, ed);
 
   while (current <= last) {
-
     const yyyy = current.getFullYear();
     const mm = String(current.getMonth() + 1).padStart(2, "0");
     const dd = String(current.getDate()).padStart(2, "0");
 
     arr.push(`${yyyy}-${mm}-${dd}`);
-
     current.setDate(current.getDate() + 1);
   }
 
-  return arr;
-}
 
 function createFairDates() {
   const start = document.getElementById("fairStart").value;
@@ -373,6 +406,7 @@ function createFairDates() {
 
   document.getElementById("fairInputs").innerHTML = html;
   loadFairInputs();
+  attachMoneyInputEvents();
 }
 
 function saveFairSales() {
@@ -403,10 +437,12 @@ function saveFairSales() {
       end,
       amount
     };
+
+    input.value = amount.toFixed(2);
   });
 
   saveData();
-  alert("已储存 Fair 营业额");
+  alert("已储存 / 已更新 Fair 营业额");
 }
 
 function loadFairInputs() {
@@ -417,7 +453,7 @@ function loadFairInputs() {
     const date = input.dataset.date;
     const record = data.fairs?.[company]?.[date];
     if (record) {
-      input.value = record.amount || "";
+      input.value = record.amount === undefined ? "" : Number(record.amount).toFixed(2);
       document.getElementById("fairLocation").value = record.location || "";
     }
   });
@@ -455,8 +491,9 @@ function renderAll() {
 function renderTable() {
   const rows = [];
   const allDates = new Set();
+  const selectedCompany = getCompany();
 
-  ["adenium", "gardening"].forEach(company => {
+  [selectedCompany].forEach(company => {
     Object.keys(data.daily?.[company] || {}).forEach(date => allDates.add(date + "|" + company));
     Object.keys(data.fairs?.[company] || {}).forEach(date => allDates.add(date + "|" + company));
   });
@@ -524,7 +561,9 @@ document.getElementById("company").addEventListener("change", () => {
   renderAll();
 });
 document.getElementById("saleDate").addEventListener("change", loadDailySales);
+document.getElementById("dailySales").addEventListener("blur", moneyBlurHandler);
 
+attachMoneyInputEvents();
 renderAll();
 </script>
 </body>
