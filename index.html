@@ -1,25 +1,22 @@
 <!DOCTYPE html>
 <html lang="zh-Hans">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lover Legend Sales Dashboard Pro v2.0</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lover Legend Sales Dashboard V3</title>
   <style>
     * { box-sizing: border-box; }
-
     body {
       margin: 0;
       font-family: Arial, "Microsoft YaHei", sans-serif;
       background: #f4f6f3;
       color: #111;
     }
-
     .app {
       max-width: 1120px;
       margin: 0 auto;
       padding: 16px;
     }
-
     .header {
       display: flex;
       align-items: center;
@@ -27,7 +24,6 @@
       gap: 18px;
       margin: 14px 0 20px;
     }
-
     .header h1 {
       margin: 0;
       color: #b00000;
@@ -35,19 +31,16 @@
       font-weight: 900;
       text-align: center;
     }
-
     .logo-left {
       width: 72px;
       height: 72px;
       object-fit: contain;
     }
-
     .logo-right {
       width: 55px;
       height: 55px;
       object-fit: contain;
     }
-
     .card {
       background: #fff;
       border-radius: 14px;
@@ -55,17 +48,12 @@
       margin-bottom: 14px;
       box-shadow: 0 2px 8px rgba(0,0,0,.08);
     }
-
-    h2 {
-      margin: 4px 0 14px;
-    }
-
+    h2 { margin: 4px 0 14px; }
     label {
       font-weight: 800;
       display: block;
       margin-bottom: 6px;
     }
-
     select, input, button {
       width: 100%;
       padding: 11px;
@@ -73,25 +61,14 @@
       border: 1px solid #ccc;
       font-size: 16px;
     }
-
-    input[type="date"],
-    input[type="month"] {
+    input[type="date"], input[type="month"] {
       color: #b00000;
       font-weight: 900;
     }
-
-    input.money-input {
+    .money-input {
       text-align: left;
       font-weight: 900;
-      -moz-appearance: textfield;
     }
-
-    input.money-input::-webkit-outer-spin-button,
-    input.money-input::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-
     button {
       border: none;
       background: #111;
@@ -100,49 +77,41 @@
       cursor: pointer;
       margin-top: 8px;
     }
-
+    button.green { background: #0b6b2b; }
     button.red { background: #b00000; }
     button.gray { background: #666; }
-    button.green { background: #0b6b2b; }
-
     .grid2 {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
     }
-
     .grid3 {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 12px;
     }
-
     .grid5 {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 10px;
     }
-
     .box {
       background: #f8f8f8;
       border: 1px solid #ddd;
       border-radius: 13px;
       padding: 12px;
     }
-
     .box b {
       display: block;
       font-size: 15px;
       margin-bottom: 7px;
     }
-
     .amount {
       font-size: 21px;
       font-weight: 900;
       color: #b00000;
       line-height: 1.3;
     }
-
     .sub {
       display: block;
       font-size: 14px;
@@ -150,15 +119,13 @@
       margin-top: 5px;
       color: #111;
     }
-
     .small {
       font-size: 13px;
       color: #666;
       margin-top: 7px;
       line-height: 1.45;
     }
-
-    .notice {
+    .status {
       background: #fff7dc;
       border: 1px solid #e4c45f;
       color: #5b4200;
@@ -166,76 +133,54 @@
       border-radius: 10px;
       margin-top: 10px;
       font-weight: 800;
-      display: none;
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 10px;
       font-size: 14px;
     }
-
     th, td {
       border: 1px solid #ddd;
       padding: 8px;
       text-align: right;
     }
-
     th:first-child, td:first-child,
     th:nth-child(2), td:nth-child(2),
-    th:nth-child(4), td:nth-child(4) {
+    th:nth-child(4), td:nth-child(4),
+    th:nth-child(6), td:nth-child(6) {
       text-align: left;
     }
-
-    th {
-      background: #eee;
-    }
-
+    th { background: #eee; }
     @media (max-width: 900px) {
       .grid5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
-
     @media (max-width: 700px) {
       .grid2, .grid3, .grid5 { grid-template-columns: 1fr; }
-
-      .header {
-        gap: 8px;
-        margin: 10px 0 16px;
-      }
-
-      .header h1 {
-        font-size: 22px;
-        line-height: 1.1;
-      }
-
-      .logo-left {
-        width: 52px;
-        height: 52px;
-      }
-
-      .logo-right {
-        width: 42px;
-        height: 42px;
-      }
-
-      table {
-        font-size: 12px;
-      }
-
-      th, td {
-        padding: 6px;
-      }
+      .header h1 { font-size: 22px; line-height: 1.1; }
+      .logo-left { width: 52px; height: 52px; }
+      .logo-right { width: 42px; height: 42px; }
+      table { font-size: 12px; }
+      th, td { padding: 6px; }
     }
   </style>
 </head>
-
 <body>
   <div class="app">
     <div class="header">
       <img src="logo.png" class="logo-left">
-      <h1>Lover Legend Sales Dashboard Pro</h1>
+      <h1>Lover Legend Sales Dashboard V3</h1>
       <img src="Logo2.jpg" class="logo-right">
+    </div>
+
+    <div class="card">
+      <h2>Google Sheets 设定</h2>
+      <label>Apps Script Web App URL</label>
+      <input type="text" id="apiUrl" value="https://script.google.com/macros/s/AKfycby1OwDIiVf5quXKiD9AG8s2ppM942sLFdJSfyePp--yZtDjYY8jBtkOYLwD9c3WiC_KNw/exec" placeholder="贴上 Google Apps Script Web App URL">
+      <button class="green" onclick="saveApiUrl()">储存 API URL</button>
+      <button class="gray" onclick="loadFromSheet()">从 Google Sheets 读取资料</button>
+      <div class="status" id="status">状态：尚未连接 Google Sheets</div>
+      <p class="small">第一次使用需要先建立 Google Sheet + Apps Script，然后把 Web App URL 贴在这里。</p>
     </div>
 
     <div class="card">
@@ -244,45 +189,41 @@
           <label>月份</label>
           <input type="month" id="monthPicker">
         </div>
-
+        <div>
+          <label>输入人</label>
+          <select id="person">
+            <option value="Alex">Alex</option>
+            <option value="Khuan">Khuan</option>
+            <option value="Yong">Yong</option>
+          </select>
+        </div>
       </div>
-
-      <div class="notice" id="migrationNotice"></div>
-      <p class="small">资料按月份保存。切换月份就能查看历史，不需要清空旧月份。</p>
     </div>
 
     <div class="card">
       <h2>Dashboard</h2>
-
       <div class="grid5">
         <div class="box">
           <b>Balakong</b>
           <div class="amount" id="balakongMonthTotal">RM 0.00</div>
-          <span class="sub" id="balakongTodayTotal">今日：RM 0.00</span>
           <span class="sub" id="balakongAllTotal">累计：RM 0.00</span>
         </div>
-
         <div class="box">
           <b>Belimbing</b>
           <div class="amount" id="belimbingMonthTotal">RM 0.00</div>
-          <span class="sub" id="belimbingTodayTotal">今日：RM 0.00</span>
           <span class="sub" id="belimbingAllTotal">累计：RM 0.00</span>
         </div>
-
         <div class="box">
           <b>Fair</b>
           <div class="amount" id="fairMonthTotal">RM 0.00</div>
-          <span class="sub" id="fairTodayTotal">今日：RM 0.00</span>
           <span class="sub" id="fairAllTotal">累计：RM 0.00</span>
           <span class="sub" id="fairCommission">佣金 6%：RM 0.00</span>
         </div>
-
         <div class="box">
           <b>Gardening 总营业额</b>
           <div class="amount" id="gardeningTotal">RM 0.00</div>
           <span class="sub">Belimbing + Fair</span>
         </div>
-
         <div class="box">
           <b>两间公司总营业额</b>
           <div class="amount" id="grandTotal">RM 0.00</div>
@@ -293,7 +234,6 @@
 
     <div class="card">
       <h2>输入每日营业额</h2>
-
       <div class="grid3">
         <div>
           <label>公司</label>
@@ -302,64 +242,50 @@
             <option value="belimbing" selected>Lover Legend Gardening - Belimbing</option>
           </select>
         </div>
-
         <div>
           <label>日期</label>
           <input type="date" id="saleDate">
         </div>
-
         <div>
           <label>当天营业额 RM</label>
           <input type="text" id="dailySales" class="money-input" inputmode="decimal" value="0.00">
         </div>
       </div>
-
-      <button onclick="saveDailySales()">储存 / 更新每日营业额</button>
-      <p class="small">输入 12345，离开输入格后会自动变成 12,345.00。已储存的日期可以重新选择再修改。</p>
+      <button onclick="saveDailySales()">储存到 Google Sheets</button>
+      <p class="small">同一天同公司重复储存，会更新旧金额。最后储存的人覆盖前一个版本。</p>
     </div>
 
     <div class="card">
       <h2>Fair / 商场摆档记录</h2>
-
       <div class="grid3">
         <div>
           <label>Fair 地点</label>
           <input type="text" id="fairLocation" placeholder="例如 Sunway">
         </div>
-
         <div>
           <label>开始日期</label>
           <input type="date" id="fairStart">
         </div>
-
         <div>
           <label>结束日期</label>
           <input type="date" id="fairEnd">
         </div>
       </div>
-
       <div id="fairInputs"></div>
-
-      <button onclick="saveFairSales()">储存 / 更新 Fair 营业额</button>
-      <p class="small">Fair 日期一改，下面每日输入格会自动同步。例如 3 天改 2 天，画面会马上变成 2 天。</p>
+      <button onclick="saveFairSales()">储存 Fair 到 Google Sheets</button>
     </div>
 
     <div class="card">
       <h2>操作</h2>
-
       <div class="grid3">
-        <button class="green" onclick="saveMonth()">储存本月</button>
         <button class="gray" onclick="exportCSV()">导出 Excel / CSV</button>
-        <button class="gray" onclick="monthClose()">月底结算</button>
+        <button class="green" onclick="backupData()">Backup JSON</button>
+        <button class="gray" onclick="loadFromSheet()">重新同步</button>
       </div>
-
-      <button class="red" onclick="clearTestData()">暂时清空测试资料</button>
-      <p class="small">正式稳定后，才删除「暂时清空测试资料」。</p>
     </div>
 
     <div class="card">
       <h2>记录明细</h2>
-
       <table>
         <thead>
           <tr>
@@ -368,95 +294,27 @@
             <th>公司</th>
             <th>地点</th>
             <th>营业额</th>
+            <th>输入人</th>
+            <th>修改时间</th>
           </tr>
         </thead>
-
         <tbody id="recordTable"></tbody>
       </table>
     </div>
   </div>
 
 <script>
-const STORAGE_KEY = "loverLegendSalesDashboardProV2";
-const MIGRATION_KEY = "loverLegendSalesDashboardProV2_migrated";
-
-let data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
-  daily: {
-    balakong: {},
-    belimbing: {}
-  },
-  fairs: {},
-  savedMonths: {}
-};
+let rows = [];
+const API_URL_KEY = "loverLegendGoogleSheetApiUrl";
 
 const companyNames = {
   balakong: "Lover Legend Adenium - Balakong",
   belimbing: "Lover Legend Gardening - Belimbing"
 };
 
-function showNotice(text) {
-  const el = document.getElementById("migrationNotice");
-  el.textContent = text;
-  el.style.display = "block";
-}
-
-function migrateOldData() {
-  if (localStorage.getItem(MIGRATION_KEY)) return;
-
-  const oldV2 = JSON.parse(localStorage.getItem("loverLegendSalesData_v2") || "null");
-  const oldV1 = JSON.parse(localStorage.getItem("loverLegendSalesData_v1") || "null");
-  const oldData = oldV2 || oldV1;
-
-  if (!oldData) {
-    localStorage.setItem(MIGRATION_KEY, "yes");
-    return;
-  }
-
-  let migratedCount = 0;
-
-  if (oldData.daily) {
-    Object.entries(oldData.daily.adenium || {}).forEach(([date, amount]) => {
-      data.daily.balakong[date] = Number(amount || 0);
-      migratedCount++;
-    });
-
-    Object.entries(oldData.daily.gardening || {}).forEach(([date, amount]) => {
-      data.daily.belimbing[date] = Number(amount || 0);
-      migratedCount++;
-    });
-  }
-
-  if (oldData.fairs) {
-    const oldFair = oldData.fairs.gardening || oldData.fairs;
-
-    Object.entries(oldFair || {}).forEach(([date, record]) => {
-      if (!record || typeof record !== "object") return;
-
-      data.fairs[date] = {
-        location: record.location || "",
-        start: record.start || date,
-        end: record.end || date,
-        amount: Number(record.amount || 0)
-      };
-
-      migratedCount++;
-    });
-  }
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  localStorage.setItem(MIGRATION_KEY, "yes");
-
-  if (migratedCount > 0) {
-    showNotice("已自动升级旧资料：" + migratedCount + " 笔记录。你之前输入的营业额已经保留。");
-  }
-}
-
 function todayISO() {
   const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function monthISO() {
@@ -467,12 +325,26 @@ function selectedMonth() {
   return document.getElementById("monthPicker").value;
 }
 
-function selectedToday() {
-  return todayISO();
+function sameMonth(date) {
+  return String(date || "").slice(0, 7) === selectedMonth();
 }
 
-function sameMonth(date) {
-  return date.slice(0, 7) === selectedMonth();
+function getApiUrl() {
+  return document.getElementById("apiUrl").value.trim();
+}
+
+function setStatus(text) {
+  document.getElementById("status").textContent = "状态：" + text;
+}
+
+function saveApiUrl() {
+  const url = getApiUrl();
+  if (!url) {
+    alert("请先贴上 Apps Script Web App URL");
+    return;
+  }
+  localStorage.setItem(API_URL_KEY, url);
+  setStatus("API URL 已储存");
 }
 
 function money(num) {
@@ -497,16 +369,26 @@ function toAmount(value) {
   return Number(cleanAmount(value) || 0);
 }
 
+function dateRange(start, end) {
+  const arr = [];
+  const [sy, sm, sd] = start.split("-").map(Number);
+  const [ey, em, ed] = end.split("-").map(Number);
+  let current = new Date(sy, sm - 1, sd);
+  const last = new Date(ey, em - 1, ed);
+  while (current <= last) {
+    arr.push(`${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`);
+    current.setDate(current.getDate() + 1);
+  }
+  return arr;
+}
+
 function formatMoneyInput(input) {
   input.value = formatAmount(toAmount(input.value));
 }
 
 function moneyFocusHandler(e) {
   e.target.value = cleanAmount(e.target.value);
-
-  if (e.target.value === "0.00" || e.target.value === "0") {
-    e.target.value = "";
-  }
+  if (e.target.value === "0.00" || e.target.value === "0") e.target.value = "";
 }
 
 function moneyBlurHandler(e) {
@@ -522,74 +404,69 @@ function attachMoneyInputs() {
   });
 }
 
-function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  renderAll();
+async function apiPost(payload) {
+  const url = getApiUrl();
+  if (!url) throw new Error("请先设定 Apps Script Web App URL");
+
+  const res = await fetch(url, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+
+  return await res.json();
 }
 
-function dateRange(start, end) {
-  const arr = [];
-  const [sy, sm, sd] = start.split("-").map(Number);
-  const [ey, em, ed] = end.split("-").map(Number);
-
-  let current = new Date(sy, sm - 1, sd);
-  const last = new Date(ey, em - 1, ed);
-
-  while (current <= last) {
-    const yyyy = current.getFullYear();
-    const mm = String(current.getMonth() + 1).padStart(2, "0");
-    const dd = String(current.getDate()).padStart(2, "0");
-
-    arr.push(`${yyyy}-${mm}-${dd}`);
-    current.setDate(current.getDate() + 1);
+async function loadFromSheet() {
+  const url = getApiUrl();
+  if (!url) {
+    alert("请先设定 Apps Script Web App URL");
+    return;
   }
 
-  return arr;
-}
+  setStatus("正在读取 Google Sheets...");
 
-function ensureMonthWarning() {
-  const current = selectedMonth();
-  const months = new Set();
+  try {
+    const res = await fetch(url + "?action=load");
+    const json = await res.json();
 
-  Object.keys(data.daily.balakong || {}).forEach(date => months.add(date.slice(0, 7)));
-  Object.keys(data.daily.belimbing || {}).forEach(date => months.add(date.slice(0, 7)));
-  Object.keys(data.fairs || {}).forEach(date => months.add(date.slice(0, 7)));
+    if (!json.ok) throw new Error(json.message || "读取失败");
 
-  if (!months.has(current) && months.size > 0) {
-    const latest = [...months].sort().pop();
-
-    if (latest && latest !== current) {
-      alert(`你正在进入新月份：${current}\n旧月份 ${latest} 的资料会保留，不需要清空。`);
-    }
+    rows = json.rows || [];
+    renderAll();
+    setStatus("已同步 Google Sheets，共 " + rows.length + " 笔记录");
+  } catch (err) {
+    setStatus("读取失败：" + err.message);
+    alert("读取失败：" + err.message);
   }
 }
 
-function saveDailySales() {
-  const company = document.getElementById("company").value;
-  const date = document.getElementById("saleDate").value;
-  const amount = toAmount(document.getElementById("dailySales").value);
+async function saveDailySales() {
+  const payload = {
+    action: "saveDaily",
+    date: document.getElementById("saleDate").value,
+    company: document.getElementById("company").value,
+    amount: toAmount(document.getElementById("dailySales").value),
+    person: document.getElementById("person").value
+  };
 
-  if (!date) {
+  if (!payload.date) {
     alert("请选择日期");
     return;
   }
 
-  if (!data.daily[company]) data.daily[company] = {};
-  data.daily[company][date] = amount;
+  setStatus("正在储存每日营业额...");
 
-  saveData();
+  try {
+    const json = await apiPost(payload);
+    if (!json.ok) throw new Error(json.message || "储存失败");
 
-  document.getElementById("dailySales").value = "0.00";
-  alert("已储存 / 已更新每日营业额");
-}
-
-function loadDailySales() {
-  const company = document.getElementById("company").value;
-  const date = document.getElementById("saleDate").value;
-  const saved = data.daily?.[company]?.[date];
-
-  document.getElementById("dailySales").value =
-    saved === undefined ? "0.00" : formatAmount(saved);
+    document.getElementById("dailySales").value = "0.00";
+    await loadFromSheet();
+    alert("已储存到 Google Sheets");
+  } catch (err) {
+    setStatus("储存失败：" + err.message);
+    alert("储存失败：" + err.message);
+  }
 }
 
 function syncFairInputs() {
@@ -601,46 +478,23 @@ function syncFairInputs() {
     return;
   }
 
-  const dates = dateRange(start, end);
-  const currentDates = new Set(dates);
-  const location = document.getElementById("fairLocation").value.trim();
-
-  if (location) {
-    Object.keys(data.fairs || {}).forEach(date => {
-      const record = data.fairs[date];
-      if (record?.location === location && !currentDates.has(date)) {
-        delete data.fairs[date];
-      }
-    });
-  }
-
   let html = "<h3>Fair 每日营业额</h3>";
-
-  dates.forEach(date => {
-    const saved = data.fairs?.[date]?.amount;
-    const savedLocation = data.fairs?.[date]?.location;
-
-    if (savedLocation && !location) {
-      document.getElementById("fairLocation").value = savedLocation;
-    }
-
+  dateRange(start, end).forEach(date => {
+    const old = rows.find(r => r.type === "fair" && r.date === date);
     html += `
       <div style="margin-top:10px;">
         <label>${date} Fair 营业额 RM</label>
-        <input type="text" class="fairAmount money-input" data-date="${date}" value="${saved === undefined ? "0.00" : formatAmount(saved)}" inputmode="decimal">
+        <input type="text" class="fairAmount money-input" data-date="${date}" value="${old ? formatAmount(old.amount) : "0.00"}" inputmode="decimal">
       </div>
     `;
   });
 
   document.getElementById("fairInputs").innerHTML = html;
   attachMoneyInputs();
-  saveData();
 }
 
-function saveFairSales() {
+async function saveFairSales() {
   const location = document.getElementById("fairLocation").value.trim();
-  const start = document.getElementById("fairStart").value;
-  const end = document.getElementById("fairEnd").value;
   const inputs = document.querySelectorAll(".fairAmount");
 
   if (!location) {
@@ -648,133 +502,89 @@ function saveFairSales() {
     return;
   }
 
-  if (!start || !end || inputs.length === 0) {
+  if (inputs.length === 0) {
     alert("请先选择 Fair 开始和结束日期");
     return;
   }
 
-  const currentDates = new Set([...inputs].map(input => input.dataset.date));
+  const payload = {
+    action: "saveFair",
+    location,
+    person: document.getElementById("person").value,
+    records: [...inputs].map(input => ({
+      date: input.dataset.date,
+      amount: toAmount(input.value)
+    }))
+  };
 
-  Object.keys(data.fairs || {}).forEach(date => {
-    const record = data.fairs[date];
-    const sameLocation = record?.location === location;
+  setStatus("正在储存 Fair...");
 
-    if (sameLocation && !currentDates.has(date)) {
-      delete data.fairs[date];
-    }
-  });
+  try {
+    const json = await apiPost(payload);
+    if (!json.ok) throw new Error(json.message || "储存失败");
 
-  inputs.forEach(input => {
-    const date = input.dataset.date;
-    const amount = toAmount(input.value);
-
-    data.fairs[date] = {
-      location,
-      start,
-      end,
-      amount
-    };
-
-    input.value = formatAmount(amount);
-  });
-
-  saveData();
-  alert("已储存 / 已更新 Fair 营业额");
+    await loadFromSheet();
+    alert("Fair 已储存到 Google Sheets");
+  } catch (err) {
+    setStatus("Fair 储存失败：" + err.message);
+    alert("Fair 储存失败：" + err.message);
+  }
 }
 
-function getMonthCompanyTotal(company) {
-  return Object.entries(data.daily?.[company] || {})
-    .filter(([date]) => sameMonth(date))
-    .reduce((sum, [, amount]) => sum + Number(amount || 0), 0);
+function monthTotal(type, company = "") {
+  return rows
+    .filter(r => r.type === type)
+    .filter(r => company ? r.company === company : true)
+    .filter(r => sameMonth(r.date))
+    .reduce((sum, r) => sum + Number(r.amount || 0), 0);
 }
 
-function getTodayCompanyTotal(company) {
-  return Number(data.daily?.[company]?.[selectedToday()] || 0);
-}
-
-function getAllCompanyTotal(company) {
-  return Object.values(data.daily?.[company] || {})
-    .reduce((sum, amount) => sum + Number(amount || 0), 0);
-}
-
-function getMonthFairTotal() {
-  return Object.entries(data.fairs || {})
-    .filter(([date]) => sameMonth(date))
-    .reduce((sum, [, record]) => sum + Number(record.amount || 0), 0);
-}
-
-function getTodayFairTotal() {
-  return Number(data.fairs?.[selectedToday()]?.amount || 0);
-}
-
-function getAllFairTotal() {
-  return Object.values(data.fairs || {})
-    .reduce((sum, record) => sum + Number(record.amount || 0), 0);
+function allTotal(type, company = "") {
+  return rows
+    .filter(r => r.type === type)
+    .filter(r => company ? r.company === company : true)
+    .reduce((sum, r) => sum + Number(r.amount || 0), 0);
 }
 
 function renderDashboard() {
-  const balakongMonth = getMonthCompanyTotal("balakong");
-  const belimbingMonth = getMonthCompanyTotal("belimbing");
-  const fairMonth = getMonthFairTotal();
-
-  const gardeningMonth = belimbingMonth + fairMonth;
-  const grandMonth = balakongMonth + gardeningMonth;
+  const balakongMonth = monthTotal("daily", "balakong");
+  const belimbingMonth = monthTotal("daily", "belimbing");
+  const fairMonth = monthTotal("fair");
+  const gardening = belimbingMonth + fairMonth;
+  const grand = balakongMonth + gardening;
 
   document.getElementById("balakongMonthTotal").textContent = money(balakongMonth);
-  document.getElementById("balakongTodayTotal").textContent = "今日：" + money(getTodayCompanyTotal("balakong"));
-  document.getElementById("balakongAllTotal").textContent = "累计：" + money(getAllCompanyTotal("balakong"));
+  document.getElementById("balakongAllTotal").textContent = "累计：" + money(allTotal("daily", "balakong"));
 
   document.getElementById("belimbingMonthTotal").textContent = money(belimbingMonth);
-  document.getElementById("belimbingTodayTotal").textContent = "今日：" + money(getTodayCompanyTotal("belimbing"));
-  document.getElementById("belimbingAllTotal").textContent = "累计：" + money(getAllCompanyTotal("belimbing"));
+  document.getElementById("belimbingAllTotal").textContent = "累计：" + money(allTotal("daily", "belimbing"));
 
   document.getElementById("fairMonthTotal").textContent = money(fairMonth);
-  document.getElementById("fairTodayTotal").textContent = "今日：" + money(getTodayFairTotal());
-  document.getElementById("fairAllTotal").textContent = "累计：" + money(getAllFairTotal());
+  document.getElementById("fairAllTotal").textContent = "累计：" + money(allTotal("fair"));
   document.getElementById("fairCommission").textContent = "佣金 6%：" + money(fairMonth * 0.06);
 
-  document.getElementById("gardeningTotal").textContent = money(gardeningMonth);
-  document.getElementById("grandTotal").textContent = money(grandMonth);
+  document.getElementById("gardeningTotal").textContent = money(gardening);
+  document.getElementById("grandTotal").textContent = money(grand);
 }
 
 function renderTable() {
-  const rows = [];
-
-  ["balakong", "belimbing"].forEach(company => {
-    Object.entries(data.daily?.[company] || {})
-      .filter(([date]) => sameMonth(date))
-      .sort()
-      .forEach(([date, amount]) => {
-        rows.push(`
-          <tr>
-            <td>${date}</td>
-            <td>每日营业额</td>
-            <td>${companyNames[company]}</td>
-            <td>-</td>
-            <td>${money(amount)}</td>
-          </tr>
-        `);
-      });
+  const filtered = rows.filter(r => sameMonth(r.date)).sort((a, b) => {
+    const companyOrder = (a.company || "").localeCompare(b.company || "");
+    if (companyOrder !== 0) return companyOrder;
+    return String(a.date).localeCompare(String(b.date));
   });
 
-  Object.entries(data.fairs || {})
-    .filter(([date]) => sameMonth(date))
-    .sort()
-    .forEach(([date, record]) => {
-      rows.push(`
-        <tr>
-          <td>${date}</td>
-          <td>Fair</td>
-          <td>Lover Legend Gardening - Belimbing</td>
-          <td>${record.location || "-"}</td>
-          <td>${money(record.amount)}</td>
-        </tr>
-      `);
-    });
-
-  document.getElementById("recordTable").innerHTML = rows.join("") || `
-    <tr><td colspan="5" style="text-align:center;">这个月份还没有记录</td></tr>
-  `;
+  document.getElementById("recordTable").innerHTML = filtered.map(r => `
+    <tr>
+      <td>${r.date}</td>
+      <td>${r.type === "fair" ? "Fair" : "每日营业额"}</td>
+      <td>${companyNames[r.company] || r.company}</td>
+      <td>${r.location || "-"}</td>
+      <td>${money(r.amount)}</td>
+      <td>${r.person || "-"}</td>
+      <td>${r.updatedAt || "-"}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="7" style="text-align:center;">这个月份还没有记录</td></tr>`;
 }
 
 function renderAll() {
@@ -782,92 +592,49 @@ function renderAll() {
   renderTable();
 }
 
-function saveMonth() {
-  const month = selectedMonth();
-
-  data.savedMonths[month] = {
-    savedAt: new Date().toISOString(),
-    balakong: getMonthCompanyTotal("balakong"),
-    belimbing: getMonthCompanyTotal("belimbing"),
-    fair: getMonthFairTotal(),
-    gardening: getMonthCompanyTotal("belimbing") + getMonthFairTotal(),
-    grandTotal: getMonthCompanyTotal("balakong") + getMonthCompanyTotal("belimbing") + getMonthFairTotal()
-  };
-
-  saveData();
-  alert(month + " 已储存本月资料。");
-}
-
-function monthClose() {
-  const month = selectedMonth();
-
-  // 永远先储存本月
-  saveMonth();
-
-  const [year, monthNum] = month.split("-").map(Number);
-  const next = new Date(year, monthNum, 1);
-  const nextMonth = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
-
-  const ok = confirm(
-`系统已经自动储存 ${month} 的资料。
-
-现在准备进行月底结算，
-并切换到 ${nextMonth}。
-
-历史资料会永久保留。
-
-确定继续？`);
-
-  if (!ok) return;
-
-  document.getElementById("monthPicker").value = nextMonth;
-  renderAll();
-
-  alert(`${month} 已完成月底结算，并进入 ${nextMonth}。`);
-}
-
 function exportCSV() {
-  let csv = "\uFEFF公司,日期,类别,地点,营业额\n";
+  let csv = "\uFEFF公司,日期,类别,地点,营业额,输入人,修改时间\n";
 
-  function addCompanySection(companyKey, title) {
+  const selected = rows.filter(r => sameMonth(r.date));
+
+  function addSection(company, title) {
     let total = 0;
+    csv += `"${title}",,,,,,\n`;
 
-    csv += `"${title}",,,,\n`;
-
-    Object.entries(data.daily?.[companyKey] || {})
-      .filter(([date]) => sameMonth(date))
-      .sort()
-      .forEach(([date, amount]) => {
-        total += Number(amount || 0);
-        csv += `"${title}",${date},"每日营业额","",${Number(amount || 0).toFixed(2)}\n`;
+    selected
+      .filter(r => r.type === "daily" && r.company === company)
+      .sort((a,b) => String(a.date).localeCompare(String(b.date)))
+      .forEach(r => {
+        total += Number(r.amount || 0);
+        csv += `"${title}",${r.date},"每日营业额","",${Number(r.amount || 0).toFixed(2)},"${r.person || ""}","${r.updatedAt || ""}"\n`;
       });
 
-    csv += `"${title} Total",,,,${total.toFixed(2)}\n\n`;
+    csv += `"${title} Total",,,,${total.toFixed(2)},,\n\n`;
   }
 
-  addCompanySection("balakong", "Lover Legend Adenium - Balakong");
-  addCompanySection("belimbing", "Lover Legend Gardening - Belimbing");
+  addSection("balakong", "Lover Legend Adenium - Balakong");
+  addSection("belimbing", "Lover Legend Gardening - Belimbing");
 
   let fairTotal = 0;
-  csv += `"Fair",,,,\n`;
+  csv += `"Fair",,,,,,\n`;
 
-  Object.entries(data.fairs || {})
-    .filter(([date]) => sameMonth(date))
-    .sort()
-    .forEach(([date, record]) => {
-      fairTotal += Number(record.amount || 0);
-      csv += `"Fair",${date},"Fair","${record.location || ""}",${Number(record.amount || 0).toFixed(2)}\n`;
+  selected
+    .filter(r => r.type === "fair")
+    .sort((a,b) => String(a.date).localeCompare(String(b.date)))
+    .forEach(r => {
+      fairTotal += Number(r.amount || 0);
+      csv += `"Fair",${r.date},"Fair","${r.location || ""}",${Number(r.amount || 0).toFixed(2)},"${r.person || ""}","${r.updatedAt || ""}"\n`;
     });
 
-  csv += `"Fair Total",,,,${fairTotal.toFixed(2)}\n\n`;
+  csv += `"Fair Total",,,,${fairTotal.toFixed(2)},,\n\n`;
 
-  const balakongTotal = getMonthCompanyTotal("balakong");
-  const belimbingTotal = getMonthCompanyTotal("belimbing");
-  const gardeningTotal = belimbingTotal + fairTotal;
-  const grandTotal = balakongTotal + gardeningTotal;
+  const balakong = monthTotal("daily", "balakong");
+  const belimbing = monthTotal("daily", "belimbing");
+  const gardening = belimbing + fairTotal;
+  const grand = balakong + gardening;
 
-  csv += `"Gardening Total",,,Belimbing + Fair,${gardeningTotal.toFixed(2)}\n`;
-  csv += `"Grand Total",,,Balakong + Gardening,${grandTotal.toFixed(2)}\n`;
+  csv += `"Gardening Total",,,Belimbing + Fair,${gardening.toFixed(2)},,\n`;
+  csv += `"Grand Total",,,Balakong + Gardening,${grand.toFixed(2)},,\n`;
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -881,54 +648,45 @@ function exportCSV() {
   document.body.removeChild(link);
 }
 
-function clearTestData() {
-  const ok = confirm("确定清空全部测试资料？这个动作会删除新版和旧版浏览器资料。");
-
-  if (!ok) return;
-
-  data = {
-    daily: {
-      balakong: {},
-      belimbing: {}
-    },
-    fairs: {},
-    savedMonths: {}
+function backupData() {
+  const backup = {
+    app: "Lover Legend Sales Dashboard V3",
+    backupAt: new Date().toISOString(),
+    rows
   };
 
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(MIGRATION_KEY);
-  localStorage.removeItem("loverLegendSalesData_v2");
-  localStorage.removeItem("loverLegendSalesData_v1");
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {
+    type: "application/json;charset=utf-8;"
+  });
 
-  document.getElementById("fairLocation").value = "";
-  document.getElementById("fairStart").value = "";
-  document.getElementById("fairEnd").value = "";
-  document.getElementById("fairInputs").innerHTML = "";
-  document.getElementById("dailySales").value = "0.00";
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
 
-  saveData();
-  alert("测试资料已清空。");
+  link.href = url;
+  link.download = `lover_legend_v3_backup_${todayISO()}.json`;
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 document.getElementById("monthPicker").value = monthISO();
 document.getElementById("saleDate").value = todayISO();
 
-migrateOldData();
+const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycby1OwDIiVf5quXKiD9AG8s2ppM942sLFdJSfyePp--yZtDjYY8jBtkOYLwD9c3WiC_KNw/exec";
+const savedUrl = localStorage.getItem(API_URL_KEY) || DEFAULT_API_URL;
 
-document.getElementById("monthPicker").addEventListener("change", () => {
-  ensureMonthWarning();
-  renderAll();
-});
+if (savedUrl) {
+  document.getElementById("apiUrl").value = savedUrl;
+  localStorage.setItem(API_URL_KEY, savedUrl);
+  setStatus("API URL 已设定，可以同步 Google Sheets");
+}
 
-
-document.getElementById("company").addEventListener("change", loadDailySales);
-document.getElementById("saleDate").addEventListener("change", loadDailySales);
-
+document.getElementById("monthPicker").addEventListener("change", renderAll);
 document.getElementById("fairStart").addEventListener("change", syncFairInputs);
 document.getElementById("fairEnd").addEventListener("change", syncFairInputs);
 
 attachMoneyInputs();
-loadDailySales();
 renderAll();
 </script>
 </body>
