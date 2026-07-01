@@ -245,10 +245,6 @@
           <input type="month" id="monthPicker">
         </div>
 
-        <div>
-          <label>今日日期</label>
-          <input type="date" id="todayDate">
-        </div>
       </div>
 
       <div class="notice" id="migrationNotice"></div>
@@ -472,7 +468,7 @@ function selectedMonth() {
 }
 
 function selectedToday() {
-  return document.getElementById("todayDate").value;
+  return todayISO();
 }
 
 function sameMonth(date) {
@@ -804,18 +800,30 @@ function saveMonth() {
 
 function monthClose() {
   const month = selectedMonth();
+
+  // 永远先储存本月
   saveMonth();
 
   const [year, monthNum] = month.split("-").map(Number);
   const next = new Date(year, monthNum, 1);
   const nextMonth = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
 
-  const ok = confirm(`${month} 已结算。\n是否切换到 ${nextMonth}？`);
+  const ok = confirm(
+`系统已经自动储存 ${month} 的资料。
 
-  if (ok) {
-    document.getElementById("monthPicker").value = nextMonth;
-    renderAll();
-  }
+现在准备进行月底结算，
+并切换到 ${nextMonth}。
+
+历史资料会永久保留。
+
+确定继续？`);
+
+  if (!ok) return;
+
+  document.getElementById("monthPicker").value = nextMonth;
+  renderAll();
+
+  alert(`${month} 已完成月底结算，并进入 ${nextMonth}。`);
 }
 
 function exportCSV() {
@@ -903,7 +911,6 @@ function clearTestData() {
 }
 
 document.getElementById("monthPicker").value = monthISO();
-document.getElementById("todayDate").value = todayISO();
 document.getElementById("saleDate").value = todayISO();
 
 migrateOldData();
@@ -913,7 +920,6 @@ document.getElementById("monthPicker").addEventListener("change", () => {
   renderAll();
 });
 
-document.getElementById("todayDate").addEventListener("change", renderAll);
 
 document.getElementById("company").addEventListener("change", loadDailySales);
 document.getElementById("saleDate").addEventListener("change", loadDailySales);
