@@ -45,23 +45,23 @@ function renderDashboard() {
 
   document.getElementById("balakongToday").textContent = money(balakongToday);
   document.getElementById("balakongMonth").textContent = money(balakongMonth);
-
   document.getElementById("belimbingToday").textContent = money(belimbingToday);
   document.getElementById("belimbingMonth").textContent = money(belimbingMonth);
-
   document.getElementById("fairToday").textContent = money(fairToday);
   document.getElementById("fairMonth").textContent = money(fairMonth);
   document.getElementById("fairCommission").textContent = money(fairMonth * 0.06);
-
   document.getElementById("gardeningTotal").textContent = money(gardening);
   document.getElementById("grandTotal").textContent = money(grand);
 
   const warning = document.getElementById("todayWarning");
+  const done = document.getElementById("todayDone");
 
   if (balakongToday === 0 && belimbingToday === 0 && fairToday === 0) {
     warning.classList.remove("hidden");
+    done.classList.add("hidden");
   } else {
     warning.classList.add("hidden");
+    done.classList.remove("hidden");
   }
 }
 
@@ -105,7 +105,7 @@ async function saveDailySales() {
     await saveDailyToSheet(date, company, amount);
     document.getElementById("dailySales").value = "0.00";
     await loadFromSheet();
-    alert("已储存");
+    showTempMsg("saveMsg");
   } catch (err) {
     setSync("储存失败：" + err.message, false, true);
     alert("储存失败：" + err.message);
@@ -145,6 +145,8 @@ async function saveFairSales() {
     return;
   }
 
+  localStorage.setItem("lover_last_fair_location", location);
+
   if (inputs.length === 0) {
     alert("请选择 Fair 日期");
     return;
@@ -159,7 +161,7 @@ async function saveFairSales() {
     setSync("正在储存 Fair...");
     await saveFairToSheet(location, records);
     await loadFromSheet();
-    alert("Fair 已储存");
+    showTempMsg("fairSaveMsg");
   } catch (err) {
     setSync("Fair 储存失败：" + err.message, false, true);
     alert("Fair 储存失败：" + err.message);
@@ -209,18 +211,18 @@ function exportCSV() {
   csv += `"Gardening Total",,,Belimbing + Fair,${gardening.toFixed(2)}\n`;
   csv += `"Grand Total",,,Balakong + Gardening,${grand.toFixed(2)}\n`;
 
-  downloadFile(`lover_legend_sales_${selectedMonth()}.csv`, csv, "text/csv;charset=utf-8;");
+  downloadFile(`Lover_Sales_${selectedMonth()}.csv`, csv, "text/csv;charset=utf-8;");
 }
 
 function backupData() {
   const backup = {
-    app: "Lover Legend Sales V4",
+    app: "Lover Legend Sales V4.1",
     backupAt: new Date().toISOString(),
     rows
   };
 
   downloadFile(
-    `lover_legend_backup_${todayISO()}.json`,
+    `Sales_Backup_${todayISO()}.json`,
     JSON.stringify(backup, null, 2),
     "application/json;charset=utf-8;"
   );
@@ -229,6 +231,8 @@ function backupData() {
 async function restoreData(event) {
   const file = event.target.files[0];
   if (!file) return;
+
+  backupData();
 
   const reader = new FileReader();
 
@@ -242,12 +246,11 @@ async function restoreData(event) {
         return;
       }
 
-      const ok = confirm("确定恢复备份？Google Sheets 现有资料会被覆盖。");
+      const ok = confirm("系统已先自动 Backup。确定恢复？Google Sheets 现有资料会被覆盖。");
       if (!ok) return;
 
       await restoreRowsToSheet(restoredRows);
       await loadFromSheet();
-
       alert("恢复完成");
     } catch (err) {
       alert("恢复失败：" + err.message);
@@ -268,7 +271,7 @@ function monthClose() {
   lastDay.setHours(0,0,0,0);
 
   if (today < lastDay) {
-    alert(`现在还不能月底结算。\n${month} 的最后一天是 ${lastDay.getFullYear()}-${String(lastDay.getMonth()+1).padStart(2,"0")}-${String(lastDay.getDate()).padStart(2,"0")}`);
+    alert(`今天不是月底，无法进行月结。\n${month} 的最后一天是 ${lastDay.getFullYear()}-${String(lastDay.getMonth()+1).padStart(2,"0")}-${String(lastDay.getDate()).padStart(2,"0")}`);
     return;
   }
 
@@ -292,7 +295,6 @@ async function clearTestData() {
   try {
     await clearAllSheet();
     await loadFromSheet();
-
     alert("测试资料已清空");
   } catch (err) {
     alert("清空失败：" + err.message);
@@ -301,6 +303,11 @@ async function clearTestData() {
 
 document.getElementById("monthPicker").value = monthISO();
 document.getElementById("saleDate").value = todayISO();
+document.getElementById("fairStart").value = todayISO();
+document.getElementById("fairEnd").value = todayISO();
+
+const lastFairLocation = localStorage.getItem("lover_last_fair_location");
+if (lastFairLocation) document.getElementById("fairLocation").value = lastFairLocation;
 
 document.getElementById("monthPicker").addEventListener("change", renderAll);
 document.getElementById("fairStart").addEventListener("change", syncFairInputs);

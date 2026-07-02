@@ -42,12 +42,22 @@ function moneyBlurHandler(e) {
   formatMoneyInput(e.target);
 }
 
+function enterToSaveHandler(e) {
+  if (e.key === "Enter" && e.target.id === "dailySales") {
+    e.preventDefault();
+    saveDailySales();
+  }
+}
+
 function attachMoneyInputs() {
   document.querySelectorAll(".money-input").forEach(input => {
     input.removeEventListener("focus", moneyFocusHandler);
     input.removeEventListener("blur", moneyBlurHandler);
+    input.removeEventListener("keydown", enterToSaveHandler);
+
     input.addEventListener("focus", moneyFocusHandler);
     input.addEventListener("blur", moneyBlurHandler);
+    input.addEventListener("keydown", enterToSaveHandler);
   });
 }
 
@@ -55,7 +65,6 @@ function dateRange(start, end) {
   const arr = [];
   const [sy, sm, sd] = start.split("-").map(Number);
   const [ey, em, ed] = end.split("-").map(Number);
-
   let current = new Date(sy, sm - 1, sd);
   const last = new Date(ey, em - 1, ed);
 
@@ -83,4 +92,11 @@ function downloadFile(filename, content, type) {
 function getLastDayOfMonth(monthText) {
   const [year, month] = monthText.split("-").map(Number);
   return new Date(year, month, 0);
+}
+
+function showTempMsg(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove("hidden");
+  setTimeout(() => el.classList.add("hidden"), 2500);
 }

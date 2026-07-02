@@ -29,11 +29,13 @@
           <label>月份</label>
           <input type="month" id="monthPicker">
           <div class="sync-line" id="syncStatus">🟡 准备同步</div>
+          <button class="green backup-home" onclick="backupData()">💾 Backup</button>
         </div>
 
         <div class="card">
           <h2>Dashboard</h2>
           <div id="todayWarning" class="warning hidden">🔴 今天还没有输入营业额</div>
+          <div id="todayDone" class="done hidden">🟢 今天已有营业额记录</div>
 
           <div class="dash">
             <div class="box">
@@ -87,6 +89,7 @@
           <input type="text" id="dailySales" class="money-input" inputmode="decimal" value="0.00">
 
           <button class="green" onclick="saveDailySales()">储存</button>
+          <div id="saveMsg" class="save-msg hidden">✅ 已储存</div>
           <p class="note">同一天同公司重复储存，会更新旧金额。</p>
         </div>
       </section>
@@ -113,6 +116,7 @@
           <div id="fairInputs"></div>
 
           <button class="green" onclick="saveFairSales()">储存 Fair</button>
+          <div id="fairSaveMsg" class="save-msg hidden">✅ Fair 已储存</div>
         </div>
       </section>
 
