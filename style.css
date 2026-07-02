@@ -280,5 +280,51 @@ th { background: #eee; }
 
 @media (min-width: 520px) {
   .dash { grid-template-columns: 1fr 1fr; }
-  .box.total { grid-column: span 2; }
+  .box.total, .fair-box { grid-column: span 2; }
+}
+
+.fair-location-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 13px;
+  padding: 10px;
+  margin: 8px 0;
+}
+
+.fair-location-title {
+  font-size: 17px;
+  font-weight: 900;
+  color: #111;
+  margin-bottom: 5px;
+}
+
+.fair-location-row, .fair-total-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin: 6px 0;
+}
+
+.fair-location-row span, .fair-total-line span {
+  font-weight: 800;
+  color: #333;
+}
+
+.fair-location-row b {
+  color: #b00000;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.fair-total-line {
+  border-top: 1px dashed #ccc;
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.fair-total-line b {
+  color: #b00000;
+  font-size: 22px;
+  font-weight: 900;
 }

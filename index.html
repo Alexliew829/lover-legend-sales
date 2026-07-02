@@ -50,11 +50,11 @@
               <div class="row"><span>本月</span><b id="belimbingMonth">RM 0.00</b></div>
             </div>
 
-            <div class="box">
-              <div class="name">Fair</div>
-              <div class="row"><span>今日</span><b id="fairToday">RM 0.00</b></div>
-              <div class="row"><span>本月</span><b id="fairMonth">RM 0.00</b></div>
-              <div class="row small-row"><span>佣金 6%</span><b id="fairCommission">RM 0.00</b></div>
+            <div class="box fair-box total">
+              <div class="name">Fair 本月</div>
+              <div id="fairLocationList"></div>
+              <div class="fair-total-line"><span>Fair 总营业额</span><b id="fairMonthTotal">RM 0.00</b></div>
+              <div class="fair-total-line"><span>Fair 总佣金 6%</span><b id="fairCommissionTotal">RM 0.00</b></div>
             </div>
 
             <div class="box total">
@@ -152,6 +152,7 @@
           <button class="gray" onclick="monthClose()">📅 月底结算</button>
           <button class="red" onclick="clearTestData()">🧪 暂时清空</button>
           <p class="note">正式使用后不要乱按“暂时清空”。</p>
+          <div id="clearMsg" class="save-msg hidden">✅ 已清空</div>
         </div>
       </section>
     </main>

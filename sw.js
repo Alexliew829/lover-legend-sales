@@ -1,4 +1,4 @@
-const CACHE_NAME = "lover-sales-v4-1";
+const CACHE_NAME = "lover-sales-v4-2";
 const FILES = [
   "./",
   "./index.html",
@@ -30,5 +30,5 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
   if (url.hostname.includes("script.google.com")) return;
-  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
+  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });

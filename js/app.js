@@ -31,6 +31,62 @@ function totalBy(type, company = "", dateMode = "month") {
     .reduce((sum, r) => sum + Number(r.amount || 0), 0);
 }
 
+
+function upsertLocalRow(newRow) {
+  const index = rows.findIndex(r =>
+    r.type === newRow.type &&
+    r.date === newRow.date &&
+    r.company === newRow.company &&
+    (r.location || "") === (newRow.location || "")
+  );
+  if (index >= 0) rows[index] = newRow;
+  else rows.push(newRow);
+}
+
+function removeLocalFairLocationOutsideDates(location, keepDates) {
+  rows = rows.filter(r => {
+    if (r.type !== "fair") return true;
+    if ((r.location || "") !== location) return true;
+    return keepDates.includes(r.date);
+  });
+}
+
+function fairByLocation() {
+  const grouped = {};
+  rows.filter(r => r.type === "fair")
+    .filter(r => sameMonth(r.date))
+    .forEach(r => {
+      const location = r.location || "Fair";
+      if (!grouped[location]) grouped[location] = 0;
+      grouped[location] += Number(r.amount || 0);
+    });
+  return grouped;
+}
+
+function renderFairLocationList() {
+  const grouped = fairByLocation();
+  const locations = Object.keys(grouped).sort();
+  const container = document.getElementById("fairLocationList");
+
+  if (!container) return;
+
+  if (locations.length === 0) {
+    container.innerHTML = `<div class="sub">这个月份还没有 Fair 记录</div>`;
+    return;
+  }
+
+  container.innerHTML = locations.map(location => {
+    const total = grouped[location];
+    return `
+      <div class="fair-location-card">
+        <div class="fair-location-title">${location}</div>
+        <div class="fair-location-row"><span>营业额</span><b>${money(total)}</b></div>
+        <div class="fair-location-row"><span>佣金 6%</span><b>${money(total * 0.06)}</b></div>
+      </div>
+    `;
+  }).join("");
+}
+
 function renderDashboard() {
   const balakongToday = totalBy("daily", "balakong", "today");
   const belimbingToday = totalBy("daily", "belimbing", "today");
@@ -47,9 +103,11 @@ function renderDashboard() {
   document.getElementById("balakongMonth").textContent = money(balakongMonth);
   document.getElementById("belimbingToday").textContent = money(belimbingToday);
   document.getElementById("belimbingMonth").textContent = money(belimbingMonth);
-  document.getElementById("fairToday").textContent = money(fairToday);
-  document.getElementById("fairMonth").textContent = money(fairMonth);
-  document.getElementById("fairCommission").textContent = money(fairMonth * 0.06);
+
+  renderFairLocationList();
+
+  document.getElementById("fairMonthTotal").textContent = money(fairMonth);
+  document.getElementById("fairCommissionTotal").textContent = money(fairMonth * 0.06);
   document.getElementById("gardeningTotal").textContent = money(gardening);
   document.getElementById("grandTotal").textContent = money(grand);
 
@@ -100,15 +158,27 @@ async function saveDailySales() {
     return;
   }
 
+  const localRow = {
+    type: "daily",
+    date,
+    company,
+    location: "",
+    amount,
+    updatedAt: new Date().toISOString()
+  };
+
+  upsertLocalRow(localRow);
+  document.getElementById("dailySales").value = "0.00";
+  renderAll();
+  showTempMsg("saveMsg");
+
   try {
-    setSync("正在储存...");
+    setSync("同步中...");
     await saveDailyToSheet(date, company, amount);
-    document.getElementById("dailySales").value = "0.00";
-    await loadFromSheet();
-    showTempMsg("saveMsg");
+    setSync("已同步", true);
   } catch (err) {
-    setSync("储存失败：" + err.message, false, true);
-    alert("储存失败：" + err.message);
+    setSync("同步失败：" + err.message, false, true);
+    alert("同步失败：" + err.message);
   }
 }
 
@@ -157,14 +227,30 @@ async function saveFairSales() {
     amount: toAmount(input.value)
   }));
 
+  const keepDates = records.map(r => r.date);
+  removeLocalFairLocationOutsideDates(location, keepDates);
+
+  records.forEach(item => {
+    upsertLocalRow({
+      type: "fair",
+      date: item.date,
+      company: "belimbing",
+      location,
+      amount: item.amount,
+      updatedAt: new Date().toISOString()
+    });
+  });
+
+  renderAll();
+  showTempMsg("fairSaveMsg");
+
   try {
-    setSync("正在储存 Fair...");
+    setSync("同步中...");
     await saveFairToSheet(location, records);
-    await loadFromSheet();
-    showTempMsg("fairSaveMsg");
+    setSync("已同步", true);
   } catch (err) {
-    setSync("Fair 储存失败：" + err.message, false, true);
-    alert("Fair 储存失败：" + err.message);
+    setSync("同步失败：" + err.message, false, true);
+    alert("Fair 同步失败：" + err.message);
   }
 }
 
@@ -191,15 +277,25 @@ function exportCSV() {
   addSection("belimbing", "Lover Legend Gardening - Belimbing");
 
   let fairTotal = 0;
+  const fairLocations = [...new Set(selected.filter(r => r.type === "fair").map(r => r.location || "Fair"))].sort();
+
   csv += `"Fair",,,,\n`;
 
-  selected
-    .filter(r => r.type === "fair")
-    .sort((a,b) => String(a.date).localeCompare(String(b.date)))
-    .forEach(r => {
-      fairTotal += Number(r.amount || 0);
-      csv += `"Fair",${r.date},"Fair","${r.location || ""}",${Number(r.amount || 0).toFixed(2)}\n`;
-    });
+  fairLocations.forEach(location => {
+    let locationTotal = 0;
+    csv += `"${location}",,,,\n`;
+
+    selected
+      .filter(r => r.type === "fair" && (r.location || "Fair") === location)
+      .sort((a,b) => String(a.date).localeCompare(String(b.date)))
+      .forEach(r => {
+        locationTotal += Number(r.amount || 0);
+        fairTotal += Number(r.amount || 0);
+        csv += `"Fair",${r.date},"Fair","${r.location || ""}",${Number(r.amount || 0).toFixed(2)}\n`;
+      });
+
+    csv += `"${location} Total",,,,${locationTotal.toFixed(2)}\n\n`;
+  });
 
   csv += `"Fair Total",,,,${fairTotal.toFixed(2)}\n\n`;
 
@@ -276,7 +372,6 @@ function monthClose() {
   }
 
   backupData();
-  exportCSV();
 
   const [year, monthNum] = month.split("-").map(Number);
   const next = new Date(year, monthNum, 1);
@@ -293,9 +388,11 @@ async function clearTestData() {
   if (word !== "DELETE") return;
 
   try {
+    rows = [];
+    renderAll();
     await clearAllSheet();
-    await loadFromSheet();
-    alert("测试资料已清空");
+    setSync("已清空并同步", true);
+    showTempMsg("clearMsg");
   } catch (err) {
     alert("清空失败：" + err.message);
   }
