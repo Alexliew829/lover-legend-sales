@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b6b2b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Lover Sales">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Lover Sales</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <img src="images/logo.png" class="logo" alt="Logo">
+        <div class="brand-title">Lover Legend<br>Sales <small>V4.3 Sheet1</small></div>
+        <img src="images/Logo2.jpg" class="seal" alt="Seal">
+      </div>
+    </header>
+
+    <main>
+      <section id="page-home" class="page active">
+        <div class="card compact">
+          <label>月份</label>
+          <input type="month" id="monthPicker">
+          <div class="sync-line" id="syncStatus">🟡 准备同步</div>
+          <button class="green backup-home" onclick="backupData()">💾 Backup</button>
+        </div>
+
+        <div class="card">
+          <h2>Dashboard</h2>
+          <div id="todayWarning" class="warning hidden">🔴 今天还没有输入营业额</div>
+          <div id="todayDone" class="done hidden">🟢 今天已有营业额记录</div>
+
+          <div class="dash">
+            <div class="box">
+              <div class="name">Balakong</div>
+              <div class="row"><span>今日</span><b id="balakongToday">RM 0.00</b></div>
+              <div class="row"><span>本月</span><b id="balakongMonth">RM 0.00</b></div>
+            </div>
+
+            <div class="box">
+              <div class="name">Belimbing</div>
+              <div class="row"><span>今日</span><b id="belimbingToday">RM 0.00</b></div>
+              <div class="row"><span>本月</span><b id="belimbingMonth">RM 0.00</b></div>
+            </div>
+
+            <div class="box fair-box total">
+              <div class="name">Fair 本月</div>
+              <div id="fairLocationList"></div>
+              <div class="fair-total-line"><span>Fair 总营业额</span><b id="fairMonthTotal">RM 0.00</b></div>
+              <div class="fair-total-line"><span>Fair 总佣金 6%</span><b id="fairCommissionTotal">RM 0.00</b></div>
+            </div>
+
+            <div class="box total">
+              <div class="name">Gardening 总营业额</div>
+              <div class="amount" id="gardeningTotal">RM 0.00</div>
+              <div class="sub">Belimbing + Fair</div>
+            </div>
+
+            <div class="box total">
+              <div class="name">两间公司总营业额</div>
+              <div class="amount" id="grandTotal">RM 0.00</div>
+              <div class="sub">Balakong + Gardening</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-sales" class="page">
+        <div class="card">
+          <h2>每日营业额</h2>
+
+          <label>公司</label>
+          <select id="company">
+            <option value="balakong">Lover Legend Adenium - Balakong</option>
+            <option value="belimbing" selected>Lover Legend Gardening - Belimbing</option>
+          </select>
+
+          <label>日期</label>
+          <input type="date" id="saleDate">
+
+          <label>营业额 RM</label>
+          <input type="text" id="dailySales" class="money-input" inputmode="decimal" value="0.00">
+
+          <button class="green" onclick="saveDailySales()">储存</button>
+          <div id="saveMsg" class="save-msg hidden">✅ 已储存</div>
+          <p class="note">同一天同公司重复储存，会更新旧金额。</p>
+        </div>
+      </section>
+
+      <section id="page-fair" class="page">
+        <div class="card">
+          <h2>Fair</h2>
+
+          <label>地点</label>
+          <input type="text" id="fairLocation" placeholder="例如 Sunway">
+
+          <div class="split">
+            <div>
+              <label>开始日期</label>
+              <input type="date" id="fairStart">
+            </div>
+
+            <div>
+              <label>结束日期</label>
+              <input type="date" id="fairEnd">
+            </div>
+          </div>
+
+          <div id="fairInputs"></div>
+
+          <button class="green" onclick="saveFairSales()">储存 Fair</button>
+          <div id="fairSaveMsg" class="save-msg hidden">✅ Fair 已储存</div>
+        </div>
+      </section>
+
+      <section id="page-report" class="page">
+        <div class="card">
+          <h2>Report</h2>
+          <button class="gray" onclick="exportCSV()">导出 Excel / CSV</button>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>日期</th>
+                  <th>类别</th>
+                  <th>公司</th>
+                  <th>地点</th>
+                  <th>营业额</th>
+                </tr>
+              </thead>
+              <tbody id="recordTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-more" class="page">
+        <div class="card">
+          <h2>More</h2>
+          <button class="green" onclick="backupData()">💾 Backup</button>
+          <button class="gray" onclick="document.getElementById('restoreFile').click()">📂 Restore</button>
+          <input type="file" id="restoreFile" accept=".json,application/json" hidden onchange="restoreData(event)">
+          <button class="gray" onclick="exportCSV()">📈 导出 Excel</button>
+          <button class="gray" onclick="monthClose()">📅 月底结算</button>
+          <button class="gray" onclick="seedTestData()">🧪 输入测试资料</button>
+          <button class="red" onclick="clearTestData()">🧹 暂时清空</button>
+          <p class="note">正式使用后不要乱按“暂时清空”。</p>
+          <div id="seedMsg" class="save-msg hidden">✅ 测试资料已输入</div>
+          <div id="clearMsg" class="save-msg hidden">✅ 已清空</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item active" onclick="showPage('home', this)"><span>🏠</span>Home</div>
+    <div class="nav-item" onclick="showPage('sales', this)"><span>💰</span>Sales</div>
+    <div class="nav-item" onclick="showPage('fair', this)"><span>🏪</span>Fair</div>
+    <div class="nav-item" onclick="showPage('report', this)"><span>📊</span>Report</div>
+    <div class="nav-item" onclick="showPage('more', this)"><span>⚙️</span>More</div>
+  </nav>
+
+  <script>window.LOVER_API_URL = "https://script.google.com/macros/s/AKfycby1OwDIiVf5quXKiD9AG8s2ppM942sLFdJSfyePp--yZtDjYY8jBtkOYLwD9c3WiC_KNw/exec";</script>
+  <script src="js/utils.js"></script>
+  <script src="js/sheet.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
