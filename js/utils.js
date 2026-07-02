@@ -1,74 +1,22 @@
-function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-function isoToDisplay(dateText) {
-  if (!dateText) return "";
-  if (/^\d{2}-\d{2}-\d{4}$/.test(dateText)) return dateText;
-  const [yyyy, mm, dd] = String(dateText).split("-");
-  return `${dd}-${mm}-${yyyy}`;
-}
-function displayToISO(dateText) {
-  if (!dateText) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateText)) return dateText;
-  const [dd, mm, yyyy] = String(dateText).split("-");
-  return `${yyyy}-${mm}-${dd}`;
-}
-function monthISO() { return todayISO().slice(0, 7); }
-function sameMonthDisplay(dateText, monthText) {
-  const iso = displayToISO(dateText);
-  return iso.slice(0, 7) === monthText;
-}
-function money(num) {
-  return Number(num || 0).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function formatAmount(num) { return money(num); }
-function cleanAmount(value) { return String(value || "").replace(/,/g, "").trim(); }
-function toAmount(value) { return Number(cleanAmount(value) || 0); }
-function formatMoneyInput(input) { input.value = formatAmount(toAmount(input.value)); }
-function moneyFocusHandler(e) { e.target.value = cleanAmount(e.target.value); if (e.target.value === "0.00" || e.target.value === "0") e.target.value = ""; }
-function moneyBlurHandler(e) { formatMoneyInput(e.target); }
-function enterToSaveHandler(e) { if (e.key === "Enter" && e.target.id === "dailySales") { e.preventDefault(); saveDailySales(); } }
-function attachMoneyInputs() {
-  document.querySelectorAll(".money-input").forEach(input => {
-    input.removeEventListener("focus", moneyFocusHandler);
-    input.removeEventListener("blur", moneyBlurHandler);
-    input.removeEventListener("keydown", enterToSaveHandler);
-    input.addEventListener("focus", moneyFocusHandler);
-    input.addEventListener("blur", moneyBlurHandler);
-    input.addEventListener("keydown", enterToSaveHandler);
-  });
-}
-function dateRange(startISO, endISO) {
-  const arr = [];
-  const [sy, sm, sd] = startISO.split("-").map(Number);
-  const [ey, em, ed] = endISO.split("-").map(Number);
-  let current = new Date(sy, sm - 1, sd);
-  const last = new Date(ey, em - 1, ed);
-  while (current <= last) {
-    const iso = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
-    arr.push(isoToDisplay(iso));
-    current.setDate(current.getDate() + 1);
-  }
-  return arr;
-}
-function downloadFile(filename, content, type) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url; link.download = filename;
-  document.body.appendChild(link); link.click(); document.body.removeChild(link);
-}
-function getLastDayOfMonth(monthText) {
-  const [year, month] = monthText.split("-").map(Number);
-  return new Date(year, month, 0);
-}
-function showTempMsg(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.classList.remove("hidden");
-  setTimeout(() => el.classList.add("hidden"), 2500);
-}
-function nowText() {
-  return new Date().toLocaleTimeString("zh-MY", { hour: "2-digit", minute: "2-digit" });
-}
+function todayISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+function isoToDisplay(s){if(!s)return"";if(/^\d{2}-\d{2}-\d{4}$/.test(s))return s;const [y,m,d]=String(s).split("-");return `${d}-${m}-${y}`}
+function displayToISO(s){if(!s)return"";if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;const [d,m,y]=String(s).split("-");return `${y}-${m}-${d}`}
+function monthISO(){return todayISO().slice(0,7)}
+function currentYear(){return new Date().getFullYear()}
+function sameMonthDisplay(d,m){return displayToISO(d).slice(0,7)===m}
+function sameYearDisplay(d,y){return displayToISO(d).slice(0,4)===String(y)}
+function money(n){return Number(n||0).toLocaleString("en-MY",{minimumFractionDigits:2,maximumFractionDigits:2})}
+function formatAmount(n){return money(n)}
+function cleanAmount(v){return String(v||"").replace(/,/g,"").trim()}
+function toAmount(v){return Number(cleanAmount(v)||0)}
+function formatMoneyInput(i){i.value=formatAmount(toAmount(i.value))}
+function moneyFocusHandler(e){e.target.value=cleanAmount(e.target.value);if(e.target.value==="0.00"||e.target.value==="0")e.target.value=""}
+function moneyBlurHandler(e){formatMoneyInput(e.target)}
+function enterToSaveHandler(e){if(e.key==="Enter"&&e.target.id==="dailySales"){e.preventDefault();saveDailySales()}}
+function attachMoneyInputs(){document.querySelectorAll(".money-input").forEach(i=>{i.removeEventListener("focus",moneyFocusHandler);i.removeEventListener("blur",moneyBlurHandler);i.removeEventListener("keydown",enterToSaveHandler);i.addEventListener("focus",moneyFocusHandler);i.addEventListener("blur",moneyBlurHandler);i.addEventListener("keydown",enterToSaveHandler)})}
+function dateRange(startISO,endISO){const a=[];const[sy,sm,sd]=startISO.split("-").map(Number);const[ey,em,ed]=endISO.split("-").map(Number);let c=new Date(sy,sm-1,sd);const l=new Date(ey,em-1,ed);while(c<=l){a.push(isoToDisplay(`${c.getFullYear()}-${String(c.getMonth()+1).padStart(2,"0")}-${String(c.getDate()).padStart(2,"0")}`));c.setDate(c.getDate()+1)}return a}
+function downloadFile(filename,content,type){const b=new Blob([content],{type});const u=URL.createObjectURL(b);const l=document.createElement("a");l.href=u;l.download=filename;document.body.appendChild(l);l.click();document.body.removeChild(l)}
+function getLastDayOfMonth(m){const[y,mo]=m.split("-").map(Number);return new Date(y,mo,0)}
+function showTempMsg(id){const e=document.getElementById(id);if(!e)return;e.classList.remove("hidden");setTimeout(()=>e.classList.add("hidden"),2500)}
+function nowText(){return new Date().toLocaleTimeString("zh-MY",{hour:"2-digit",minute:"2-digit"})}
+function normLoc(s){return String(s||"").trim().replace(/\s+/g," ").toLowerCase()}
