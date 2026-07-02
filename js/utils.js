@@ -24,3 +24,15 @@ function normLoc(s){return String(s||"").trim().replace(/\s+/g," ").toLowerCase(
 function canonicalLocation(value){let s=String(value||"").trim();if(!s)return"";s=s.replace(/[-_]+/g," ").replace(/\s+/g," ").trim();const c=s.replace(/\s+/g,"").toLowerCase();if(c==="sunway"||c==="sunwaymall")return"Sunway";if(c==="ioi"||c==="ioimall")return"IOI";if(c==="midvalley"||c==="midvalleymall")return"Mid Valley";return s.split(" ").map(p=>{const l=p.toLowerCase();if(l==="ioi")return"IOI";if(p.length<=3&&p===p.toUpperCase())return p;return p.charAt(0).toUpperCase()+p.slice(1).toLowerCase()}).join(" ")}
 function monthAfter(m){const[y,mo]=m.split("-").map(Number);const d=new Date(y,mo,1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`}
 function yearAfter(y){return String(Number(y)+1)}
+
+function syncKey(row){
+  return [row.type,row.date,row.company,canonicalLocation(row.location||"")].join("|");
+}
+function monthAfter(m){
+  const [y,mo]=m.split("-").map(Number);
+  const d=new Date(y,mo,1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+}
+function yearAfter(y){
+  return String(Number(y)+1);
+}
