@@ -149,7 +149,73 @@ async function saveFairSales(){
 
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=rows.filter(r=>scope==="year"?sameYear(r.date):sameMonth(r.date));function sec(c,t){let total=0;csv+=`"${t}",,,,\n`;selected.filter(r=>r.type==="daily"&&r.company===c).sort((a,b)=>displayToISO(a.date).localeCompare(displayToISO(b.date))).forEach(r=>{total+=Number(r.amount||0);csv+=`"${t}",${r.date},"每日","",${Number(r.amount||0).toFixed(2)}\n`});csv+=`"${t} Total",,,,${total.toFixed(2)}\n\n`}sec("balakong","Lover Legend Adenium - Balakong");sec("belimbing","Lover Legend Gardening - Belimbing");let ft=0;csv+='"Fair",,,,\n';[...new Set(selected.filter(r=>r.type==="fair").map(r=>r.location||"Fair"))].sort().forEach(l=>{let lt=0;csv+=`"${l}",,,,\n`;selected.filter(r=>r.type==="fair"&&(r.location||"Fair")===l).sort((a,b)=>displayToISO(a.date).localeCompare(displayToISO(b.date))).forEach(r=>{lt+=Number(r.amount||0);ft+=Number(r.amount||0);csv+=`"Fair",${r.date},"Fair","${r.location||""}",${Number(r.amount||0).toFixed(2)}\n`});csv+=`"${l} Total",,,,${lt.toFixed(2)}\n\n`});csv+=`"Fair Total",,,,${ft.toFixed(2)}\n\n`;const b=selected.filter(r=>r.type==="daily"&&r.company==="balakong").reduce((s,r)=>s+Number(r.amount||0),0);const bl=selected.filter(r=>r.type==="daily"&&r.company==="belimbing").reduce((s,r)=>s+Number(r.amount||0),0);csv+=`"Belimbing Total",,,Belimbing + Fair,${(bl+ft).toFixed(2)}\n`;csv+=`"Grand Total",,,Balakong + Belimbing,${(b+bl+ft).toFixed(2)}\n`;downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 function backupData(){downloadFile(`Sales_Backup_${isoToDisplay(todayISO())}.json`,JSON.stringify({app:"Lover Legend Sales V5.1",backupAt:new Date().toISOString(),rows},null,2),"application/json;charset=utf-8;")}
-async function restoreData(e){const file=e.target.files[0];if(!file)return;const choice=prompt("Restore 前请选择：\n1 = 先 Backup 再 Restore\n2 = 直接 Restore\n取消 = 不恢复");if(choice===null){e.target.value="";return}if(choice!=="1"&&choice!=="2"){alert("请输入 1 或 2");e.target.value="";return}backupData();const reader=new FileReader();reader.onload=async ev=>{try{const b=JSON.parse(ev.target.result),rr=b.rows||[];if(!Array.isArray(rr)){alert("这个备份文件不正确。");return}if(!confirm("确定 Restore？Google Sheet 现有资料会被覆盖。"))return;rows=rr.map(r=>({...r,date:/^\d{4}-\d{2}-\d{2}$/.test(r.date)?isoToDisplay(r.date):r.date}));renderAll();await restoreRowsToSheet(rows);pendingRows=[];savePendingRows();renderAll();setSync("Restore 已同步",true);alert("恢复完成")}catch(err){alert("恢复失败："+err.message)}finally{e.target.value=""}};reader.readAsText(file)}
+async function restoreData(e){
+  const file=e.target.files[0];
+  if(!file)return;
+
+  const reader=new FileReader();
+
+  reader.onload=async ev=>{
+    try{
+      const backupConfirm=confirm("Restore 会先自动 Backup 目前资料。\n\n确认继续？");
+      if(!backupConfirm){
+        e.target.value="";
+        return;
+      }
+
+      let parsed=JSON.parse(ev.target.result);
+      let rr=Array.isArray(parsed)?parsed:(parsed.rows||[]);
+
+      if(!Array.isArray(rr)||rr.length===0){
+        alert("Restore 文件没有资料，已取消。Google Sheet 没有被清空。");
+        e.target.value="";
+        return;
+      }
+
+      const cleaned=rr.map(r=>({
+        type:r.type==="fair"?"fair":"daily",
+        date:/^\d{4}-\d{2}-\d{2}$/.test(r.date)?isoToDisplay(r.date):r.date,
+        company:String(r.company||"").toLowerCase().includes("balakong")?"balakong":"belimbing",
+        location:canonicalLocation(r.location||""),
+        amount:Number(r.amount||0),
+        updatedAt:r.updatedAt||new Date().toISOString()
+      })).filter(r=>r.date&&r.company&&(r.type==="daily"||r.type==="fair"));
+
+      if(cleaned.length===0){
+        alert("Restore 文件格式不正确，已取消。Google Sheet 没有被清空。");
+        e.target.value="";
+        return;
+      }
+
+      backupData();
+
+      if(!confirm(`Restore 文件共有 ${cleaned.length} 笔资料。\n\n确定覆盖 Google Sheet 现有资料？`)){
+        e.target.value="";
+        return;
+      }
+
+      setSync("正在 Restore...");
+      rows=cleaned;
+      renderAll();
+
+      await restoreRowsToSheet(rows);
+
+      pendingRows=[];
+      savePendingRows();
+
+      renderAll();
+      setSync("Restore 已同步",true);
+      alert("恢复完成，共导入 "+cleaned.length+" 笔资料。");
+    }catch(err){
+      alert("恢复失败："+err.message);
+    }finally{
+      e.target.value="";
+    }
+  };
+
+  reader.readAsText(file);
+}
+
 function monthClose(){
   const m=selectedMonth();
   const nextMonth=monthAfter(m);
