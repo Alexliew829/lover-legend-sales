@@ -14,7 +14,7 @@
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo">
-    <div class="brand-title">Lover Legend<br>Sales <small>V6.1</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V6.2</small></div>
     <img src="images/Logo2.jpg" class="seal">
   </div>
 </header>
@@ -110,12 +110,7 @@
   <div class="card">
     <h2>Fair</h2>
     <label>地点</label>
-  <input
-    id="fairLocation"
-    list="fairLocationListOptions"
-    placeholder="输入或选择地点（例如 Sunway）"
-    autocomplete="off"
->
+    <input id="fairLocation" list="fairLocationListOptions" placeholder="输入或选择地点（例如 Sunway）">
     <datalist id="fairLocationListOptions"></datalist>
 
     <div class="split">
@@ -152,14 +147,11 @@
 <section id="page-more" class="page">
   <div class="card">
     <h2>More</h2>
-    <button class="green" onclick="backupData()">💾 Backup</button>
-    <button class="gray" onclick="document.getElementById('restoreFile').click()">📂 Restore（自动 Backup）</button>
-    <input type="file" id="restoreFile" accept=".json,application/json" hidden onchange="restoreData(event)">
     <button class="gray" onclick="exportCSV('month')">📈 导出本月 Excel</button>
     <button class="gray" onclick="exportCSV('year')">📈 导出全年 Excel</button>
     <button class="gray" onclick="monthClose()">📅 月底结算</button>
     <button class="gray" onclick="yearClose()">📆 年底结算</button>
-    <p class="note">V6.1：资料以 Google Sheet 为准，储存后自动同步。</p>
+    <p class="note">V6.2 正式测试版：资料以 Google Sheet 为准，每次储存自动同步。</p>
   </div>
 </section>
 </main>
@@ -179,4 +171,3 @@
 <script src="js/app.js"></script>
 </body>
 </html>
-

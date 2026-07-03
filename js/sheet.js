@@ -158,14 +158,6 @@ async function saveFairToSheet(location, records) {
   }
 }
 
-async function restoreRowsToSheet(restoredRows) {
-  const json = await jsonp({
-    action: "restoreRows",
-    rows: JSON.stringify(restoredRows)
-  });
-
-  if (!json.ok) throw new Error(json.message || "恢复失败");
-}
 
 setInterval(() => {
   loadPendingRows();
