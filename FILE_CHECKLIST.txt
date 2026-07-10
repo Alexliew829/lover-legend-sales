@@ -1,0 +1,22 @@
+Lover Legend Sales V6.2 正式测试版
+
+GitHub 上传：
+- index.html
+- style.css
+- manifest.json
+- sw.js
+- js/
+- icons/
+- images/
+
+Apps Script：
+- apps_script_v6_2.gs.txt
+
+V6.2 修改：
+- 删除 Backup
+- 删除 Restore
+- More 只保留导出本月、导出全年、月底结算、年底结算
+- Fair 地点默认空白
+- Fair placeholder：输入或选择地点（例如 Sunway）
+- 以前输入过的地点仍会出现在下拉选单
+- Google Sheet 只使用年份工作表：2026、2027、2028...

@@ -1,0 +1,9 @@
+V6.3 安装步骤
+
+1. GitHub：上传整个网站文件，覆盖旧版本。
+2. Apps Script：用 apps_script_v6_3.gs.txt 全部覆盖 Code.gs。
+3. Deploy → Manage deployments → Edit → New version → Deploy。URL 不需要更换。
+4. 旧的 2026 工作表不会被删除，也不会被修改。
+5. 新资料会自动写入每月工作表，例如 2026-07、2026-08。
+6. 如要把旧 2026 资料复制到每月工作表：在 Apps Script 手动运行 copyLegacyDataToMonthlySheets。此函数只复制，不删除原资料。建议先确认后再运行。
+7. 网站读取时会自动去重：同一天、同公司只显示更新时间最新的一笔。Google Sheet 原始历史资料不会被删除。

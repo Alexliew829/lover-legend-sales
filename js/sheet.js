@@ -49,22 +49,25 @@ function jsonp(params) {
   return new Promise((resolve, reject) => {
     const callback = "ll_cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
     params.callback = callback;
-
     const script = document.createElement("script");
     const query = new URLSearchParams(params).toString();
-
-    window[callback] = function(data) {
+    const timer = setTimeout(() => {
+      delete window[callback];
+      script.remove();
+      reject(new Error("连接 Google Apps Script 超时"));
+    }, 20000);
+    window[callback] = data => {
+      clearTimeout(timer);
       delete window[callback];
       script.remove();
       resolve(data);
     };
-
-    script.onerror = function() {
+    script.onerror = () => {
+      clearTimeout(timer);
       delete window[callback];
       script.remove();
       reject(new Error("无法连接 Google Apps Script"));
     };
-
     script.src = API_URL + "?" + query;
     document.body.appendChild(script);
   });
