@@ -1,6 +1,7 @@
 const API_URL = window.LOVER_API_URL;
 let rows = [];
 let pendingRows = [];
+let pendingSyncRunning = false;
 
 function loadPendingRows() {
   try {
@@ -49,25 +50,30 @@ function jsonp(params) {
   return new Promise((resolve, reject) => {
     const callback = "ll_cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
     params.callback = callback;
+
     const script = document.createElement("script");
     const query = new URLSearchParams(params).toString();
+
     const timer = setTimeout(() => {
       delete window[callback];
       script.remove();
       reject(new Error("连接 Google Apps Script 超时"));
     }, 20000);
+
     window[callback] = data => {
       clearTimeout(timer);
       delete window[callback];
       script.remove();
       resolve(data);
     };
+
     script.onerror = () => {
       clearTimeout(timer);
       delete window[callback];
       script.remove();
       reject(new Error("无法连接 Google Apps Script"));
     };
+
     script.src = API_URL + "?" + query;
     document.body.appendChild(script);
   });
@@ -97,74 +103,120 @@ async function loadFromSheet() {
 }
 
 async function syncPendingRows() {
-  loadPendingRows();
+  if (pendingSyncRunning) return;
+  pendingSyncRunning = true;
 
-  if (pendingRows.length === 0) {
-    setSync("已同步", true);
-    return;
-  }
+  try {
+    loadPendingRows();
 
-  setSync(`正在自动同步 ${pendingRows.length} 笔资料...`);
-
-  const copy = [...pendingRows];
-
-  for (const row of copy) {
-    try {
-      if (row.type === "daily") {
-        const saved = await saveDailyToSheet(row.date, row.company, row.amount, row.clientUpdatedAt || "");
-        if (saved) upsertLocalRow(saved);
-      } else if (row.type === "fair") {
-        await saveFairSingleToSheet(row.date, row.location, row.amount, row.clientUpdatedAt || "");
-      }
-      clearPendingRow(row);
-    } catch (err) {
-      setSync(`有 ${pendingRows.length} 笔未同步资料，系统会自动重试`, false, true);
+    if (pendingRows.length === 0) {
+      setSync("已同步", true);
       return;
     }
-  }
 
-  await loadFromSheet();
+    setSync(`正在自动同步 ${pendingRows.length} 笔资料...`);
+
+    const dailyRows = pendingRows.filter(r => r.type === "daily");
+    const fairRows = pendingRows.filter(r => r.type === "fair");
+
+    for (const row of dailyRows) {
+      const saved = await saveDailyToSheet(
+        row.date,
+        row.company,
+        row.amount,
+        row.clientUpdatedAt || ""
+      );
+      if (saved) upsertLocalRow(saved);
+      clearPendingRow(row);
+    }
+
+    const fairGroups = new Map();
+
+    fairRows.forEach(row => {
+      const loc = canonicalLocation(row.location);
+      if (!fairGroups.has(loc)) fairGroups.set(loc, []);
+      fairGroups.get(loc).push({
+        date: row.date,
+        amount: Number(row.amount || 0),
+        clientUpdatedAt: row.clientUpdatedAt || ""
+      });
+    });
+
+    for (const [location, records] of fairGroups.entries()) {
+      const result = await saveFairBatchToSheet(location, records);
+
+      if (result && Array.isArray(result.rows)) {
+        result.rows.forEach(r => {
+          if (Number(r.amount) <= 0) {
+            rows = rows.filter(x => syncKey(x) !== syncKey(r));
+          } else {
+            upsertLocalRow(r);
+          }
+        });
+      }
+
+      records.forEach(item => {
+        clearPendingRow({
+          type: "fair",
+          date: item.date,
+          company: "belimbing",
+          location
+        });
+      });
+    }
+
+    renderAll();
+    setSync("已同步", true);
+  } catch (err) {
+    loadPendingRows();
+    setSync(`有 ${pendingRows.length} 笔未同步资料，系统会自动重试`, false, true);
+  } finally {
+    pendingSyncRunning = false;
+  }
 }
 
 async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "") {
-  const json = await jsonp({ action: "saveDaily", date, company, amount, clientUpdatedAt });
-  if (!json.ok) {
-    if (json.conflict) {
-      const ok = confirm(`云端资料已更新。\n\n云端金额：${money(json.cloudAmount)}\n你准备储存：${money(amount)}\n\n确定覆盖？`);
-      if (!ok) throw new Error("已取消覆盖");
-      const force = await jsonp({ action: "saveDaily", date, company, amount, clientUpdatedAt, force: "1" });
-      if (!force.ok) throw new Error(force.message || "储存失败");
-      return force.row || null;
-    }
-    throw new Error(json.message || "储存失败");
-  }
+  const json = await jsonp({
+    action: "saveDaily",
+    date,
+    company,
+    amount,
+    clientUpdatedAt
+  });
+
+  if (!json.ok) throw new Error(json.message || "储存失败");
   return json.row || null;
 }
 
+async function saveFairBatchToSheet(location, records) {
+  const json = await jsonp({
+    action: "saveFairBatch",
+    location,
+    records: JSON.stringify(records)
+  });
+
+  if (!json.ok) throw new Error(json.message || "Fair 储存失败");
+  return json;
+}
+
 async function saveFairSingleToSheet(date, location, amount, clientUpdatedAt = "") {
-  const json = await jsonp({ action: "saveFairSingle", date, location, amount, clientUpdatedAt });
-  if (!json.ok) {
-    if (json.conflict) {
-      const ok = confirm(`云端 Fair 资料已更新。\n\n地点：${location}\n日期：${date}\n云端金额：${money(json.cloudAmount)}\n你准备储存：${money(amount)}\n\n确定覆盖？`);
-      if (!ok) throw new Error("已取消覆盖");
-      const force = await jsonp({ action: "saveFairSingle", date, location, amount, clientUpdatedAt, force: "1" });
-      if (!force.ok) throw new Error(force.message || "储存失败");
-      return;
-    }
-    throw new Error(json.message || "储存失败");
-  }
+  return saveFairBatchToSheet(location, [{
+    date,
+    amount,
+    clientUpdatedAt
+  }]);
 }
 
 async function saveFairToSheet(location, records) {
-  for (const item of records) {
-    await saveFairSingleToSheet(item.date, location, item.amount, item.clientUpdatedAt || "");
-  }
+  return saveFairBatchToSheet(location, records);
 }
-
 
 setInterval(() => {
   loadPendingRows();
-  if (pendingRows.length > 0) {
-    syncPendingRows();
-  }
+  if (pendingRows.length > 0) syncPendingRows();
 }, 30000);
+
+window.addEventListener("online", () => {
+  loadPendingRows();
+  if (pendingRows.length > 0) syncPendingRows();
+});

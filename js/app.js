@@ -21,38 +21,118 @@ function renderDashboard(){const bt=totalBy("daily","balakong","today"),blt=tota
 function sortReportRows(list){const rank=r=>r.type==="daily"&&r.company==="balakong"?0:r.type==="daily"&&r.company==="belimbing"?1:2;return [...list].sort((a,b)=>rank(a)-rank(b)||canonicalLocation(a.location).localeCompare(canonicalLocation(b.location))||displayToISO(a.date).localeCompare(displayToISO(b.date)))}
 function renderTable(){const s=sortReportRows(dedupeRows(rows).filter(r=>sameMonth(r.date)&&Number(r.amount)>0));document.getElementById("recordTable").innerHTML=s.map(r=>`<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":"每日"}</td><td>${companyNames[r.company]||r.company}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td></tr>`).join("")||'<tr><td colspan="5" style="text-align:center;">这个月份还没有记录</td></tr>'}
 function renderAll(){rows=dedupeRows(rows);renderDashboard();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions()}
-async function saveDailySales(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=toAmount(document.getElementById("dailySales").value);if(!d){alert("请选择日期");return}const localRow={type:"daily",date:d,company:c,location:"",amount:a,updatedAt:new Date().toISOString(),clientUpdatedAt:new Date().toISOString()};upsertLocalRow(localRow);addPendingRow(localRow);document.getElementById("dailySales").value=formatAmount(a);renderAll();showTempMsg("saveMsg");try{setSync("同步中...");const saved=await saveDailyToSheet(d,c,a,localRow.clientUpdatedAt);if(saved)upsertLocalRow(saved);clearPendingRow(localRow);await loadFromSheet();setSync("已同步",true)}catch(e){setSync("有未同步资料，系统会自动重试",false,true)}}
+async function saveDailySales(){
+  const d=isoToDisplay(document.getElementById("saleDate").value);
+  const c=document.getElementById("company").value;
+  const a=toAmount(document.getElementById("dailySales").value);
+
+  if(!d){
+    alert("请选择日期");
+    return;
+  }
+
+  const localRow={
+    type:"daily",
+    date:d,
+    company:c,
+    location:"",
+    amount:a,
+    updatedAt:new Date().toISOString(),
+    clientUpdatedAt:new Date().toISOString()
+  };
+
+  upsertLocalRow(localRow);
+  addPendingRow(localRow);
+  document.getElementById("dailySales").value=formatAmount(a);
+  renderAll();
+  showTempMsg("saveMsg");
+
+  try{
+    setSync("同步中...");
+    const saved=await saveDailyToSheet(d,c,a,localRow.clientUpdatedAt);
+    if(saved)upsertLocalRow(saved);
+    clearPendingRow(localRow);
+    renderAll();
+    setSync("已同步",true);
+  }catch(e){
+    setSync("有未同步资料，系统会自动重试",false,true);
+  }
+}
 function syncFairInputs(){const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value,loc=canonicalLocation(document.getElementById("fairLocation").value.trim());if(!start||!end||new Date(start)>new Date(end)){document.getElementById("fairInputs").innerHTML="";return}let html="<h3>Fair 每日营业额</h3>";dateRange(start,end).forEach(d=>{const old=rows.find(r=>r.type==="fair"&&r.date===d&&canonicalLocation(r.location)===loc);html+=`<label>${d} 营业额</label><input type="text" class="fairAmount money-input" data-date="${d}" value="${old?formatAmount(old.amount):"0.00"}" inputmode="decimal">`});document.getElementById("fairInputs").innerHTML=html;attachMoneyInputs()}
 async function saveFairSales(){
-  const loc=canonicalLocation(document.getElementById("fairLocation").value.trim()),inputs=document.querySelectorAll(".fairAmount");
-  if(!loc){alert("请输入 Fair 地点");return}
+  const loc=canonicalLocation(document.getElementById("fairLocation").value.trim());
+  const inputs=document.querySelectorAll(".fairAmount");
+
+  if(!loc){
+    alert("请输入 Fair 地点");
+    return;
+  }
+
   document.getElementById("fairLocation").value=loc;
   saveFairLocation(loc);
-  if(!inputs.length){alert("请选择 Fair 日期");return}
 
+  if(!inputs.length){
+    alert("请选择 Fair 日期");
+    return;
+  }
+
+  const now=new Date().toISOString();
   const records=[...inputs].map(i=>({
     date:i.dataset.date,
     amount:toAmount(i.value),
-    clientUpdatedAt:new Date().toISOString()
+    clientUpdatedAt:now
   }));
 
   records.forEach(i=>{
-    const row={type:"fair",date:i.date,company:"belimbing",location:loc,amount:i.amount,updatedAt:new Date().toISOString(),clientUpdatedAt:i.clientUpdatedAt};
+    const row={
+      type:"fair",
+      date:i.date,
+      company:"belimbing",
+      location:loc,
+      amount:i.amount,
+      updatedAt:now,
+      clientUpdatedAt:now
+    };
+
     if(Number(i.amount)<=0){
-      rows=rows.filter(r=>!(r.type==="fair"&&r.date===i.date&&r.company==="belimbing"&&canonicalLocation(r.location)===loc));
+      rows=rows.filter(r=>!(
+        r.type==="fair" &&
+        r.date===i.date &&
+        r.company==="belimbing" &&
+        canonicalLocation(r.location)===loc
+      ));
     }else{
       upsertLocalRow(row);
     }
+
     addPendingRow(row);
   });
 
   renderAll();
   showTempMsg("fairSaveMsg");
+
   try{
     setSync("同步中...");
-    await saveFairToSheet(loc,records);
-    records.forEach(i=>clearPendingRow({type:"fair",date:i.date,company:"belimbing",location:loc}));
-    await loadFromSheet();
+    const result=await saveFairBatchToSheet(loc,records);
+
+    if(result&&Array.isArray(result.rows)){
+      result.rows.forEach(r=>{
+        if(Number(r.amount)<=0){
+          rows=rows.filter(x=>syncKey(x)!==syncKey(r));
+        }else{
+          upsertLocalRow(r);
+        }
+      });
+    }
+
+    records.forEach(i=>clearPendingRow({
+      type:"fair",
+      date:i.date,
+      company:"belimbing",
+      location:loc
+    }));
+
+    renderAll();
     setSync("已同步",true);
   }catch(e){
     setSync("有未同步资料，系统会自动重试",false,true);

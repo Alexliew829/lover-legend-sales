@@ -1,16 +1,16 @@
-Lover Legend Sales V6.3 Final
+Lover Legend Sales V6.4
 
-GitHub 上传：
-- index.html
-- style.css
-- manifest.json
-- sw.js
-- js/
-- icons/
-- images/
+GitHub：
+index.html
+style.css
+manifest.json
+sw.js
+js/
+icons/
+images/
 
 Apps Script：
-- apps_script_v6_3_FINAL.gs.txt
+apps_script_v6_4.gs.txt
 
-说明：
-- V6_3_FINAL_INSTRUCTIONS.txt
+一次性迁移：
+copyLegacyYearSheetsToMonthlySafely

@@ -1,0 +1,32 @@
+Lover Legend Sales V6.4
+
+1. GitHub 覆盖：
+index.html
+style.css
+manifest.json
+sw.js
+js/
+icons/
+images/
+
+2. Apps Script：
+用 apps_script_v6_4.gs.txt 全部覆盖正确的 Lover Legend Sales API / Code.gs。
+保存后：
+Deploy → Manage deployments → Edit → New version → Deploy
+
+3. 一次性转移旧资料：
+Apps Script 上方函数下拉选择：
+copyLegacyYearSheetsToMonthlySafely
+点击 Run 一次。
+
+结果：
+- 2026 年 6 月 → 2026-06
+- 2026 年 7 月 → 2026-07
+- 其他月份同理
+- 原来的 2026 工作表完全保留，不删除、不改名、不清空
+- 同一笔资料以更新时间较新的为准
+
+4. V6.4 速度优化：
+- Daily 储存后不再重新读取全部 Google Sheet
+- Fair 多日资料一次批量写入
+- 网络恢复后自动同步未完成资料
