@@ -1,38 +1,296 @@
-function todayISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
-function isoToDisplay(s){if(!s)return"";if(/^\d{2}-\d{2}-\d{4}$/.test(s))return s;const [y,m,d]=String(s).split("-");return `${d}-${m}-${y}`}
-function displayToISO(s){if(!s)return"";if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;const [d,m,y]=String(s).split("-");return `${y}-${m}-${d}`}
-function monthISO(){return todayISO().slice(0,7)}
-function currentYear(){return new Date().getFullYear()}
-function sameMonthDisplay(d,m){return displayToISO(d).slice(0,7)===m}
-function sameYearDisplay(d,y){return displayToISO(d).slice(0,4)===String(y)}
-function money(n){return Number(n||0).toLocaleString("en-MY",{minimumFractionDigits:2,maximumFractionDigits:2})}
-function formatAmount(n){return money(n)}
-function cleanAmount(v){return String(v||"").replace(/,/g,"").trim()}
-function toAmount(v){return Number(cleanAmount(v)||0)}
-function formatMoneyInput(i){i.value=formatAmount(toAmount(i.value))}
-function moneyFocusHandler(e){e.target.value=cleanAmount(e.target.value);if(e.target.value==="0.00"||e.target.value==="0")e.target.value=""}
-function moneyBlurHandler(e){formatMoneyInput(e.target)}
-function enterToSaveHandler(e){if(e.key==="Enter"&&e.target.id==="dailySales"){e.preventDefault();saveDailySales()}}
-function attachMoneyInputs(){document.querySelectorAll(".money-input").forEach(i=>{i.removeEventListener("focus",moneyFocusHandler);i.removeEventListener("blur",moneyBlurHandler);i.removeEventListener("keydown",enterToSaveHandler);i.addEventListener("focus",moneyFocusHandler);i.addEventListener("blur",moneyBlurHandler);i.addEventListener("keydown",enterToSaveHandler)})}
-function dateRange(startISO,endISO){const a=[];const[sy,sm,sd]=startISO.split("-").map(Number);const[ey,em,ed]=endISO.split("-").map(Number);let c=new Date(sy,sm-1,sd);const l=new Date(ey,em-1,ed);while(c<=l){a.push(isoToDisplay(`${c.getFullYear()}-${String(c.getMonth()+1).padStart(2,"0")}-${String(c.getDate()).padStart(2,"0")}`));c.setDate(c.getDate()+1)}return a}
-function downloadFile(filename,content,type){const b=new Blob([content],{type});const u=URL.createObjectURL(b);const l=document.createElement("a");l.href=u;l.download=filename;document.body.appendChild(l);l.click();document.body.removeChild(l)}
-function getLastDayOfMonth(m){const[y,mo]=m.split("-").map(Number);return new Date(y,mo,0)}
-function showTempMsg(id){const e=document.getElementById(id);if(!e)return;e.classList.remove("hidden");setTimeout(()=>e.classList.add("hidden"),2500)}
-function nowText(){return new Date().toLocaleTimeString("zh-MY",{hour:"2-digit",minute:"2-digit"})}
-function normLoc(s){return String(s||"").trim().replace(/\s+/g," ").toLowerCase()}
+function todayISO() {
+  const d = new Date();
 
-function canonicalLocation(value){let s=String(value||"").trim();if(!s)return"";s=s.replace(/[-_]+/g," ").replace(/\s+/g," ").trim();const c=s.replace(/\s+/g,"").toLowerCase();if(c==="sunway"||c==="sunwaymall")return"Sunway";if(c==="ioi"||c==="ioimall")return"IOI";if(c==="midvalley"||c==="midvalleymall")return"Mid Valley";return s.split(" ").map(p=>{const l=p.toLowerCase();if(l==="ioi")return"IOI";if(p.length<=3&&p===p.toUpperCase())return p;return p.charAt(0).toUpperCase()+p.slice(1).toLowerCase()}).join(" ")}
-function monthAfter(m){const[y,mo]=m.split("-").map(Number);const d=new Date(y,mo,1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`}
-function yearAfter(y){return String(Number(y)+1)}
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0")
+  ].join("-");
+}
 
-function syncKey(row){
-  return [row.type,row.date,row.company,canonicalLocation(row.location||"")].join("|");
+function isoToDisplay(value) {
+  if (!value) return "";
+
+  const text = String(value).trim();
+
+  // 已经是 dd-MM-yyyy
+  if (/^\d{2}-\d{2}-\d{4}$/.test(text)) {
+    return text;
+  }
+
+  // yyyy-MM-dd → dd-MM-yyyy
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    const [year, month, day] = text.split("-");
+    return `${day}-${month}-${year}`;
+  }
+
+  return text;
 }
-function monthAfter(m){
-  const [y,mo]=m.split("-").map(Number);
-  const d=new Date(y,mo,1);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+
+function displayToISO(value) {
+  if (!value) return "";
+
+  const text = String(value).trim();
+
+  // 已经是 yyyy-MM-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return text;
+  }
+
+  // dd-MM-yyyy → yyyy-MM-dd
+  if (/^\d{2}-\d{2}-\d{4}$/.test(text)) {
+    const [day, month, year] = text.split("-");
+    return `${year}-${month}-${day}`;
+  }
+
+  return text;
 }
-function yearAfter(y){
-  return String(Number(y)+1);
+
+function monthISO() {
+  return todayISO().slice(0, 7);
+}
+
+function currentYear() {
+  return new Date().getFullYear();
+}
+
+function sameMonthDisplay(date, month) {
+  return displayToISO(date).slice(0, 7) === month;
+}
+
+function sameYearDisplay(date, year) {
+  return displayToISO(date).slice(0, 4) === String(year);
+}
+
+function money(value) {
+  return Number(value || 0).toLocaleString("en-MY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function formatAmount(value) {
+  return money(value);
+}
+
+function cleanAmount(value) {
+  return String(value || "")
+    .replace(/,/g, "")
+    .trim();
+}
+
+function toAmount(value) {
+  return Number(cleanAmount(value) || 0);
+}
+
+function formatMoneyInput(input) {
+  input.value = formatAmount(toAmount(input.value));
+}
+
+function moneyFocusHandler(event) {
+  event.target.value = cleanAmount(event.target.value);
+
+  if (
+    event.target.value === "0.00" ||
+    event.target.value === "0"
+  ) {
+    event.target.value = "";
+  }
+}
+
+function moneyBlurHandler(event) {
+  formatMoneyInput(event.target);
+}
+
+function enterToSaveHandler(event) {
+  if (
+    event.key === "Enter" &&
+    event.target.id === "dailySales"
+  ) {
+    event.preventDefault();
+    saveDailySales();
+  }
+}
+
+function attachMoneyInputs() {
+  document.querySelectorAll(".money-input").forEach(input => {
+    input.removeEventListener("focus", moneyFocusHandler);
+    input.removeEventListener("blur", moneyBlurHandler);
+    input.removeEventListener("keydown", enterToSaveHandler);
+
+    input.addEventListener("focus", moneyFocusHandler);
+    input.addEventListener("blur", moneyBlurHandler);
+    input.addEventListener("keydown", enterToSaveHandler);
+  });
+}
+
+function dateRange(startISO, endISO) {
+  const dates = [];
+
+  const [startYear, startMonth, startDay] = startISO
+    .split("-")
+    .map(Number);
+
+  const [endYear, endMonth, endDay] = endISO
+    .split("-")
+    .map(Number);
+
+  let current = new Date(
+    startYear,
+    startMonth - 1,
+    startDay
+  );
+
+  const last = new Date(
+    endYear,
+    endMonth - 1,
+    endDay
+  );
+
+  while (current <= last) {
+    const iso = [
+      current.getFullYear(),
+      String(current.getMonth() + 1).padStart(2, "0"),
+      String(current.getDate()).padStart(2, "0")
+    ].join("-");
+
+    dates.push(isoToDisplay(iso));
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
+}
+
+function downloadFile(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
+}
+
+function getLastDayOfMonth(month) {
+  const [year, monthNumber] = month
+    .split("-")
+    .map(Number);
+
+  return new Date(year, monthNumber, 0);
+}
+
+function showTempMsg(id) {
+  const element = document.getElementById(id);
+
+  if (!element) return;
+
+  element.classList.remove("hidden");
+
+  setTimeout(() => {
+    element.classList.add("hidden");
+  }, 2500);
+}
+
+function nowText() {
+  return new Date().toLocaleTimeString("zh-MY", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function normLoc(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function canonicalLocation(value) {
+  let text = String(value || "").trim();
+
+  if (!text) return "";
+
+  text = text
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const compact = text
+    .replace(/\s+/g, "")
+    .toLowerCase();
+
+  if (
+    compact === "sunway" ||
+    compact === "sunwaymall"
+  ) {
+    return "Sunway";
+  }
+
+  if (
+    compact === "ioi" ||
+    compact === "ioimall"
+  ) {
+    return "IOI";
+  }
+
+  if (
+    compact === "midvalley" ||
+    compact === "midvalleymall"
+  ) {
+    return "Mid Valley";
+  }
+
+  return text
+    .split(" ")
+    .map(part => {
+      const lower = part.toLowerCase();
+
+      if (lower === "ioi") {
+        return "IOI";
+      }
+
+      if (
+        part.length <= 3 &&
+        part === part.toUpperCase()
+      ) {
+        return part;
+      }
+
+      return (
+        part.charAt(0).toUpperCase() +
+        part.slice(1).toLowerCase()
+      );
+    })
+    .join(" ");
+}
+
+function monthAfter(month) {
+  const [year, monthNumber] = month
+    .split("-")
+    .map(Number);
+
+  const next = new Date(year, monthNumber, 1);
+
+  return [
+    next.getFullYear(),
+    String(next.getMonth() + 1).padStart(2, "0")
+  ].join("-");
+}
+
+function yearAfter(year) {
+  return String(Number(year) + 1);
+}
+
+function syncKey(row) {
+  return [
+    row.type,
+    row.date,
+    row.company,
+    canonicalLocation(row.location || "")
+  ].join("|");
 }
