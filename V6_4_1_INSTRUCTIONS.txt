@@ -1,0 +1,11 @@
+Lover Legend Sales V6.4.1
+
+本版新增：
+- Home「本年度累计」独立显示 Fair 总营业额
+- Belimbing 年度累计不再包含 Fair
+- 年度总营业额 = Balakong + Belimbing + Fair
+
+安装：
+1. GitHub 覆盖上传 index.html、style.css、manifest.json、sw.js、js/、icons/、images/
+2. Apps Script 继续使用 apps_script_v6_4.gs.txt，无需重新改动后端
+3. GitHub Pages 更新后，网页按 Ctrl + F5；手机 PWA 如仍显示旧版，请关闭再打开，必要时重新安装。
