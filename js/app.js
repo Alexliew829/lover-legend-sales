@@ -23,7 +23,41 @@ function renderTable(){const s=sortReportRows(dedupeRows(rows).filter(r=>sameMon
 function renderAll(){rows=dedupeRows(rows);renderDashboard();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions()}
 async function saveDailySales(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=toAmount(document.getElementById("dailySales").value);if(!d){alert("请选择日期");return}const localRow={type:"daily",date:d,company:c,location:"",amount:a,updatedAt:new Date().toISOString(),clientUpdatedAt:new Date().toISOString()};upsertLocalRow(localRow);addPendingRow(localRow);document.getElementById("dailySales").value=formatAmount(a);renderAll();showTempMsg("saveMsg");try{setSync("同步中...");const saved=await saveDailyToSheet(d,c,a,localRow.clientUpdatedAt);if(saved)upsertLocalRow(saved);clearPendingRow(localRow);await loadFromSheet();setSync("已同步",true)}catch(e){setSync("有未同步资料，系统会自动重试",false,true)}}
 function syncFairInputs(){const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value,loc=canonicalLocation(document.getElementById("fairLocation").value.trim());if(!start||!end||new Date(start)>new Date(end)){document.getElementById("fairInputs").innerHTML="";return}let html="<h3>Fair 每日营业额</h3>";dateRange(start,end).forEach(d=>{const old=rows.find(r=>r.type==="fair"&&r.date===d&&canonicalLocation(r.location)===loc);html+=`<label>${d} 营业额</label><input type="text" class="fairAmount money-input" data-date="${d}" value="${old?formatAmount(old.amount):"0.00"}" inputmode="decimal">`});document.getElementById("fairInputs").innerHTML=html;attachMoneyInputs()}
-async function saveFairSales(){const loc=canonicalLocation(document.getElementById("fairLocation").value.trim()),inputs=document.querySelectorAll(".fairAmount");if(!loc){alert("请输入 Fair 地点");return}document.getElementById("fairLocation").value=loc;saveFairLocation(loc);if(!inputs.length){alert("请选择 Fair 日期");return}const records=[...inputs].map(i=>({date:i.dataset.date,amount:toAmount(i.value),clientUpdatedAt:new Date().toISOString()})).filter(r=>Number(r.amount)>0);if(!records.length){alert("营业额为 0，不会储存");return}records.forEach(i=>{const row={type:"fair",date:i.date,company:"belimbing",location:loc,amount:i.amount,updatedAt:new Date().toISOString(),clientUpdatedAt:i.clientUpdatedAt};upsertLocalRow(row);addPendingRow(row)});renderAll();showTempMsg("fairSaveMsg");try{setSync("同步中...");await saveFairToSheet(loc,records);records.forEach(i=>clearPendingRow({type:"fair",date:i.date,company:"belimbing",location:loc}));await loadFromSheet();setSync("已同步",true)}catch(e){setSync("有未同步资料，系统会自动重试",false,true)}}
+async function saveFairSales(){
+  const loc=canonicalLocation(document.getElementById("fairLocation").value.trim()),inputs=document.querySelectorAll(".fairAmount");
+  if(!loc){alert("请输入 Fair 地点");return}
+  document.getElementById("fairLocation").value=loc;
+  saveFairLocation(loc);
+  if(!inputs.length){alert("请选择 Fair 日期");return}
+
+  const records=[...inputs].map(i=>({
+    date:i.dataset.date,
+    amount:toAmount(i.value),
+    clientUpdatedAt:new Date().toISOString()
+  }));
+
+  records.forEach(i=>{
+    const row={type:"fair",date:i.date,company:"belimbing",location:loc,amount:i.amount,updatedAt:new Date().toISOString(),clientUpdatedAt:i.clientUpdatedAt};
+    if(Number(i.amount)<=0){
+      rows=rows.filter(r=>!(r.type==="fair"&&r.date===i.date&&r.company==="belimbing"&&canonicalLocation(r.location)===loc));
+    }else{
+      upsertLocalRow(row);
+    }
+    addPendingRow(row);
+  });
+
+  renderAll();
+  showTempMsg("fairSaveMsg");
+  try{
+    setSync("同步中...");
+    await saveFairToSheet(loc,records);
+    records.forEach(i=>clearPendingRow({type:"fair",date:i.date,company:"belimbing",location:loc}));
+    await loadFromSheet();
+    setSync("已同步",true);
+  }catch(e){
+    setSync("有未同步资料，系统会自动重试",false,true);
+  }
+}
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 function monthClose(){const m=selectedMonth(),next=monthAfter(m);if(!confirm(`确定完成 ${m} 月底结算？\n\n系统将切换到 ${next}。\n历史资料不会删除。`))return;document.getElementById("monthPicker").value=next;renderAll();alert("已完成月底结算，进入 "+next)}
 function yearClose(){const y=selectedYear(),ny=yearAfter(y);if(!confirm(`确定完成 ${y} 年底结算？\n\n系统将导出全年 Excel，\n并切换到 ${ny}。\n历史资料不会删除。`))return;exportCSV("year");document.getElementById("yearPicker").value=ny;document.getElementById("monthPicker").value=`${ny}-01`;renderAll();alert("已完成年底结算，进入 "+ny)}

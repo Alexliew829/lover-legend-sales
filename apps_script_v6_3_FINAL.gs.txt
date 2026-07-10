@@ -1,0 +1,598 @@
+function doGet(e) {
+  const p = e.parameter || {};
+  const action = p.action || "";
+  let result;
+
+  try {
+    if (action === "load") result = loadData();
+    else if (action === "saveDaily") result = saveDaily(p);
+    else if (action === "saveFairSingle") result = saveFairSingle(p);
+    else if (action === "saveFairBatch") result = saveFairBatch(p);
+    else if (action === "migrateLegacyYearSheetsSafely") result = migrateLegacyYearSheetsSafely();
+    else if (action === "deduplicateMonthlySheets") result = deduplicateMonthlySheets();
+    else if (action === "ping") result = { ok: true, message: "Lover Legend Sales API V6.3 Final running" };
+    else result = { ok: false, message: "Unknown action: " + action };
+  } catch (err) {
+    result = { ok: false, message: err.message || String(err) };
+  }
+
+  return output(result, p.callback);
+}
+
+function monthSheetName(date) {
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM");
+}
+
+function getMonthlySheet(date) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const name = monthSheetName(date);
+  let sheet = ss.getSheetByName(name);
+
+  if (!sheet) sheet = ss.insertSheet(name);
+  ensureHeader(sheet);
+  return sheet;
+}
+
+function ensureHeader(sheet) {
+  const headers = [["类型", "日期", "公司", "地点", "营业额", "更新时间"]];
+  sheet.getRange(1, 1, 1, 6).setValues(headers);
+  formatSheet(sheet);
+}
+
+function formatSheet(sheet) {
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+
+  sheet.setFrozenRows(1);
+  sheet.getRange(1, 1, 1, 6)
+    .setFontWeight("bold")
+    .setBackground("#0b6b2b")
+    .setFontColor("#ffffff");
+
+  if (lastRow > 1) {
+    sheet.getRange(2, 2, lastRow - 1, 1).setNumberFormat("dd-MM-yyyy");
+    sheet.getRange(2, 5, lastRow - 1, 1).setNumberFormat("#,##0.00");
+    sheet.getRange(2, 6, lastRow - 1, 1).setNumberFormat("dd-MM-yyyy HH:mm");
+  }
+
+  sheet.autoResizeColumns(1, 6);
+
+  if (!sheet.getFilter()) {
+    sheet.getRange(1, 1, lastRow, 6).createFilter();
+  }
+}
+
+function normalizeRow(row) {
+  const date = parseDateFromApp(row[1]);
+  if (!row[0] || !date) return null;
+
+  return {
+    type: normalizeType(String(row[0] || "")),
+    date: formatDateForApp(date),
+    company: normalizeCompany(String(row[2] || "")),
+    location: canonicalLocation(String(row[3] || "")),
+    amount: Number(row[4] || 0),
+    updatedAt: formatDateTimeForApp(row[5])
+  };
+}
+
+function rowKey(row) {
+  return [
+    row.type,
+    row.date,
+    row.company,
+    canonicalLocation(row.location || "").toLowerCase()
+  ].join("|");
+}
+
+function newerRow(a, b) {
+  const aTime = parseDateTimeFromApp(a.updatedAt);
+  const bTime = parseDateTimeFromApp(b.updatedAt);
+
+  if (aTime && bTime) return aTime.getTime() >= bTime.getTime() ? a : b;
+  if (bTime) return b;
+  return a;
+}
+
+function loadData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const map = {};
+  const priority = {};
+
+  ss.getSheets().forEach(sheet => {
+    const name = sheet.getName();
+    const isMonthly = /^\d{4}-\d{2}$/.test(name);
+    const isLegacyYear = /^\d{4}$/.test(name);
+
+    if (!isMonthly && !isLegacyYear) return;
+
+    const sourcePriority = isMonthly ? 2 : 1;
+    const values = sheet.getDataRange().getValues();
+
+    values.slice(1).forEach(raw => {
+      const row = normalizeRow(raw);
+      if (!row) return;
+
+      const key = rowKey(row);
+
+      if (!map[key]) {
+        map[key] = row;
+        priority[key] = sourcePriority;
+        return;
+      }
+
+      if (sourcePriority > priority[key]) {
+        map[key] = row;
+        priority[key] = sourcePriority;
+      } else if (sourcePriority === priority[key]) {
+        map[key] = newerRow(map[key], row);
+      }
+    });
+  });
+
+  return {
+    ok: true,
+    rows: Object.keys(map).map(key => map[key])
+  };
+}
+
+function saveDaily(p) {
+  const date = parseDateFromApp(String(p.date || ""));
+  const company = normalizeCompany(String(p.company || ""));
+  const amount = Number(p.amount || 0);
+
+  if (!date || !company) throw new Error("Missing date or company");
+
+  upsertMonthly("daily", date, company, "", amount);
+
+  return {
+    ok: true,
+    message: "Daily saved",
+    row: {
+      type: "daily",
+      date: formatDateForApp(date),
+      company: company,
+      location: "",
+      amount: amount,
+      updatedAt: formatDateTimeForApp(new Date())
+    }
+  };
+}
+
+function saveFairSingle(p) {
+  const date = parseDateFromApp(String(p.date || ""));
+  const location = canonicalLocation(String(p.location || ""));
+  const amount = Number(p.amount || 0);
+
+  if (!date || !location) throw new Error("Missing date or Fair location");
+
+  if (amount <= 0) {
+    deleteExactRecordEverywhere("fair", date, "belimbing", location);
+    return { ok: true, message: "Fair deleted", deleted: true };
+  }
+
+  upsertMonthly("fair", date, "belimbing", location, amount);
+  return { ok: true, message: "Fair saved", deleted: false };
+}
+
+function saveFairBatch(p) {
+  const location = canonicalLocation(String(p.location || ""));
+  const records = JSON.parse(String(p.records || "[]"));
+
+  if (!location || !Array.isArray(records)) throw new Error("Invalid Fair records");
+
+  records.forEach(item => {
+    const date = parseDateFromApp(String(item.date || ""));
+    if (!date) return;
+
+    const amount = Number(item.amount || 0);
+
+    if (amount <= 0) deleteExactRecordEverywhere("fair", date, "belimbing", location);
+    else upsertMonthly("fair", date, "belimbing", location, amount);
+  });
+
+  return { ok: true, message: "Fair saved" };
+}
+
+function upsertMonthly(type, date, company, location, amount) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    upsertMonthlyUnlocked(type, date, company, location, amount);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function upsertMonthlyUnlocked(type, date, company, location, amount) {
+  const sheet = getMonthlySheet(date);
+  const values = sheet.getDataRange().getValues();
+  const targetDate = formatDateForApp(date);
+  const targetLocation = canonicalLocation(location).toLowerCase();
+  const matches = [];
+
+  for (let i = 1; i < values.length; i++) {
+    const rowType = normalizeType(String(values[i][0] || ""));
+    const rowDate = formatDateForApp(values[i][1]);
+    const rowCompany = normalizeCompany(String(values[i][2] || ""));
+    const rowLocation = canonicalLocation(String(values[i][3] || "")).toLowerCase();
+
+    if (
+      rowType === type &&
+      rowDate === targetDate &&
+      rowCompany === company &&
+      rowLocation === targetLocation
+    ) {
+      matches.push(i + 1);
+    }
+  }
+
+  const value = [[
+    displayType(type),
+    date,
+    displayCompany(company),
+    canonicalLocation(location),
+    Number(amount || 0),
+    new Date()
+  ]];
+
+  if (matches.length > 0) {
+    sheet.getRange(matches[0], 1, 1, 6).setValues(value);
+
+    for (let i = matches.length - 1; i >= 1; i--) {
+      sheet.deleteRow(matches[i]);
+    }
+  } else {
+    sheet.appendRow(value[0]);
+  }
+
+  sortMonthlySheet(sheet);
+  formatSheet(sheet);
+}
+
+function deleteExactRecordEverywhere(type, date, company, location) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const year = String(date.getFullYear());
+    const month = monthSheetName(date);
+
+    ss.getSheets().forEach(sheet => {
+      const name = sheet.getName();
+      if (name !== year && name !== month) return;
+
+      const values = sheet.getDataRange().getValues();
+      const targetDate = formatDateForApp(date);
+      const targetLocation = canonicalLocation(location).toLowerCase();
+      const rowsToDelete = [];
+
+      for (let i = 1; i < values.length; i++) {
+        const rowType = normalizeType(String(values[i][0] || ""));
+        const rowDate = formatDateForApp(values[i][1]);
+        const rowCompany = normalizeCompany(String(values[i][2] || ""));
+        const rowLocation = canonicalLocation(String(values[i][3] || "")).toLowerCase();
+
+        if (
+          rowType === type &&
+          rowDate === targetDate &&
+          rowCompany === company &&
+          rowLocation === targetLocation
+        ) {
+          rowsToDelete.push(i + 1);
+        }
+      }
+
+      for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+        sheet.deleteRow(rowsToDelete[i]);
+      }
+
+      if (/^\d{4}-\d{2}$/.test(name) && sheet.getLastRow() > 1) {
+        sortMonthlySheet(sheet);
+      }
+
+      formatSheet(sheet);
+    });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deduplicateMonthlySheets() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let removed = 0;
+
+    ss.getSheets().forEach(sheet => {
+      if (!/^\d{4}-\d{2}$/.test(sheet.getName())) return;
+
+      const values = sheet.getDataRange().getValues();
+      const best = new Map();
+
+      for (let i = 1; i < values.length; i++) {
+        const row = normalizeRow(values[i]);
+        if (!row) continue;
+
+        const key = rowKey(row);
+        const existing = best.get(key);
+
+        if (!existing) {
+          best.set(key, { rowNumber: i + 1, data: row });
+          continue;
+        }
+
+        const winner = newerRow(existing.data, row);
+        if (winner === row) best.set(key, { rowNumber: i + 1, data: row });
+      }
+
+      const keepRows = new Set(Array.from(best.values()).map(item => item.rowNumber));
+      const rowsToDelete = [];
+
+      for (let i = 1; i < values.length; i++) {
+        if (!keepRows.has(i + 1)) rowsToDelete.push(i + 1);
+      }
+
+      for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+        sheet.deleteRow(rowsToDelete[i]);
+        removed++;
+      }
+
+      if (sheet.getLastRow() > 1) sortMonthlySheet(sheet);
+      formatSheet(sheet);
+    });
+
+    return { ok: true, message: "Duplicate rows cleaned", removed: removed };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function migrateLegacyYearSheetsSafely() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const legacySheets = ss.getSheets().filter(sheet => /^\d{4}$/.test(sheet.getName()));
+    let copied = 0;
+    const archived = [];
+
+    legacySheets.forEach(sheet => {
+      const originalName = sheet.getName();
+      const values = sheet.getDataRange().getValues();
+
+      values.slice(1).forEach(raw => {
+        const row = normalizeRow(raw);
+        if (!row) return;
+
+        const date = parseDateFromApp(row.date);
+        mergeLegacyRowIntoMonthlyUnlocked(row, date);
+        copied++;
+      });
+
+      let archiveName = "ARCHIVE_" + originalName;
+      let counter = 1;
+
+      while (ss.getSheetByName(archiveName)) {
+        archiveName = "ARCHIVE_" + originalName + "_" + counter;
+        counter++;
+      }
+
+      sheet.setName(archiveName);
+      archived.push(archiveName);
+    });
+
+    return {
+      ok: true,
+      message: "Legacy data copied safely and original year sheets archived",
+      copied: copied,
+      archivedSheets: archived
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function mergeLegacyRowIntoMonthlyUnlocked(legacyRow, date) {
+  const sheet = getMonthlySheet(date);
+  const values = sheet.getDataRange().getValues();
+  const targetDate = formatDateForApp(date);
+  const targetLocation = canonicalLocation(legacyRow.location || "").toLowerCase();
+  const matches = [];
+
+  for (let i = 1; i < values.length; i++) {
+    const rowType = normalizeType(String(values[i][0] || ""));
+    const rowDate = formatDateForApp(values[i][1]);
+    const rowCompany = normalizeCompany(String(values[i][2] || ""));
+    const rowLocation = canonicalLocation(String(values[i][3] || "")).toLowerCase();
+
+    if (
+      rowType === legacyRow.type &&
+      rowDate === targetDate &&
+      rowCompany === legacyRow.company &&
+      rowLocation === targetLocation
+    ) {
+      matches.push(i + 1);
+    }
+  }
+
+  if (matches.length === 0) {
+    sheet.appendRow([
+      displayType(legacyRow.type),
+      date,
+      displayCompany(legacyRow.company),
+      canonicalLocation(legacyRow.location),
+      Number(legacyRow.amount || 0),
+      parseDateTimeFromApp(legacyRow.updatedAt) || new Date()
+    ]);
+  } else {
+    const firstRow = matches[0];
+    const existingRaw = sheet.getRange(firstRow, 1, 1, 6).getValues()[0];
+    const existing = normalizeRow(existingRaw);
+    const winner = existing ? newerRow(existing, legacyRow) : legacyRow;
+
+    if (winner === legacyRow) {
+      sheet.getRange(firstRow, 1, 1, 6).setValues([[
+        displayType(legacyRow.type),
+        date,
+        displayCompany(legacyRow.company),
+        canonicalLocation(legacyRow.location),
+        Number(legacyRow.amount || 0),
+        parseDateTimeFromApp(legacyRow.updatedAt) || new Date()
+      ]]);
+    }
+
+    for (let i = matches.length - 1; i >= 1; i--) {
+      sheet.deleteRow(matches[i]);
+    }
+  }
+
+  sortMonthlySheet(sheet);
+  formatSheet(sheet);
+}
+
+function sortMonthlySheet(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 2) return;
+
+  const values = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+
+  values.sort((a, b) => {
+    const aType = normalizeType(a[0]);
+    const bType = normalizeType(b[0]);
+    const aCompany = normalizeCompany(a[2]);
+    const bCompany = normalizeCompany(b[2]);
+
+    const rank = (type, company) => {
+      if (type === "daily" && company === "balakong") return 0;
+      if (type === "daily" && company === "belimbing") return 1;
+      return 2;
+    };
+
+    return (
+      rank(aType, aCompany) - rank(bType, bCompany) ||
+      canonicalLocation(a[3]).localeCompare(canonicalLocation(b[3])) ||
+      parseDateFromApp(a[1]) - parseDateFromApp(b[1])
+    );
+  });
+
+  sheet.getRange(2, 1, values.length, 6).setValues(values);
+}
+
+function canonicalLocation(value) {
+  let text = String(value || "").trim();
+  if (!text) return "";
+
+  text = text.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  const compact = text.replace(/\s+/g, "").toLowerCase();
+
+  if (compact === "sunway" || compact === "sunwaymall") return "Sunway";
+  if (compact === "ioi" || compact === "ioimall") return "IOI";
+  if (compact === "midvalley" || compact === "midvalleymall") return "Mid Valley";
+
+  return text.split(" ").map(part => {
+    if (part.toLowerCase() === "ioi") return "IOI";
+    if (part.length <= 3 && part === part.toUpperCase()) return part;
+    return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+  }).join(" ");
+}
+
+function parseDateFromApp(value) {
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return value;
+  }
+
+  const text = String(value || "").trim();
+
+  if (/^\d{2}-\d{2}-\d{4}$/.test(text)) {
+    const parts = text.split("-").map(Number);
+    return new Date(parts[2], parts[1] - 1, parts[0]);
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    const parts = text.split("-").map(Number);
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+
+  return null;
+}
+
+function parseDateTimeFromApp(value) {
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return value;
+  }
+
+  const text = String(value || "").trim();
+
+  if (/^\d{2}-\d{2}-\d{4} \d{2}:\d{2}$/.test(text)) {
+    const date = parseDateFromApp(text.slice(0, 10));
+    const time = text.slice(11).split(":").map(Number);
+    date.setHours(time[0], time[1], 0, 0);
+    return date;
+  }
+
+  const date = new Date(text);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+function formatDateForApp(value) {
+  const date = Object.prototype.toString.call(value) === "[object Date]"
+    ? value
+    : parseDateFromApp(value);
+
+  return date
+    ? Utilities.formatDate(date, Session.getScriptTimeZone(), "dd-MM-yyyy")
+    : "";
+}
+
+function formatDateTimeForApp(value) {
+  const date = Object.prototype.toString.call(value) === "[object Date]"
+    ? value
+    : parseDateTimeFromApp(value);
+
+  return date
+    ? Utilities.formatDate(date, Session.getScriptTimeZone(), "dd-MM-yyyy HH:mm")
+    : "";
+}
+
+function displayType(type) {
+  return type === "fair" ? "Fair" : "每日";
+}
+
+function normalizeType(type) {
+  const text = String(type || "").toLowerCase();
+  if (type === "每日" || type === "今日" || text === "daily") return "daily";
+  if (text === "fair") return "fair";
+  return text;
+}
+
+function displayCompany(company) {
+  if (company === "balakong") return "Balakong";
+  if (company === "belimbing") return "Belimbing";
+  return company;
+}
+
+function normalizeCompany(company) {
+  const text = String(company || "").toLowerCase();
+  if (text.indexOf("adenium") >= 0 || text.indexOf("balakong") >= 0) return "balakong";
+  if (text.indexOf("gardening") >= 0 || text.indexOf("belimbing") >= 0) return "belimbing";
+  return text;
+}
+
+function output(obj, callback) {
+  const json = JSON.stringify(obj);
+
+  if (callback) {
+    return ContentService
+      .createTextOutput(callback + "(" + json + ")")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+
+  return ContentService
+    .createTextOutput(json)
+    .setMimeType(ContentService.MimeType.JSON);
+}

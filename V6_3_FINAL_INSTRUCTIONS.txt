@@ -1,0 +1,31 @@
+Lover Legend Sales V6.3 Final 安装步骤
+
+一、GitHub
+1. 上传并覆盖：index.html、style.css、manifest.json、sw.js、js、icons、images。
+2. 等 GitHub Pages 绿色勾。
+3. 网页按 Ctrl + F5 强制刷新。
+
+二、Google Apps Script
+1. 打开正确的 Lover Legend Sales API。
+2. 左边 Code.gs 全选删除。
+3. 复制 apps_script_v6_3_FINAL.gs.txt 全部内容进去。
+4. 保存。
+5. Deploy → Manage deployments → Edit → New version → Deploy。
+
+三、旧资料安全迁移（只做一次）
+1. 先确认网页已经可以读取原有资料。
+2. Apps Script 顶部函数下拉选择 migrateLegacyYearSheetsSafely。
+3. 点击 Run。
+4. 系统会把 2026 工作表资料复制到 2026-06、2026-07 等每月工作表。
+5. 原来的 2026 不会删除，只会改名为 ARCHIVE_2026。
+6. 完成后回网页刷新并核对总数。
+
+四、重复资料清理（需要时才做）
+选择 deduplicateMonthlySheets → Run。
+只处理同类型、同日期、同公司、同地点的重复记录，保留更新时间较新的那笔。
+
+重要规则
+- Daily 可储存 0.00。
+- Fair 改为 0.00，只删除该地点该日期，不影响同一 Fair 其他日期。
+- 所有写入使用 LockService，避免同一时间重复新增。
+- Google Sheet 顺序固定：Balakong → Belimbing → Fair；组内日期从旧到新。
