@@ -1,0 +1,15 @@
+Lover Legend Sales V6.5 Final
+
+修正：
+- iPhone / Android 的 Sales、Fair 开始日期、Fair 结束日期都可正常点选。
+- 日期仍以 dd-MM-yyyy 显示。
+- 保留 V6.5 快速同步和每月分页。
+
+安装：
+1. 把 ZIP 内 GitHub 网站文件覆盖上传。
+2. Apps Script 继续使用 apps_script_v6_5.gs.txt；如果已经部署过 V6.5，不需要再次修改 Apps Script。
+3. GitHub Pages 更新后，在电脑按 Ctrl + F5。
+4. 手机如仍显示旧版，完全关闭 App 再打开；仍未更新才删除旧 PWA 后重新安装。
+
+旧资料迁移函数仍是：
+copyLegacyYearSheetsToMonthlySafely
