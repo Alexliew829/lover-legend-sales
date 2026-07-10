@@ -48,7 +48,7 @@ async function saveDailySales(){
   showTempMsg("saveMsg");
 
   try{
-    setSync("同步中...");
+    setSync("已储存，正在后台同步...");
     const saved=await saveDailyToSheet(d,c,a,localRow.clientUpdatedAt);
     if(saved)upsertLocalRow(saved);
     clearPendingRow(localRow);
@@ -112,7 +112,7 @@ async function saveFairSales(){
   showTempMsg("fairSaveMsg");
 
   try{
-    setSync("同步中...");
+    setSync("已储存，正在后台同步...");
     const result=await saveFairBatchToSheet(loc,records);
 
     if(result&&Array.isArray(result.rows)){

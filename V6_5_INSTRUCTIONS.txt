@@ -1,0 +1,19 @@
+Lover Legend Sales V6.5 快速同步版
+
+GitHub：覆盖上传网站全部文件。
+
+Apps Script：
+1. 用 apps_script_v6_5.gs.txt 全部覆盖 Lover Legend Sales API 的 Code.gs。
+2. 保存。
+3. Deploy → Manage deployments → Edit → New version → Deploy。
+
+旧资料迁移：
+函数选择 copyLegacyYearSheetsToMonthlySafely，Run 一次。
+原来的 2026 Sheet 不会删除、不改名、不清空。
+
+V6.5 优化：
+- Daily 只更新目标行，不再整张 Sheet 重写。
+- Fair 多日一次批量写入。
+- Fair 改 0 只删除当天。
+- 写入锁防止手机同时提交产生重复。
+- 储存后先显示“已储存，正在后台同步”，真正完成后显示“已同步”。
