@@ -97,6 +97,39 @@ async function saveDailySales(){
     setSync("有未同步资料，系统会自动重试",false,true);
   }
 }
+function saveFairSession(){
+  const location=canonicalLocation(document.getElementById("fairLocation").value.trim());
+  const start=document.getElementById("fairStart").value;
+  const end=document.getElementById("fairEnd").value;
+
+  if(!location||!start||!end)return;
+
+  localStorage.setItem("lover_last_fair_session",JSON.stringify({
+    location,
+    start,
+    end
+  }));
+}
+
+function restoreFairSession(){
+  try{
+    const saved=JSON.parse(localStorage.getItem("lover_last_fair_session")||"null");
+
+    if(!saved||!saved.location||!saved.start||!saved.end){
+      return false;
+    }
+
+    document.getElementById("fairLocation").value=canonicalLocation(saved.location);
+    setDateControl("fairStart",saved.start);
+    setDateControl("fairEnd",saved.end);
+    syncFairInputs();
+
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
 function syncFairInputs(){const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value,loc=canonicalLocation(document.getElementById("fairLocation").value.trim());if(!start||!end||new Date(start)>new Date(end)){document.getElementById("fairInputs").innerHTML="";return}let html="<h3>Fair 每日营业额</h3>";dateRange(start,end).forEach(d=>{const old=rows.find(r=>r.type==="fair"&&r.date===d&&canonicalLocation(r.location)===loc);html+=`<label>${d} 营业额</label><input type="text" class="fairAmount money-input" data-date="${d}" value="${old?formatAmount(old.amount):"0.00"}" inputmode="decimal">`});document.getElementById("fairInputs").innerHTML=html;attachMoneyInputs()}
 async function saveFairSales(){
   const loc=canonicalLocation(document.getElementById("fairLocation").value.trim());
@@ -109,6 +142,7 @@ async function saveFairSales(){
 
   document.getElementById("fairLocation").value=loc;
   saveFairLocation(loc);
+  saveFairSession();
 
   if(!inputs.length){
     alert("请选择 Fair 日期");
@@ -180,4 +214,47 @@ async function saveFairSales(){
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 function monthClose(){const m=selectedMonth(),next=monthAfter(m);if(!confirm(`确定完成 ${m} 月底结算？\n\n系统将切换到 ${next}。\n历史资料不会删除。`))return;document.getElementById("monthPicker").value=next;renderAll();alert("已完成月底结算，进入 "+next)}
 function yearClose(){const y=selectedYear(),ny=yearAfter(y);if(!confirm(`确定完成 ${y} 年底结算？\n\n系统将导出全年 Excel，\n并切换到 ${ny}。\n历史资料不会删除。`))return;exportCSV("year");document.getElementById("yearPicker").value=ny;document.getElementById("monthPicker").value=`${ny}-01`;renderAll();alert("已完成年底结算，进入 "+ny)}
-document.getElementById("monthPicker").value=monthISO();document.getElementById("yearPicker").value=currentYear();setDateControl("saleDate",todayISO());setDateControl("fairStart",todayISO());setDateControl("fairEnd",todayISO());bindDateControl("saleDate",updateDailyInputFromSelectedDate);bindDateControl("fairStart",syncFairInputs);bindDateControl("fairEnd",syncFairInputs);renderFairLocationOptions();document.getElementById("monthPicker").addEventListener("change",renderAll);document.getElementById("yearPicker").addEventListener("change",renderAll);document.getElementById("company").addEventListener("change",updateDailyInputFromSelectedDate);document.getElementById("fairLocation").addEventListener("input",syncFairInputs);document.getElementById("fairLocation").addEventListener("blur",()=>{document.getElementById("fairLocation").value=canonicalLocation(document.getElementById("fairLocation").value);saveFairLocation(document.getElementById("fairLocation").value);syncFairInputs()});attachMoneyInputs();renderAll();loadFromSheet();
+document.getElementById("monthPicker").value=monthISO();
+document.getElementById("yearPicker").value=currentYear();
+
+setDateControl("saleDate",todayISO());
+setDateControl("fairStart",todayISO());
+setDateControl("fairEnd",todayISO());
+
+bindDateControl("saleDate",updateDailyInputFromSelectedDate);
+
+bindDateControl("fairStart",()=>{
+  saveFairSession();
+  syncFairInputs();
+});
+
+bindDateControl("fairEnd",()=>{
+  saveFairSession();
+  syncFairInputs();
+});
+
+renderFairLocationOptions();
+
+document.getElementById("monthPicker").addEventListener("change",renderAll);
+document.getElementById("yearPicker").addEventListener("change",renderAll);
+document.getElementById("company").addEventListener("change",updateDailyInputFromSelectedDate);
+
+document.getElementById("fairLocation").addEventListener("input",()=>{
+  saveFairSession();
+  syncFairInputs();
+});
+
+document.getElementById("fairLocation").addEventListener("blur",()=>{
+  const input=document.getElementById("fairLocation");
+  input.value=canonicalLocation(input.value);
+  saveFairLocation(input.value);
+  saveFairSession();
+  syncFairInputs();
+});
+
+attachMoneyInputs();
+renderAll();
+
+loadFromSheet().then(()=>{
+  restoreFairSession();
+});
