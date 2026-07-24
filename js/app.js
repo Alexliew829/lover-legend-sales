@@ -111,23 +111,32 @@ function saveFairSession(){
   }));
 }
 
-function restoreFairSession(){
+function getSavedFairSession(){
   try{
     const saved=JSON.parse(localStorage.getItem("lover_last_fair_session")||"null");
 
     if(!saved||!saved.location||!saved.start||!saved.end){
-      return false;
+      return null;
     }
 
-    document.getElementById("fairLocation").value=canonicalLocation(saved.location);
-    setDateControl("fairStart",saved.start);
-    setDateControl("fairEnd",saved.end);
-    syncFairInputs();
-
-    return true;
+    return saved;
   }catch(e){
+    return null;
+  }
+}
+
+function restoreFairSession(){
+  const saved=getSavedFairSession();
+
+  if(!saved){
     return false;
   }
+
+  document.getElementById("fairLocation").value=canonicalLocation(saved.location);
+  setDateControl("fairStart",saved.start);
+  setDateControl("fairEnd",saved.end);
+
+  return true;
 }
 
 function syncFairInputs(){const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value,loc=canonicalLocation(document.getElementById("fairLocation").value.trim());if(!start||!end||new Date(start)>new Date(end)){document.getElementById("fairInputs").innerHTML="";return}let html="<h3>Fair 每日营业额</h3>";dateRange(start,end).forEach(d=>{const old=rows.find(r=>r.type==="fair"&&r.date===d&&canonicalLocation(r.location)===loc);html+=`<label>${d} 营业额</label><input type="text" class="fairAmount money-input" data-date="${d}" value="${old?formatAmount(old.amount):"0.00"}" inputmode="decimal">`});document.getElementById("fairInputs").innerHTML=html;attachMoneyInputs()}
@@ -218,8 +227,13 @@ document.getElementById("monthPicker").value=monthISO();
 document.getElementById("yearPicker").value=currentYear();
 
 setDateControl("saleDate",todayISO());
-setDateControl("fairStart",todayISO());
-setDateControl("fairEnd",todayISO());
+
+const fairSessionRestored=restoreFairSession();
+
+if(!fairSessionRestored){
+  setDateControl("fairStart",todayISO());
+  setDateControl("fairEnd",todayISO());
+}
 
 bindDateControl("saleDate",updateDailyInputFromSelectedDate);
 
@@ -240,7 +254,6 @@ document.getElementById("yearPicker").addEventListener("change",renderAll);
 document.getElementById("company").addEventListener("change",updateDailyInputFromSelectedDate);
 
 document.getElementById("fairLocation").addEventListener("input",()=>{
-  saveFairSession();
   syncFairInputs();
 });
 
@@ -256,5 +269,5 @@ attachMoneyInputs();
 renderAll();
 
 loadFromSheet().then(()=>{
-  restoreFairSession();
+  syncFairInputs();
 });
