@@ -41,7 +41,7 @@ function renderTodayCompanyStatus(){
       "🟢 Balakong 今天已记录<br>"+
       "🟢 Belimbing 今天已记录";
     return;
-  }
+  } 
 
   done.classList.add("hidden");
   warning.classList.remove("hidden");
