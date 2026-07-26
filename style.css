@@ -30,3 +30,18 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 @media(min-width:520px){.dash{grid-template-columns:1fr 1fr}.box.total,.fair-box{grid-column:span 2}.fair-location-grid{grid-template-columns:1fr 1fr}}
 
 .date-field{display:flex;gap:8px;align-items:center;position:relative}.date-field>input[type=text]{flex:1}.date-btn{width:54px;min-width:54px;margin:0;padding:0;height:54px;background:#fff;color:#111;border:1px solid #ccc;font-size:22px;pointer-events:none}.hidden-date{position:absolute!important;right:0!important;top:0!important;opacity:0!important;pointer-events:auto!important;width:54px!important;height:54px!important;z-index:5!important;cursor:pointer!important}
+
+
+/* V6.7.2：仅新增动态 Fair 佣金提示，不改变 V6.6.1 页面结构 */
+#fairCommissionLabel {
+  white-space: nowrap;
+}
+
+.fair-commission-message {
+  margin-top: 8px;
+  color: #c40000;
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1.4;
+  text-align: left;
+}
