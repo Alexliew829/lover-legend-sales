@@ -1,0 +1,13 @@
+Lover Legend Sales V6.6.1 Stable
+
+修改：
+- Home 分别显示 Balakong 与 Belimbing 今天是否已经记录。
+- 判断依据是当天是否存在 Daily 记录；金额 0.00 也算已经记录。
+- 保留 V6.6 自动更新、自动同步、快速同步、手机日期及每月 Google Sheet。
+
+安装：
+1. 把 ZIP 内网站文件覆盖上传到 GitHub。
+2. Apps Script 不需要修改，继续使用目前已部署版本。
+3. 等 GitHub Pages 绿色勾。
+4. 电脑第一次按 Ctrl + F5。
+5. 手机完全关闭 App 后重新打开一次。
