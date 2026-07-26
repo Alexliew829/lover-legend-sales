@@ -1,9 +1,9 @@
-Lover Legend Sales V6.6 自动更新版
+Lover Legend Sales V6.7 自动更新版
 
 这次只需覆盖 GitHub 网站文件。
 Apps Script 继续使用目前已部署的 V6.5 Apps Script，不需要修改。
 
-V6.6 功能：
+V6.7 功能：
 1. 每次真正打开网页时，会从 Google Sheet 读取最新资料。
 2. 手机 PWA 从后台回到前台时，会自动重新读取 Google Sheet。
 3. 每次打开或回到 App，会自动检查 GitHub 是否有新版本。

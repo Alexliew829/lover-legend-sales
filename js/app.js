@@ -56,7 +56,46 @@ function renderTodayCompanyStatus(){
       :"🔴 Belimbing 今天还没有记录");
 }
 
-function renderDashboard(){const bt=totalBy("daily","balakong","today"),blt=totalBy("daily","belimbing","today"),ft=totalBy("fair","","today"),bm=totalBy("daily","balakong","month"),blm=totalBy("daily","belimbing","month"),fm=totalBy("fair","","month"),by=totalBy("daily","balakong","year"),bly=totalBy("daily","belimbing","year"),fy=totalBy("fair","","year");document.getElementById("balakongMonth").textContent=money(bm);document.getElementById("belimbingMonth").textContent=money(blm);renderFairLocationList();document.getElementById("fairMonthTotal").textContent=money(fm);document.getElementById("fairCommissionTotal").textContent=money(fm*.06);document.getElementById("monthGrandTotal").textContent=money(bm+blm+fm);document.getElementById("balakongYearTotal").textContent=money(by);document.getElementById("belimbingYearTotal").textContent=money(bly);document.getElementById("fairYearTotal").textContent=money(fy);document.getElementById("yearGrandTotal").textContent=money(by+bly+fy);renderTodayCompanyStatus()}
+function getFairCommissionRate(total){
+  const amount=Number(total||0);
+
+  if(amount>=100000)return 0.08;
+  if(amount>=50000)return 0.07;
+  return 0.06;
+}
+
+function renderFairCommission(total){
+  const amount=Number(total||0);
+  const rate=getFairCommissionRate(amount);
+  const percent=Math.round(rate*100);
+
+  const label=document.getElementById("fairCommissionLabel");
+  const value=document.getElementById("fairCommissionTotal");
+  const message=document.getElementById("fairCommissionMessage");
+
+  if(label){
+    label.textContent=`Fair 本月总佣金 ${percent}%`;
+  }
+
+  if(value){
+    value.textContent=money(amount*rate);
+  }
+
+  if(!message)return;
+
+  if(amount<50000){
+    message.textContent="加油，达到 RM50,000 就 7%";
+    message.classList.remove("hidden");
+  }else if(amount<100000){
+    message.textContent="加油，达到 RM100,000 就 8%";
+    message.classList.remove("hidden");
+  }else{
+    message.textContent="";
+    message.classList.add("hidden");
+  }
+}
+
+function renderDashboard(){const bt=totalBy("daily","balakong","today"),blt=totalBy("daily","belimbing","today"),ft=totalBy("fair","","today"),bm=totalBy("daily","balakong","month"),blm=totalBy("daily","belimbing","month"),fm=totalBy("fair","","month"),by=totalBy("daily","balakong","year"),bly=totalBy("daily","belimbing","year"),fy=totalBy("fair","","year");document.getElementById("balakongMonth").textContent=money(bm);document.getElementById("belimbingMonth").textContent=money(blm);renderFairLocationList();document.getElementById("fairMonthTotal").textContent=money(fm);renderFairCommission(fm);document.getElementById("monthGrandTotal").textContent=money(bm+blm+fm);document.getElementById("balakongYearTotal").textContent=money(by);document.getElementById("belimbingYearTotal").textContent=money(bly);document.getElementById("fairYearTotal").textContent=money(fy);document.getElementById("yearGrandTotal").textContent=money(by+bly+fy);renderTodayCompanyStatus()}
 function sortReportRows(list){const rank=r=>r.type==="daily"&&r.company==="balakong"?0:r.type==="daily"&&r.company==="belimbing"?1:2;return [...list].sort((a,b)=>rank(a)-rank(b)||canonicalLocation(a.location).localeCompare(canonicalLocation(b.location))||displayToISO(a.date).localeCompare(displayToISO(b.date)))}
 function renderTable(){const s=sortReportRows(dedupeRows(rows).filter(r=>sameMonth(r.date)&&Number(r.amount)>0));document.getElementById("recordTable").innerHTML=s.map(r=>`<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":"每日"}</td><td>${companyNames[r.company]||r.company}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td></tr>`).join("")||'<tr><td colspan="5" style="text-align:center;">这个月份还没有记录</td></tr>'}
 function renderAll(){rows=dedupeRows(rows);renderDashboard();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions()}
