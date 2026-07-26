@@ -1,0 +1,15 @@
+Lover Legend Sales V6.4.1
+
+GitHub 上传：
+- index.html
+- style.css
+- manifest.json
+- sw.js
+- js/
+- icons/
+- images/
+
+Apps Script：
+- 继续使用 apps_script_v6_4.gs.txt
+
+新增：本年度 Fair 总营业额独立显示。
