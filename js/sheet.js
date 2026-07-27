@@ -95,6 +95,9 @@ async function loadFromSheet() {
     if (!json.ok) throw new Error(json.message || "读取失败");
 
     rows = json.rows || [];
+    if(json.commissionSettings&&typeof applyCommissionSettings==="function"){
+      applyCommissionSettings(json.commissionSettings);
+    }
     renderAll();
     setSync("已同步", true);
   } catch (err) {
@@ -209,6 +212,23 @@ async function saveFairSingleToSheet(date, location, amount, clientUpdatedAt = "
 
 async function saveFairToSheet(location, records) {
   return saveFairBatchToSheet(location, records);
+}
+
+async function saveCommissionSettingsToSheet(settings) {
+  const json = await jsonp({
+    action: "saveCommissionSettings",
+    rate1: settings.rate1,
+    rate2: settings.rate2,
+    rate3: settings.rate3
+  });
+  if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
+  return json.commissionSettings || null;
+}
+
+async function resetCommissionSettingsInSheet() {
+  const json = await jsonp({ action: "resetCommissionSettings" });
+  if (!json.ok) throw new Error(json.message || "恢复默认值失败");
+  return json.commissionSettings || null;
 }
 
 setInterval(() => {

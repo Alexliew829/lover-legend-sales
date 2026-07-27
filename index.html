@@ -14,7 +14,7 @@
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo">
-    <div class="brand-title">Lover Legend<br>Sales <small>V6.7.2</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V6.8.1</small></div>
     <img src="images/Logo2.jpg" class="seal">
   </div>
 </header>
@@ -159,6 +159,34 @@
   </div>
 </section>
 </main>
+
+<div class="commission-settings-card">
+  <h3>佣金设置</h3>
+
+  <label for="commissionRate1">RM50,000 以下</label>
+  <div class="commission-input-row">
+    <input id="commissionRate1" type="number" min="0" max="100" step="0.1" inputmode="decimal">
+    <span>%</span>
+  </div>
+
+  <label for="commissionRate2">RM50,000 以上</label>
+  <div class="commission-input-row">
+    <input id="commissionRate2" type="number" min="0" max="100" step="0.1" inputmode="decimal">
+    <span>%</span>
+  </div>
+
+  <label for="commissionRate3">RM100,000 以上</label>
+  <div class="commission-input-row">
+    <input id="commissionRate3" type="number" min="0" max="100" step="0.1" inputmode="decimal">
+    <span>%</span>
+  </div>
+
+  <button type="button" onclick="saveCommissionSettings()">💾 储存佣金设置</button>
+  <button type="button" class="secondary-btn" onclick="resetCommissionSettings()">↺ 恢复默认值</button>
+
+  <div id="commissionSettingsMsg" class="save-msg hidden">佣金设置已储存</div>
+</div>
+
 </div>
 
 <nav class="bottom-nav">

@@ -1,0 +1,12 @@
+Lover Legend Sales V6.8.1
+
+- 佣金设置改为 Google Sheet 云端同步。
+- 一台设备修改，其他设备打开或自动刷新时同步。
+- 自动建立 Settings 分页。
+- 默认值 6% / 7% / 8%。
+- 不会修改或删除营业记录。
+
+安装：
+1. 覆盖 GitHub 网站文件。
+2. 用 apps_script_v6_8_1.gs.txt 覆盖 Code.gs。
+3. Deploy → Manage deployments → Edit → New version → Deploy。

@@ -45,3 +45,43 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   line-height: 1.4;
   text-align: left;
 }
+
+
+.commission-settings-card {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px dashed #cfcfcf;
+}
+
+.commission-settings-card h3 {
+  margin: 0 0 14px;
+}
+
+.commission-settings-card label {
+  display: block;
+  margin: 12px 0 6px;
+  font-weight: 700;
+}
+
+.commission-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.commission-input-row input {
+  flex: 1;
+}
+
+.commission-input-row span {
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.commission-settings-card button {
+  margin-top: 14px;
+}
+
+.commission-settings-card .secondary-btn {
+  background: #777;
+}

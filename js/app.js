@@ -56,18 +56,126 @@ function renderTodayCompanyStatus(){
       :"🔴 Belimbing 今天还没有记录");
 }
 
+const DEFAULT_COMMISSION_SETTINGS={
+  rate1:6,
+  rate2:7,
+  rate3:8
+};
+
+let commissionSettings={...DEFAULT_COMMISSION_SETTINGS};
+
+function normalizeCommissionSettings(settings){
+  const source=settings||{};
+  const rate1=Number(source.rate1);
+  const rate2=Number(source.rate2);
+  const rate3=Number(source.rate3);
+
+  if(
+    !Number.isFinite(rate1)||
+    !Number.isFinite(rate2)||
+    !Number.isFinite(rate3)||
+    rate1<0||rate2<0||rate3<0
+  ){
+    return{...DEFAULT_COMMISSION_SETTINGS};
+  }
+
+  return{rate1,rate2,rate3};
+}
+
+function getCommissionSettings(){
+  return{...commissionSettings};
+}
+
+function applyCommissionSettings(settings){
+  commissionSettings=normalizeCommissionSettings(settings);
+  localStorage.setItem(
+    "lover_commission_settings_cache",
+    JSON.stringify(commissionSettings)
+  );
+  loadCachedCommissionSettings();
+loadCommissionSettingsForm();
+  if(typeof renderDashboard==="function")renderDashboard();
+}
+
+function loadCachedCommissionSettings(){
+  try{
+    const cached=JSON.parse(
+      localStorage.getItem("lover_commission_settings_cache")||"null"
+    );
+    if(cached)commissionSettings=normalizeCommissionSettings(cached);
+  }catch(e){
+    commissionSettings={...DEFAULT_COMMISSION_SETTINGS};
+  }
+}
+
+function loadCommissionSettingsForm(){
+  const settings=getCommissionSettings();
+  const rate1=document.getElementById("commissionRate1");
+  const rate2=document.getElementById("commissionRate2");
+  const rate3=document.getElementById("commissionRate3");
+  if(rate1)rate1.value=settings.rate1;
+  if(rate2)rate2.value=settings.rate2;
+  if(rate3)rate3.value=settings.rate3;
+}
+
+async function saveCommissionSettings(){
+  const rate1=Number(document.getElementById("commissionRate1").value);
+  const rate2=Number(document.getElementById("commissionRate2").value);
+  const rate3=Number(document.getElementById("commissionRate3").value);
+  const settings=normalizeCommissionSettings({rate1,rate2,rate3});
+
+  if(settings.rate1!==rate1||settings.rate2!==rate2||settings.rate3!==rate3){
+    alert("请输入正确的佣金百分比");
+    return;
+  }
+
+  try{
+    setSync("正在同步佣金设置...");
+    const saved=await saveCommissionSettingsToSheet(settings);
+    applyCommissionSettings(saved||settings);
+    showTempMsg("commissionSettingsMsg");
+    setSync("已同步",true);
+  }catch(e){
+    alert("佣金设置储存失败："+e.message);
+    setSync("佣金设置同步失败",false,true);
+  }
+}
+
+async function resetCommissionSettings(){
+  const ok=confirm(
+    "确定恢复默认佣金？\n\n"+
+    "RM50,000 以下：6%\n"+
+    "RM50,000 以上：7%\n"+
+    "RM100,000 以上：8%"
+  );
+  if(!ok)return;
+
+  try{
+    setSync("正在恢复默认佣金...");
+    const saved=await resetCommissionSettingsInSheet();
+    applyCommissionSettings(saved||DEFAULT_COMMISSION_SETTINGS);
+    showTempMsg("commissionSettingsMsg");
+    setSync("已同步",true);
+  }catch(e){
+    alert("恢复默认值失败："+e.message);
+    setSync("佣金设置同步失败",false,true);
+  }
+}
+
 function getFairCommissionRate(total){
   const amount=Number(total||0);
+  const settings=getCommissionSettings();
 
-  if(amount>=100000)return 0.08;
-  if(amount>=50000)return 0.07;
-  return 0.06;
+  if(amount>=100000)return settings.rate3/100;
+  if(amount>=50000)return settings.rate2/100;
+  return settings.rate1/100;
 }
 
 function renderFairCommission(total){
   const amount=Number(total||0);
+  const settings=getCommissionSettings();
   const rate=getFairCommissionRate(amount);
-  const percent=Math.round(rate*100);
+  const percent=Number((rate*100).toFixed(2));
 
   const label=document.getElementById("fairCommissionLabel");
   const value=document.getElementById("fairCommissionTotal");
@@ -84,10 +192,10 @@ function renderFairCommission(total){
   if(!message)return;
 
   if(amount<50000){
-    message.textContent="加油，达到 RM50,000 就 7%";
+    message.textContent=`加油，达到 RM50,000 就 ${settings.rate2}%`;
     message.classList.remove("hidden");
   }else if(amount<100000){
-    message.textContent="加油，达到 RM100,000 就 8%";
+    message.textContent=`加油，达到 RM100,000 就 ${settings.rate3}%`;
     message.classList.remove("hidden");
   }else{
     message.textContent="";
