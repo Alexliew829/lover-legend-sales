@@ -1,0 +1,15 @@
+Lover Legend Sales V6.8.2 Fast
+
+加速：
+- App 先显示本机已同步资料，再后台更新。
+- 防止手机同时重复发出多个 load 请求。
+- 4 秒内重复同步会自动合并。
+- Apps Script 使用 5 分钟快取。
+- Daily、Fair、佣金设置写入后立即清除快取。
+- Settings 不再每次读取都重新排版。
+- 不改变营业资料、页面和计算逻辑。
+
+安装：
+1. 覆盖 GitHub 网站文件。
+2. apps_script_v6_8_2_fast.gs.txt 覆盖 Code.gs。
+3. Deploy → Manage deployments → Edit → New version → Deploy。

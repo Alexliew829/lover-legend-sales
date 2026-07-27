@@ -2,6 +2,41 @@ const API_URL = window.LOVER_API_URL;
 let rows = [];
 let pendingRows = [];
 let pendingSyncRunning = false;
+let cloudLoadPromise = null;
+let lastCloudLoadAt = 0;
+
+const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v682";
+const CLOUD_LOAD_COOLDOWN_MS = 4000;
+
+function loadLocalDataCache() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(LOCAL_DATA_CACHE_KEY) || "null");
+    if (!cached || !Array.isArray(cached.rows)) return false;
+
+    rows = cached.rows;
+
+    if (cached.commissionSettings && typeof applyCommissionSettings === "function") {
+      applyCommissionSettings(cached.commissionSettings);
+    }
+
+    renderAll();
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function saveLocalDataCache(commissionSettings = null) {
+  try {
+    localStorage.setItem(LOCAL_DATA_CACHE_KEY, JSON.stringify({
+      rows,
+      commissionSettings:
+        commissionSettings ||
+        (typeof getCommissionSettings === "function" ? getCommissionSettings() : null),
+      savedAt: Date.now()
+    }));
+  } catch (err) {}
+}
 
 function loadPendingRows() {
   try {
@@ -79,29 +114,53 @@ function jsonp(params) {
   });
 }
 
-async function loadFromSheet() {
-  loadPendingRows();
+async function loadFromSheet(options = {}) {
+  const force = options.force === true;
+  const now = Date.now();
 
-  if (pendingRows.length > 0) {
-    setSync(`有 ${pendingRows.length} 笔未同步资料，正在自动同步...`, false, true);
-    await syncPendingRows();
-    return;
-  }
+  if (cloudLoadPromise) return cloudLoadPromise;
+  if (!force && now - lastCloudLoadAt < CLOUD_LOAD_COOLDOWN_MS) return;
 
-  setSync("同步中...");
+  lastCloudLoadAt = now;
+
+  cloudLoadPromise = (async () => {
+    loadPendingRows();
+
+    if (pendingRows.length > 0) {
+      setSync(`有 ${pendingRows.length} 笔未同步资料，正在自动同步...`, false, true);
+      await syncPendingRows();
+      return;
+    }
+
+    const hasLocalData = loadLocalDataCache();
+    setSync(hasLocalData ? "已显示本机资料，后台同步中..." : "同步中...");
+
+    try {
+      const json = await jsonp({ action: "load" });
+      if (!json.ok) throw new Error(json.message || "读取失败");
+
+      rows = json.rows || [];
+
+      if (json.commissionSettings && typeof applyCommissionSettings === "function") {
+        applyCommissionSettings(json.commissionSettings);
+      }
+
+      renderAll();
+      saveLocalDataCache(json.commissionSettings || null);
+      setSync("已同步", true);
+    } catch (err) {
+      setSync(
+        hasLocalData ? "已显示本机资料，云端同步稍后重试" : "同步失败：" + err.message,
+        false,
+        true
+      );
+    }
+  })();
 
   try {
-    const json = await jsonp({ action: "load" });
-    if (!json.ok) throw new Error(json.message || "读取失败");
-
-    rows = json.rows || [];
-    if(json.commissionSettings&&typeof applyCommissionSettings==="function"){
-      applyCommissionSettings(json.commissionSettings);
-    }
-    renderAll();
-    setSync("已同步", true);
-  } catch (err) {
-    setSync("同步失败：" + err.message, false, true);
+    return await cloudLoadPromise;
+  } finally {
+    cloudLoadPromise = null;
   }
 }
 
@@ -169,6 +228,7 @@ async function syncPendingRows() {
     }
 
     renderAll();
+    saveLocalDataCache();
     setSync("已同步", true);
   } catch (err) {
     loadPendingRows();
