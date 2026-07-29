@@ -1,23 +1,149 @@
 const API_URL = window.LOVER_API_URL;
+
 let rows = [];
 let pendingRows = [];
-let pendingSyncRunning = false;
-let cloudLoadPromise = null;
-let lastCloudLoadAt = 0;
 
-const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v682";
-const CLOUD_LOAD_COOLDOWN_MS = 4000;
+let cloudSyncBusy = false;
+let cloudSyncRequestedWhileBusy = false;
+let cloudSyncTimer = null;
+let cloudInitialSyncComplete = false;
+
+const SALES_CACHE_KEY = "lover_sales_snapshot_v8";
+const SALES_QUEUE_KEY = "lover_sales_queue_v8";
+const SALES_CONFIG_KEY = "lover_sales_cloud_config_v8";
+
+function getSelectedSyncYear() {
+  return (
+    document.getElementById("yearPicker")?.value ||
+    String(new Date().getFullYear())
+  );
+}
+
+function getCloudConfig() {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(SALES_CONFIG_KEY) || "{}"
+    );
+
+    return {
+      revisions: saved.revisions || {},
+      lastSyncAt: saved.lastSyncAt || ""
+    };
+  } catch (err) {
+    return {
+      revisions: {},
+      lastSyncAt: ""
+    };
+  }
+}
+
+function saveCloudConfig(config) {
+  localStorage.setItem(
+    SALES_CONFIG_KEY,
+    JSON.stringify(config)
+  );
+}
+
+function getCloudQueue() {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(SALES_QUEUE_KEY) || "null"
+    );
+
+    if (!saved) {
+      return {
+        dirty: false,
+        changedAt: "",
+        settingsDirty: false,
+        records: []
+      };
+    }
+
+    return {
+      dirty: Boolean(saved.dirty),
+      changedAt: saved.changedAt || "",
+      settingsDirty: Boolean(saved.settingsDirty),
+      records: Array.isArray(saved.records)
+        ? saved.records
+        : []
+    };
+  } catch (err) {
+    return {
+      dirty: false,
+      changedAt: "",
+      settingsDirty: false,
+      records: []
+    };
+  }
+}
+
+function saveCloudQueue(queue) {
+  localStorage.setItem(
+    SALES_QUEUE_KEY,
+    JSON.stringify(queue)
+  );
+
+  pendingRows = Array.isArray(queue.records)
+    ? [...queue.records]
+    : [];
+}
+
+function loadPendingRows() {
+  const queue = getCloudQueue();
+  pendingRows = [...queue.records];
+}
+
+function savePendingRows() {
+  const queue = getCloudQueue();
+  queue.records = [...pendingRows];
+  queue.dirty =
+    queue.settingsDirty ||
+    queue.records.length > 0;
+
+  if (queue.dirty && !queue.changedAt) {
+    queue.changedAt = new Date().toISOString();
+  }
+
+  saveCloudQueue(queue);
+}
+
+function saveLocalDataCache(commissionSettings = null) {
+  try {
+    localStorage.setItem(
+      SALES_CACHE_KEY,
+      JSON.stringify({
+        rows,
+        commissionSettings:
+          commissionSettings ||
+          (
+            typeof getCommissionSettings === "function"
+              ? getCommissionSettings()
+              : null
+          ),
+        savedAt: Date.now()
+      })
+    );
+  } catch (err) {}
+}
 
 function loadLocalDataCache() {
   try {
-    const cached = JSON.parse(localStorage.getItem(LOCAL_DATA_CACHE_KEY) || "null");
-    if (!cached || !Array.isArray(cached.rows)) return false;
+    const cached = JSON.parse(
+      localStorage.getItem(SALES_CACHE_KEY) || "null"
+    );
 
-    rows = typeof applyLiveDeleteTombstones==="function"
+    if (!cached || !Array.isArray(cached.rows)) {
+      return false;
+    }
+
+    rows = typeof applyLiveDeleteTombstones === "function"
       ? applyLiveDeleteTombstones(cached.rows)
       : cached.rows;
 
-    if (cached.commissionSettings && typeof applyCommissionSettings === "function") {
+    if (
+      cached.commissionSettings &&
+      typeof applyCommissionSettings === "function"
+    ) {
       applyCommissionSettings(cached.commissionSettings);
     }
 
@@ -26,44 +152,6 @@ function loadLocalDataCache() {
   } catch (err) {
     return false;
   }
-}
-
-function saveLocalDataCache(commissionSettings = null) {
-  try {
-    localStorage.setItem(LOCAL_DATA_CACHE_KEY, JSON.stringify({
-      rows,
-      commissionSettings:
-        commissionSettings ||
-        (typeof getCommissionSettings === "function" ? getCommissionSettings() : null),
-      savedAt: Date.now()
-    }));
-  } catch (err) {}
-}
-
-function loadPendingRows() {
-  try {
-    pendingRows = JSON.parse(localStorage.getItem("lover_pending_rows") || "[]");
-  } catch (err) {
-    pendingRows = [];
-  }
-}
-
-function savePendingRows() {
-  localStorage.setItem("lover_pending_rows", JSON.stringify(pendingRows));
-}
-
-function addPendingRow(row) {
-  const key = syncKey(row);
-  const index = pendingRows.findIndex(r => syncKey(r) === key);
-  if (index >= 0) pendingRows[index] = row;
-  else pendingRows.push(row);
-  savePendingRows();
-}
-
-function clearPendingRow(row) {
-  const key = syncKey(row);
-  pendingRows = pendingRows.filter(r => syncKey(r) !== key);
-  savePendingRows();
 }
 
 function setSync(text, good = false, error = false) {
@@ -79,278 +167,573 @@ function setSync(text, good = false, error = false) {
 
   if (good) {
     const last = document.getElementById("lastSync");
-    if (last) last.textContent = "最后同步：" + nowText();
+
+    if (last) {
+      last.textContent = "最后同步：" + nowText();
+    }
   }
 }
 
-function jsonp(params) {
+function jsonp(params, timeout = 15000) {
   return new Promise((resolve, reject) => {
-    const callback = "ll_cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
-    params.callback = callback;
+    const callback =
+      "ll_v8_cb_" +
+      Date.now() +
+      "_" +
+      Math.floor(Math.random() * 100000);
 
     const script = document.createElement("script");
-    const query = new URLSearchParams(params).toString();
+    const payload = {
+      ...params,
+      callback,
+      requestId:
+        Date.now() +
+        "-" +
+        Math.floor(Math.random() * 1000000)
+    };
 
-    const timer = setTimeout(() => {
+    const timer = window.setTimeout(() => {
       delete window[callback];
       script.remove();
-      reject(new Error("连接 Google Apps Script 超时"));
-    }, 8000);
+      reject(
+        new Error("连接 Google Apps Script 超时")
+      );
+    }, timeout);
 
     window[callback] = data => {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       delete window[callback];
       script.remove();
       resolve(data);
     };
 
     script.onerror = () => {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       delete window[callback];
       script.remove();
-      reject(new Error("无法连接 Google Apps Script"));
+      reject(
+        new Error("无法连接 Google Apps Script")
+      );
     };
 
-    script.src = API_URL + "?" + query;
+    script.src =
+      API_URL +
+      "?" +
+      new URLSearchParams(payload).toString();
+
     document.body.appendChild(script);
   });
 }
 
-async function loadFromSheet(options = {}) {
-  const force = options.force === true;
-  const now = Date.now();
+function mergeRows(remoteRows, localRows, queue) {
+  const map = new Map();
 
-  if (cloudLoadPromise) return cloudLoadPromise;
-  if (!force && now - lastCloudLoadAt < CLOUD_LOAD_COOLDOWN_MS) return;
+  (remoteRows || []).forEach(row => {
+    map.set(syncKey(row), row);
+  });
 
-  lastCloudLoadAt = now;
+  (localRows || []).forEach(row => {
+    const key = syncKey(row);
+    const existing = map.get(key);
 
-  cloudLoadPromise = (async () => {
-    // 第一时间显示本机最后一次成功同步的资料。
-    const hasLocalData = loadLocalDataCache();
+    const localTime = Date.parse(
+      row.clientUpdatedAt ||
+      row.updatedAt ||
+      ""
+    ) || 0;
 
-    if (hasLocalData) {
-      setSync("已显示本机资料，后台更新中...");
+    const remoteTime = Date.parse(
+      existing?.clientUpdatedAt ||
+      existing?.updatedAt ||
+      ""
+    ) || 0;
+
+    if (!existing || localTime >= remoteTime) {
+      map.set(key, row);
+    }
+  });
+
+  (queue.records || []).forEach(row => {
+    const key = syncKey(row);
+
+    if (Number(row.amount || 0) <= 0) {
+      map.delete(key);
     } else {
-      setSync("正在读取资料...");
+      map.set(key, row);
     }
+  });
 
-    // 未同步资料不再阻塞云端读取。
-    // 先在后台尝试上传，然后无论成功与否都继续读取。
-    loadPendingRows();
+  let merged = [...map.values()];
 
-    if (pendingRows.length > 0) {
-      try {
-        await syncPendingRows();
-      } catch (err) {
-        console.warn("Pending sync failed:", err);
-      }
-    }
-
-    try {
-      const selectedYear =
-        document.getElementById("yearPicker")?.value ||
-        String(new Date().getFullYear());
-
-      const json = await jsonp({
-        action: "load",
-        year: selectedYear
-      });
-
-      if (!json.ok) {
-        throw new Error(json.message || "读取失败");
-      }
-
-      rows = typeof applyLiveDeleteTombstones==="function"?applyLiveDeleteTombstones(json.rows||[]):(json.rows||[]);
-
-      if (
-        json.commissionSettings &&
-        typeof applyCommissionSettings === "function"
-      ) {
-        applyCommissionSettings(json.commissionSettings);
-      }
-
-      renderAll();
-      saveLocalDataCache(json.commissionSettings || null);
-      setSync("已同步", true);
-    } catch (err) {
-      loadPendingRows();
-
-      if (hasLocalData) {
-        setSync("已显示本机资料，云端稍后重试", false, true);
-      } else if (pendingRows.length > 0) {
-        setSync(
-          `有 ${pendingRows.length} 笔资料等待同步`,
-          false,
-          true
-        );
-      } else {
-        setSync("同步失败：" + err.message, false, true);
-      }
-    }
-  })();
-
-  try {
-    return await cloudLoadPromise;
-  } finally {
-    cloudLoadPromise = null;
+  if (
+    typeof applyLiveDeleteTombstones === "function"
+  ) {
+    merged = applyLiveDeleteTombstones(merged);
   }
+
+  return dedupeRows(merged);
 }
 
-async function syncPendingRows() {
-  if (pendingSyncRunning) return;
-  pendingSyncRunning = true;
+function addPendingRow(row) {
+  const queue = getCloudQueue();
+  const key = syncKey(row);
+  const index = queue.records.findIndex(
+    item => syncKey(item) === key
+  );
+
+  const nextRow = {
+    ...row,
+    clientUpdatedAt:
+      row.clientUpdatedAt ||
+      new Date().toISOString()
+  };
+
+  if (index >= 0) {
+    queue.records[index] = nextRow;
+  } else {
+    queue.records.push(nextRow);
+  }
+
+  queue.dirty = true;
+  queue.changedAt = new Date().toISOString();
+
+  saveCloudQueue(queue);
+  saveLocalDataCache();
+  scheduleGoogleSync(80);
+}
+
+function clearPendingRow(row) {
+  const queue = getCloudQueue();
+  const key = syncKey(row);
+
+  queue.records = queue.records.filter(
+    item => syncKey(item) !== key
+  );
+
+  queue.dirty =
+    queue.settingsDirty ||
+    queue.records.length > 0;
+
+  if (!queue.dirty) {
+    queue.changedAt = "";
+  }
+
+  saveCloudQueue(queue);
+}
+
+function markCommissionSettingsDirty() {
+  const queue = getCloudQueue();
+
+  queue.settingsDirty = true;
+  queue.dirty = true;
+  queue.changedAt = new Date().toISOString();
+
+  saveCloudQueue(queue);
+  saveLocalDataCache();
+  scheduleGoogleSync(80);
+}
+
+function scheduleGoogleSync(delay = 80) {
+  const queue = getCloudQueue();
+
+  if (queue.dirty) {
+    setSync(
+      `已储存本机，正在同步 ${
+        queue.records.length
+      } 笔资料...`
+    );
+  } else {
+    setSync("后台检查更新中...");
+  }
+
+  window.clearTimeout(cloudSyncTimer);
+
+  cloudSyncTimer = window.setTimeout(
+    () => runCloudSync(),
+    delay
+  );
+}
+
+async function loadFromSheet(options = {}) {
+  const force = options.force === true;
+
+  if (!cloudInitialSyncComplete) {
+    loadLocalDataCache();
+  }
+
+  return runCloudSync({ force });
+}
+
+async function runCloudSync(options = {}) {
+  if (!navigator.onLine) {
+    setSync(
+      "离线：资料已保存在本机",
+      false,
+      true
+    );
+    return;
+  }
+
+  if (cloudSyncBusy) {
+    cloudSyncRequestedWhileBusy = true;
+    return;
+  }
+
+  cloudSyncBusy = true;
+  cloudSyncRequestedWhileBusy = false;
 
   try {
-    loadPendingRows();
+    const queue = getCloudQueue();
 
-    if (pendingRows.length === 0) {
-      setSync("已同步", true);
-      return;
-    }
-
-    setSync(`正在自动同步 ${pendingRows.length} 笔资料...`);
-
-    const dailyRows = pendingRows.filter(r => r.type === "daily");
-    const fairRows = pendingRows.filter(r => r.type === "fair");
-    const liveRows = pendingRows.filter(r => r.type === "live");
-
-    for (const row of dailyRows) {
-      const saved = await saveDailyToSheet(
-        row.date,
-        row.company,
-        row.amount,
-        row.clientUpdatedAt || ""
+    if (queue.dirty) {
+      await pushPendingSnapshot(queue);
+    } else {
+      await pullLatestSnapshot(
+        options.force === true
       );
-      if (saved) upsertLocalRow(saved);
-      clearPendingRow(row);
     }
 
-    const fairGroups = new Map();
+    cloudInitialSyncComplete = true;
+  } catch (error) {
+    cloudInitialSyncComplete = true;
 
-    fairRows.forEach(row => {
-      const loc = canonicalLocation(row.location);
-      if (!fairGroups.has(loc)) fairGroups.set(loc, []);
-      fairGroups.get(loc).push({
-        date: row.date,
-        amount: Number(row.amount || 0),
-        clientUpdatedAt: row.clientUpdatedAt || ""
-      });
-    });
+    const queue = getCloudQueue();
 
-    for (const [location, records] of fairGroups.entries()) {
-      const result = await saveFairBatchToSheet(location, records);
-
-      if (result && Array.isArray(result.rows)) {
-        result.rows.forEach(r => {
-          if (Number(r.amount) <= 0) {
-            rows = rows.filter(x => syncKey(x) !== syncKey(r));
-          } else {
-            upsertLocalRow(r);
-          }
-        });
-      }
-
-      records.forEach(item => {
-        clearPendingRow({
-          type: "fair",
-          date: item.date,
-          company: "belimbing",
-          location
-        });
-      });
-    }
-
-    for (const row of liveRows) {
-      const saved = await saveLiveToSheet(row.date,row.location,row.amount,row.clientUpdatedAt||"");
-      if(saved&&Number(saved.amount)<=0){rows=rows.filter(x=>syncKey(x)!==syncKey(saved));if(typeof clearLiveDeleteTombstone==="function")clearLiveDeleteTombstone(row.date,row.location)}
-      else if(saved){if(typeof clearLiveDeleteTombstone==="function")clearLiveDeleteTombstone(row.date,row.location);upsertLocalRow(saved)}
-      clearPendingRow(row);
-    }
-
-    renderAll();
-    saveLocalDataCache();
-    setSync("已同步", true);
-  } catch (err) {
-    loadPendingRows();
-
-    if (pendingRows.length > 0) {
+    if (queue.dirty) {
       setSync(
-        `有 ${pendingRows.length} 笔资料等待同步`,
+        `已保存在本机，${queue.records.length} 笔等待同步`,
         false,
         true
       );
     } else {
-      setSync("云端暂时连接失败", false, true);
+      setSync(
+        "云端暂时连接失败",
+        false,
+        true
+      );
     }
+
+    console.error(
+      "Google sync failed:",
+      error
+    );
   } finally {
-    pendingSyncRunning = false;
+    cloudSyncBusy = false;
+
+    if (
+      cloudSyncRequestedWhileBusy ||
+      getCloudQueue().dirty
+    ) {
+      cloudSyncTimer = window.setTimeout(
+        () => runCloudSync(),
+        180
+      );
+    }
   }
 }
 
-async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "") {
-  const json = await jsonp({
-    action: "saveDaily",
+async function pullLatestSnapshot(force = false) {
+  const year = getSelectedSyncYear();
+  const config = getCloudConfig();
+  const knownRevision = force
+    ? -1
+    : Number(config.revisions[year]) || 0;
+
+  const data = await jsonp({
+    action: "pull",
+    year,
+    knownRevision
+  });
+
+  if (!data.ok) {
+    throw new Error(
+      data.message || "读取失败"
+    );
+  }
+
+  if (data.unchanged) {
+    config.revisions[year] =
+      Number(data.revision) || 0;
+
+    config.lastSyncAt =
+      new Date().toISOString();
+
+    saveCloudConfig(config);
+    setSync("已同步", true);
+    return;
+  }
+
+  const queue = getCloudQueue();
+
+  rows = mergeRows(
+    data.rows || [],
+    rows,
+    queue
+  );
+
+  if (
+    data.commissionSettings &&
+    !queue.settingsDirty &&
+    typeof applyCommissionSettings === "function"
+  ) {
+    applyCommissionSettings(
+      data.commissionSettings
+    );
+  }
+
+  config.revisions[year] =
+    Number(data.revision) || 0;
+
+  config.lastSyncAt =
+    new Date().toISOString();
+
+  saveCloudConfig(config);
+  saveLocalDataCache(
+    queue.settingsDirty
+      ? getCommissionSettings()
+      : data.commissionSettings
+  );
+
+  renderAll();
+  setSync("已同步", true);
+}
+
+async function pushPendingSnapshot(
+  queue,
+  retryCount = 0
+) {
+  const year = getSelectedSyncYear();
+  const config = getCloudConfig();
+  const sentChangedAt =
+    queue.changedAt || "";
+
+  const data = await jsonp(
+    {
+      action: "push",
+      year,
+      baseRevision:
+        Number(config.revisions[year]) || 0,
+      changes: JSON.stringify(
+        queue.records || []
+      ),
+      settingsDirty:
+        queue.settingsDirty ? "1" : "0",
+      commissionSettings:
+        JSON.stringify(
+          typeof getCommissionSettings === "function"
+            ? getCommissionSettings()
+            : {}
+        ),
+      updatedBy: "Sales V8.0"
+    },
+    20000
+  );
+
+  if (!data.ok) {
+    throw new Error(
+      data.message || "同步失败"
+    );
+  }
+
+  if (data.conflict) {
+    if (retryCount >= 1) {
+      throw new Error(
+        "资料冲突仍未解决，请重新打开系统再同步"
+      );
+    }
+
+    rows = mergeRows(
+      data.rows || [],
+      rows,
+      queue
+    );
+
+    if (
+      data.commissionSettings &&
+      !queue.settingsDirty &&
+      typeof applyCommissionSettings === "function"
+    ) {
+      applyCommissionSettings(
+        data.commissionSettings
+      );
+    }
+
+    config.revisions[year] =
+      Number(data.revision) || 0;
+
+    saveCloudConfig(config);
+    saveLocalDataCache();
+    renderAll();
+
+    return pushPendingSnapshot(
+      getCloudQueue(),
+      retryCount + 1
+    );
+  }
+
+  config.revisions[year] =
+    Number(data.revision) || 0;
+
+  config.lastSyncAt =
+    new Date().toISOString();
+
+  saveCloudConfig(config);
+
+  const latestQueue = getCloudQueue();
+
+  if (
+    latestQueue.changedAt === sentChangedAt
+  ) {
+    saveCloudQueue({
+      dirty: false,
+      changedAt: "",
+      settingsDirty: false,
+      records: []
+    });
+  }
+
+  if (Array.isArray(data.rows)) {
+    rows = mergeRows(
+      data.rows,
+      rows,
+      getCloudQueue()
+    );
+  }
+
+  if (
+    data.commissionSettings &&
+    typeof applyCommissionSettings === "function"
+  ) {
+    applyCommissionSettings(
+      data.commissionSettings
+    );
+  }
+
+  saveLocalDataCache(
+    data.commissionSettings || null
+  );
+
+  renderAll();
+  setSync("已同步", true);
+}
+
+async function syncPendingRows() {
+  return runCloudSync();
+}
+
+async function saveDailyToSheet(
+  date,
+  company,
+  amount,
+  clientUpdatedAt = ""
+) {
+  await runCloudSync();
+
+  return {
+    type: "daily",
     date,
     company,
-    amount,
-    clientUpdatedAt
-  });
-
-  if (!json.ok) throw new Error(json.message || "储存失败");
-  return json.row || null;
+    location: "",
+    amount: Number(amount || 0),
+    updatedAt:
+      clientUpdatedAt ||
+      new Date().toISOString()
+  };
 }
 
-async function saveFairBatchToSheet(location, records) {
-  const json = await jsonp({
-    action: "saveFairBatch",
-    location,
-    records: JSON.stringify(records)
-  });
+async function saveFairBatchToSheet(
+  location,
+  records
+) {
+  await runCloudSync();
 
-  if (!json.ok) throw new Error(json.message || "Fair 储存失败");
-  return json;
+  return {
+    rows: (records || []).map(item => ({
+      type: "fair",
+      date: item.date,
+      company: "belimbing",
+      location,
+      amount: Number(item.amount || 0),
+      updatedAt:
+        item.clientUpdatedAt ||
+        new Date().toISOString()
+    }))
+  };
 }
 
-async function saveFairSingleToSheet(date, location, amount, clientUpdatedAt = "") {
-  return saveFairBatchToSheet(location, [{
+async function saveLiveToSheet(
+  date,
+  host,
+  amount,
+  clientUpdatedAt = ""
+) {
+  await runCloudSync();
+
+  return {
+    type: "live",
     date,
-    amount,
-    clientUpdatedAt
-  }]);
+    company: "live",
+    location: host,
+    amount: Number(amount || 0),
+    updatedAt:
+      clientUpdatedAt ||
+      new Date().toISOString()
+  };
 }
 
-async function saveFairToSheet(location, records) {
-  return saveFairBatchToSheet(location, records);
-}
+async function saveCommissionSettingsToSheet(
+  settings
+) {
+  if (
+    typeof applyCommissionSettingsImmediately ===
+    "function"
+  ) {
+    applyCommissionSettingsImmediately(
+      settings
+    );
+  }
 
-async function saveLiveToSheet(date,host,amount,clientUpdatedAt=""){const json=await jsonp({action:"saveLive",date,host,amount,clientUpdatedAt});if(!json.ok)throw new Error(json.message||"Live 储存失败");return json.row||null}
+  markCommissionSettingsDirty();
+  await runCloudSync();
 
-async function saveCommissionSettingsToSheet(settings) {
-  const json = await jsonp({
-    action: "saveCommissionSettings",
-    rate1: settings.rate1,
-    rate2: settings.rate2,
-    rate3: settings.rate3,
-    liveRate: settings.liveRate,
-    liveHostRates: JSON.stringify(settings.liveHostRates || {})
-  });
-  if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
-  return json.commissionSettings || null;
+  return getCommissionSettings();
 }
 
 async function resetCommissionSettingsInSheet() {
-  const json = await jsonp({ action: "resetCommissionSettings" });
-  if (!json.ok) throw new Error(json.message || "恢复默认值失败");
-  return json.commissionSettings || null;
+  return saveCommissionSettingsToSheet({
+    rate1: 6,
+    rate2: 7,
+    rate3: 8,
+    liveRate: 10,
+    liveHostRates: {}
+  });
 }
 
-setInterval(() => {
-  loadPendingRows();
-  if (pendingRows.length > 0) syncPendingRows();
-}, 30000);
-
 window.addEventListener("online", () => {
-  loadPendingRows();
-  if (pendingRows.length > 0) syncPendingRows();
+  scheduleGoogleSync(100);
 });
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+    if (
+      document.visibilityState === "visible"
+    ) {
+      scheduleGoogleSync(150);
+    }
+  }
+);
+
+window.addEventListener("focus", () => {
+  scheduleGoogleSync(150);
+});
+
+window.setInterval(() => {
+  const queue = getCloudQueue();
+
+  if (queue.dirty) {
+    runCloudSync();
+  }
+}, 15000);
+
+loadPendingRows();
