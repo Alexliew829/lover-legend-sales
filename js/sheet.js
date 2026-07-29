@@ -3,6 +3,7 @@ let rows = [];
 let pendingRows = [];
 let pendingSyncRunning = false;
 let cloudLoadPromise = null;
+let commissionSavePromise = null;
 let lastCloudLoadAt = 0;
 
 const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v682";
@@ -284,16 +285,33 @@ async function saveFairToSheet(location, records) {
 async function saveLiveToSheet(date,host,amount,clientUpdatedAt=""){const json=await jsonp({action:"saveLive",date,host,amount,clientUpdatedAt});if(!json.ok)throw new Error(json.message||"Live 储存失败");return json.row||null}
 
 async function saveCommissionSettingsToSheet(settings) {
-  const json = await jsonp({
-    action: "saveCommissionSettings",
-    rate1: settings.rate1,
-    rate2: settings.rate2,
-    rate3: settings.rate3,
-    liveRate: settings.liveRate,
-    liveHostRates: JSON.stringify(settings.liveHostRates || {})
-  });
-  if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
-  return json.commissionSettings || null;
+  // 避免重复点击产生多个并发请求。
+  if (commissionSavePromise) {
+    await commissionSavePromise;
+  }
+
+  commissionSavePromise = (async () => {
+    const json = await jsonp({
+      action: "saveCommissionSettings",
+      rate1: settings.rate1,
+      rate2: settings.rate2,
+      rate3: settings.rate3,
+      liveRate: settings.liveRate,
+      liveHostRates: JSON.stringify(settings.liveHostRates || {})
+    });
+
+    if (!json.ok) {
+      throw new Error(json.message || "佣金设置储存失败");
+    }
+
+    return json.commissionSettings || null;
+  })();
+
+  try {
+    return await commissionSavePromise;
+  } finally {
+    commissionSavePromise = null;
+  }
 }
 
 async function resetCommissionSettingsInSheet() {

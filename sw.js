@@ -1,4 +1,4 @@
-const CACHE_NAME = "lover-sales-v7-0";
+const CACHE_NAME = "lover-sales-v7-1-fast";
 
 const CORE_FILES = [
   "./",
