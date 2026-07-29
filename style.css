@@ -149,3 +149,17 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .live-list-header,.live-daily-row{grid-template-columns:minmax(105px,1.15fr) minmax(115px,1fr) minmax(105px,.9fr)}
 .live-list-header span:nth-child(2),.live-daily-row span:nth-child(2){text-align:right;padding-right:12px}
 .live-list-header span:nth-child(3),.live-daily-row b{text-align:right;padding-right:4px}
+
+
+/* V7.5 Live 列表对齐 */
+.live-list-header span:nth-child(2),
+.live-daily-row span:nth-child(2) {
+  text-align: right;
+  padding-right: 18px;
+}
+
+.live-list-header span:nth-child(3),
+.live-daily-row b {
+  text-align: right;
+  padding-right: 6px;
+}

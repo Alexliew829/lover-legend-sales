@@ -13,7 +13,9 @@ function loadLocalDataCache() {
     const cached = JSON.parse(localStorage.getItem(LOCAL_DATA_CACHE_KEY) || "null");
     if (!cached || !Array.isArray(cached.rows)) return false;
 
-    rows = cached.rows;
+    rows = typeof applyLiveDeleteTombstones==="function"
+      ? applyLiveDeleteTombstones(cached.rows)
+      : cached.rows;
 
     if (cached.commissionSettings && typeof applyCommissionSettings === "function") {
       applyCommissionSettings(cached.commissionSettings);
