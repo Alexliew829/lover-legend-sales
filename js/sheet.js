@@ -4,6 +4,7 @@ let rows = [];
 let pendingRows = [];
 
 let cloudSyncBusy = false;
+let cloudSyncPromise = null;
 let cloudSyncRequestedWhileBusy = false;
 let cloudSyncTimer = null;
 let cloudInitialSyncComplete = false;
@@ -338,9 +339,7 @@ function scheduleGoogleSync(delay = 80) {
 
   if (queue.dirty) {
     setSync(
-      `已储存本机，正在同步 ${
-        queue.records.length
-      } 笔资料...`
+      `已储存本机，正在同步 ${queue.records.length} 笔资料...`
     );
   } else {
     setSync("后台检查更新中...");
@@ -348,10 +347,11 @@ function scheduleGoogleSync(delay = 80) {
 
   window.clearTimeout(cloudSyncTimer);
 
-  cloudSyncTimer = window.setTimeout(
-    () => runCloudSync(),
-    delay
-  );
+  cloudSyncTimer = window.setTimeout(() => {
+    runCloudSync().catch(error => {
+      console.error("Background sync failed:", error);
+    });
+  }, delay);
 }
 
 async function loadFromSheet(options = {}) {
@@ -366,68 +366,82 @@ async function loadFromSheet(options = {}) {
 
 async function runCloudSync(options = {}) {
   if (!navigator.onLine) {
+    const error = new Error("目前离线");
+
     setSync(
       "离线：资料已保存在本机",
       false,
       true
     );
-    return;
+
+    throw error;
   }
 
-  if (cloudSyncBusy) {
+  // 已有同步在运行时，等待同一个 Promise。
+  // 保存函数不能提前当成成功。
+  if (cloudSyncPromise) {
     cloudSyncRequestedWhileBusy = true;
-    return;
+    return cloudSyncPromise;
   }
 
   cloudSyncBusy = true;
   cloudSyncRequestedWhileBusy = false;
 
+  cloudSyncPromise = (async () => {
+    try {
+      const queue = getCloudQueue();
+
+      if (queue.dirty) {
+        await pushPendingSnapshot(queue);
+      } else {
+        await pullLatestSnapshot(
+          options.force === true
+        );
+      }
+
+      cloudInitialSyncComplete = true;
+      return true;
+    } catch (error) {
+      cloudInitialSyncComplete = true;
+
+      const queue = getCloudQueue();
+
+      if (queue.dirty) {
+        setSync(
+          `已保存在本机，${queue.records.length} 笔等待同步`,
+          false,
+          true
+        );
+      } else {
+        setSync(
+          "云端暂时连接失败",
+          false,
+          true
+        );
+      }
+
+      console.error("Google sync failed:", error);
+      throw error;
+    } finally {
+      cloudSyncBusy = false;
+      cloudSyncPromise = null;
+    }
+  })();
+
   try {
-    const queue = getCloudQueue();
-
-    if (queue.dirty) {
-      await pushPendingSnapshot(queue);
-    } else {
-      await pullLatestSnapshot(
-        options.force === true
-      );
-    }
-
-    cloudInitialSyncComplete = true;
-  } catch (error) {
-    cloudInitialSyncComplete = true;
-
-    const queue = getCloudQueue();
-
-    if (queue.dirty) {
-      setSync(
-        `已保存在本机，${queue.records.length} 笔等待同步`,
-        false,
-        true
-      );
-    } else {
-      setSync(
-        "云端暂时连接失败",
-        false,
-        true
-      );
-    }
-
-    console.error(
-      "Google sync failed:",
-      error
-    );
+    return await cloudSyncPromise;
   } finally {
-    cloudSyncBusy = false;
-
     if (
       cloudSyncRequestedWhileBusy ||
       getCloudQueue().dirty
     ) {
-      cloudSyncTimer = window.setTimeout(
-        () => runCloudSync(),
-        180
-      );
+      cloudSyncRequestedWhileBusy = false;
+
+      cloudSyncTimer = window.setTimeout(() => {
+        runCloudSync().catch(error => {
+          console.error("Retry sync failed:", error);
+        });
+      }, 250);
     }
   }
 }
@@ -504,8 +518,13 @@ async function pushPendingSnapshot(
 ) {
   const year = getSelectedSyncYear();
   const config = getCloudConfig();
-  const sentChangedAt =
-    queue.changedAt || "";
+
+  const sentRecords = [...(queue.records || [])];
+  const sentKeys = new Set(
+    sentRecords.map(syncKey)
+  );
+  const sentSettingsDirty =
+    Boolean(queue.settingsDirty);
 
   const data = await jsonp(
     {
@@ -513,20 +532,18 @@ async function pushPendingSnapshot(
       year,
       baseRevision:
         Number(config.revisions[year]) || 0,
-      changes: JSON.stringify(
-        queue.records || []
-      ),
+      changes: JSON.stringify(sentRecords),
       settingsDirty:
-        queue.settingsDirty ? "1" : "0",
+        sentSettingsDirty ? "1" : "0",
       commissionSettings:
         JSON.stringify(
           typeof getCommissionSettings === "function"
             ? getCommissionSettings()
             : {}
         ),
-      updatedBy: "Sales V8.0"
+      updatedBy: "Sales V8.2"
     },
-    20000
+    25000
   );
 
   if (!data.ok) {
@@ -536,21 +553,21 @@ async function pushPendingSnapshot(
   }
 
   if (data.conflict) {
-    if (retryCount >= 1) {
+    if (retryCount >= 2) {
       throw new Error(
-        "资料冲突仍未解决，请重新打开系统再同步"
+        "资料冲突仍未解决，系统会保留本机资料并稍后重试"
       );
     }
 
     rows = mergeRows(
       data.rows || [],
       rows,
-      queue
+      getCloudQueue()
     );
 
     if (
       data.commissionSettings &&
-      !queue.settingsDirty &&
+      !getCloudQueue().settingsDirty &&
       typeof applyCommissionSettings === "function"
     ) {
       applyCommissionSettings(
@@ -579,29 +596,38 @@ async function pushPendingSnapshot(
 
   saveCloudConfig(config);
 
+  // 只清除本次云端已确认的记录。
   const latestQueue = getCloudQueue();
 
-  if (
-    latestQueue.changedAt === sentChangedAt
-  ) {
-    saveCloudQueue({
-      dirty: false,
-      changedAt: "",
-      settingsDirty: false,
-      records: []
-    });
+  latestQueue.records = latestQueue.records.filter(
+    record => !sentKeys.has(syncKey(record))
+  );
+
+  if (sentSettingsDirty) {
+    latestQueue.settingsDirty = false;
   }
+
+  latestQueue.dirty =
+    latestQueue.settingsDirty ||
+    latestQueue.records.length > 0;
+
+  if (!latestQueue.dirty) {
+    latestQueue.changedAt = "";
+  }
+
+  saveCloudQueue(latestQueue);
 
   if (Array.isArray(data.rows)) {
     rows = mergeRows(
       data.rows,
       rows,
-      getCloudQueue()
+      latestQueue
     );
   }
 
   if (
     data.commissionSettings &&
+    !latestQueue.settingsDirty &&
     typeof applyCommissionSettings === "function"
   ) {
     applyCommissionSettings(
@@ -610,11 +636,20 @@ async function pushPendingSnapshot(
   }
 
   saveLocalDataCache(
-    data.commissionSettings || null
+    latestQueue.settingsDirty
+      ? getCommissionSettings()
+      : (data.commissionSettings || null)
   );
 
   renderAll();
-  setSync("已同步", true);
+
+  if (latestQueue.dirty) {
+    setSync(
+      `已同步部分资料，尚有 ${latestQueue.records.length} 笔等待同步`
+    );
+  } else {
+    setSync("已同步", true);
+  }
 }
 
 async function syncPendingRows() {
@@ -629,12 +664,24 @@ async function saveDailyToSheet(
 ) {
   await runCloudSync();
 
-  return {
+  const row = {
     type: "daily",
     date,
     company,
     location: "",
-    amount: Number(amount || 0),
+    amount: Number(amount || 0)
+  };
+
+  const stillPending = getCloudQueue().records.some(
+    pending => syncKey(pending) === syncKey(row)
+  );
+
+  if (stillPending) {
+    throw new Error("这笔营业额仍在等待同步");
+  }
+
+  return {
+    ...row,
     updatedAt:
       clientUpdatedAt ||
       new Date().toISOString()
@@ -647,18 +694,30 @@ async function saveFairBatchToSheet(
 ) {
   await runCloudSync();
 
-  return {
-    rows: (records || []).map(item => ({
-      type: "fair",
-      date: item.date,
-      company: "belimbing",
-      location,
-      amount: Number(item.amount || 0),
-      updatedAt:
-        item.clientUpdatedAt ||
-        new Date().toISOString()
-    }))
-  };
+  const resultRows = (records || []).map(item => ({
+    type: "fair",
+    date: item.date,
+    company: "belimbing",
+    location,
+    amount: Number(item.amount || 0),
+    updatedAt:
+      item.clientUpdatedAt ||
+      new Date().toISOString()
+  }));
+
+  const pendingKeys = new Set(
+    getCloudQueue().records.map(syncKey)
+  );
+
+  if (
+    resultRows.some(
+      row => pendingKeys.has(syncKey(row))
+    )
+  ) {
+    throw new Error("Fair 资料仍在等待同步");
+  }
+
+  return { rows: resultRows };
 }
 
 async function saveLiveToSheet(
@@ -669,7 +728,7 @@ async function saveLiveToSheet(
 ) {
   await runCloudSync();
 
-  return {
+  const row = {
     type: "live",
     date,
     company: "live",
@@ -679,6 +738,16 @@ async function saveLiveToSheet(
       clientUpdatedAt ||
       new Date().toISOString()
   };
+
+  const stillPending = getCloudQueue().records.some(
+    pending => syncKey(pending) === syncKey(row)
+  );
+
+  if (stillPending) {
+    throw new Error("这笔 Live 资料仍在等待同步");
+  }
+
+  return row;
 }
 
 async function saveCommissionSettingsToSheet(
@@ -732,7 +801,9 @@ window.setInterval(() => {
   const queue = getCloudQueue();
 
   if (queue.dirty) {
-    runCloudSync();
+    runCloudSync().catch(error => {
+      console.error("Interval sync failed:", error);
+    });
   }
 }, 15000);
 
