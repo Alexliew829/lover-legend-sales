@@ -7,6 +7,19 @@ function collectLiveHosts(){const merged=[];[...rows.filter(r=>r.type==="live").
 function canonicalHost(value){const raw=String(value||"").trim().replace(/\s+/g," ");if(!raw)return"";const found=collectLiveHosts().find(n=>normHost(n)===normHost(raw));return found||formatHostName(raw)}
 function saveLiveHost(value){const host=canonicalHost(value);if(!host)return;const list=getSavedLiveHosts();if(!list.some(x=>normHost(x)===normHost(host)))list.push(host);list.sort((a,b)=>a.localeCompare(b));localStorage.setItem("lover_live_hosts",JSON.stringify(list));renderLiveHostOptions();renderLiveHostCommissionSettings()}
 function renderLiveHostOptions(){const el=document.getElementById("liveHostListOptions");if(el)el.innerHTML=collectLiveHosts().map(n=>`<option value="${n}"></option>`).join("")}
+const LIVE_SESSION_KEY="lover_live_session_v74";
+const LIVE_DELETE_TOMBSTONES_KEY="lover_live_delete_tombstones_v74";
+let commissionSyncInProgress=false;
+let pendingCommissionSettings=null;
+function saveLiveSession(){const host=document.getElementById("liveHost")?.value||"",date=document.getElementById("liveDate")?.value||todayISO(),sales=document.getElementById("liveSales")?.value||"0.00";localStorage.setItem(LIVE_SESSION_KEY,JSON.stringify({host,date,sales}))}
+function restoreLiveSession(){try{const s=JSON.parse(localStorage.getItem(LIVE_SESSION_KEY)||"null");if(!s)return false;if(s.host)document.getElementById("liveHost").value=canonicalHost(s.host);if(s.date)setDateControl("liveDate",s.date);if(s.sales!==undefined)document.getElementById("liveSales").value=formatAmount(s.sales);return true}catch(e){return false}}
+function getLiveDeleteTombstones(){try{return JSON.parse(localStorage.getItem(LIVE_DELETE_TOMBSTONES_KEY)||"{}")||{}}catch(e){return{}}}
+function addLiveDeleteTombstone(date,host){const m=getLiveDeleteTombstones();m[`${date}|${normHost(host)}`]=Date.now();localStorage.setItem(LIVE_DELETE_TOMBSTONES_KEY,JSON.stringify(m))}
+function clearLiveDeleteTombstone(date,host){const m=getLiveDeleteTombstones();delete m[`${date}|${normHost(host)}`];localStorage.setItem(LIVE_DELETE_TOMBSTONES_KEY,JSON.stringify(m))}
+function applyLiveDeleteTombstones(list){const m=getLiveDeleteTombstones(),now=Date.now(),max=604800000;Object.keys(m).forEach(k=>{if(now-Number(m[k]||0)>max)delete m[k]});localStorage.setItem(LIVE_DELETE_TOMBSTONES_KEY,JSON.stringify(m));return list.filter(r=>r.type!=="live"||!m[`${r.date}|${normHost(r.location)}`])}
+function refreshLiveViewsImmediately(){rows=dedupeRows(applyLiveDeleteTombstones(rows));renderLiveDailyList();renderLiveHostList();renderLiveHostOptions();renderLiveHostCommissionSettings();renderTable();const lm=totalBy("live","","month"),ly=totalBy("live","","year"),me=document.getElementById("liveMonthTotal"),ye=document.getElementById("liveYearTotal");if(me)me.textContent=money(lm);if(ye)ye.textContent=money(ly);renderLiveCommission();const mg=document.getElementById("monthGrandTotal");if(mg)mg.textContent=money(totalBy("daily","balakong","month")+totalBy("daily","belimbing","month")+totalBy("fair","","month")+lm);const yg=document.getElementById("yearGrandTotal");if(yg)yg.textContent=money(totalBy("daily","balakong","year")+totalBy("daily","belimbing","year")+totalBy("fair","","year")+ly);saveLocalDataCache()}
+function applyCommissionSettingsImmediately(settings){commissionSettings=normalizeCommissionSettings(settings);localStorage.setItem("lover_commission_settings_cache",JSON.stringify(commissionSettings));loadCommissionSettingsForm();renderDashboard();renderLiveHostCommissionSettings();saveLocalDataCache(commissionSettings)}
+
 const companyNames={balakong:"Lover Legend Adenium - Balakong",belimbing:"Lover Legend Gardening - Belimbing"};
 function selectedMonth(){return document.getElementById("monthPicker").value}
 function selectedYear(){return document.getElementById("yearPicker").value}
@@ -107,16 +120,7 @@ function getCommissionSettings(){
   return{...commissionSettings};
 }
 
-function applyCommissionSettings(settings){
-  commissionSettings=normalizeCommissionSettings(settings);
-  localStorage.setItem(
-    "lover_commission_settings_cache",
-    JSON.stringify(commissionSettings)
-  );
-  loadCachedCommissionSettings();
-loadCommissionSettingsForm();
-  if(typeof renderDashboard==="function")renderDashboard();
-}
+function applyCommissionSettings(settings){commissionSettings=normalizeCommissionSettings(commissionSyncInProgress&&pendingCommissionSettings?pendingCommissionSettings:settings);localStorage.setItem("lover_commission_settings_cache",JSON.stringify(commissionSettings));loadCommissionSettingsForm();if(typeof renderDashboard==="function")renderDashboard()}
 
 function loadCachedCommissionSettings(){
   try{
@@ -230,61 +234,8 @@ async function resetCommissionSettings(){
   }
 }
 
-async function saveLiveCommissionSetting(){
-  const liveRate=Number(document.getElementById("liveCommissionRate").value);
-
-  if(!Number.isFinite(liveRate)||liveRate<0){
-    alert("请输入正确的默认 Live 佣金百分比");
-    return;
-  }
-
-  const liveHostRates={};
-  document.querySelectorAll(".live-host-rate-input").forEach(input=>{
-    const key=normHost(input.dataset.hostKey);
-    const rate=Number(input.value);
-
-    if(key&&Number.isFinite(rate)&&rate>=0){
-      liveHostRates[key]=rate;
-    }
-  });
-
-  const current=getCommissionSettings();
-  const next={...current,liveRate,liveHostRates};
-
-  try{
-    setSync("正在同步 Live 佣金...");
-    const saved=await saveCommissionSettingsToSheet(next);
-    applyCommissionSettings(saved||next);
-    showTempMsg("liveCommissionSettingsMsg");
-    setSync("已同步",true);
-  }catch(e){
-    alert("Live 佣金设置储存失败："+e.message);
-    setSync("Live 佣金设置同步失败",false,true);
-  }
-}
-
-async function resetLiveCommissionSetting(){
-  if(!confirm("确定所有主播恢复默认佣金 10%？"))return;
-
-  const current=getCommissionSettings();
-  const next={
-    ...current,
-    liveRate:10,
-    liveHostRates:{}
-  };
-
-  try{
-    setSync("正在恢复 Live 默认佣金...");
-    const saved=await saveCommissionSettingsToSheet(next);
-    applyCommissionSettings(saved||next);
-    showTempMsg("liveCommissionSettingsMsg");
-    setSync("已同步",true);
-  }catch(e){
-    alert("恢复 Live 默认佣金失败："+e.message);
-    setSync("Live 佣金设置同步失败",false,true);
-  }
-}
-
+async function saveLiveCommissionSetting(){const liveRate=Number(document.getElementById("liveCommissionRate").value);if(!Number.isFinite(liveRate)||liveRate<0){alert("请输入正确的默认 Live 佣金百分比");return}const liveHostRates={};document.querySelectorAll(".live-host-rate-input").forEach(input=>{const key=normHost(input.dataset.hostKey),rate=Number(input.value);if(key&&Number.isFinite(rate)&&rate>=0)liveHostRates[key]=rate});const previous=getCommissionSettings(),next={...previous,liveRate,liveHostRates};commissionSyncInProgress=true;pendingCommissionSettings=next;applyCommissionSettingsImmediately(next);showTempMsg("liveCommissionSettingsMsg");setSync("Live 佣金已更新，后台同步中...");try{const saved=await saveCommissionSettingsToSheet(next);commissionSyncInProgress=false;pendingCommissionSettings=null;applyCommissionSettingsImmediately(saved||next);setSync("已同步",true)}catch(e){commissionSyncInProgress=false;pendingCommissionSettings=null;applyCommissionSettingsImmediately(previous);alert("Live 佣金储存失败，已恢复原设置："+e.message);setSync("Live 佣金同步失败",false,true)}}
+async function resetLiveCommissionSetting(){if(!confirm("确定所有主播恢复默认佣金 10%？"))return;const previous=getCommissionSettings(),next={...previous,liveRate:10,liveHostRates:{}};commissionSyncInProgress=true;pendingCommissionSettings=next;applyCommissionSettingsImmediately(next);showTempMsg("liveCommissionSettingsMsg");setSync("已恢复默认 10%，后台同步中...");try{const saved=await saveCommissionSettingsToSheet(next);commissionSyncInProgress=false;pendingCommissionSettings=null;applyCommissionSettingsImmediately(saved||next);setSync("已同步",true)}catch(e){commissionSyncInProgress=false;pendingCommissionSettings=null;applyCommissionSettingsImmediately(previous);alert("恢复默认佣金失败，已恢复原设置："+e.message);setSync("Live 佣金同步失败",false,true)}}
 function renderLiveCommission(){
   const label=document.getElementById("liveCommissionLabel");
   const value=document.getElementById("liveCommissionTotal");
@@ -398,11 +349,11 @@ function renderLiveDailyList(){
   );
 }
 
-async function saveLiveSales(){const h=canonicalHost(document.getElementById("liveHost").value),d=isoToDisplay(document.getElementById("liveDate").value),a=toAmount(document.getElementById("liveSales").value);if(!h){alert("请输入主播名字");return}if(!d){alert("请选择日期");return}document.getElementById("liveHost").value=h;saveLiveHost(h);const now=new Date().toISOString(),row={type:"live",date:d,company:"live",location:h,amount:a,updatedAt:now,clientUpdatedAt:now};if(a<=0)rows=rows.filter(r=>!(r.type==="live"&&r.date===d&&normHost(r.location)===normHost(h)));else upsertLocalRow(row);addPendingRow(row);renderAll();updateLiveInputFromSelectedDate();showTempMsg("liveSaveMsg");try{setSync("已储存，正在后台同步...");const saved=await saveLiveToSheet(d,h,a,now);if(saved&&Number(saved.amount)<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(saved));else if(saved)upsertLocalRow(saved);clearPendingRow(row);renderAll();updateLiveInputFromSelectedDate();setSync("已同步",true)}catch(e){setSync("有未同步资料，系统会自动重试",false,true)}}
+async function saveLiveSales(){const host=canonicalHost(document.getElementById("liveHost").value),date=isoToDisplay(document.getElementById("liveDate").value),amount=toAmount(document.getElementById("liveSales").value);if(!host){alert("请输入主播名字");return}if(!date){alert("请选择日期");return}document.getElementById("liveHost").value=host;saveLiveHost(host);const now=new Date().toISOString(),row={type:"live",date,company:"live",location:host,amount,updatedAt:now,clientUpdatedAt:now};if(amount<=0){addLiveDeleteTombstone(date,host);rows=rows.filter(r=>!(r.type==="live"&&r.date===date&&normHost(r.location)===normHost(host)))}else{clearLiveDeleteTombstone(date,host);upsertLocalRow(row)}addPendingRow(row);saveLiveSession();refreshLiveViewsImmediately();updateLiveInputFromSelectedDate();showTempMsg("liveSaveMsg");setSync("已储存，后台同步中...");try{const saved=await saveLiveToSheet(date,host,amount,now);if(saved&&Number(saved.amount)<=0){rows=rows.filter(r=>!(r.type==="live"&&r.date===date&&normHost(r.location)===normHost(host)));clearLiveDeleteTombstone(date,host)}else if(saved){clearLiveDeleteTombstone(date,host);upsertLocalRow(saved)}clearPendingRow(row);refreshLiveViewsImmediately();updateLiveInputFromSelectedDate();setSync("已同步",true)}catch(e){refreshLiveViewsImmediately();setSync("已保存在本机，云端会自动重试",false,true)}}
 function renderDashboard(){const bm=totalBy("daily","balakong","month"),blm=totalBy("daily","belimbing","month"),fm=totalBy("fair","","month"),lm=totalBy("live","","month"),by=totalBy("daily","balakong","year"),bly=totalBy("daily","belimbing","year"),fy=totalBy("fair","","year"),ly=totalBy("live","","year");document.getElementById("balakongMonth").textContent=money(bm);document.getElementById("belimbingMonth").textContent=money(blm);renderFairLocationList();document.getElementById("fairMonthTotal").textContent=money(fm);renderFairCommission(fm);renderLiveHostList();document.getElementById("liveMonthTotal").textContent=money(lm);renderLiveCommission();document.getElementById("monthGrandTotal").textContent=money(bm+blm+fm+lm);document.getElementById("balakongYearTotal").textContent=money(by);document.getElementById("belimbingYearTotal").textContent=money(bly);document.getElementById("fairYearTotal").textContent=money(fy);document.getElementById("liveYearTotal").textContent=money(ly);document.getElementById("yearGrandTotal").textContent=money(by+bly+fy+ly);renderTodayCompanyStatus()}
 function sortReportRows(list){const rank=r=>r.type==="daily"&&r.company==="balakong"?0:r.type==="daily"&&r.company==="belimbing"?1:r.type==="fair"?2:3;return[...list].sort((a,b)=>rank(a)-rank(b)||String(a.location||"").localeCompare(String(b.location||""))||displayToISO(a.date).localeCompare(displayToISO(b.date)))}
 function renderTable(){const s=sortReportRows(dedupeRows(rows).filter(r=>sameMonth(r.date)&&Number(r.amount)>0));document.getElementById("recordTable").innerHTML=s.map(r=>{const ty=r.type==="fair"?"Fair":r.type==="live"?"Live":"每日",co=r.type==="live"?canonicalHost(r.location):(companyNames[r.company]||r.company),lo=r.type==="live"?"-":(r.location||"-");return`<tr><td>${r.date}</td><td>${ty}</td><td>${co}</td><td>${lo}</td><td>${money(r.amount)}</td></tr>`}).join("")||'<tr><td colspan="5" style="text-align:center;">这个月份还没有记录</td></tr>'}
-function renderAll(){rows=dedupeRows(rows);renderDashboard();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions();
+function renderAll(){rows=dedupeRows(applyLiveDeleteTombstones(rows));renderDashboard();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions();
 renderLiveHostOptions();renderLiveDailyList();renderLiveHostCommissionSettings()}
 async function saveDailySales(){
   const d=isoToDisplay(document.getElementById("saleDate").value);
@@ -572,7 +523,7 @@ document.getElementById("monthPicker").value=monthISO();
 document.getElementById("yearPicker").value=currentYear();
 
 setDateControl("saleDate",todayISO());
-setDateControl("liveDate",todayISO());
+const liveSessionRestored=restoreLiveSession();if(!liveSessionRestored)setDateControl("liveDate",todayISO());
 
 const fairSessionRestored=restoreFairSession();
 
@@ -582,7 +533,7 @@ if(!fairSessionRestored){
 }
 
 bindDateControl("saleDate",updateDailyInputFromSelectedDate);
-bindDateControl("liveDate",updateLiveInputFromSelectedDate);
+bindDateControl("liveDate",()=>{saveLiveSession();updateLiveInputFromSelectedDate()});
 
 bindDateControl("fairStart",()=>{
   saveFairSession();
@@ -603,7 +554,7 @@ document.getElementById("yearPicker").addEventListener("change",()=>{
 });
 document.getElementById("company").addEventListener("change",updateDailyInputFromSelectedDate);
 document.getElementById("liveHost").addEventListener("input",updateLiveInputFromSelectedDate);
-document.getElementById("liveHost").addEventListener("blur",()=>{const i=document.getElementById("liveHost");i.value=canonicalHost(i.value);saveLiveHost(i.value);updateLiveInputFromSelectedDate()});
+document.getElementById("liveHost").addEventListener("blur",()=>{const i=document.getElementById("liveHost");i.value=canonicalHost(i.value);saveLiveHost(i.value);saveLiveSession();updateLiveInputFromSelectedDate()});
 
 document.getElementById("fairLocation").addEventListener("input",()=>{
   syncFairInputs();
@@ -617,7 +568,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-attachMoneyInputs();
+document.getElementById("liveSales").addEventListener("input",saveLiveSession);document.getElementById("liveSales").addEventListener("blur",saveLiveSession);attachMoneyInputs();
 renderAll();
 
-loadFromSheet().then(()=>{syncFairInputs();updateLiveInputFromSelectedDate()});
+loadFromSheet().then(()=>{syncFairInputs();const s=JSON.parse(localStorage.getItem(LIVE_SESSION_KEY)||"null");if(s?.host)document.getElementById("liveHost").value=canonicalHost(s.host);if(s?.date)setDateControl("liveDate",s.date);updateLiveInputFromSelectedDate();if(s?.sales!==undefined)document.getElementById("liveSales").value=formatAmount(s.sales)});

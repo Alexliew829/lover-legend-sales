@@ -159,7 +159,7 @@ async function loadFromSheet(options = {}) {
         throw new Error(json.message || "读取失败");
       }
 
-      rows = json.rows || [];
+      rows = typeof applyLiveDeleteTombstones==="function"?applyLiveDeleteTombstones(json.rows||[]):(json.rows||[]);
 
       if (
         json.commissionSettings &&
@@ -261,7 +261,8 @@ async function syncPendingRows() {
 
     for (const row of liveRows) {
       const saved = await saveLiveToSheet(row.date,row.location,row.amount,row.clientUpdatedAt||"");
-      if(saved&&Number(saved.amount)<=0)rows=rows.filter(x=>syncKey(x)!==syncKey(saved));else if(saved)upsertLocalRow(saved);
+      if(saved&&Number(saved.amount)<=0){rows=rows.filter(x=>syncKey(x)!==syncKey(saved));if(typeof clearLiveDeleteTombstone==="function")clearLiveDeleteTombstone(row.date,row.location)}
+      else if(saved){if(typeof clearLiveDeleteTombstone==="function")clearLiveDeleteTombstone(row.date,row.location);upsertLocalRow(saved)}
       clearPendingRow(row);
     }
 
