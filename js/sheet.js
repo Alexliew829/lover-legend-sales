@@ -178,7 +178,7 @@ function setSync(text, good = false, error = false) {
 function jsonp(params, timeout = 15000) {
   return new Promise((resolve, reject) => {
     const callback =
-      "ll_v83_cb_" +
+      "ll_v84_cb_" +
       Date.now() +
       "_" +
       Math.floor(Math.random() * 100000);
@@ -466,6 +466,13 @@ async function pullLatestSnapshot(force = false) {
   }
 
   if (data.unchanged) {
+    // V8.4：Revision 相同不代表本机一定已有资料。
+    // 若本机 rows 为空（例如清除浏览器资料、换设备或旧版本只留下 Revision），
+    // 必须强制拉取完整 Snapshot，避免显示“已同步”但全部为 0.00。
+    if (!force && (!Array.isArray(rows) || rows.length === 0)) {
+      return pullLatestSnapshot(true);
+    }
+
     config.revisions[year] =
       Number(data.revision) || 0;
 
@@ -541,7 +548,7 @@ async function pushPendingSnapshot(
             ? getCommissionSettings()
             : {}
         ),
-      updatedBy: "Sales V8.3 Fast Sync",
+      updatedBy: "Sales V8.4 Fast Sync",
       fastAck: "1"
     },
     25000
@@ -642,8 +649,14 @@ async function pushPendingSnapshot(
       : (data.commissionSettings || null)
   );
 
-  // Fast ACK: successful saves no longer download and redraw the whole year.
-  // Only redraw when the server actually returned merged rows/settings (conflict/legacy mode).
+  // V8.4：Fast ACK 不回传 rows。若本机没有任何资料，立即强制 Pull 一次，
+  // 防止云端已有资料但主页仍显示 0.00。正常已有本机资料时不额外 Pull，保持快速。
+  if (!latestQueue.dirty && (!Array.isArray(rows) || rows.length === 0)) {
+    await pullLatestSnapshot(true);
+    return;
+  }
+
+  // 只有服务器真的回传合并资料/设置时才重绘。
   if (Array.isArray(data.rows) || data.commissionSettings) {
     renderAll();
   }
