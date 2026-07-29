@@ -306,7 +306,8 @@ async function saveCommissionSettingsToSheet(settings) {
     rate1: settings.rate1,
     rate2: settings.rate2,
     rate3: settings.rate3,
-    liveRate: settings.liveRate
+    liveRate: settings.liveRate,
+    liveHostRates: JSON.stringify(settings.liveHostRates || {})
   });
   if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
   return json.commissionSettings || null;

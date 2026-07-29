@@ -87,3 +87,9 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 .live-box{grid-column:1/-1}.live-box .fair-location-grid{margin-bottom:8px}
+
+.host-commission-list{display:flex;flex-direction:column;gap:10px;margin:8px 0 14px}
+.host-commission-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.host-commission-row>span:first-child{font-weight:700;overflow-wrap:anywhere}
+.host-commission-row .commission-input-row{width:48%;margin:0}
+.host-commission-row input{width:100%}

@@ -14,7 +14,7 @@
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo">
-    <div class="brand-title">Lover Legend<br>Sales <small>V6.9</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V7.0</small></div>
     <img src="images/Logo2.jpg" class="seal">
   </div>
 </header>
@@ -179,7 +179,7 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>日期</th><th>类别</th><th>公司</th><th>地点</th><th>营业额</th></tr>
+          <tr><th>日期</th><th>类别</th><th>公司</th><th>地点/主播</th><th>营业额</th><th>佣金%</th><th>佣金</th></tr>
         </thead>
         <tbody id="recordTable"></tbody>
       </table>
@@ -200,17 +200,20 @@
   <h3>Fair 佣金设置</h3>
 
   <label for="commissionRate1">RM50,000 以下</label>
-  <div class="commission-input-row"><input id="commissionRate1" type="number" min="0" max="100" step="0.1" inputmode="decimal"><span>%</span></div>
+  <div class="commission-input-row"><input id="commissionRate1" type="text" inputmode="decimal"><span>%</span></div>
 
   <label for="commissionRate2">RM50,000 以上</label>
-  <div class="commission-input-row"><input id="commissionRate2" type="number" min="0" max="100" step="0.1" inputmode="decimal"><span>%</span></div>
+  <div class="commission-input-row"><input id="commissionRate2" type="text" inputmode="decimal"><span>%</span></div>
 
   <label for="commissionRate3">RM100,000 以上</label>
-  <div class="commission-input-row"><input id="commissionRate3" type="number" min="0" max="100" step="0.1" inputmode="decimal"><span>%</span></div>
+  <div class="commission-input-row"><input id="commissionRate3" type="text" inputmode="decimal"><span>%</span></div>
 
   <h3>Live 佣金设置</h3>
   <label for="liveCommissionRate">直播佣金</label>
-  <div class="commission-input-row"><input id="liveCommissionRate" type="number" min="0" max="100" step="0.1" inputmode="decimal"><span>%</span></div>
+  <div class="commission-input-row"><input id="liveCommissionRate" type="text" inputmode="decimal"><span>%</span></div>
+
+  <h3>各主播佣金</h3>
+  <div id="liveHostCommissionList" class="host-commission-list"></div>
 
   <button type="button" onclick="saveCommissionSettings()">💾 储存佣金设置</button>
   <button type="button" class="secondary-btn" onclick="resetCommissionSettings()">↺ 恢复默认值</button>
