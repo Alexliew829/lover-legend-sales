@@ -59,7 +59,8 @@ function renderTodayCompanyStatus(){
 const DEFAULT_COMMISSION_SETTINGS={
   rate1:6,
   rate2:7,
-  rate3:8
+  rate3:8,
+  liveRate:10
 };
 
 let commissionSettings={...DEFAULT_COMMISSION_SETTINGS};
@@ -69,17 +70,19 @@ function normalizeCommissionSettings(settings){
   const rate1=Number(source.rate1);
   const rate2=Number(source.rate2);
   const rate3=Number(source.rate3);
+  const liveRate=Number(source.liveRate);
 
   if(
     !Number.isFinite(rate1)||
     !Number.isFinite(rate2)||
     !Number.isFinite(rate3)||
-    rate1<0||rate2<0||rate3<0
+    !Number.isFinite(liveRate)||
+    rate1<0||rate2<0||rate3<0||liveRate<0
   ){
     return{...DEFAULT_COMMISSION_SETTINGS};
   }
 
-  return{rate1,rate2,rate3};
+  return{rate1,rate2,rate3,liveRate};
 }
 
 function getCommissionSettings(){
@@ -113,9 +116,11 @@ function loadCommissionSettingsForm(){
   const rate1=document.getElementById("commissionRate1");
   const rate2=document.getElementById("commissionRate2");
   const rate3=document.getElementById("commissionRate3");
+  const liveRate=document.getElementById("liveCommissionRate");
   if(rate1)rate1.value=settings.rate1;
   if(rate2)rate2.value=settings.rate2;
   if(rate3)rate3.value=settings.rate3;
+  if(liveRate)liveRate.value=settings.liveRate;
 }
 
 async function saveCommissionSettings(){
@@ -418,3 +423,224 @@ renderAll();
 loadFromSheet().then(()=>{
   syncFairInputs();
 });
+
+
+/* ===== V6.9 Live Module ===== */
+function normalizeLiveHostKey(value){
+  return String(value||"").replace(/\s+/g,"").toLowerCase();
+}
+function canonicalLiveHost(value){
+  return String(value||"").trim().replace(/\s+/g," ");
+}
+function rowKey(r){
+  const location=r.type==="live"
+    ? normalizeLiveHostKey(r.location||"")
+    : canonicalLocation(r.location||"");
+  return [r.type,r.date,r.company,location].join("|");
+}
+function getSavedLiveHosts(){
+  try{return JSON.parse(localStorage.getItem("lover_live_hosts_v69")||"[]")}catch(e){return[]}
+}
+function collectLiveHosts(){
+  const merged=[];
+  [...rows.filter(r=>r.type==="live").map(r=>canonicalLiveHost(r.location)),...getSavedLiveHosts()]
+    .filter(Boolean)
+    .forEach(name=>{
+      const key=normalizeLiveHostKey(name);
+      if(key&&!merged.some(x=>normalizeLiveHostKey(x)===key))merged.push(canonicalLiveHost(name));
+    });
+  merged.sort((a,b)=>a.localeCompare(b));
+  localStorage.setItem("lover_live_hosts_v69",JSON.stringify(merged));
+  return merged;
+}
+function saveLiveHost(name){
+  const host=canonicalLiveHost(name);
+  if(!host)return;
+  const list=collectLiveHosts();
+  if(!list.some(x=>normalizeLiveHostKey(x)===normalizeLiveHostKey(host)))list.push(host);
+  localStorage.setItem("lover_live_hosts_v69",JSON.stringify(list));
+  renderLiveHostOptions();
+}
+function renderLiveHostOptions(){
+  const el=document.getElementById("liveHostOptions");
+  if(el)el.innerHTML=collectLiveHosts().map(name=>`<option value="${name}"></option>`).join("");
+}
+function selectedLiveHost(){
+  const input=document.getElementById("liveHost");
+  if(!input)return"";
+  const raw=canonicalLiveHost(input.value);
+  const existing=collectLiveHosts().find(x=>normalizeLiveHostKey(x)===normalizeLiveHostKey(raw));
+  return existing||raw;
+}
+function getLiveAmount(date,host){
+  const key=normalizeLiveHostKey(host);
+  const found=rows.find(r=>r.type==="live"&&r.date===date&&normalizeLiveHostKey(r.location)===key);
+  return found?Number(found.amount||0):0;
+}
+function updateLiveInputFromSelectedDate(){
+  const dateEl=document.getElementById("liveDate");
+  const amountEl=document.getElementById("liveSales");
+  const resultEl=document.getElementById("liveDateResult");
+  if(!dateEl||!amountEl||!resultEl)return;
+  const d=isoToDisplay(dateEl.value);
+  const host=selectedLiveHost();
+  const amount=host?getLiveAmount(d,host):0;
+  amountEl.value=formatAmount(amount);
+  resultEl.textContent=host?`${host}｜${d}｜${money(amount)}`:`请选择或输入主播｜${d}`;
+  renderLiveMonthlyList();
+}
+function renderLiveMonthlyList(){
+  const container=document.getElementById("liveMonthlyList");
+  const totalEl=document.getElementById("liveSelectedHostTotal");
+  if(!container||!totalEl)return;
+  const host=selectedLiveHost();
+  if(!host){
+    container.innerHTML='<div class="sub">请先选择主播</div>';
+    totalEl.textContent="0.00";
+    return;
+  }
+  const key=normalizeLiveHostKey(host);
+  const list=rows.filter(r=>r.type==="live"&&sameMonth(r.date)&&normalizeLiveHostKey(r.location)===key&&Number(r.amount)>0)
+    .sort((a,b)=>displayToISO(a.date).localeCompare(displayToISO(b.date)));
+  const total=list.reduce((s,r)=>s+Number(r.amount||0),0);
+  container.innerHTML=list.length
+    ?list.map(r=>`<div class="fair-location-row"><span>${r.date}</span><b>${money(r.amount)}</b></div>`).join("")
+    :'<div class="sub">这个月份还没有 Live 记录</div>';
+  totalEl.textContent=money(total);
+}
+function liveByHostThisMonth(){
+  const map={};
+  rows.filter(r=>r.type==="live"&&sameMonth(r.date)&&Number(r.amount)>0).forEach(r=>{
+    const key=normalizeLiveHostKey(r.location);
+    if(!key)return;
+    if(!map[key])map[key]={name:canonicalLiveHost(r.location),total:0};
+    map[key].total+=Number(r.amount||0);
+  });
+  return Object.values(map).sort((a,b)=>a.name.localeCompare(b.name));
+}
+function renderLiveHostSummary(){
+  const el=document.getElementById("liveHostSummary");
+  if(!el)return;
+  const rate=getCommissionSettings().liveRate/100;
+  const data=liveByHostThisMonth();
+  el.innerHTML=data.length?data.map(item=>`<div class="fair-location-card"><div class="fair-location-title">${item.name}</div><div class="fair-location-row"><span>销售额</span><b>${money(item.total)}</b></div><div class="fair-location-row"><span>佣金</span><b>${money(item.total*rate)}</b></div></div>`).join(""):'<div class="sub">这个月份还没有 Live 记录</div>';
+}
+async function saveLiveSales(){
+  const dateEl=document.getElementById("liveDate");
+  const hostInput=document.getElementById("liveHost");
+  const amountEl=document.getElementById("liveSales");
+  const d=isoToDisplay(dateEl.value);
+  const host=selectedLiveHost();
+  const amount=toAmount(amountEl.value);
+  if(!host){alert("请输入主播名字");return}
+  if(!d){alert("请选择日期");return}
+  hostInput.value=host;
+  saveLiveHost(host);
+  const now=new Date().toISOString();
+  const localRow={type:"live",date:d,company:"live",location:host,amount,updatedAt:now,clientUpdatedAt:now};
+  if(amount<=0)rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));
+  else upsertLocalRow(localRow);
+  addPendingRow(localRow);
+  renderAll();
+  showTempMsg("liveSaveMsg");
+  try{
+    setSync("已储存，正在后台同步...");
+    const saved=await saveLiveToSheet(d,host,amount,now);
+    if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);
+    else rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));
+    clearPendingRow(localRow);
+    renderAll();
+    setSync("已同步",true);
+  }catch(e){
+    setSync("有未同步资料，系统会自动重试",false,true);
+  }
+}
+async function saveCommissionSettings(){
+  const rate1=Number(document.getElementById("commissionRate1").value);
+  const rate2=Number(document.getElementById("commissionRate2").value);
+  const rate3=Number(document.getElementById("commissionRate3").value);
+  const liveRate=Number(document.getElementById("liveCommissionRate").value);
+  const settings=normalizeCommissionSettings({rate1,rate2,rate3,liveRate});
+  if([rate1,rate2,rate3,liveRate].some((v,i)=>v!==[settings.rate1,settings.rate2,settings.rate3,settings.liveRate][i])){
+    alert("请输入正确的佣金百分比");return;
+  }
+  try{
+    setSync("正在同步佣金设置...");
+    const saved=await saveCommissionSettingsToSheet(settings);
+    applyCommissionSettings(saved||settings);
+    showTempMsg("commissionSettingsMsg");
+    setSync("已同步",true);
+  }catch(e){alert("佣金设置储存失败："+e.message);setSync("佣金设置同步失败",false,true)}
+}
+async function resetCommissionSettings(){
+  const ok=confirm("确定恢复默认佣金？\n\nFair：6% / 7% / 8%\nLive：10%");
+  if(!ok)return;
+  try{
+    setSync("正在恢复默认佣金...");
+    const saved=await resetCommissionSettingsInSheet();
+    applyCommissionSettings(saved||DEFAULT_COMMISSION_SETTINGS);
+    showTempMsg("commissionSettingsMsg");
+    setSync("已同步",true);
+  }catch(e){alert("恢复默认值失败："+e.message);setSync("佣金设置同步失败",false,true)}
+}
+function renderDashboard(){
+  const bm=totalBy("daily","balakong","month"),blm=totalBy("daily","belimbing","month"),fm=totalBy("fair","","month"),lm=totalBy("live","","month");
+  const by=totalBy("daily","balakong","year"),bly=totalBy("daily","belimbing","year"),fy=totalBy("fair","","year"),ly=totalBy("live","","year");
+  document.getElementById("balakongMonth").textContent=money(bm);
+  document.getElementById("belimbingMonth").textContent=money(blm);
+  renderFairLocationList();
+  document.getElementById("fairMonthTotal").textContent=money(fm);
+  renderFairCommission(fm);
+  renderLiveHostSummary();
+  document.getElementById("liveMonthTotal").textContent=money(lm);
+  const liveRate=getCommissionSettings().liveRate;
+  document.getElementById("liveCommissionLabel").textContent=`Live 本月总佣金 ${liveRate}%`;
+  document.getElementById("liveCommissionTotal").textContent=money(lm*liveRate/100);
+  document.getElementById("monthGrandTotal").textContent=money(bm+blm+fm+lm);
+  document.getElementById("balakongYearTotal").textContent=money(by);
+  document.getElementById("belimbingYearTotal").textContent=money(bly);
+  document.getElementById("fairYearTotal").textContent=money(fy);
+  document.getElementById("liveYearTotal").textContent=money(ly);
+  document.getElementById("yearGrandTotal").textContent=money(by+bly+fy+ly);
+  renderTodayCompanyStatus();
+}
+function sortReportRows(list){
+  const rank=r=>r.type==="daily"&&r.company==="balakong"?0:r.type==="daily"&&r.company==="belimbing"?1:r.type==="fair"?2:3;
+  return [...list].sort((a,b)=>rank(a)-rank(b)||(rLocation(a)).localeCompare(rLocation(b))||displayToISO(a.date).localeCompare(displayToISO(b.date)));
+}
+function rLocation(r){return r.type==="live"?canonicalLiveHost(r.location):canonicalLocation(r.location)}
+function renderTable(){
+  const s=sortReportRows(dedupeRows(rows).filter(r=>sameMonth(r.date)&&Number(r.amount)>0));
+  document.getElementById("recordTable").innerHTML=s.map(r=>`<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":r.type==="live"?"Live":"每日"}</td><td>${r.type==="live"?"Live":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td></tr>`).join("")||'<tr><td colspan="5" style="text-align:center;">这个月份还没有记录</td></tr>';
+}
+function renderAll(){
+  rows=dedupeRows(rows);
+  renderDashboard();
+  renderTable();
+  updateDailyInputFromSelectedDate();
+  renderFairLocationOptions();
+  renderLiveHostOptions();
+  updateLiveInputFromSelectedDate();
+}
+function exportCSV(scope="month"){
+  let csv="\uFEFF公司,日期,类别,地点/主播,营业额\n";
+  const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));
+  selected.forEach(r=>{csv+=`"${r.type==="live"?"Live":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":r.type==="live"?"Live":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});
+  downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;");
+}
+
+/* Live controls */
+if(document.getElementById("liveDate")){
+  setDateControl("liveDate",todayISO());
+  bindDateControl("liveDate",updateLiveInputFromSelectedDate);
+}
+if(document.getElementById("liveHost")){
+  document.getElementById("liveHost").addEventListener("input",updateLiveInputFromSelectedDate);
+  document.getElementById("liveHost").addEventListener("blur",()=>{
+    const input=document.getElementById("liveHost");
+    const host=selectedLiveHost();
+    input.value=host;
+    if(host)saveLiveHost(host);
+    updateLiveInputFromSelectedDate();
+  });
+}
