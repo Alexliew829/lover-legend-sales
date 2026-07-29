@@ -65,6 +65,11 @@ function selectedYear(){return document.getElementById("yearPicker").value}
 function sameMonth(date){return sameMonthDisplay(date,selectedMonth())}
 function sameYear(date){return sameYearDisplay(date,selectedYear())}
 function showPage(name,el){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));document.getElementById("page-"+name).classList.add("active");document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));el.classList.add("active")}
+const companyNames={
+  balakong:"Lover Legend Adenium - Balakong",
+  belimbing:"Lover Legend Gardening - Belimbing"
+};
+
 function rowKey(r){const l=r.type==="live"?normHost(r.location||""):canonicalLocation(r.location||"");return[r.type,r.date,r.company,l].join("|")}
 function dedupeRows(list){const m=new Map();list.forEach(r=>{const k=rowKey(r),old=m.get(k);if(!old||String(r.updatedAt||"")>=String(old.updatedAt||""))m.set(k,r)});return [...m.values()]}
 function upsertLocalRow(n){rows=dedupeRows([...rows,n])}
