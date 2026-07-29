@@ -95,7 +95,7 @@ function jsonp(params) {
       delete window[callback];
       script.remove();
       reject(new Error("连接 Google Apps Script 超时"));
-    }, 12000);
+    }, 8000);
 
     window[callback] = data => {
       clearTimeout(timer);
