@@ -673,3 +673,97 @@ if(document.getElementById("liveHost")){
     updateLiveInputFromSelectedDate();
   });
 }
+
+
+// V7.1: Fair and Live commission settings are saved and reset independently.
+function readFairCommissionInputs(){
+  const rate1=Number(document.getElementById("commissionRate1").value);
+  const rate2=Number(document.getElementById("commissionRate2").value);
+  const rate3=Number(document.getElementById("commissionRate3").value);
+  if(![rate1,rate2,rate3].every(v=>Number.isFinite(v)&&v>=0)){
+    throw new Error("请输入正确的 Fair 佣金百分比");
+  }
+  return {rate1,rate2,rate3};
+}
+
+function readLiveCommissionInputs(){
+  const liveRate=Number(document.getElementById("liveCommissionRate").value);
+  if(!Number.isFinite(liveRate)||liveRate<0){
+    throw new Error("请输入正确的 Live 默认佣金百分比");
+  }
+  const liveHostRates={};
+  document.querySelectorAll("[data-live-host-key]").forEach(input=>{
+    const key=String(input.dataset.liveHostKey||"");
+    const rate=Number(input.value);
+    if(key&&Number.isFinite(rate)&&rate>=0)liveHostRates[key]=rate;
+  });
+  return {liveRate,liveHostRates};
+}
+
+async function saveFairCommissionSettings(){
+  try{
+    const fair=readFairCommissionInputs();
+    const current=getCommissionSettings();
+    const settings=normalizeCommissionSettings({...current,...fair});
+    setSync("正在同步 Fair 佣金设置...");
+    const saved=await saveCommissionSettingsToSheet(settings);
+    applyCommissionSettings(saved||settings);
+    showTempMsg("fairCommissionSettingsMsg");
+    setSync("已同步",true);
+  }catch(e){
+    alert("Fair 佣金设置储存失败："+e.message);
+    setSync("Fair 佣金同步失败",false,true);
+  }
+}
+
+async function saveLiveCommissionSettings(){
+  try{
+    const live=readLiveCommissionInputs();
+    const current=getCommissionSettings();
+    const settings=normalizeCommissionSettings({...current,...live});
+    setSync("正在同步 Live 主播佣金...");
+    const saved=await saveCommissionSettingsToSheet(settings);
+    applyCommissionSettings(saved||settings);
+    renderLiveHostCommissionSettings();
+    showTempMsg("liveCommissionSettingsMsg");
+    setSync("已同步",true);
+  }catch(e){
+    alert("Live 主播佣金储存失败："+e.message);
+    setSync("Live 佣金同步失败",false,true);
+  }
+}
+
+async function resetFairCommissionSettings(){
+  if(!confirm("确定只恢复 Fair 默认佣金？\n\nRM50,000 以下：6%\nRM50,000 以上：7%\nRM100,000 以上：8%\n\nLive 与各主播佣金不会改变。"))return;
+  try{
+    const current=getCommissionSettings();
+    const settings=normalizeCommissionSettings({...current,rate1:6,rate2:7,rate3:8});
+    setSync("正在恢复 Fair 默认佣金...");
+    const saved=await saveCommissionSettingsToSheet(settings);
+    applyCommissionSettings(saved||settings);
+    showTempMsg("fairCommissionSettingsMsg");
+    setSync("已同步",true);
+    alert("Fair 佣金已恢复默认并自动储存");
+  }catch(e){
+    alert("Fair 恢复默认失败："+e.message);
+    setSync("Fair 佣金同步失败",false,true);
+  }
+}
+
+async function resetLiveCommissionSettings(){
+  if(!confirm("确定只恢复 Live 默认佣金？\n\n直播默认：10%\n所有主播独立佣金将清除。\n\nFair 佣金不会改变。"))return;
+  try{
+    const current=getCommissionSettings();
+    const settings=normalizeCommissionSettings({...current,liveRate:10,liveHostRates:{}});
+    setSync("正在恢复 Live 默认佣金...");
+    const saved=await saveCommissionSettingsToSheet(settings);
+    applyCommissionSettings(saved||settings);
+    renderLiveHostCommissionSettings();
+    showTempMsg("liveCommissionSettingsMsg");
+    setSync("已同步",true);
+    alert("Live 主播佣金已恢复默认并自动储存");
+  }catch(e){
+    alert("Live 恢复默认失败："+e.message);
+    setSync("Live 佣金同步失败",false,true);
+  }
+}

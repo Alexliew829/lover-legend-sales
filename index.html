@@ -14,7 +14,7 @@
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo">
-    <div class="brand-title">Lover Legend<br>Sales <small>V7.0</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V7.1</small></div>
     <img src="images/Logo2.jpg" class="seal">
   </div>
 </header>
@@ -194,30 +194,51 @@
     <button class="gray" onclick="exportCSV('year')">📈 导出全年 Excel</button>
     <button class="gray" onclick="monthClose()">📅 月底结算</button>
     <button class="gray" onclick="yearClose()">📆 年底结算</button>
-    <p class="note">V6.6：每月一个 Google Sheet，资料自动去重及排序。</p>
+    <p class="note">V7.1：Fair 与 Live 使用两套独立佣金机制。</p>
   </div>
-<div class="commission-settings-card">
-  <h3>Fair 佣金设置</h3>
+<div class="commission-mechanisms">
+  <div class="commission-panel fair-commission-panel">
+    <div class="commission-panel-header">
+      <div>
+        <h3>Fair 佣金机制</h3>
+        <p>按 Fair 本月总营业额自动套用 6% / 7% / 8%</p>
+      </div>
+      <span class="commission-badge">FAIR</span>
+    </div>
 
-  <label for="commissionRate1">RM50,000 以下</label>
-  <div class="commission-input-row"><input id="commissionRate1" type="text" inputmode="decimal"><span>%</span></div>
+    <label for="commissionRate1">RM50,000 以下</label>
+    <div class="commission-input-row"><input id="commissionRate1" type="text" inputmode="decimal"><span>%</span></div>
 
-  <label for="commissionRate2">RM50,000 以上</label>
-  <div class="commission-input-row"><input id="commissionRate2" type="text" inputmode="decimal"><span>%</span></div>
+    <label for="commissionRate2">RM50,000 以上</label>
+    <div class="commission-input-row"><input id="commissionRate2" type="text" inputmode="decimal"><span>%</span></div>
 
-  <label for="commissionRate3">RM100,000 以上</label>
-  <div class="commission-input-row"><input id="commissionRate3" type="text" inputmode="decimal"><span>%</span></div>
+    <label for="commissionRate3">RM100,000 以上</label>
+    <div class="commission-input-row"><input id="commissionRate3" type="text" inputmode="decimal"><span>%</span></div>
 
-  <h3>Live 佣金设置</h3>
-  <label for="liveCommissionRate">直播佣金</label>
-  <div class="commission-input-row"><input id="liveCommissionRate" type="text" inputmode="decimal"><span>%</span></div>
+    <button type="button" onclick="saveFairCommissionSettings()">💾 储存 Fair 佣金</button>
+    <button type="button" class="secondary-btn" onclick="resetFairCommissionSettings()">↺ Fair 恢复默认 6% / 7% / 8%</button>
+    <div id="fairCommissionSettingsMsg" class="save-msg hidden">Fair 佣金设置已储存</div>
+  </div>
 
-  <h3>各主播佣金</h3>
-  <div id="liveHostCommissionList" class="host-commission-list"></div>
+  <div class="commission-panel live-commission-panel">
+    <div class="commission-panel-header">
+      <div>
+        <h3>Live 主播佣金机制</h3>
+        <p>每位主播独立计算；未单独设置时使用直播默认佣金</p>
+      </div>
+      <span class="commission-badge">LIVE</span>
+    </div>
 
-  <button type="button" onclick="saveCommissionSettings()">💾 储存佣金设置</button>
-  <button type="button" class="secondary-btn" onclick="resetCommissionSettings()">↺ 恢复默认值</button>
-  <div id="commissionSettingsMsg" class="save-msg hidden">佣金设置已储存</div>
+    <label for="liveCommissionRate">直播默认佣金</label>
+    <div class="commission-input-row"><input id="liveCommissionRate" type="text" inputmode="decimal"><span>%</span></div>
+
+    <div class="host-section-title">各主播独立佣金</div>
+    <div id="liveHostCommissionList" class="host-commission-list"></div>
+
+    <button type="button" onclick="saveLiveCommissionSettings()">💾 储存主播佣金</button>
+    <button type="button" class="secondary-btn" onclick="resetLiveCommissionSettings()">↺ Live 恢复默认 10%</button>
+    <div id="liveCommissionSettingsMsg" class="save-msg hidden">Live 主播佣金已储存</div>
+  </div>
 </div>
 </section>
 </main>
