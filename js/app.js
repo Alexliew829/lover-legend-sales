@@ -389,10 +389,39 @@ async function saveFairSales(){
   }
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
-function monthClose(){const m=selectedMonth(),next=monthAfter(m);if(!confirm(`确定完成 ${m} 月底结算？\n\n系统将切换到 ${next}。\n历史资料不会删除。`))return;document.getElementById("monthPicker").value=next;renderAll();alert("已完成月底结算，进入 "+next)}
-function yearClose(){const y=selectedYear(),ny=yearAfter(y);if(!confirm(`确定完成 ${y} 年底结算？\n\n系统将导出全年 Excel，\n并切换到 ${ny}。\n历史资料不会删除。`))return;exportCSV("year");document.getElementById("yearPicker").value=ny;document.getElementById("monthPicker").value=`${ny}-01`;renderAll();alert("已完成年底结算，进入 "+ny)}
-document.getElementById("monthPicker").value=monthISO();
-document.getElementById("yearPicker").value=currentYear();
+const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v73";
+function saveActiveMonth(month){
+  if(/^\d{4}-\d{2}$/.test(String(month||""))){
+    localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month));
+  }
+}
+function getActiveMonth(){
+  const saved=localStorage.getItem(ACTIVE_MONTH_STORAGE_KEY)||"";
+  return /^\d{4}-\d{2}$/.test(saved)?saved:monthISO();
+}
+function monthClose(){
+  const m=selectedMonth(),next=monthAfter(m);
+  if(!confirm(`确定完成 ${m} 月底结算？\n\n系统会切换到 ${next}，Home 和各页面的本月列表会清空。\n原有 Sales / Fair / Live 资料不会删除，仍可在各页面选择日期查询。`))return;
+  document.getElementById("monthPicker").value=next;
+  document.getElementById("yearPicker").value=next.slice(0,4);
+  saveActiveMonth(next);
+  renderAll();
+  alert(`已完成月底结算，进入 ${next}。\n历史资料仍保留，可按日期查询。`);
+}
+function yearClose(){
+  const y=selectedYear(),ny=yearAfter(y);
+  if(!confirm(`确定完成 ${y} 年底结算？\n\n系统将导出全年 Excel，\n并切换到 ${ny}。\n历史资料不会删除。`))return;
+  exportCSV("year");
+  const nextMonth=`${ny}-01`;
+  document.getElementById("yearPicker").value=ny;
+  document.getElementById("monthPicker").value=nextMonth;
+  saveActiveMonth(nextMonth);
+  renderAll();
+  alert("已完成年底结算，进入 "+ny);
+}
+const initialActiveMonth=getActiveMonth();
+document.getElementById("monthPicker").value=initialActiveMonth;
+document.getElementById("yearPicker").value=initialActiveMonth.slice(0,4);
 
 setDateControl("saleDate",todayISO());
 
@@ -417,7 +446,7 @@ bindDateControl("fairEnd",()=>{
 
 renderFairLocationOptions();
 
-document.getElementById("monthPicker").addEventListener("change",renderAll);
+document.getElementById("monthPicker").addEventListener("change",()=>{saveActiveMonth(selectedMonth());document.getElementById("yearPicker").value=selectedMonth().slice(0,4);renderAll()});
 document.getElementById("yearPicker").addEventListener("change",renderAll);
 document.getElementById("company").addEventListener("change",updateDailyInputFromSelectedDate);
 
@@ -441,7 +470,7 @@ loadFromSheet().then(()=>{
 });
 
 
-/* ===== V7.2 Live Module ===== */
+/* ===== V7.3 Live Module ===== */
 function normalizeLiveHostKey(value){
   return String(value||"").replace(/\s+/g,"").toLowerCase();
 }
@@ -540,8 +569,9 @@ function renderLiveMonthlyList(){
   container.innerHTML=groups.map(group=>{
     const hostTotal=group.rows.reduce((sum,r)=>sum+Number(r.amount||0),0);
     return `<div class="live-sales-group">
-      <div class="live-sales-group-title"><span>${group.name}</span><b>${money(hostTotal)}</b></div>
+      <div class="live-sales-group-title"><span>${group.name}</span></div>
       ${group.rows.map(r=>`<div class="fair-location-row"><span>${r.date}</span><b>${money(r.amount)}</b></div>`).join("")}
+      <div class="live-sales-host-total"><span>总数</span><b>${money(hostTotal)}</b></div>
     </div>`;
   }).join("");
 
