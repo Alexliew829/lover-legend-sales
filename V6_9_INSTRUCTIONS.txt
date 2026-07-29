@@ -1,9 +1,0 @@
-Lover Legend Sales V6.9
-
-新增 Live 页面、主播下拉、每日列表、Home Live 汇总、独立 Live 佣金及 Google Sheet 同步。
-
-安装：
-1. 覆盖 GitHub 网站文件。
-2. apps_script_v6_9.gs.txt 覆盖 Code.gs。
-3. Deploy → Manage deployments → Edit → New version → Deploy。
-4. 现有营业记录不会删除。
