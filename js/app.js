@@ -190,32 +190,22 @@ async function saveCommissionSettings(){
   const rate1=Number(document.getElementById("commissionRate1").value);
   const rate2=Number(document.getElementById("commissionRate2").value);
   const rate3=Number(document.getElementById("commissionRate3").value);
-  const previous=getCommissionSettings();
+  const settings=normalizeCommissionSettings({rate1,rate2,rate3});
 
-  if(
-    !Number.isFinite(rate1)||
-    !Number.isFinite(rate2)||
-    !Number.isFinite(rate3)||
-    rate1<0||rate2<0||rate3<0
-  ){
+  if(settings.rate1!==rate1||settings.rate2!==rate2||settings.rate3!==rate3){
     alert("请输入正确的佣金百分比");
     return;
   }
 
-  const next={...previous,rate1,rate2,rate3};
-
-  applyCommissionSettingsImmediately(next);
-  showTempMsg("commissionSettingsMsg");
-  setSync("Fair 佣金已更新，后台同步中...");
-
   try{
-    const saved=await saveCommissionSettingsToSheet(next);
-    applyCommissionSettingsImmediately(saved||next);
+    setSync("正在同步佣金设置...");
+    const saved=await saveCommissionSettingsToSheet({...settings,liveRate:getCommissionSettings().liveRate});
+    applyCommissionSettings(saved||settings);
+    showTempMsg("commissionSettingsMsg");
     setSync("已同步",true);
   }catch(e){
-    applyCommissionSettingsImmediately(previous);
-    alert("Fair 佣金同步失败，已恢复原设置："+e.message);
-    setSync("Fair 佣金同步失败",false,true);
+    alert("佣金设置储存失败："+e.message);
+    setSync("佣金设置同步失败",false,true);
   }
 }
 
@@ -249,7 +239,6 @@ async function saveLiveCommissionSetting(){
   }
 
   const liveHostRates={};
-
   document.querySelectorAll(".live-host-rate-input").forEach(input=>{
     const key=normHost(input.dataset.hostKey);
     const rate=Number(input.value);
@@ -259,46 +248,40 @@ async function saveLiveCommissionSetting(){
     }
   });
 
-  const previous=getCommissionSettings();
-  const next={...previous,liveRate,liveHostRates};
-
-  applyCommissionSettingsImmediately(next);
-  showTempMsg("liveCommissionSettingsMsg");
-  setSync("Live 佣金已更新，后台同步中...");
+  const current=getCommissionSettings();
+  const next={...current,liveRate,liveHostRates};
 
   try{
+    setSync("正在同步 Live 佣金...");
     const saved=await saveCommissionSettingsToSheet(next);
-    applyCommissionSettingsImmediately(saved||next);
+    applyCommissionSettings(saved||next);
+    showTempMsg("liveCommissionSettingsMsg");
     setSync("已同步",true);
   }catch(e){
-    applyCommissionSettingsImmediately(previous);
-    alert("Live 佣金同步失败，已恢复原设置："+e.message);
-    setSync("Live 佣金同步失败",false,true);
+    alert("Live 佣金设置储存失败："+e.message);
+    setSync("Live 佣金设置同步失败",false,true);
   }
 }
 
 async function resetLiveCommissionSetting(){
   if(!confirm("确定所有主播恢复默认佣金 10%？"))return;
 
-  const previous=getCommissionSettings();
+  const current=getCommissionSettings();
   const next={
-    ...previous,
+    ...current,
     liveRate:10,
     liveHostRates:{}
   };
 
-  applyCommissionSettingsImmediately(next);
-  showTempMsg("liveCommissionSettingsMsg");
-  setSync("Live 默认佣金已恢复，后台同步中...");
-
   try{
+    setSync("正在恢复 Live 默认佣金...");
     const saved=await saveCommissionSettingsToSheet(next);
-    applyCommissionSettingsImmediately(saved||next);
+    applyCommissionSettings(saved||next);
+    showTempMsg("liveCommissionSettingsMsg");
     setSync("已同步",true);
   }catch(e){
-    applyCommissionSettingsImmediately(previous);
-    alert("恢复默认佣金同步失败，已恢复原设置："+e.message);
-    setSync("Live 佣金同步失败",false,true);
+    alert("恢复 Live 默认佣金失败："+e.message);
+    setSync("Live 佣金设置同步失败",false,true);
   }
 }
 
@@ -415,124 +398,47 @@ function renderLiveDailyList(){
   );
 }
 
-function refreshLiveViewsImmediately(){
-  rows=dedupeRows(rows);
+async function saveLiveSales(){const h=canonicalHost(document.getElementById("liveHost").value),d=isoToDisplay(document.getElementById("liveDate").value),a=toAmount(document.getElementById("liveSales").value);if(!h){alert("请输入主播名字");return}if(!d){alert("请选择日期");return}document.getElementById("liveHost").value=h;saveLiveHost(h);const now=new Date().toISOString(),row={type:"live",date:d,company:"live",location:h,amount:a,updatedAt:now,clientUpdatedAt:now};if(a<=0)rows=rows.filter(r=>!(r.type==="live"&&r.date===d&&normHost(r.location)===normHost(h)));else upsertLocalRow(row);addPendingRow(row);renderAll();updateLiveInputFromSelectedDate();showTempMsg("liveSaveMsg");try{setSync("已储存，正在后台同步...");const saved=await saveLiveToSheet(d,h,a,now);if(saved&&Number(saved.amount)<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(saved));else if(saved)upsertLocalRow(saved);clearPendingRow(row);renderAll();updateLiveInputFromSelectedDate();setSync("已同步",true)}catch(e){setSync("有未同步资料，系统会自动重试",false,true)}}
+function renderDashboard(){const bm=totalBy("daily","balakong","month"),blm=totalBy("daily","belimbing","month"),fm=totalBy("fair","","month"),lm=totalBy("live","","month"),by=totalBy("daily","balakong","year"),bly=totalBy("daily","belimbing","year"),fy=totalBy("fair","","year"),ly=totalBy("live","","year");document.getElementById("balakongMonth").textContent=money(bm);document.getElementById("belimbingMonth").textContent=money(blm);renderFairLocationList();document.getElementById("fairMonthTotal").textContent=money(fm);renderFairCommission(fm);renderLiveHostList();document.getElementById("liveMonthTotal").textContent=money(lm);renderLiveCommission();document.getElementById("monthGrandTotal").textContent=money(bm+blm+fm+lm);document.getElementById("balakongYearTotal").textContent=money(by);document.getElementById("belimbingYearTotal").textContent=money(bly);document.getElementById("fairYearTotal").textContent=money(fy);document.getElementById("liveYearTotal").textContent=money(ly);document.getElementById("yearGrandTotal").textContent=money(by+bly+fy+ly);renderTodayCompanyStatus()}
+function sortReportRows(list){const rank=r=>r.type==="daily"&&r.company==="balakong"?0:r.type==="daily"&&r.company==="belimbing"?1:r.type==="fair"?2:3;return[...list].sort((a,b)=>rank(a)-rank(b)||String(a.location||"").localeCompare(String(b.location||""))||displayToISO(a.date).localeCompare(displayToISO(b.date)))}
+function renderTable(){const s=sortReportRows(dedupeRows(rows).filter(r=>sameMonth(r.date)&&Number(r.amount)>0));document.getElementById("recordTable").innerHTML=s.map(r=>{const ty=r.type==="fair"?"Fair":r.type==="live"?"Live":"每日",co=r.type==="live"?canonicalHost(r.location):(companyNames[r.company]||r.company),lo=r.type==="live"?"-":(r.location||"-");return`<tr><td>${r.date}</td><td>${ty}</td><td>${co}</td><td>${lo}</td><td>${money(r.amount)}</td></tr>`}).join("")||'<tr><td colspan="5" style="text-align:center;">这个月份还没有记录</td></tr>'}
+function renderAll(){rows=dedupeRows(rows);renderDashboard();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions();
+renderLiveHostOptions();renderLiveDailyList();renderLiveHostCommissionSettings()}
+async function saveDailySales(){
+  const d=isoToDisplay(document.getElementById("saleDate").value);
+  const c=document.getElementById("company").value;
+  const a=toAmount(document.getElementById("dailySales").value);
 
-  renderLiveDailyList();
-  renderLiveHostList();
-  renderLiveHostOptions();
-  renderTable();
-
-  const liveMonth=totalBy("live","","month");
-  const liveYear=totalBy("live","","year");
-
-  const liveMonthEl=document.getElementById("liveMonthTotal");
-  const liveYearEl=document.getElementById("liveYearTotal");
-
-  if(liveMonthEl)liveMonthEl.textContent=money(liveMonth);
-  if(liveYearEl)liveYearEl.textContent=money(liveYear);
-
-  renderLiveCommission();
-
-  const monthGrand=document.getElementById("monthGrandTotal");
-  if(monthGrand){
-    monthGrand.textContent=money(
-      totalBy("daily","balakong","month")+
-      totalBy("daily","belimbing","month")+
-      totalBy("fair","","month")+
-      liveMonth
-    );
-  }
-
-  const yearGrand=document.getElementById("yearGrandTotal");
-  if(yearGrand){
-    yearGrand.textContent=money(
-      totalBy("daily","balakong","year")+
-      totalBy("daily","belimbing","year")+
-      totalBy("fair","","year")+
-      liveYear
-    );
-  }
-
-  saveLocalDataCache();
-}
-
-function applyCommissionSettingsImmediately(settings){
-  applyCommissionSettings(settings);
-  renderLiveHostList();
-  renderLiveCommission();
-  renderFairCommission(totalBy("fair","","month"));
-  renderLiveHostCommissionSettings();
-  saveLocalDataCache(settings);
-}
-
-async function saveLiveSales(){
-  const host=canonicalHost(document.getElementById("liveHost").value);
-  const date=isoToDisplay(document.getElementById("liveDate").value);
-  const amount=toAmount(document.getElementById("liveSales").value);
-
-  if(!host){
-    alert("请输入主播名字");
-    return;
-  }
-
-  if(!date){
+  if(!d){
     alert("请选择日期");
     return;
   }
 
-  document.getElementById("liveHost").value=host;
-  saveLiveHost(host);
-
-  const now=new Date().toISOString();
-  const row={
-    type:"live",
-    date,
-    company:"live",
-    location:host,
-    amount,
-    updatedAt:now,
-    clientUpdatedAt:now
+  const localRow={
+    type:"daily",
+    date:d,
+    company:c,
+    location:"",
+    amount:a,
+    updatedAt:new Date().toISOString(),
+    clientUpdatedAt:new Date().toISOString()
   };
 
-  if(amount<=0){
-    rows=rows.filter(r=>!(
-      r.type==="live"&&
-      r.date===date&&
-      normHost(r.location)===normHost(host)
-    ));
-  }else{
-    upsertLocalRow(row);
-  }
-
-  addPendingRow(row);
-
-  // 立即更新 Home、Live 列表与所有合计，不等待云端。
-  refreshLiveViewsImmediately();
-  updateLiveInputFromSelectedDate();
-  showTempMsg("liveSaveMsg");
-  setSync("已储存，后台同步中...");
+  upsertLocalRow(localRow);
+  addPendingRow(localRow);
+  document.getElementById("dailySales").value=formatAmount(a);
+  renderAll();
+  showTempMsg("saveMsg");
 
   try{
-    const saved=await saveLiveToSheet(
-      date,
-      host,
-      amount,
-      now
-    );
-
-    if(saved&&Number(saved.amount)<=0){
-      rows=rows.filter(r=>syncKey(r)!==syncKey(saved));
-    }else if(saved){
-      upsertLocalRow(saved);
-    }
-
-    clearPendingRow(row);
-    refreshLiveViewsImmediately();
-    updateLiveInputFromSelectedDate();
+    setSync("已储存，正在后台同步...");
+    const saved=await saveDailyToSheet(d,c,a,localRow.clientUpdatedAt);
+    if(saved)upsertLocalRow(saved);
+    clearPendingRow(localRow);
+    renderAll();
     setSync("已同步",true);
   }catch(e){
-    setSync("已保存本机，云端会自动重试",false,true);
+    setSync("有未同步资料，系统会自动重试",false,true);
   }
 }
 function saveFairSession(){

@@ -3,7 +3,6 @@ let rows = [];
 let pendingRows = [];
 let pendingSyncRunning = false;
 let cloudLoadPromise = null;
-let commissionSavePromise = null;
 let lastCloudLoadAt = 0;
 
 const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v682";
@@ -125,31 +124,35 @@ async function loadFromSheet(options = {}) {
   lastCloudLoadAt = now;
 
   cloudLoadPromise = (async () => {
-    loadPendingRows();
-
-    // 有未同步资料时先处理，但处理完成后必须继续读取云端，
-    // 不能直接 return，否则 Home 会一直停留旧资料。
-    if (pendingRows.length > 0) {
-      setSync(`正在同步 ${pendingRows.length} 笔资料...`);
-      await syncPendingRows();
-    }
-
+    // 第一时间显示本机最后一次成功同步的资料。
     const hasLocalData = loadLocalDataCache();
 
-    setSync(
-      hasLocalData
-        ? "已显示本机资料，后台更新中..."
-        : "正在读取资料..."
-    );
+    if (hasLocalData) {
+      setSync("已显示本机资料，后台更新中...");
+    } else {
+      setSync("正在读取资料...");
+    }
+
+    // 未同步资料不再阻塞云端读取。
+    // 先在后台尝试上传，然后无论成功与否都继续读取。
+    loadPendingRows();
+
+    if (pendingRows.length > 0) {
+      try {
+        await syncPendingRows();
+      } catch (err) {
+        console.warn("Pending sync failed:", err);
+      }
+    }
 
     try {
-      const year =
+      const selectedYear =
         document.getElementById("yearPicker")?.value ||
         String(new Date().getFullYear());
 
       const json = await jsonp({
         action: "load",
-        year
+        year: selectedYear
       });
 
       if (!json.ok) {
@@ -171,24 +174,16 @@ async function loadFromSheet(options = {}) {
     } catch (err) {
       loadPendingRows();
 
-      if (pendingRows.length > 0) {
+      if (hasLocalData) {
+        setSync("已显示本机资料，云端稍后重试", false, true);
+      } else if (pendingRows.length > 0) {
         setSync(
           `有 ${pendingRows.length} 笔资料等待同步`,
           false,
           true
         );
-      } else if (hasLocalData) {
-        setSync(
-          "已显示本机资料，云端暂时连接失败",
-          false,
-          true
-        );
       } else {
-        setSync(
-          "同步失败：" + err.message,
-          false,
-          true
-        );
+        setSync("同步失败：" + err.message, false, true);
       }
     }
   })();
@@ -283,11 +278,7 @@ async function syncPendingRows() {
         true
       );
     } else {
-      setSync(
-        "云端连接失败，请稍后重试",
-        false,
-        true
-      );
+      setSync("云端暂时连接失败", false, true);
     }
   } finally {
     pendingSyncRunning = false;
@@ -333,33 +324,16 @@ async function saveFairToSheet(location, records) {
 async function saveLiveToSheet(date,host,amount,clientUpdatedAt=""){const json=await jsonp({action:"saveLive",date,host,amount,clientUpdatedAt});if(!json.ok)throw new Error(json.message||"Live 储存失败");return json.row||null}
 
 async function saveCommissionSettingsToSheet(settings) {
-  // 避免重复点击产生多个并发请求。
-  if (commissionSavePromise) {
-    await commissionSavePromise;
-  }
-
-  commissionSavePromise = (async () => {
-    const json = await jsonp({
-      action: "saveCommissionSettings",
-      rate1: settings.rate1,
-      rate2: settings.rate2,
-      rate3: settings.rate3,
-      liveRate: settings.liveRate,
-      liveHostRates: JSON.stringify(settings.liveHostRates || {})
-    });
-
-    if (!json.ok) {
-      throw new Error(json.message || "佣金设置储存失败");
-    }
-
-    return json.commissionSettings || null;
-  })();
-
-  try {
-    return await commissionSavePromise;
-  } finally {
-    commissionSavePromise = null;
-  }
+  const json = await jsonp({
+    action: "saveCommissionSettings",
+    rate1: settings.rate1,
+    rate2: settings.rate2,
+    rate3: settings.rate3,
+    liveRate: settings.liveRate,
+    liveHostRates: JSON.stringify(settings.liveHostRates || {})
+  });
+  if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
+  return json.commissionSettings || null;
 }
 
 async function resetCommissionSettingsInSheet() {
