@@ -1,0 +1,20 @@
+Lover Legend Sales V6.9.0 Live - File Checklist
+
+Website:
+- index.html
+- style.css
+- manifest.json
+- version.json
+- sw.js
+- js/utils.js
+- js/sheet.js
+- js/app.js
+- js/update.js
+- icons/*
+- images/*
+
+Google Apps Script:
+- apps_script_v6_9_0_live.gs.txt
+
+Important:
+Deploy the Apps Script code as a new version of the existing Web App and keep the same Web App URL.

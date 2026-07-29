@@ -303,6 +303,7 @@ function yearAfter(y){
 }
 
 function syncKey(row){
+  if(row.type==="live")return `live|${row.id||""}`;
   return[
     row.type,
     row.date,
@@ -357,6 +358,3 @@ function bindDateControl(id,onChange){
     }
   });
 }
-
-function normHost(s){return String(s||"").trim().replace(/\s+/g,"").toLowerCase()}
-function formatHostName(value){const s=String(value||"").trim().replace(/\s+/g," ");if(!s)return"";return s.split(" ").map(p=>p?p.charAt(0).toUpperCase()+p.slice(1):"").join(" ")}
