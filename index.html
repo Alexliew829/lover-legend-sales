@@ -14,7 +14,7 @@
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo">
-    <div class="brand-title">Lover Legend<br>Sales <small>V7.1</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V7.2</small></div>
     <img src="images/Logo2.jpg" class="seal">
   </div>
 </header>
@@ -158,7 +158,7 @@
     <div class="date-field"><input type="text" id="liveDateDisplay" placeholder="dd-mm-yyyy" inputmode="numeric" maxlength="10"><button type="button" class="date-btn">📅</button><input type="date" id="liveDate" class="hidden-date"></div>
     <div id="liveDateResult" class="sales-date-result">当天销售额：0.00</div>
 
-    <label>销售额</label>
+    <label>已付款，可享佣金的营业额</label>
     <input id="liveSales" class="money-input" inputmode="decimal" value="0.00">
 
     <button class="green" onclick="saveLiveSales()">储存 Live</button>
@@ -167,9 +167,9 @@
   </div>
 
   <div class="card">
-    <h2>主播本月销售记录</h2>
+    <h2>Live 本月销售记录</h2>
     <div id="liveMonthlyList"></div>
-    <div class="fair-total-line"><span>该主播本月总销售额</span><b id="liveSelectedHostTotal">0.00</b></div>
+    <div class="fair-total-line"><span>Live 本月总销售额</span><b id="liveSelectedHostTotal">0.00</b></div>
   </div>
 </section>
 
@@ -194,7 +194,7 @@
     <button class="gray" onclick="exportCSV('year')">📈 导出全年 Excel</button>
     <button class="gray" onclick="monthClose()">📅 月底结算</button>
     <button class="gray" onclick="yearClose()">📆 年底结算</button>
-    <p class="note">V7.1：Fair 与 Live 使用两套独立佣金机制。</p>
+    <p class="note">V7.2：Live 列表按主播名字及日期排序，佣金修改立即更新 Home。</p>
   </div>
 <div class="commission-mechanisms">
   <div class="commission-panel fair-commission-panel">

@@ -441,7 +441,7 @@ loadFromSheet().then(()=>{
 });
 
 
-/* ===== V7.0 Live Module ===== */
+/* ===== V7.2 Live Module ===== */
 function normalizeLiveHostKey(value){
   return String(value||"").replace(/\s+/g,"").toLowerCase();
 }
@@ -509,20 +509,65 @@ function renderLiveMonthlyList(){
   const container=document.getElementById("liveMonthlyList");
   const totalEl=document.getElementById("liveSelectedHostTotal");
   if(!container||!totalEl)return;
-  const host=selectedLiveHost();
-  if(!host){
-    container.innerHTML='<div class="sub">请先选择主播</div>';
+
+  const list=rows
+    .filter(r=>r.type==="live"&&sameMonth(r.date)&&Number(r.amount)>0)
+    .map(r=>({...r,displayHost:canonicalLiveHost(r.location)}))
+    .sort((a,b)=>{
+      const hostSort=a.displayHost.localeCompare(b.displayHost,"en",{sensitivity:"base"});
+      return hostSort||displayToISO(a.date).localeCompare(displayToISO(b.date));
+    });
+
+  const total=list.reduce((sum,r)=>sum+Number(r.amount||0),0);
+
+  if(!list.length){
+    container.innerHTML='<div class="sub">这个月份还没有 Live 记录</div>';
     totalEl.textContent="0.00";
     return;
   }
-  const key=normalizeLiveHostKey(host);
-  const list=rows.filter(r=>r.type==="live"&&sameMonth(r.date)&&normalizeLiveHostKey(r.location)===key&&Number(r.amount)>0)
-    .sort((a,b)=>displayToISO(a.date).localeCompare(displayToISO(b.date)));
-  const total=list.reduce((s,r)=>s+Number(r.amount||0),0);
-  container.innerHTML=list.length
-    ?list.map(r=>`<div class="fair-location-row"><span>${r.date}</span><b>${money(r.amount)}</b></div>`).join("")
-    :'<div class="sub">这个月份还没有 Live 记录</div>';
+
+  const groups=[];
+  list.forEach(r=>{
+    const key=normalizeLiveHostKey(r.displayHost);
+    let group=groups.find(item=>item.key===key);
+    if(!group){
+      group={key,name:r.displayHost,rows:[]};
+      groups.push(group);
+    }
+    group.rows.push(r);
+  });
+
+  container.innerHTML=groups.map(group=>{
+    const hostTotal=group.rows.reduce((sum,r)=>sum+Number(r.amount||0),0);
+    return `<div class="live-sales-group">
+      <div class="live-sales-group-title"><span>${group.name}</span><b>${money(hostTotal)}</b></div>
+      ${group.rows.map(r=>`<div class="fair-location-row"><span>${r.date}</span><b>${money(r.amount)}</b></div>`).join("")}
+    </div>`;
+  }).join("");
+
   totalEl.textContent=money(total);
+}
+
+const LIVE_LAST_SESSION_KEY="lover_live_last_saved_session_v72";
+function saveLastLiveSession(host,dateISO){
+  const cleanHost=canonicalLiveHost(host);
+  if(!cleanHost||!dateISO)return;
+  try{
+    localStorage.setItem(LIVE_LAST_SESSION_KEY,JSON.stringify({host:cleanHost,dateISO}));
+  }catch(e){}
+}
+function restoreLastLiveSession(){
+  const hostEl=document.getElementById("liveHost");
+  const dateEl=document.getElementById("liveDate");
+  if(!hostEl||!dateEl)return;
+  try{
+    const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
+    if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
+    if(saved&&/^\d{4}-\d{2}-\d{2}$/.test(String(saved.dateISO||""))){
+      setDateControl("liveDate",saved.dateISO);
+    }
+  }catch(e){}
+  updateLiveInputFromSelectedDate();
 }
 function liveByHostThisMonth(){
   const map={};
@@ -551,6 +596,7 @@ async function saveLiveSales(){
   if(!d){alert("请选择日期");return}
   hostInput.value=host;
   saveLiveHost(host);
+  saveLastLiveSession(host,dateEl.value);
   const now=new Date().toISOString();
   const localRow={type:"live",date:d,company:"live",location:host,amount,updatedAt:now,clientUpdatedAt:now};
   if(amount<=0)rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));
@@ -674,6 +720,8 @@ if(document.getElementById("liveHost")){
   });
 }
 
+restoreLastLiveSession();
+
 
 // V7.1: Fair and Live commission settings are saved and reset independently.
 function readFairCommissionInputs(){
@@ -717,17 +765,26 @@ async function saveFairCommissionSettings(){
 }
 
 async function saveLiveCommissionSettings(){
+  const previous=getCommissionSettings();
   try{
     const live=readLiveCommissionInputs();
-    const current=getCommissionSettings();
-    const settings=normalizeCommissionSettings({...current,...live});
-    setSync("正在同步 Live 主播佣金...");
+    const settings=normalizeCommissionSettings({...previous,...live});
+
+    // V7.2：先在本机立即套用，让 Home 不必等待云端回应。
+    applyCommissionSettings(settings);
+    renderLiveHostCommissionSettings();
+    saveLocalDataCache(settings);
+    showTempMsg("liveCommissionSettingsMsg");
+    setSync("Live 佣金已更新，正在后台同步...");
+
     const saved=await saveCommissionSettingsToSheet(settings);
     applyCommissionSettings(saved||settings);
-    renderLiveHostCommissionSettings();
-    showTempMsg("liveCommissionSettingsMsg");
+    saveLocalDataCache(saved||settings);
     setSync("已同步",true);
   }catch(e){
+    applyCommissionSettings(previous);
+    renderLiveHostCommissionSettings();
+    saveLocalDataCache(previous);
     alert("Live 主播佣金储存失败："+e.message);
     setSync("Live 佣金同步失败",false,true);
   }
@@ -752,17 +809,24 @@ async function resetFairCommissionSettings(){
 
 async function resetLiveCommissionSettings(){
   if(!confirm("确定只恢复 Live 默认佣金？\n\n直播默认：10%\n所有主播独立佣金将清除。\n\nFair 佣金不会改变。"))return;
+  const previous=getCommissionSettings();
   try{
-    const current=getCommissionSettings();
-    const settings=normalizeCommissionSettings({...current,liveRate:10,liveHostRates:{}});
-    setSync("正在恢复 Live 默认佣金...");
+    const settings=normalizeCommissionSettings({...previous,liveRate:10,liveHostRates:{}});
+    applyCommissionSettings(settings);
+    renderLiveHostCommissionSettings();
+    saveLocalDataCache(settings);
+    showTempMsg("liveCommissionSettingsMsg");
+    setSync("Live 默认佣金已更新，正在后台同步...");
+
     const saved=await saveCommissionSettingsToSheet(settings);
     applyCommissionSettings(saved||settings);
-    renderLiveHostCommissionSettings();
-    showTempMsg("liveCommissionSettingsMsg");
+    saveLocalDataCache(saved||settings);
     setSync("已同步",true);
     alert("Live 主播佣金已恢复默认并自动储存");
   }catch(e){
+    applyCommissionSettings(previous);
+    renderLiveHostCommissionSettings();
+    saveLocalDataCache(previous);
     alert("Live 恢复默认失败："+e.message);
     setSync("Live 佣金同步失败",false,true);
   }
