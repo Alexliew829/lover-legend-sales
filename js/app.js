@@ -164,186 +164,25 @@ function getCommissionSettings(){
   return{...commissionSettings};
 }
 
-function applyCommissionSettings(settings){commissionSettings=normalizeCommissionSettings(commissionSyncInProgress&&pendingCommissionSettings?pendingCommissionSettings:settings);localStorage.setItem("lover_commission_settings_cache",JSON.stringify(commissionSettings));loadCommissionSettingsForm();if(typeof renderDashboard==="function")renderDashboard()}
-
-function loadCachedCommissionSettings(){
-  try{
-    const cached=JSON.parse(
-      localStorage.getItem("lover_commission_settings_cache")||"null"
+function applyCommissionSettings(settings){
+  if(commissionSyncInProgress&&pendingCommissionSettings){
+    commissionSettings=normalizeCommissionSettings(
+      pendingCommissionSettings
     );
-    if(cached)commissionSettings=normalizeCommissionSettings(cached);
-  }catch(e){
-    commissionSettings={...DEFAULT_COMMISSION_SETTINGS};
-  }
-}
-
-function getLiveHostCommissionRate(host){
-  const settings=getCommissionSettings();
-  const key=normHost(host);
-  const custom=Number(settings.liveHostRates?.[key]);
-  return Number.isFinite(custom)?custom:Number(settings.liveRate||10);
-}
-
-function renderLiveHostCommissionSettings(){
-  const container=document.getElementById("liveHostCommissionList");
-  if(!container)return;
-
-  const settings=getCommissionSettings();
-  const hosts=collectLiveHosts();
-
-  if(!hosts.length){
-    container.innerHTML='<div class="sub">还没有主播记录；新增主播后会自动出现在这里。</div>';
-    return;
+  }else{
+    commissionSettings=normalizeCommissionSettings(settings);
   }
 
-  container.innerHTML=hosts.map(host=>{
-    const key=normHost(host);
-    const rate=getLiveHostCommissionRate(host);
-
-    return`
-      <div class="live-host-commission-row">
-        <div class="live-host-commission-name">${host}</div>
-        <div class="live-host-commission-input">
-          <input
-            type="number"
-            class="live-host-rate-input"
-            data-host-key="${key}"
-            min="0"
-            max="100"
-            step="0.1"
-            inputmode="decimal"
-            value="${rate}"
-          >
-          <span>%</span>
-        </div>
-      </div>
-    `;
-  }).join("");
-}
-
-function loadCommissionSettingsForm(){
-  const settings=getCommissionSettings();
-  const rate1=document.getElementById("commissionRate1");
-  const rate2=document.getElementById("commissionRate2");
-  const rate3=document.getElementById("commissionRate3");
-  const liveRate=document.getElementById("liveCommissionRate");
-  if(rate1)rate1.value=settings.rate1;
-  if(rate2)rate2.value=settings.rate2;
-  if(rate3)rate3.value=settings.rate3;
-  if(liveRate)liveRate.value=settings.liveRate;
-  renderLiveHostCommissionSettings();
-}
-
-async function saveCommissionSettings(){
-  const rate1=Number(document.getElementById("commissionRate1").value);
-  const rate2=Number(document.getElementById("commissionRate2").value);
-  const rate3=Number(document.getElementById("commissionRate3").value);
-
-  if(
-    !Number.isFinite(rate1)||
-    !Number.isFinite(rate2)||
-    !Number.isFinite(rate3)||
-    rate1<0||rate2<0||rate3<0
-  ){
-    alert("请输入正确的 Fair 佣金百分比");
-    return;
-  }
-
-  const previous=getCommissionSettings();
-  const next={...previous,rate1,rate2,rate3};
-
-  commissionSyncInProgress=true;
-  pendingCommissionSettings=next;
-
-  applyCommissionSettingsImmediately(next);
-  showTempMsg("commissionSettingsMsg");
-  setSync("Fair 佣金已更新，后台同步中...");
-
-  try{
-    const saved=await saveCommissionSettingsToSheet(next);
-
-    commissionSyncInProgress=false;
-    pendingCommissionSettings=null;
-
-    applyCommissionSettingsImmediately(saved||next);
-    setSync("已同步",true);
-  }catch(e){
-    commissionSyncInProgress=false;
-    pendingCommissionSettings=null;
-
-    applyCommissionSettingsImmediately(previous);
-    alert("Fair 佣金储存失败，已恢复原设置："+e.message);
-    setSync("Fair 佣金同步失败",false,true);
-  }
-}
-async function resetCommissionSettings(){
-  const ok=confirm(
-    "确定恢复默认佣金？\n\n"+
-    "RM50,000 以下：6%\n"+
-    "RM50,000 以上：7%\n"+
-    "RM100,000 以上：8%"
-  );
-  if(!ok)return;
-
-  try{
-    setSync("正在恢复默认佣金...");
-    const saved=await saveCommissionSettingsToSheet({rate1:6,rate2:7,rate3:8,liveRate:getCommissionSettings().liveRate});
-    applyCommissionSettings(saved||{rate1:6,rate2:7,rate3:8,liveRate:getCommissionSettings().liveRate});
-    showTempMsg("commissionSettingsMsg");
-    setSync("已同步",true);
-  }catch(e){
-    alert("恢复默认值失败："+e.message);
-    setSync("佣金设置同步失败",false,true);
-  }
-}
-
-async function saveLiveCommissionSetting(){const liveRate=Number(document.getElementById("liveCommissionRate").value);if(!Number.isFinite(liveRate)||liveRate<0){alert("请输入正确的默认 Live 佣金百分比");return}const liveHostRates={};document.querySelectorAll(".live-host-rate-input").forEach(input=>{const key=normHost(input.dataset.hostKey),rate=Number(input.value);if(key&&Number.isFinite(rate)&&rate>=0)liveHostRates[key]=rate});const previous=getCommissionSettings(),next={...previous,liveRate,liveHostRates};commissionSyncInProgress=true;pendingCommissionSettings=next;applyCommissionSettingsImmediately(next,{refreshForm:false});showTempMsg("liveCommissionSettingsMsg");setSync("Live 佣金已更新，后台同步中...");try{const saved=await saveCommissionSettingsToSheet(next);commissionSyncInProgress=false;pendingCommissionSettings=null;applyCommissionSettingsImmediately(saved||next);setSync("已同步",true)}catch(e){commissionSyncInProgress=false;pendingCommissionSettings=null;applyCommissionSettingsImmediately(previous);alert("Live 佣金储存失败，已恢复原设置："+e.message);setSync("Live 佣金同步失败",false,true)}}
-async function resetLiveCommissionSetting(){
-  if(!confirm("确定所有主播恢复默认佣金 10%？"))return;
-
-  const previous=getCommissionSettings();
-  const next={
-    ...previous,
-    liveRate:10,
-    liveHostRates:{}
-  };
-
-  commissionSyncInProgress=true;
-  pendingCommissionSettings=next;
-
-  // 所有输入框立即显示 10，不等待云端。
-  applyCommissionSettingsImmediately(next);
-  showTempMsg("liveCommissionSettingsMsg");
-  setSync("已恢复默认 10%，后台同步中...");
-
-  try{
-    const saved=await saveCommissionSettingsToSheet(next);
-
-    commissionSyncInProgress=false;
-    pendingCommissionSettings=null;
-
-    applyCommissionSettingsImmediately(saved||next);
-    setSync("已同步",true);
-  }catch(e){
-    commissionSyncInProgress=false;
-    pendingCommissionSettings=null;
-
-    applyCommissionSettingsImmediately(previous);
-    alert("恢复默认佣金失败，已恢复原设置："+e.message);
-    setSync("Live 佣金同步失败",false,true);
-  }
-}
-function renderLiveCommission(){
-  const label=document.getElementById("liveCommissionLabel");
-  const value=document.getElementById("liveCommissionTotal");
-
-  const commission=Object.entries(liveByHost()).reduce(
-    (sum,[host,sales])=>sum+(Number(sales||0)*getLiveHostCommissionRate(host)/100),
-    0
+  localStorage.setItem(
+    "lover_commission_settings_cache",
+    JSON.stringify(commissionSettings)
   );
 
-  if(label)label.textContent="Live 本月总佣金";
-  if(value)value.textContent=money(commission);
+  loadCommissionSettingsForm();
+
+  if(typeof renderDashboard==="function"){
+    renderDashboard();
+  }
 }
 function getFairCommissionRate(total){
   const amount=Number(total||0);
@@ -986,6 +825,25 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
 });
 
 document.getElementById("liveSales").addEventListener("input",saveLiveSession);document.getElementById("liveSales").addEventListener("blur",saveLiveSession);attachMoneyInputs();
+
+document.addEventListener("input",event=>{
+  if(
+    event.target?.id==="liveCommissionRate"||
+    event.target?.classList?.contains("live-host-rate-input")
+  ){
+    persistLiveCommissionDraft();
+  }
+});
+
+document.addEventListener("change",event=>{
+  if(
+    event.target?.id==="liveCommissionRate"||
+    event.target?.classList?.contains("live-host-rate-input")
+  ){
+    persistLiveCommissionDraft();
+  }
+});
+
 renderAll();
 
 loadFromSheet().then(()=>{syncFairInputs();const s=JSON.parse(localStorage.getItem(LIVE_SESSION_KEY)||"null");if(s?.host)document.getElementById("liveHost").value=canonicalHost(s.host);if(s?.date)setDateControl("liveDate",s.date);updateLiveInputFromSelectedDate({preserveTyped:true});if(s?.sales!==undefined)document.getElementById("liveSales").value=safeFormatAmount(s.sales)});
