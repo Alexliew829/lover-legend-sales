@@ -180,6 +180,7 @@ async function syncPendingRows() {
 
     const dailyRows = pendingRows.filter(r => r.type === "daily");
     const fairRows = pendingRows.filter(r => r.type === "fair");
+    const liveRows = pendingRows.filter(r => r.type === "live");
 
     for (const row of dailyRows) {
       const saved = await saveDailyToSheet(
@@ -225,6 +226,12 @@ async function syncPendingRows() {
           location
         });
       });
+    }
+
+    for (const row of liveRows) {
+      const saved = await saveLiveToSheet(row.date,row.location,row.amount,row.clientUpdatedAt||"");
+      if(saved&&Number(saved.amount)<=0)rows=rows.filter(x=>syncKey(x)!==syncKey(saved));else if(saved)upsertLocalRow(saved);
+      clearPendingRow(row);
     }
 
     renderAll();
@@ -274,12 +281,15 @@ async function saveFairToSheet(location, records) {
   return saveFairBatchToSheet(location, records);
 }
 
+async function saveLiveToSheet(date,host,amount,clientUpdatedAt=""){const json=await jsonp({action:"saveLive",date,host,amount,clientUpdatedAt});if(!json.ok)throw new Error(json.message||"Live 储存失败");return json.row||null}
+
 async function saveCommissionSettingsToSheet(settings) {
   const json = await jsonp({
     action: "saveCommissionSettings",
     rate1: settings.rate1,
     rate2: settings.rate2,
-    rate3: settings.rate3
+    rate3: settings.rate3,
+    liveRate: settings.liveRate
   });
   if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
   return json.commissionSettings || null;
