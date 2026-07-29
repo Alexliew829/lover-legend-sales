@@ -94,7 +94,7 @@ function jsonp(params) {
       delete window[callback];
       script.remove();
       reject(new Error("连接 Google Apps Script 超时"));
-    }, 20000);
+    }, 12000);
 
     window[callback] = data => {
       clearTimeout(timer);
@@ -127,22 +127,41 @@ async function loadFromSheet(options = {}) {
   cloudLoadPromise = (async () => {
     loadPendingRows();
 
+    // 有未同步资料时先处理，但处理完成后必须继续读取云端，
+    // 不能直接 return，否则 Home 会一直停留旧资料。
     if (pendingRows.length > 0) {
-      setSync(`有 ${pendingRows.length} 笔未同步资料，正在自动同步...`, false, true);
+      setSync(`正在同步 ${pendingRows.length} 笔资料...`);
       await syncPendingRows();
-      return;
     }
 
     const hasLocalData = loadLocalDataCache();
-    setSync(hasLocalData ? "已显示本机资料，后台同步中..." : "同步中...");
+
+    setSync(
+      hasLocalData
+        ? "已显示本机资料，后台更新中..."
+        : "正在读取资料..."
+    );
 
     try {
-      const json = await jsonp({ action: "load" });
-      if (!json.ok) throw new Error(json.message || "读取失败");
+      const year =
+        document.getElementById("yearPicker")?.value ||
+        String(new Date().getFullYear());
+
+      const json = await jsonp({
+        action: "load",
+        year
+      });
+
+      if (!json.ok) {
+        throw new Error(json.message || "读取失败");
+      }
 
       rows = json.rows || [];
 
-      if (json.commissionSettings && typeof applyCommissionSettings === "function") {
+      if (
+        json.commissionSettings &&
+        typeof applyCommissionSettings === "function"
+      ) {
         applyCommissionSettings(json.commissionSettings);
       }
 
@@ -150,11 +169,27 @@ async function loadFromSheet(options = {}) {
       saveLocalDataCache(json.commissionSettings || null);
       setSync("已同步", true);
     } catch (err) {
-      setSync(
-        hasLocalData ? "已显示本机资料，云端同步稍后重试" : "同步失败：" + err.message,
-        false,
-        true
-      );
+      loadPendingRows();
+
+      if (pendingRows.length > 0) {
+        setSync(
+          `有 ${pendingRows.length} 笔资料等待同步`,
+          false,
+          true
+        );
+      } else if (hasLocalData) {
+        setSync(
+          "已显示本机资料，云端暂时连接失败",
+          false,
+          true
+        );
+      } else {
+        setSync(
+          "同步失败：" + err.message,
+          false,
+          true
+        );
+      }
     }
   })();
 
@@ -240,7 +275,20 @@ async function syncPendingRows() {
     setSync("已同步", true);
   } catch (err) {
     loadPendingRows();
-    setSync(`有 ${pendingRows.length} 笔未同步资料，系统会自动重试`, false, true);
+
+    if (pendingRows.length > 0) {
+      setSync(
+        `有 ${pendingRows.length} 笔资料等待同步`,
+        false,
+        true
+      );
+    } else {
+      setSync(
+        "云端连接失败，请稍后重试",
+        false,
+        true
+      );
+    }
   } finally {
     pendingSyncRunning = false;
   }

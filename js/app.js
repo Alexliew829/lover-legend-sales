@@ -691,7 +691,10 @@ bindDateControl("fairEnd",()=>{
 renderFairLocationOptions();
 
 document.getElementById("monthPicker").addEventListener("change",renderAll);
-document.getElementById("yearPicker").addEventListener("change",renderAll);
+document.getElementById("yearPicker").addEventListener("change",()=>{
+  renderAll();
+  loadFromSheet({force:true});
+});
 document.getElementById("company").addEventListener("change",updateDailyInputFromSelectedDate);
 document.getElementById("liveHost").addEventListener("input",updateLiveInputFromSelectedDate);
 document.getElementById("liveHost").addEventListener("blur",()=>{const i=document.getElementById("liveHost");i.value=canonicalHost(i.value);saveLiveHost(i.value);updateLiveInputFromSelectedDate()});
