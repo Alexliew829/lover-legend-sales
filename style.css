@@ -87,3 +87,60 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 .live-box{border-color:#efb0b0}.live-host-grid{display:grid;grid-template-columns:1fr;gap:8px}.live-host-card{background:#fff;border:1px solid #ddd;border-radius:13px;padding:10px}.live-host-title{font-size:17px;font-weight:900;margin-bottom:5px}.live-list-section{margin-top:20px;padding-top:12px;border-top:1px dashed #ccc}.live-daily-row{display:flex;justify-content:space-between;gap:10px;padding:9px 2px;border-bottom:1px solid #eee;font-weight:800}.live-daily-row b{color:#b00000}@media(min-width:520px){.live-host-grid{grid-template-columns:1fr 1fr}}
+
+
+.live-list-header,
+.live-daily-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 1.2fr) minmax(95px, 1fr) minmax(90px, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.live-list-header {
+  padding: 8px 2px;
+  border-bottom: 2px solid #ddd;
+  font-weight: 900;
+}
+
+.live-daily-row span:nth-child(2) {
+  text-align: center;
+}
+
+.live-daily-row b {
+  text-align: right;
+}
+
+.live-host-commission-list {
+  margin-top: 16px;
+}
+
+.live-host-commission-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(100px, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.live-host-commission-name {
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.live-host-commission-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-host-commission-input input {
+  min-width: 0;
+  width: 100%;
+}
+
+.live-rate-note {
+  margin-top: 8px;
+  line-height: 1.45;
+}

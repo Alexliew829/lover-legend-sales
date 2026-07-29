@@ -1,0 +1,20 @@
+Lover Legend Sales V7.0
+
+Live 改进：
+- Live 每日列表显示全部主播：主播、日期、销售额。
+- Live 本月总营业额加总全部主播。
+- 本月总营业额与本年度总营业额包括 Live。
+- More 可设置新主播默认佣金，默认 10%。
+- 每位主播可设置独立佣金率。
+- Home 每位主播卡片使用各自佣金率计算。
+- Live 本月总佣金为所有主播各自佣金加总。
+- 佣金设置同步全部设备。
+
+示例：
+Alex 10%、Khuan 8%、Yong 12%，系统分别计算后再加总。
+
+安装：
+1. 覆盖 GitHub 网站文件。
+2. 用 apps_script_v7_0.gs.txt 全部覆盖 Code.gs。
+3. Deploy → Manage deployments → Edit → New version → Deploy。
+4. 不会删除现有营业记录。
