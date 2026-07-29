@@ -1,20 +1,15 @@
-Lover Legend Sales V6.9.0 Live - File Checklist
+Lover Legend Sales V6.4.1
 
-Website:
+GitHub 上传：
 - index.html
 - style.css
 - manifest.json
-- version.json
 - sw.js
-- js/utils.js
-- js/sheet.js
-- js/app.js
-- js/update.js
-- icons/*
-- images/*
+- js/
+- icons/
+- images/
 
-Google Apps Script:
-- apps_script_v6_9_0_live.gs.txt
+Apps Script：
+- 继续使用 apps_script_v6_4.gs.txt
 
-Important:
-Deploy the Apps Script code as a new version of the existing Web App and keep the same Web App URL.
+新增：本年度 Fair 总营业额独立显示。
