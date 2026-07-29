@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b6b2b">
+<title>Lover Sales</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body>
+<div class="app">
+<header class="top">
+  <div class="brand">
+    <img src="images/logo.png" class="logo">
+    <div class="brand-title">Lover Legend<br>Sales <small>V9.0 Stable</small></div>
+    <img src="images/Logo2.jpg" class="seal">
+  </div>
+</header>
+
+<main>
+<section id="page-home" class="page active">
+  <div class="card">
+    <label>月份</label>
+    <input type="month" id="monthPicker">
+    <label>年度</label>
+    <input type="number" id="yearPicker" min="2020" max="2100">
+    <div id="syncStatus" class="sync-line">🟡 准备同步</div>
+    <div id="lastSync" class="last-sync">最后同步：-</div>
+  </div>
+
+  <div class="card">
+    <h2>本月营业额</h2>
+    <div id="todayWarning" class="warning hidden">🔴 今天还没有输入营业额</div>
+    <div id="todayDone" class="done hidden">🟢 今天已有营业额记录</div>
+
+    <div class="dash">
+      <div class="box">
+        <div class="name">Balakong 本月</div>
+        <div class="amount" id="balakongMonth">0.00</div>
+      </div>
+
+      <div class="box">
+        <div class="name">Belimbing 本月</div>
+        <div class="amount" id="belimbingMonth">0.00</div>
+      </div>
+
+      <div class="box total fair-box">
+        <div id="fairLocationList"></div>
+        <div class="fair-total-line"><span>Fair 本月总营业额</span><b id="fairMonthTotal">0.00</b></div>
+        <div class="fair-total-line"><span><span id="fairCommissionLabel">Fair 本月总佣金 6%</span></span><b id="fairCommissionTotal">0.00</b></div>
+<div id="fairCommissionMessage" class="fair-commission-message hidden"></div>
+      </div>
+
+      <div class="box total live-box">
+        <div id="liveHostList"></div>
+        <div class="fair-total-line"><span>Live 本月总营业额</span><b id="liveMonthTotal">0.00</b></div>
+        <div class="fair-total-line"><span id="liveCommissionLabel">Live 本月总佣金 10%</span><b id="liveCommissionTotal">0.00</b></div>
+      </div>
+
+      <div class="box total highlight">
+        <div class="name">本月总营业额</div>
+        <div id="monthGrandTotal" class="amount">0.00</div>
+        <div class="sub">Balakong 本月 + Belimbing 本月 + Fair 本月 + Live 本月</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>本年度累计</h2>
+    <div class="dash">
+      <div class="box">
+        <div class="name">Balakong 总营业额</div>
+        <div class="amount" id="balakongYearTotal">0.00</div>
+      </div>
+
+      <div class="box">
+        <div class="name">Belimbing 总营业额</div>
+        <div class="amount" id="belimbingYearTotal">0.00</div>
+      </div>
+
+      <div class="box">
+        <div class="name">Fair 总营业额</div>
+        <div class="amount" id="fairYearTotal">0.00</div>
+      </div>
+
+      <div class="box">
+        <div class="name">Live 总营业额</div>
+        <div class="amount" id="liveYearTotal">0.00</div>
+      </div>
+
+      <div class="box total highlight">
+        <div class="name">本年度总营业额</div>
+        <div class="amount" id="yearGrandTotal">0.00</div>
+        <div class="sub">Balakong + Belimbing + Fair + Live</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="page-sales" class="page">
+  <div class="card">
+    <h2>每日营业额</h2>
+    <label>公司</label>
+    <select id="company">
+      <option value="balakong">Lover Legend Adenium - Balakong</option>
+      <option value="belimbing" selected>Lover Legend Gardening - Belimbing</option>
+    </select>
+
+    <label>日期</label>
+    <div class="date-field"><input type="text" id="saleDateDisplay" placeholder="dd-mm-yyyy" inputmode="numeric" maxlength="10"><button type="button" class="date-btn">📅</button><input type="date" id="saleDate" class="hidden-date"></div>
+    <div id="salesDateResult" class="sales-date-result">当天记录：0.00</div>
+
+    <label>营业额</label>
+    <input id="dailySales" class="money-input" inputmode="decimal" value="0.00">
+
+    <button class="green" onclick="saveDailySales()">储存</button>
+    <div id="saveMsg" class="save-msg hidden">✅ 已储存</div>
+    <p class="note">选择旧日期会自动显示当天已储存金额。</p>
+  </div>
+</section>
+
+<section id="page-fair" class="page">
+  <div class="card">
+    <h2>Fair</h2>
+    <label>地点</label>
+    <input id="fairLocation" list="fairLocationListOptions" placeholder="输入或选择地点（例如 Sunway）">
+    <datalist id="fairLocationListOptions"></datalist>
+
+    <div class="split">
+      <div>
+        <label>开始日期</label>
+        <div class="date-field"><input type="text" id="fairStartDisplay" placeholder="dd-mm-yyyy" inputmode="numeric" maxlength="10"><button type="button" class="date-btn">📅</button><input type="date" id="fairStart" class="hidden-date"></div>
+      </div>
+      <div>
+        <label>结束日期</label>
+        <div class="date-field"><input type="text" id="fairEndDisplay" placeholder="dd-mm-yyyy" inputmode="numeric" maxlength="10"><button type="button" class="date-btn">📅</button><input type="date" id="fairEnd" class="hidden-date"></div>
+      </div>
+    </div>
+
+    <div id="fairInputs"></div>
+    <button class="green" onclick="saveFairSales()">储存 Fair</button>
+    <div id="fairSaveMsg" class="save-msg hidden">✅ Fair 已储存</div>
+  </div>
+</section>
+
+<section id="page-live" class="page">
+  <div class="card">
+    <h2>Live</h2>
+    <label>主播</label>
+    <input id="liveHost" list="liveHostListOptions" placeholder="输入或选择主播名字">
+    <datalist id="liveHostListOptions"></datalist>
+    <label>日期</label>
+    <div class="date-field"><input type="text" id="liveDateDisplay" placeholder="dd-mm-yyyy" inputmode="numeric" maxlength="10"><button type="button" class="date-btn">📅</button><input type="date" id="liveDate" class="hidden-date"></div>
+    <div id="liveDateResult" class="sales-date-result">当天记录：0.00</div>
+    <label>销售额</label>
+    <input id="liveSales" class="money-input" inputmode="decimal" value="0.00">
+    <button class="green" onclick="saveLiveSales()">储存 Live</button>
+    <div id="liveSaveMsg" class="save-msg hidden">✅ Live 已储存</div>
+    <div class="live-list-section">
+      <h3>所有主播每日销售额</h3>
+      <div class="live-list-header">
+        <span>主播</span>
+        <span>日期</span>
+        <span>销售额</span>
+      </div>
+      <div id="liveDailyList"></div>
+      <div class="fair-total-line">
+        <span>Live 本月总营业额</span>
+        <b id="liveAllHostsTotal">0.00</b>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="page-report" class="page">
+  <div class="card">
+    <h2>Report</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>日期</th><th>类别</th><th>公司/主播</th><th>地点</th><th>营业额</th></tr>
+        </thead>
+        <tbody id="recordTable"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="page-more" class="page">
+  <div class="card">
+    <h2>More</h2>
+    <button class="gray" onclick="exportCSV('month')">📈 导出本月 Excel</button>
+    <button class="gray" onclick="exportCSV('year')">📈 导出全年 Excel</button>
+    <button class="gray" onclick="monthClose()">📅 月底结算</button>
+    <button class="gray" onclick="yearClose()">📆 年底结算</button>
+    <p class="note">V6.6：每月一个 Google Sheet，资料自动去重及排序。</p>
+  </div>
+<div class="commission-settings-card">
+  <h3>Fair 佣金设置</h3>
+
+  <label for="commissionRate1">RM50,000 以下</label>
+  <div class="commission-input-row">
+    <input id="commissionRate1" type="number" min="0" max="100" step="0.1" inputmode="decimal">
+    <span>%</span>
+  </div>
+
+  <label for="commissionRate2">RM50,000 以上</label>
+  <div class="commission-input-row">
+    <input id="commissionRate2" type="number" min="0" max="100" step="0.1" inputmode="decimal">
+    <span>%</span>
+  </div>
+
+  <label for="commissionRate3">RM100,000 以上</label>
+  <div class="commission-input-row">
+    <input id="commissionRate3" type="number" min="0" max="100" step="0.1" inputmode="decimal">
+    <span>%</span>
+  </div>
+
+  <button type="button" onclick="saveCommissionSettings()">💾 储存佣金设置</button>
+  <button type="button" class="secondary-btn" onclick="resetCommissionSettings()">↺ 恢复默认值</button>
+
+  <div id="commissionSettingsMsg" class="save-msg hidden">Fair 佣金设置已储存</div>
+</div>
+<div class="commission-settings-card">
+  <h3>Live 佣金设置</h3>
+
+  <label for="liveCommissionRate">新主播默认佣金</label>
+  <div class="commission-input-row">
+    <input id="liveCommissionRate" type="number" min="0" max="100" step="0.1" inputmode="decimal">
+    <span>%</span>
+  </div>
+
+  <div class="sub live-rate-note">每位主播可以使用不同佣金率；没有特别设置的主播会使用默认佣金。</div>
+
+  <div id="liveHostCommissionList" class="live-host-commission-list"></div>
+
+  <button type="button" onclick="saveLiveCommissionSetting()">💾 储存全部 Live 佣金</button>
+  <button type="button" class="secondary-btn" onclick="resetLiveCommissionSetting()">↺ 全部恢复默认 10%</button>
+
+  <div id="liveCommissionSettingsMsg" class="save-msg hidden">Live 佣金设置已储存</div>
+</div>
+</section>
+</main>
+
+
+
+</div>
+
+<nav class="bottom-nav">
+  <div class="nav-item active" onclick="showPage('home',this)"><span>🏠</span>Home</div>
+  <div class="nav-item" onclick="showPage('sales',this)"><span>💰</span>Sales</div>
+  <div class="nav-item" onclick="showPage('fair',this)"><span>🏪</span>Fair</div>
+  <div class="nav-item" onclick="showPage('live',this)"><span>🔴</span>Live</div>
+  <div class="nav-item" onclick="showPage('report',this)"><span>📊</span>Report</div>
+  <div class="nav-item" onclick="showPage('more',this)"><span>⚙️</span>More</div>
+</nav>
+
+<script>window.LOVER_API_URL="https://script.google.com/macros/s/AKfycby1OwDIiVf5quXKiD9AG8s2ppM942sLFdJSfyePp--yZtDjYY8jBtkOYLwD9c3WiC_KNw/exec";</script>
+<script src="js/utils.js"></script>
+<script src="js/sheet.js"></script>
+<script src="js/app.js"></script>
+<script src="js/update.js"></script>
+</body>
+</html>
