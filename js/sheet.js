@@ -5,7 +5,7 @@ let pendingSyncRunning = false;
 let cloudLoadPromise = null;
 let lastCloudLoadAt = 0;
 
-const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v682";
+const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v69";
 const CLOUD_LOAD_COOLDOWN_MS = 4000;
 
 function loadLocalDataCache() {
@@ -93,7 +93,7 @@ function jsonp(params) {
       delete window[callback];
       script.remove();
       reject(new Error("连接 Google Apps Script 超时"));
-    }, 12000);
+    }, 20000);
 
     window[callback] = data => {
       clearTimeout(timer);
@@ -124,47 +124,24 @@ async function loadFromSheet(options = {}) {
   lastCloudLoadAt = now;
 
   cloudLoadPromise = (async () => {
-    // 第一时间显示本机最后一次成功同步的资料。
-    const hasLocalData = loadLocalDataCache();
-
-    if (hasLocalData) {
-      setSync("已显示本机资料，后台更新中...");
-    } else {
-      setSync("正在读取资料...");
-    }
-
-    // 未同步资料不再阻塞云端读取。
-    // 先在后台尝试上传，然后无论成功与否都继续读取。
     loadPendingRows();
 
     if (pendingRows.length > 0) {
-      try {
-        await syncPendingRows();
-      } catch (err) {
-        console.warn("Pending sync failed:", err);
-      }
+      setSync(`有 ${pendingRows.length} 笔未同步资料，正在自动同步...`, false, true);
+      await syncPendingRows();
+      return;
     }
 
+    const hasLocalData = loadLocalDataCache();
+    setSync(hasLocalData ? "已显示本机资料，后台同步中..." : "同步中...");
+
     try {
-      const selectedYear =
-        document.getElementById("yearPicker")?.value ||
-        String(new Date().getFullYear());
+      const json = await jsonp({ action: "load" });
+      if (!json.ok) throw new Error(json.message || "读取失败");
 
-      const json = await jsonp({
-        action: "load",
-        year: selectedYear
-      });
+      rows = json.rows || [];
 
-      if (!json.ok) {
-        throw new Error(json.message || "读取失败");
-      }
-
-      rows = typeof applyLiveDeleteTombstones==="function"?applyLiveDeleteTombstones(json.rows||[]):(json.rows||[]);
-
-      if (
-        json.commissionSettings &&
-        typeof applyCommissionSettings === "function"
-      ) {
+      if (json.commissionSettings && typeof applyCommissionSettings === "function") {
         applyCommissionSettings(json.commissionSettings);
       }
 
@@ -172,19 +149,11 @@ async function loadFromSheet(options = {}) {
       saveLocalDataCache(json.commissionSettings || null);
       setSync("已同步", true);
     } catch (err) {
-      loadPendingRows();
-
-      if (hasLocalData) {
-        setSync("已显示本机资料，云端稍后重试", false, true);
-      } else if (pendingRows.length > 0) {
-        setSync(
-          `有 ${pendingRows.length} 笔资料等待同步`,
-          false,
-          true
-        );
-      } else {
-        setSync("同步失败：" + err.message, false, true);
-      }
+      setSync(
+        hasLocalData ? "已显示本机资料，云端同步稍后重试" : "同步失败：" + err.message,
+        false,
+        true
+      );
     }
   })();
 
@@ -236,6 +205,18 @@ async function syncPendingRows() {
       });
     });
 
+    for (const row of liveRows) {
+      const saved = await saveLiveToSheet(
+        row.date,
+        row.location,
+        row.amount,
+        row.clientUpdatedAt || ""
+      );
+      if (saved && Number(saved.amount) > 0) upsertLocalRow(saved);
+      else rows = rows.filter(x => syncKey(x) !== syncKey(row));
+      clearPendingRow(row);
+    }
+
     for (const [location, records] of fairGroups.entries()) {
       const result = await saveFairBatchToSheet(location, records);
 
@@ -259,28 +240,12 @@ async function syncPendingRows() {
       });
     }
 
-    for (const row of liveRows) {
-      const saved = await saveLiveToSheet(row.date,row.location,row.amount,row.clientUpdatedAt||"");
-      if(saved&&Number(saved.amount)<=0){rows=rows.filter(x=>syncKey(x)!==syncKey(saved));if(typeof clearLiveDeleteTombstone==="function")clearLiveDeleteTombstone(row.date,row.location)}
-      else if(saved){if(typeof clearLiveDeleteTombstone==="function")clearLiveDeleteTombstone(row.date,row.location);upsertLocalRow(saved)}
-      clearPendingRow(row);
-    }
-
     renderAll();
     saveLocalDataCache();
     setSync("已同步", true);
   } catch (err) {
     loadPendingRows();
-
-    if (pendingRows.length > 0) {
-      setSync(
-        `有 ${pendingRows.length} 笔资料等待同步`,
-        false,
-        true
-      );
-    } else {
-      setSync("云端暂时连接失败", false, true);
-    }
+    setSync(`有 ${pendingRows.length} 笔未同步资料，系统会自动重试`, false, true);
   } finally {
     pendingSyncRunning = false;
   }
@@ -322,7 +287,18 @@ async function saveFairToSheet(location, records) {
   return saveFairBatchToSheet(location, records);
 }
 
-async function saveLiveToSheet(date,host,amount,clientUpdatedAt=""){const json=await jsonp({action:"saveLive",date,host,amount,clientUpdatedAt});if(!json.ok)throw new Error(json.message||"Live 储存失败");return json.row||null}
+
+async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "") {
+  const json = await jsonp({
+    action: "saveLive",
+    date,
+    host,
+    amount,
+    clientUpdatedAt
+  });
+  if (!json.ok) throw new Error(json.message || "Live 储存失败");
+  return json.row || null;
+}
 
 async function saveCommissionSettingsToSheet(settings) {
   const json = await jsonp({

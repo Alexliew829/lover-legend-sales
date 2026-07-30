@@ -86,66 +86,121 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   background: #777;
 }
 
-.live-box{border-color:#efb0b0}.live-host-grid{display:grid;grid-template-columns:1fr;gap:8px}.live-host-card{background:#fff;border:1px solid #ddd;border-radius:13px;padding:10px}.live-host-title{font-size:17px;font-weight:900;margin-bottom:5px}.live-list-section{margin-top:20px;padding-top:12px;border-top:1px dashed #ccc}.live-daily-row{display:flex;justify-content:space-between;gap:10px;padding:9px 2px;border-bottom:1px solid #eee;font-weight:800}.live-daily-row b{color:#b00000}@media(min-width:520px){.live-host-grid{grid-template-columns:1fr 1fr}}
+.live-box{grid-column:1/-1}.live-box .fair-location-grid{margin-bottom:8px}
+
+.host-commission-list{display:flex;flex-direction:column;gap:10px;margin:8px 0 14px}
+.host-commission-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.host-commission-row>span:first-child{font-weight:700;overflow-wrap:anywhere}
+.host-commission-row .commission-input-row{width:48%;margin:0}
+.host-commission-row input{width:100%}
 
 
-.live-list-header,
-.live-daily-row {
-  display: grid;
-  grid-template-columns: minmax(90px, 1.2fr) minmax(95px, 1fr) minmax(90px, 1fr);
-  gap: 8px;
-  align-items: center;
+/* V7.1: clearly separate Fair and Live commission mechanisms */
+.commission-mechanisms{
+  display:grid;
+  gap:18px;
+  margin-top:18px;
+}
+.commission-panel{
+  padding:18px;
+  border:2px solid;
+  border-radius:18px;
+  box-shadow:0 6px 18px rgba(0,0,0,.06);
+}
+.commission-panel-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:14px;
+}
+.commission-panel-header h3{
+  margin:0 0 5px;
+}
+.commission-panel-header p{
+  margin:0;
+  font-size:13px;
+  line-height:1.45;
+  color:#555;
+}
+.commission-badge{
+  flex:0 0 auto;
+  padding:5px 9px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:.5px;
+}
+.fair-commission-panel{
+  background:#f4fbf5;
+  border-color:#58a86c;
+}
+.fair-commission-panel .commission-badge{
+  color:#17612c;
+  background:#dcefe1;
+}
+.live-commission-panel{
+  background:#fff6f8;
+  border-color:#d7657d;
+}
+.live-commission-panel .commission-badge{
+  color:#8d1730;
+  background:#f8dce3;
+}
+.commission-panel label{
+  display:block;
+  margin:12px 0 6px;
+  font-weight:700;
+}
+.commission-panel button{
+  margin-top:14px;
+}
+.commission-panel .secondary-btn{
+  background:#777;
+}
+.host-section-title{
+  margin-top:18px;
+  padding-top:14px;
+  border-top:1px dashed #d9a6b1;
+  font-weight:900;
+  font-size:18px;
 }
 
-.live-list-header {
-  padding: 8px 2px;
-  border-bottom: 2px solid #ddd;
-  font-weight: 900;
+/* V7.4 Live list: host rows followed by an explicit total */
+.live-sales-group{
+  padding:10px 0;
+  border-bottom:1px dashed #d7d7d7;
 }
-
-.live-daily-row span:nth-child(2) {
-  text-align: center;
+.live-sales-group:last-child{border-bottom:0}
+.live-sales-group-title{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:4px;
+  font-weight:800;
+  color:#111;
 }
+.live-sales-group-title b{color:#b40000}
 
-.live-daily-row b {
-  text-align: right;
+.live-sales-host-total{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-top:7px;
+  padding-top:8px;
+  border-top:1px dotted #cfcfcf;
+  font-weight:900;
 }
+.live-sales-host-total b{color:#b40000;font-size:18px}
 
-.live-host-commission-list {
-  margin-top: 16px;
-}
 
-.live-host-commission-row {
-  display: grid;
-  grid-template-columns: minmax(110px, 1fr) minmax(100px, 1fr);
-  gap: 10px;
-  align-items: center;
-  padding: 9px 0;
-  border-bottom: 1px solid #eee;
-}
-
-.live-host-commission-name {
-  font-weight: 900;
-  overflow-wrap: anywhere;
-}
-
-.live-host-commission-input {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.live-host-commission-input input {
-  min-width: 0;
-  width: 100%;
-}
-
-.live-rate-note {
-  margin-top: 8px;
-  line-height: 1.45;
-}
-
-/* V7.4 Live 列表对齐 */
-.live-list-header,.live-daily-row{grid-template-columns:minmax(105px,1.15fr) minmax(115px,1fr) minmax(105px,.9fr)}
-.live-list-header span:nth-child(2),.live-daily-row span:nth-child(2){text-align:right;padding-right:12px}
-.live-list-header span:nth-child(3),.live-daily-row b{text-align:right;padding-right:4px}
+/* V7.4 login, password management and WebAuthn */
+body.auth-locked .app, body.auth-locked .bottom-nav{visibility:hidden;pointer-events:none}
+.auth-gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px;background:#f3f6f1}
+.auth-gate.hidden{display:none}
+.auth-card{width:min(100%,430px);background:#fff;border-radius:22px;padding:22px;box-shadow:0 8px 30px rgba(0,0,0,.14)}
+.auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:18px}.auth-logo{width:62px;height:62px;object-fit:contain}.auth-brand h1{margin:0;color:#b00000;font-size:23px}.auth-brand p{margin:5px 0 0;color:#0b6b2b;font-weight:900}
+.auth-secondary{background:#444}.auth-note{font-size:13px;color:#666;text-align:center;margin:12px 0 0}.auth-message{margin-top:10px;padding:10px;border-radius:10px;background:#ffe7e7;color:#9b0000;font-weight:900;text-align:center}.auth-message.success{background:#e6f7ea;color:#0b6b2b}
+.password-dialog{width:min(calc(100% - 24px),460px);border:0;border-radius:20px;padding:0;box-shadow:0 12px 36px rgba(0,0,0,.25)}.password-dialog::backdrop{background:rgba(0,0,0,.55)}.password-dialog form{padding:20px}.dialog-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.dialog-actions button{margin-top:14px}

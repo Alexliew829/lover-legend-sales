@@ -6,6 +6,7 @@ const CORE_FILES = [
   "./style.css",
   "./manifest.json",
   "./version.json",
+  "./js/auth.js",
   "./js/utils.js",
   "./js/sheet.js",
   "./js/app.js",
@@ -54,6 +55,11 @@ self.addEventListener("activate", event => {
 self.addEventListener("message", event => {
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
+  }
+  if (event.data && event.data.type === "CLEAR_CACHES") {
+    event.waitUntil(
+      caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))))
+    );
   }
 });
 

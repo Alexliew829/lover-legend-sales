@@ -9,7 +9,23 @@
 <link rel="stylesheet" href="style.css">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 </head>
-<body>
+<body class="auth-locked">
+<div id="authGate" class="auth-gate">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <img src="images/logo.png" alt="Lover Legend" class="auth-logo">
+      <div><h1>Lover Legend Sales</h1><p>V7.4 安全登录</p></div>
+    </div>
+    <form id="loginForm" autocomplete="off">
+      <label for="loginPassword">密码</label>
+      <input id="loginPassword" type="password" inputmode="numeric" maxlength="12" autocomplete="new-password" name="lover-login-code" data-lpignore="true" data-1p-ignore="true" placeholder="请输入密码">
+      <button type="submit" class="green">登录</button>
+      <button type="button" id="biometricLoginBtn" class="auth-secondary hidden">Face ID / 指纹 / Windows Hello</button>
+      <div id="loginMessage" class="auth-message hidden"></div>
+      <p class="auth-note">首次密码：123456</p>
+    </form>
+  </div>
+</div>
 <div class="app">
 <header class="top">
   <div class="brand">
@@ -54,13 +70,14 @@
       </div>
 
       <div class="box total live-box">
-        <div id="liveHostList"></div>
+        <div class="name">Live</div>
+        <div id="liveHostSummary" class="fair-location-grid"></div>
         <div class="fair-total-line"><span>Live 本月总营业额</span><b id="liveMonthTotal">0.00</b></div>
         <div class="fair-total-line"><span id="liveCommissionLabel">Live 本月总佣金 10%</span><b id="liveCommissionTotal">0.00</b></div>
       </div>
 
       <div class="box total highlight">
-        <div class="name">本月总营业额</div>
+        <div class="name">两间公司本月总营业额</div>
         <div id="monthGrandTotal" class="amount">0.00</div>
         <div class="sub">Balakong 本月 + Belimbing 本月 + Fair 本月 + Live 本月</div>
       </div>
@@ -91,7 +108,7 @@
       </div>
 
       <div class="box total highlight">
-        <div class="name">本年度总营业额</div>
+        <div class="name">两间公司总营业额</div>
         <div class="amount" id="yearGrandTotal">0.00</div>
         <div class="sub">Balakong + Belimbing + Fair + Live</div>
       </div>
@@ -148,29 +165,27 @@
 <section id="page-live" class="page">
   <div class="card">
     <h2>Live</h2>
+
     <label>主播</label>
-    <input id="liveHost" list="liveHostListOptions" placeholder="输入或选择主播名字">
-    <datalist id="liveHostListOptions"></datalist>
+    <input id="liveHost" list="liveHostOptions" placeholder="输入或选择主播名字">
+    <datalist id="liveHostOptions"></datalist>
+
     <label>日期</label>
     <div class="date-field"><input type="text" id="liveDateDisplay" placeholder="dd-mm-yyyy" inputmode="numeric" maxlength="10"><button type="button" class="date-btn">📅</button><input type="date" id="liveDate" class="hidden-date"></div>
-    <div id="liveDateResult" class="sales-date-result">当天记录：0.00</div>
-    <label>销售额</label>
+    <div id="liveDateResult" class="sales-date-result">当天销售额：0.00</div>
+
+    <label>已付款，可享佣金的营业额</label>
     <input id="liveSales" class="money-input" inputmode="decimal" value="0.00">
+
     <button class="green" onclick="saveLiveSales()">储存 Live</button>
     <div id="liveSaveMsg" class="save-msg hidden">✅ Live 已储存</div>
-    <div class="live-list-section">
-      <h3>所有主播每日销售额</h3>
-      <div class="live-list-header">
-        <span>主播</span>
-        <span>日期</span>
-        <span>销售额</span>
-      </div>
-      <div id="liveDailyList"></div>
-      <div class="fair-total-line">
-        <span>Live 本月总营业额</span>
-        <b id="liveAllHostsTotal">0.00</b>
-      </div>
-    </div>
+    <p class="note">主播名字忽略大小写及空格；选择旧日期会自动带出该主播当天销售额。</p>
+  </div>
+
+  <div class="card">
+    <h2>Live 本月销售记录</h2>
+    <div id="liveMonthlyList"></div>
+    <div class="fair-total-line"><span>Live 本月总销售额</span><b id="liveSelectedHostTotal">0.00</b></div>
   </div>
 </section>
 
@@ -180,7 +195,7 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>日期</th><th>类别</th><th>公司/主播</th><th>地点</th><th>营业额</th></tr>
+          <tr><th>日期</th><th>类别</th><th>公司</th><th>地点/主播</th><th>营业额</th><th>佣金%</th><th>佣金</th></tr>
         </thead>
         <tbody id="recordTable"></tbody>
       </table>
@@ -195,51 +210,55 @@
     <button class="gray" onclick="exportCSV('year')">📈 导出全年 Excel</button>
     <button class="gray" onclick="monthClose()">📅 月底结算</button>
     <button class="gray" onclick="yearClose()">📆 年底结算</button>
-    <p class="note">V6.6：每月一个 Google Sheet，资料自动去重及排序。</p>
+    <button class="gray" onclick="openPasswordDialog()">🔐 更改密码</button>
+    <button class="gray" onclick="registerBiometric()">👤 注册 Face ID / 指纹</button>
+    <button class="gray" onclick="updateSystemNow()">🔄 更新系统</button>
+    <button class="red" onclick="logoutSalesSystem()">🚪 登出</button>
+    <p class="note">V7.4：新增密码登录、生物识别及安全更新；更新不会删除营业记录、佣金、密码或其他 Local Storage。</p>
   </div>
-<div class="commission-settings-card">
-  <h3>Fair 佣金设置</h3>
+<div class="commission-mechanisms">
+  <div class="commission-panel fair-commission-panel">
+    <div class="commission-panel-header">
+      <div>
+        <h3>Fair 佣金机制</h3>
+        <p>按 Fair 本月总营业额自动套用 6% / 7% / 8%</p>
+      </div>
+      <span class="commission-badge">FAIR</span>
+    </div>
 
-  <label for="commissionRate1">RM50,000 以下</label>
-  <div class="commission-input-row">
-    <input id="commissionRate1" type="number" min="0" max="100" step="0.1" inputmode="decimal">
-    <span>%</span>
-  </div>
+    <label for="commissionRate1">RM50,000 以下</label>
+    <div class="commission-input-row"><input id="commissionRate1" type="text" inputmode="decimal"><span>%</span></div>
 
-  <label for="commissionRate2">RM50,000 以上</label>
-  <div class="commission-input-row">
-    <input id="commissionRate2" type="number" min="0" max="100" step="0.1" inputmode="decimal">
-    <span>%</span>
-  </div>
+    <label for="commissionRate2">RM50,000 以上</label>
+    <div class="commission-input-row"><input id="commissionRate2" type="text" inputmode="decimal"><span>%</span></div>
 
-  <label for="commissionRate3">RM100,000 以上</label>
-  <div class="commission-input-row">
-    <input id="commissionRate3" type="number" min="0" max="100" step="0.1" inputmode="decimal">
-    <span>%</span>
-  </div>
+    <label for="commissionRate3">RM100,000 以上</label>
+    <div class="commission-input-row"><input id="commissionRate3" type="text" inputmode="decimal"><span>%</span></div>
 
-  <button type="button" onclick="saveCommissionSettings()">💾 储存佣金设置</button>
-  <button type="button" class="secondary-btn" onclick="resetCommissionSettings()">↺ 恢复默认值</button>
-
-  <div id="commissionSettingsMsg" class="save-msg hidden">Fair 佣金设置已储存</div>
-</div>
-<div class="commission-settings-card">
-  <h3>Live 佣金设置</h3>
-
-  <label for="liveCommissionRate">新主播默认佣金</label>
-  <div class="commission-input-row">
-    <input id="liveCommissionRate" type="number" min="0" max="100" step="0.1" inputmode="decimal">
-    <span>%</span>
+    <button type="button" onclick="saveFairCommissionSettings()">💾 储存 Fair 佣金</button>
+    <button type="button" class="secondary-btn" onclick="resetFairCommissionSettings()">↺ Fair 恢复默认 6% / 7% / 8%</button>
+    <div id="fairCommissionSettingsMsg" class="save-msg hidden">Fair 佣金设置已储存</div>
   </div>
 
-  <div class="sub live-rate-note">每位主播可以使用不同佣金率；没有特别设置的主播会使用默认佣金。</div>
+  <div class="commission-panel live-commission-panel">
+    <div class="commission-panel-header">
+      <div>
+        <h3>Live 主播佣金机制</h3>
+        <p>每位主播独立计算；未单独设置时使用直播默认佣金</p>
+      </div>
+      <span class="commission-badge">LIVE</span>
+    </div>
 
-  <div id="liveHostCommissionList" class="live-host-commission-list"></div>
+    <label for="liveCommissionRate">直播默认佣金</label>
+    <div class="commission-input-row"><input id="liveCommissionRate" type="text" inputmode="decimal"><span>%</span></div>
 
-  <button type="button" onclick="saveLiveCommissionSetting()">💾 储存全部 Live 佣金</button>
-  <button type="button" class="secondary-btn" onclick="resetLiveCommissionSetting()">↺ 全部恢复默认 10%</button>
+    <div class="host-section-title">各主播独立佣金</div>
+    <div id="liveHostCommissionList" class="host-commission-list"></div>
 
-  <div id="liveCommissionSettingsMsg" class="save-msg hidden">Live 佣金设置已储存</div>
+    <button type="button" onclick="saveLiveCommissionSettings()">💾 储存主播佣金</button>
+    <button type="button" class="secondary-btn" onclick="resetLiveCommissionSettings()">↺ Live 恢复默认 10%</button>
+    <div id="liveCommissionSettingsMsg" class="save-msg hidden">Live 主播佣金已储存</div>
+  </div>
 </div>
 </section>
 </main>
@@ -247,6 +266,23 @@
 
 
 </div>
+
+<dialog id="passwordDialog" class="password-dialog">
+  <form id="passwordForm" method="dialog" autocomplete="off">
+    <h2>更改密码</h2>
+    <label for="oldPassword">旧密码</label>
+    <input id="oldPassword" type="password" maxlength="12" autocomplete="new-password" name="lover-old-code" data-lpignore="true" data-1p-ignore="true">
+    <label for="newPassword">新密码</label>
+    <input id="newPassword" type="password" maxlength="12" autocomplete="new-password" name="lover-new-code" data-lpignore="true" data-1p-ignore="true">
+    <label for="confirmPassword">确认新密码</label>
+    <input id="confirmPassword" type="password" maxlength="12" autocomplete="new-password" name="lover-confirm-code" data-lpignore="true" data-1p-ignore="true">
+    <div id="passwordMessage" class="auth-message hidden"></div>
+    <div class="dialog-actions">
+      <button type="button" class="gray" onclick="closePasswordDialog()">取消</button>
+      <button type="submit" class="green">储存新密码</button>
+    </div>
+  </form>
+</dialog>
 
 <nav class="bottom-nav">
   <div class="nav-item active" onclick="showPage('home',this)"><span>🏠</span>Home</div>
@@ -258,6 +294,7 @@
 </nav>
 
 <script>window.LOVER_API_URL="https://script.google.com/macros/s/AKfycby1OwDIiVf5quXKiD9AG8s2ppM942sLFdJSfyePp--yZtDjYY8jBtkOYLwD9c3WiC_KNw/exec";</script>
+<script src="js/auth.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/sheet.js"></script>
 <script src="js/app.js"></script>
