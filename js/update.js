@@ -1,5 +1,5 @@
 (() => {
-  const RELOAD_FLAG = "lover_sales_sw_reloaded_v74";
+  const RELOAD_FLAG = "lover_sales_sw_reloaded_v66";
   const REFRESH_COOLDOWN_MS = 5000;
   let lastCloudRefresh = 0;
   let refreshRunning = false;
@@ -95,31 +95,3 @@
     refreshCloudData("online");
   });
 })();
-
-
-async function updateSystemNow() {
-  const clickEvent = window.event;
-  const button = clickEvent && clickEvent.currentTarget ? clickEvent.currentTarget : null;
-  const oldText = button ? button.textContent : "";
-  try {
-    if (button) { button.disabled = true; button.textContent = "正在更新系统..."; }
-    if ("serviceWorker" in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      for (const registration of registrations) {
-        if (registration.active) registration.active.postMessage({ type: "CLEAR_CACHES" });
-        await registration.update();
-        if (registration.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
-      }
-    }
-    const names = await caches.keys();
-    await Promise.all(names.map(name => caches.delete(name)));
-    sessionStorage.setItem("lover_sales_manual_update_v74", "1");
-    const url = new URL(location.href);
-    url.searchParams.set("updated", Date.now().toString());
-    location.replace(url.toString());
-  } catch (err) {
-    alert("更新失败，请检查网络后再试。\n" + (err.message || err));
-    if (button) { button.disabled = false; button.textContent = oldText; }
-  }
-}
-window.updateSystemNow = updateSystemNow;

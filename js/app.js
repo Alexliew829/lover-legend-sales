@@ -470,7 +470,7 @@ loadFromSheet().then(()=>{
 });
 
 
-/* ===== V7.4 Live Module ===== */
+/* ===== V7.3 Live Module ===== */
 function normalizeLiveHostKey(value){
   return String(value||"").replace(/\s+/g,"").toLowerCase();
 }
