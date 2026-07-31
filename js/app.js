@@ -7,7 +7,7 @@ function selectedMonth(){return document.getElementById("monthPicker").value}
 function selectedYear(){return document.getElementById("yearPicker").value}
 function sameMonth(date){return sameMonthDisplay(date,selectedMonth())}
 function sameYear(date){return sameYearDisplay(date,selectedYear())}
-function showPage(name,el){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));document.getElementById("page-"+name).classList.add("active");document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));el.classList.add("active")}
+function showPage(name,el){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));document.getElementById("page-"+name).classList.add("active");document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));el.classList.add("active");if(typeof loadFromSheet==="function")loadFromSheet({force:true,skipLocalCache:true}).catch(()=>{})}
 function rowKey(r){return [r.type,r.date,r.company,canonicalLocation(r.location||"")].join("|")}
 function dedupeRows(list){const m=new Map();list.forEach(r=>{const k=rowKey(r),old=m.get(k);if(!old||String(r.updatedAt||"")>=String(old.updatedAt||""))m.set(k,r)});return [...m.values()]}
 function upsertLocalRow(n){rows=dedupeRows([...rows,n])}
@@ -61,7 +61,8 @@ const DEFAULT_COMMISSION_SETTINGS={
   rate2:7,
   rate3:8,
   liveRate:10,
-  liveHostRates:{}
+  liveHostRates:{},
+  liveHosts:{}
 };
 
 let commissionSettings={...DEFAULT_COMMISSION_SETTINGS};
@@ -73,18 +74,28 @@ function normalizeCommissionSettings(settings){
   const rate3=Number(source.rate3);
   const liveRate=Number(source.liveRate);
   const liveHostRates={};
+  const liveHosts={};
   Object.entries(source.liveHostRates||{}).forEach(([key,value])=>{
     const cleanKey=String(key||"").replace(/\s+/g,"").toLowerCase();
     const rate=Number(value);
     if(cleanKey&&Number.isFinite(rate)&&rate>=0)liveHostRates[cleanKey]=rate;
   });
+  const hostSource=Array.isArray(source.liveHosts)
+    ? Object.fromEntries(source.liveHosts.map(name=>[normalizeLiveHostKey(name),canonicalLiveHost(name)]))
+    : (source.liveHosts||{});
+  Object.entries(hostSource).forEach(([key,value])=>{
+    const cleanKey=String(key||"").replace(/\s+/g,"").toLowerCase();
+    const name=canonicalLiveHost(value);
+    if(cleanKey&&name)liveHosts[cleanKey]=name;
+  });
+  Object.keys(liveHostRates).forEach(key=>{if(!liveHosts[key])liveHosts[key]=key.replace(/(^|\s)\S/g,c=>c.toUpperCase())});
   if(![rate1,rate2,rate3,liveRate].every(Number.isFinite)||rate1<0||rate2<0||rate3<0||liveRate<0){
-    return{...DEFAULT_COMMISSION_SETTINGS,liveHostRates:{}};
+    return{...DEFAULT_COMMISSION_SETTINGS,liveHostRates:{},liveHosts:{}};
   }
-  return{rate1,rate2,rate3,liveRate,liveHostRates};
+  return{rate1,rate2,rate3,liveRate,liveHostRates,liveHosts};
 }
 function getCommissionSettings(){
-  return{...commissionSettings,liveHostRates:{...(commissionSettings.liveHostRates||{})}};
+  return{...commissionSettings,liveHostRates:{...(commissionSettings.liveHostRates||{})},liveHosts:{...(commissionSettings.liveHosts||{})}};
 }
 
 function applyCommissionSettings(settings){
@@ -393,7 +404,7 @@ async function saveFairSales(){
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"8.4"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"8.6"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -406,7 +417,7 @@ function updateReadOnlyMode(){
     el.textContent=closed?`${m} · 已结算 · 可修正`:history?`${m} · 历史月份 · 可编辑`:`${m} · 当前月份 · 可编辑`;
   }
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"8.4"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"8.6"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -415,7 +426,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV8.4 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV8.6 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){const current=monthISO();document.getElementById("monthPicker").value=current;document.getElementById("yearPicker").value=current.slice(0,4);saveActiveMonth(current)}
 initializeCurrentMonth();
 
@@ -506,7 +517,8 @@ function getSavedLiveHosts(){
 }
 function collectLiveHosts(){
   const merged=[];
-  [...rows.filter(r=>r.type==="live").map(r=>canonicalLiveHost(r.location)),...getSavedLiveHosts()]
+  const cloudHosts=Object.values((getCommissionSettings().liveHosts)||{});
+  [...rows.filter(r=>r.type==="live").map(r=>canonicalLiveHost(r.location)),...cloudHosts,...getSavedLiveHosts()]
     .filter(Boolean)
     .forEach(name=>{
       const key=normalizeLiveHostKey(name);
@@ -839,12 +851,14 @@ function readLiveCommissionInputs(){
     throw new Error("请输入正确的 Live 默认佣金百分比");
   }
   const liveHostRates={};
+  const liveHosts={};
+  collectLiveHosts().forEach(name=>{const key=normalizeLiveHostKey(name);if(key)liveHosts[key]=canonicalLiveHost(name)});
   document.querySelectorAll("[data-live-host-key]").forEach(input=>{
     const key=String(input.dataset.liveHostKey||"");
     const rate=Number(input.value);
     if(key&&Number.isFinite(rate)&&rate>=0)liveHostRates[key]=rate;
   });
-  return {liveRate,liveHostRates};
+  return {liveRate,liveHostRates,liveHosts};
 }
 
 async function saveFairCommissionSettings(){
@@ -854,7 +868,7 @@ async function saveFairCommissionSettings(){
     const fair=readFairCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...fair});
 
-    // V8.4：单击后立即在页面套用，不必等待 Google Sheet 回应。
+    // V8.6：单击后立即套用，并由所有已开启装置自动读取最新佣金。
     if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
@@ -956,8 +970,8 @@ async function resetLiveCommissionSettings(){
 }
 
 
-/* ================= V8.4 Backup / Restore ================= */
-function getBackupPayload(){return{system:"Lover Legend Sales System",version:"8.4",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
+/* ================= V8.6 Backup / Restore ================= */
+function getBackupPayload(){return{system:"Lover Legend Sales System",version:"8.6",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
 function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V8_0_1_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}
 async function restoreBackupFile(file){
   let payload;try{payload=JSON.parse(await file.text())}catch(e){alert("Backup 文件无法读取或不是有效 JSON。");return}

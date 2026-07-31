@@ -5,7 +5,7 @@ let pendingSyncRunning = false;
 let cloudLoadPromise = null;
 let lastCloudLoadAt = 0;
 
-const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v83";
+const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v86";
 const CLOUD_LOAD_COOLDOWN_MS = 4000;
 
 function loadLocalDataCache() {
@@ -85,6 +85,7 @@ function jsonp(params) {
   return new Promise((resolve, reject) => {
     const callback = "ll_cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
     params.callback = callback;
+    params._ts = Date.now();
 
     const script = document.createElement("script");
     const query = new URLSearchParams(params).toString();
@@ -132,8 +133,9 @@ async function loadFromSheet(options = {}) {
       return;
     }
 
-    const hasLocalData = loadLocalDataCache();
-    setSync(hasLocalData ? "已显示本机资料，后台同步中..." : "同步中...");
+    const skipLocalCache = options.skipLocalCache === true || force;
+    const hasLocalData = skipLocalCache ? rows.length > 0 : loadLocalDataCache();
+    setSync(hasLocalData ? "正在读取云端最新资料..." : "同步中...");
 
     try {
       const json = await jsonp({ action: "load" });
@@ -310,6 +312,7 @@ async function saveCommissionSettingsToSheet(settings, targetMonth = "") {
     rate3: settings.rate3,
     liveRate: settings.liveRate,
     liveHostRates: JSON.stringify(settings.liveHostRates || {}),
+    liveHosts: JSON.stringify(settings.liveHosts || {}),
     targetMonth: targetMonth || ""
   });
   if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
