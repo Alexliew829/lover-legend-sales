@@ -5,7 +5,7 @@ let pendingSyncRunning = false;
 let cloudLoadPromise = null;
 let lastCloudLoadAt = 0;
 
-const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v86";
+const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v87";
 const CLOUD_LOAD_COOLDOWN_MS = 4000;
 
 function loadLocalDataCache() {
