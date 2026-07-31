@@ -195,7 +195,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 .live-sales-host-total b{color:#b40000;font-size:18px}
 
-/* V8.0 month/history mode */
+/* V8.0.1 month/history mode */
 .month-mode{margin-top:8px;padding:9px 12px;border-radius:10px;font-weight:700;text-align:center;font-size:14px}
 .current-mode{background:#e8f6ec;color:#0b6b2b;border:1px solid #a9d8b7}
 .history-mode{background:#fff3cd;color:#7a5500;border:1px solid #e4c86a}
