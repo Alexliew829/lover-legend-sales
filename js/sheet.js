@@ -141,6 +141,8 @@ async function loadFromSheet(options = {}) {
 
       rows = json.rows || [];
 
+      if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
+
       if (json.commissionSettings && typeof applyCommissionSettings === "function") {
         applyCommissionSettings(json.commissionSettings);
       }
@@ -328,3 +330,12 @@ window.addEventListener("online", () => {
   loadPendingRows();
   if (pendingRows.length > 0) syncPendingRows();
 });
+
+
+async function closeMonthInSheet(month){const json=await jsonp({action:"closeMonth",month});if(!json.ok)throw new Error(json.message||"月底结算失败");return json}
+async function restoreBackupToSheet(payload){
+  const raw=JSON.stringify(payload),id="restore_"+Date.now()+"_"+Math.floor(Math.random()*100000),chunkSize=3200,total=Math.ceil(raw.length/chunkSize);
+  let result=await jsonp({action:"restoreBegin",restoreId:id,totalChunks:total});if(!result.ok)throw new Error(result.message||"无法开始恢复");
+  for(let i=0;i<total;i++){result=await jsonp({action:"restoreChunk",restoreId:id,index:i,data:raw.slice(i*chunkSize,(i+1)*chunkSize)});if(!result.ok)throw new Error(result.message||`恢复区块 ${i+1} 失败`);setSync(`正在恢复 Backup ${i+1}/${total}...`)}
+  result=await jsonp({action:"restoreCommit",restoreId:id});if(!result.ok)throw new Error(result.message||"恢复失败");return result
+}

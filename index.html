@@ -14,7 +14,7 @@
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo">
-    <div class="brand-title">Lover Legend<br>Sales <small>V7.3</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V8.0</small></div>
     <img src="images/Logo2.jpg" class="seal">
   </div>
 </header>
@@ -28,6 +28,7 @@
     <input type="number" id="yearPicker" min="2020" max="2100">
     <div id="syncStatus" class="sync-line">🟡 准备同步</div>
     <div id="lastSync" class="last-sync">最后同步：-</div>
+    <div id="monthMode" class="month-mode current-mode">当前月份 · 可编辑</div>
   </div>
 
   <div class="card">
@@ -194,7 +195,10 @@
     <button class="gray" onclick="exportCSV('year')">📈 导出全年 Excel</button>
     <button class="gray" onclick="monthClose()">📅 月底结算</button>
     <button class="gray" onclick="yearClose()">📆 年底结算</button>
-    <p class="note">V7.3：Live 按主播及日期显示；月底结算只清空本月画面，历史资料仍可按日期查询。</p>
+    <button class="gray" onclick="backupAllData()">💾 Backup 完整备份</button>
+    <button class="gray" onclick="document.getElementById('restoreFile').click()">♻️ Restore 恢复备份</button>
+    <input id="restoreFile" type="file" accept="application/json,.json" hidden>
+    <p class="note">V8.0：月份选择可读取历史资料；历史及已结算月份只能查看与导出。月底结算不会提前切换月份，系统日期进入新月份后才自动切换。</p>
   </div>
 <div class="commission-mechanisms">
   <div class="commission-panel fair-commission-panel">
