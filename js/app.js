@@ -392,8 +392,8 @@ async function saveFairSales(){
   }
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
-const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v801";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"8.0.1"};
+const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"8.2"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -406,7 +406,7 @@ function updateReadOnlyMode(){
     el.textContent=closed?`${m} · 已结算 · 可修正`:history?`${m} · 历史月份 · 可编辑`:`${m} · 当前月份 · 可编辑`;
   }
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"8.0.1"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"8.2"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -415,7 +415,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV8.0.1 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV8.2 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){const current=monthISO();document.getElementById("monthPicker").value=current;document.getElementById("yearPicker").value=current.slice(0,4);saveActiveMonth(current)}
 initializeCurrentMonth();
 
@@ -718,7 +718,53 @@ function renderAll(){
   updateLiveInputFromSelectedDate();
   loadCommissionSettingsForm();
   renderLiveHostCommissionSettings();
+  renderMonthlySummary();
 }
+
+function getMonthKeyFromRow(row){
+  const iso=displayToISO(row&&row.date);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso)?iso.slice(0,7):"";
+}
+function buildMonthlySummary(){
+  const map=new Map();
+  const seedMonths=new Set([selectedMonth(),systemState.currentMonth,...(systemState.closedMonths||[])]);
+  seedMonths.forEach(month=>{if(/^\d{4}-\d{2}$/.test(month))map.set(month,{month,balakong:0,belimbing:0,fair:0,live:0})});
+  dedupeRows(rows).forEach(row=>{
+    const month=getMonthKeyFromRow(row);
+    if(!month)return;
+    if(!map.has(month))map.set(month,{month,balakong:0,belimbing:0,fair:0,live:0});
+    const item=map.get(month),amount=Number(row.amount||0);
+    if(row.type==="daily"&&row.company==="balakong")item.balakong+=amount;
+    else if(row.type==="daily"&&row.company==="belimbing")item.belimbing+=amount;
+    else if(row.type==="fair")item.fair+=amount;
+    else if(row.type==="live")item.live+=amount;
+  });
+  return [...map.values()].map(item=>({...item,total:item.balakong+item.belimbing+item.fair+item.live})).sort((a,b)=>b.month.localeCompare(a.month));
+}
+function renderMonthlySummary(){
+  const body=document.getElementById("monthlySummaryBody");
+  if(!body)return;
+  const list=buildMonthlySummary();
+  body.innerHTML=list.length?list.map(item=>`<tr class="monthly-summary-row${item.month===selectedMonth()?" active":""}" onclick="selectSummaryMonth('${item.month}')"><td><b>${item.month.slice(5,7)}-${item.month.slice(0,4)}</b></td><td>${money(item.balakong)}</td><td>${money(item.belimbing)}</td><td>${money(item.fair)}</td><td>${money(item.live)}</td><td><b>${money(item.total)}</b></td></tr>`).join(""):'<tr><td colspan="6" class="summary-empty">还没有月份资料</td></tr>';
+}
+function toggleMonthlySummary(force){
+  const card=document.getElementById("monthlySummaryCard"),btn=document.getElementById("monthlySummaryBtn");
+  if(!card)return;
+  const show=typeof force==="boolean"?force:card.classList.contains("hidden");
+  card.classList.toggle("hidden",!show);
+  if(btn)btn.classList.toggle("active",show);
+  if(show){renderMonthlySummary();setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50)}
+}
+function selectSummaryMonth(month){
+  if(!/^\d{4}-\d{2}$/.test(month))return;
+  document.getElementById("monthPicker").value=month;
+  document.getElementById("yearPicker").value=month.slice(0,4);
+  saveActiveMonth(month);
+  renderAll();
+  updateReadOnlyMode();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
 function exportCSV(scope="month"){
   let csv="\uFEFF公司,日期,类别,地点/主播,营业额,佣金%,佣金金额\n";
   const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));
@@ -860,8 +906,8 @@ async function resetLiveCommissionSettings(){
 }
 
 
-/* ================= V8.0.1 Backup / Restore ================= */
-function getBackupPayload(){return{system:"Lover Legend Sales System",version:"8.0.1",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
+/* ================= V8.2 Backup / Restore ================= */
+function getBackupPayload(){return{system:"Lover Legend Sales System",version:"8.2",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
 function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V8_0_1_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}
 async function restoreBackupFile(file){
   let payload;try{payload=JSON.parse(await file.text())}catch(e){alert("Backup 文件无法读取或不是有效 JSON。");return}

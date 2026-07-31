@@ -17,5 +17,7 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "version": "8.2",
+  "description": "Lover Legend Sales System V8.2"
 }
