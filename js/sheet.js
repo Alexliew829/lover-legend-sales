@@ -302,14 +302,15 @@ async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "") {
   return json.row || null;
 }
 
-async function saveCommissionSettingsToSheet(settings) {
+async function saveCommissionSettingsToSheet(settings, targetMonth = "") {
   const json = await jsonp({
     action: "saveCommissionSettings",
     rate1: settings.rate1,
     rate2: settings.rate2,
     rate3: settings.rate3,
     liveRate: settings.liveRate,
-    liveHostRates: JSON.stringify(settings.liveHostRates || {})
+    liveHostRates: JSON.stringify(settings.liveHostRates || {}),
+    targetMonth: targetMonth || ""
   });
   if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
   return json.commissionSettings || null;
