@@ -5,7 +5,7 @@ let pendingSyncRunning = false;
 let cloudLoadPromise = null;
 let lastCloudLoadAt = 0;
 
-const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v88";
+const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v90";
 const CLOUD_LOAD_COOLDOWN_MS = 4000;
 
 function loadLocalDataCache() {
@@ -94,7 +94,7 @@ function jsonp(params) {
       delete window[callback];
       script.remove();
       reject(new Error("连接 Google Apps Script 超时"));
-    }, 20000);
+    }, 10000);
 
     window[callback] = data => {
       clearTimeout(timer);
@@ -363,4 +363,20 @@ async function saveAccessSettingsToSheet(settings) {
   });
   if (!json.ok) throw new Error(json.message || "密码设置同步失败");
   return json.accessSettings || null;
+}
+
+
+async function verifyAccessBackendVersion() {
+  const json = await jsonp({
+    action: "accessVersion"
+  });
+
+  if (!json.ok ||
+      json.accessSettingsSupported !== true) {
+    throw new Error(
+      "Google Apps Script 密码功能未部署"
+    );
+  }
+
+  return json;
 }

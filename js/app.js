@@ -1,9 +1,11 @@
 
-/* ================= V8.8.2 Access Password System ================= */
+/* ================= V9.0 Access Password System ================= */
 const DEFAULT_ACCESS_PASSWORD_HASH =
   "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
 const DEFAULT_ACCESS_PASSWORD_HINT = "6个数字";
 const ACCESS_UNLOCK_SESSION_KEY = "loverLegendSalesSystemUnlocked";
+const MOBILE_ACCESS_GRANTED_AT_KEY = "loverLegendSalesMobileAccessGrantedAt";
+const MOBILE_ACCESS_VALID_MS = 8 * 60 * 60 * 1000;
 const DESKTOP_SAVED_PASSWORD_KEY = "loverLegendSalesDesktopSavedPassword";
 const BIOMETRIC_CREDENTIAL_KEY = "loverLegendSalesBiometricCredentialId";
 const BIOMETRIC_USER_ID_KEY = "loverLegendSalesBiometricUserId";
@@ -200,11 +202,39 @@ async function updateDeviceBiometricStatus() {
   if (remove) remove.hidden = !enabled;
   if (login) login.hidden = !enabled;
 }
+function getMobileAccessGrantedAt() {
+  const value = Number(
+    localStorage.getItem(MOBILE_ACCESS_GRANTED_AT_KEY) || 0
+  );
+  return Number.isFinite(value) ? value : 0;
+}
+function isMobileAccessStillValid() {
+  if (!isMobileOrTabletDevice()) return false;
+  const grantedAt = getMobileAccessGrantedAt();
+  if (!grantedAt) return false;
+  const elapsed = Date.now() - grantedAt;
+  return elapsed >= 0 && elapsed < MOBILE_ACCESS_VALID_MS;
+}
+function clearExpiredMobileAccess() {
+  localStorage.removeItem(MOBILE_ACCESS_GRANTED_AT_KEY);
+  sessionStorage.removeItem(ACCESS_UNLOCK_SESSION_KEY);
+}
+function recordAccessGrantedTime() {
+  if (isMobileOrTabletDevice()) {
+    localStorage.setItem(
+      MOBILE_ACCESS_GRANTED_AT_KEY,
+      String(Date.now())
+    );
+  }
+}
+
 function unlockAccessLock() {
   sessionStorage.setItem(ACCESS_UNLOCK_SESSION_KEY, "1");
+  recordAccessGrantedTime();
   const lock = document.getElementById("accessLock");
   if (lock) lock.hidden = true;
   document.body.classList.remove("access-locked");
+  window.dispatchEvent(new CustomEvent("lover-sales-unlocked"));
 }
 async function tryBiometricLogin(manual = false) {
   const status = document.getElementById("biometricLoginStatus");
@@ -233,7 +263,16 @@ async function setupAccessLock() {
 
   if (!lock || !form || !input) return;
 
-  if (sessionStorage.getItem(ACCESS_UNLOCK_SESSION_KEY) === "1") {
+  const sessionUnlocked =
+    sessionStorage.getItem(ACCESS_UNLOCK_SESSION_KEY) === "1";
+
+  if (isMobileOrTabletDevice()) {
+    if (isMobileAccessStillValid()) {
+      unlockAccessLock();
+      return;
+    }
+    clearExpiredMobileAccess();
+  } else if (sessionUnlocked) {
     unlockAccessLock();
     return;
   }
@@ -313,13 +352,18 @@ async function setupAccessLock() {
 
   await updateDeviceBiometricStatus();
 
-  // 登录前先读取云端最新密码 Hash / 提示。
-  try {
-    if (typeof loadAccessSettingsFromSheet === "function") {
-      const cloudSettings = await loadAccessSettingsFromSheet();
+  // 使用本机缓存立即显示登录画面；云端密码设置在后台更新，
+  // 避免电脑因为 Apps Script 回应慢而一直显示加载状态。
+  if (typeof loadAccessSettingsFromSheet === "function") {
+    Promise.race([
+      loadAccessSettingsFromSheet(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("access settings timeout")), 7000)
+      )
+    ]).then(cloudSettings => {
       if (cloudSettings) applyAccessPasswordSettings(cloudSettings);
-    }
-  } catch (error) {}
+    }).catch(() => {});
+  }
 
   if (isMobileOrTabletDevice() &&
       hasDeviceBiometricCredential()) {
@@ -367,6 +411,10 @@ function setupPasswordChange() {
       `密码已更改 · 提示：${newHint} · 正在同步`;
 
     try {
+      if (typeof verifyAccessBackendVersion === "function") {
+        await verifyAccessBackendVersion();
+      }
+
       const saved = await saveAccessSettingsToSheet({
         accessPasswordHash: newHash,
         accessPasswordHint: newHint
@@ -392,7 +440,7 @@ function setupPasswordChange() {
     } catch (error) {
       const message = String(error?.message || error || "");
       status.textContent = /Unknown action:\s*saveAccessSettings/i.test(message)
-        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V8.8.2 Code.gs"
+        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V9.0 Code.gs"
         : "密码同步失败：" + message;
     } finally {
       button.disabled = false;
@@ -437,7 +485,7 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V8.8.2: every time Live is opened, start from today's date.
+  // V9.0: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -842,7 +890,7 @@ async function saveFairSales(){
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"8.8.2"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"9.0"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -855,7 +903,7 @@ function updateReadOnlyMode(){
     el.textContent=closed?`${m} · 已结算 · 可修正`:history?`${m} · 历史月份 · 可编辑`:`${m} · 当前月份 · 可编辑`;
   }
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"8.8.2"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"9.0"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -864,7 +912,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV8.8.2 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV9.0 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){const current=monthISO();document.getElementById("monthPicker").value=current;document.getElementById("yearPicker").value=current.slice(0,4);saveActiveMonth(current)}
 initializeCurrentMonth();
 setupPasswordChange();
@@ -934,9 +982,26 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
 attachMoneyInputs();
 renderAll();
 
-loadFromSheet().then(()=>{
-  syncFairInputs();
-});
+function startInitialSalesDataLoad() {
+  if (startInitialSalesDataLoad.started) return;
+  startInitialSalesDataLoad.started = true;
+  loadFromSheet().then(() => {
+    syncFairInputs();
+  }).catch(() => {
+    // 本机资料仍可使用，不让页面一直处于加载状态。
+  });
+}
+
+if (sessionStorage.getItem(ACCESS_UNLOCK_SESSION_KEY) === "1" ||
+    isMobileAccessStillValid()) {
+  startInitialSalesDataLoad();
+} else {
+  window.addEventListener(
+    "lover-sales-unlocked",
+    startInitialSalesDataLoad,
+    { once: true }
+  );
+}
 
 
 /* ===== V7.3 Live Module ===== */
@@ -1064,7 +1129,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V8.8.2: do not restore the previously saved date.
+  // V9.0: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -1307,7 +1372,7 @@ async function saveFairCommissionSettings(){
     const fair=readFairCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...fair});
 
-    // V8.8.2：单击后立即套用，并由所有已开启装置自动读取最新佣金。
+    // V9.0：单击后立即套用，并由所有已开启装置自动读取最新佣金。
     if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
@@ -1409,8 +1474,8 @@ async function resetLiveCommissionSettings(){
 }
 
 
-/* ================= V8.8.2 Backup / Restore ================= */
-function getBackupPayload(){return{system:"Lover Legend Sales System",version:"8.8.2",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
+/* ================= V9.0 Backup / Restore ================= */
+function getBackupPayload(){return{system:"Lover Legend Sales System",version:"9.0",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
 accessSettings:getAccessPasswordSettings(),
 closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
 function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V8_8_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}
