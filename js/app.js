@@ -1,3 +1,402 @@
+
+/* ================= V8.8 Access Password System ================= */
+const DEFAULT_ACCESS_PASSWORD_HASH =
+  "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
+const DEFAULT_ACCESS_PASSWORD_HINT = "6个数字";
+const ACCESS_UNLOCK_SESSION_KEY = "loverLegendSalesSystemUnlocked";
+const DESKTOP_SAVED_PASSWORD_KEY = "loverLegendSalesDesktopSavedPassword";
+const BIOMETRIC_CREDENTIAL_KEY = "loverLegendSalesBiometricCredentialId";
+const BIOMETRIC_USER_ID_KEY = "loverLegendSalesBiometricUserId";
+
+let accessPasswordSettings = {
+  accessPasswordHash: DEFAULT_ACCESS_PASSWORD_HASH,
+  accessPasswordHint: DEFAULT_ACCESS_PASSWORD_HINT
+};
+
+function bytesToBase64Url(bytes) {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+function base64UrlToBytes(value) {
+  const base64 = String(value || "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - base64.length % 4) % 4);
+  return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+}
+function randomBytes(length = 32) {
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return bytes;
+}
+async function hashAccessPassword(password) {
+  const data = new TextEncoder().encode(String(password || ""));
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+function buildAccessPasswordHint(password) {
+  const chars = Array.from(String(password || ""));
+  const letters = chars.filter(char => /[A-Za-z]/.test(char)).length;
+  const numbers = chars.filter(char => /[0-9]/.test(char)).length;
+  const symbols = chars.length - letters - numbers;
+  const parts = [];
+  if (letters) parts.push(`${letters}个英文字`);
+  if (symbols) parts.push(`${symbols}个符号`);
+  if (numbers) parts.push(`${numbers}个数字`);
+  return parts.join(" ") || "密码提示暂不可用";
+}
+function getAccessPasswordSettings() {
+  return {
+    accessPasswordHash:
+      accessPasswordSettings.accessPasswordHash ||
+      DEFAULT_ACCESS_PASSWORD_HASH,
+    accessPasswordHint:
+      accessPasswordSettings.accessPasswordHint ||
+      DEFAULT_ACCESS_PASSWORD_HINT
+  };
+}
+function applyAccessPasswordSettings(settings) {
+  if (!settings || typeof settings !== "object") return;
+  accessPasswordSettings = {
+    accessPasswordHash:
+      String(settings.accessPasswordHash || DEFAULT_ACCESS_PASSWORD_HASH),
+    accessPasswordHint:
+      String(settings.accessPasswordHint || DEFAULT_ACCESS_PASSWORD_HINT)
+  };
+  localStorage.setItem(
+    "lover_sales_access_settings_cache",
+    JSON.stringify(accessPasswordSettings)
+  );
+  updatePasswordHintDisplays();
+}
+function loadCachedAccessPasswordSettings() {
+  try {
+    const cached = JSON.parse(
+      localStorage.getItem("lover_sales_access_settings_cache") || "null"
+    );
+    if (cached) applyAccessPasswordSettings(cached);
+  } catch (error) {}
+}
+function updatePasswordHintDisplays() {
+  const hint = getAccessPasswordSettings().accessPasswordHint;
+  const loginHint = document.getElementById("accessPasswordHint");
+  const currentHint = document.getElementById("currentPasswordHint");
+  if (loginHint) loginHint.textContent = `密码提示：${hint}`;
+  if (currentHint) currentHint.textContent = `当前密码提示：${hint}`;
+}
+function isMobileOrTabletDevice() {
+  const ua = navigator.userAgent || "";
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) ||
+    (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+}
+async function isPlatformBiometricAvailable() {
+  if (!isMobileOrTabletDevice()) return false;
+  if (!window.isSecureContext ||
+      !window.PublicKeyCredential ||
+      !navigator.credentials) return false;
+  try {
+    return await PublicKeyCredential
+      .isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch (error) {
+    return false;
+  }
+}
+function hasDeviceBiometricCredential() {
+  return Boolean(localStorage.getItem(BIOMETRIC_CREDENTIAL_KEY));
+}
+async function registerDeviceBiometric() {
+  if (!(await isPlatformBiometricAvailable())) {
+    throw new Error("此手机不支持 Face ID / 生物辨识");
+  }
+  let userId = localStorage.getItem(BIOMETRIC_USER_ID_KEY);
+  if (!userId) {
+    userId = bytesToBase64Url(randomBytes(16));
+    localStorage.setItem(BIOMETRIC_USER_ID_KEY, userId);
+  }
+  const credential = await navigator.credentials.create({
+    publicKey: {
+      challenge: randomBytes(32),
+      rp: { name: "Lover Legend Sales System" },
+      user: {
+        id: base64UrlToBytes(userId),
+        name: "lover-legend-sales-user",
+        displayName: "Lover Legend Sales"
+      },
+      pubKeyCredParams: [
+        { type: "public-key", alg: -7 },
+        { type: "public-key", alg: -257 }
+      ],
+      authenticatorSelection: {
+        authenticatorAttachment: "platform",
+        userVerification: "required",
+        residentKey: "preferred"
+      },
+      timeout: 60000,
+      attestation: "none"
+    }
+  });
+  if (!credential) throw new Error("无法建立生物辨识");
+  localStorage.setItem(
+    BIOMETRIC_CREDENTIAL_KEY,
+    bytesToBase64Url(new Uint8Array(credential.rawId))
+  );
+  await updateDeviceBiometricStatus();
+  return true;
+}
+async function authenticateDeviceBiometric() {
+  const stored = localStorage.getItem(BIOMETRIC_CREDENTIAL_KEY);
+  if (!stored) throw new Error("尚未启用生物辨识");
+  const assertion = await navigator.credentials.get({
+    publicKey: {
+      challenge: randomBytes(32),
+      allowCredentials: [{
+        type: "public-key",
+        id: base64UrlToBytes(stored),
+        transports: ["internal"]
+      }],
+      userVerification: "required",
+      timeout: 60000
+    }
+  });
+  return Boolean(assertion);
+}
+function clearDeviceBiometric() {
+  localStorage.removeItem(BIOMETRIC_CREDENTIAL_KEY);
+  localStorage.removeItem(BIOMETRIC_USER_ID_KEY);
+}
+async function updateDeviceBiometricStatus() {
+  const status = document.getElementById("deviceBiometricStatus");
+  const setup = document.getElementById("setupBiometricBtn");
+  const remove = document.getElementById("removeBiometricBtn");
+  const login = document.getElementById("biometricLoginBtn");
+  const deviceText = document.getElementById("accessLockDeviceText");
+
+  if (!isMobileOrTabletDevice()) {
+    if (status) status.textContent = "电脑使用已储存密码登录";
+    if (setup) setup.hidden = true;
+    if (remove) remove.hidden = true;
+    if (login) login.hidden = true;
+    if (deviceText) deviceText.textContent =
+      "电脑会记住系统密码，点击进入系统即可";
+    return;
+  }
+
+  const available = await isPlatformBiometricAvailable();
+  if (!available) {
+    if (status) status.textContent = "此手机不支持";
+    if (setup) setup.hidden = true;
+    if (remove) remove.hidden = true;
+    if (login) login.hidden = true;
+    return;
+  }
+
+  const enabled = hasDeviceBiometricCredential();
+  if (status) status.textContent = enabled ? "已启用" : "尚未启用";
+  if (setup) setup.hidden = enabled;
+  if (remove) remove.hidden = !enabled;
+  if (login) login.hidden = !enabled;
+}
+function unlockAccessLock() {
+  sessionStorage.setItem(ACCESS_UNLOCK_SESSION_KEY, "1");
+  const lock = document.getElementById("accessLock");
+  if (lock) lock.hidden = true;
+  document.body.classList.remove("access-locked");
+}
+async function tryBiometricLogin(manual = false) {
+  const status = document.getElementById("biometricLoginStatus");
+  try {
+    if (status) status.textContent =
+      "请使用 Face ID / 生物辨识确认...";
+    const ok = await authenticateDeviceBiometric();
+    if (ok) unlockAccessLock();
+  } catch (error) {
+    if (status) status.textContent = manual
+      ? "生物辨识未完成，请输入密码"
+      : "可输入密码进入系统";
+  }
+}
+async function setupAccessLock() {
+  loadCachedAccessPasswordSettings();
+  updatePasswordHintDisplays();
+
+  const lock = document.getElementById("accessLock");
+  const form = document.getElementById("accessLockForm");
+  const input = document.getElementById("accessPasswordInput");
+  const hintButton = document.getElementById("showPasswordHintBtn");
+  const hint = document.getElementById("accessPasswordHint");
+  const status = document.getElementById("accessLockStatus");
+  const biometricButton = document.getElementById("biometricLoginBtn");
+
+  if (!lock || !form || !input) return;
+
+  if (sessionStorage.getItem(ACCESS_UNLOCK_SESSION_KEY) === "1") {
+    unlockAccessLock();
+    return;
+  }
+
+  document.body.classList.add("access-locked");
+
+  if (!isMobileOrTabletDevice()) {
+    input.value =
+      localStorage.getItem(DESKTOP_SAVED_PASSWORD_KEY) || "";
+  }
+
+  hintButton?.addEventListener("click", () => {
+    const showing = !hint.hidden;
+    hint.hidden = showing;
+    hintButton.textContent = showing
+      ? "忘记密码？查看提示"
+      : "隐藏密码提示";
+  });
+
+  biometricButton?.addEventListener("click", () =>
+    tryBiometricLogin(true)
+  );
+
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const password = String(input.value || "");
+    if (!password) {
+      status.textContent = "请输入密码";
+      return;
+    }
+    const hash = await hashAccessPassword(password);
+    if (hash !== getAccessPasswordSettings().accessPasswordHash) {
+      status.textContent = "密码错误，可查看密码提示";
+      input.select();
+      return;
+    }
+
+    if (!isMobileOrTabletDevice()) {
+      localStorage.setItem(DESKTOP_SAVED_PASSWORD_KEY, password);
+    }
+    status.textContent = "";
+    unlockAccessLock();
+
+    if (isMobileOrTabletDevice() &&
+        await isPlatformBiometricAvailable() &&
+        !hasDeviceBiometricCredential()) {
+      try {
+        await registerDeviceBiometric();
+      } catch (error) {
+        // 用户取消也不影响密码登录。
+      }
+    }
+  });
+
+  await updateDeviceBiometricStatus();
+
+  // 登录前先读取云端最新密码 Hash / 提示。
+  try {
+    if (typeof loadAccessSettingsFromSheet === "function") {
+      const cloudSettings = await loadAccessSettingsFromSheet();
+      if (cloudSettings) applyAccessPasswordSettings(cloudSettings);
+    }
+  } catch (error) {}
+
+  if (isMobileOrTabletDevice() &&
+      hasDeviceBiometricCredential()) {
+    tryBiometricLogin(false);
+  }
+}
+function setupPasswordChange() {
+  const oldInput = document.getElementById("oldAccessPassword");
+  const newInput = document.getElementById("newAccessPassword");
+  const confirmInput = document.getElementById("confirmAccessPassword");
+  const button = document.getElementById("changeAccessPasswordBtn");
+  const status = document.getElementById("passwordChangeStatus");
+  if (!button) return;
+
+  button.addEventListener("click", async () => {
+    const oldPassword = String(oldInput?.value || "");
+    const newPassword = String(newInput?.value || "");
+    const confirmPassword = String(confirmInput?.value || "");
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      status.textContent =
+        "请填写旧密码、新密码和确认密码";
+      return;
+    }
+    if (Array.from(newPassword).length > 12) {
+      status.textContent = "密码最多12个字";
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      status.textContent = "两次输入的新密码不一致";
+      return;
+    }
+    if (
+      await hashAccessPassword(oldPassword) !==
+      getAccessPasswordSettings().accessPasswordHash
+    ) {
+      status.textContent = "旧密码不正确";
+      return;
+    }
+
+    const newHash = await hashAccessPassword(newPassword);
+    const newHint = buildAccessPasswordHint(newPassword);
+    button.disabled = true;
+    status.textContent =
+      `密码已更改 · 提示：${newHint} · 正在同步`;
+
+    try {
+      const saved = await saveAccessSettingsToSheet({
+        accessPasswordHash: newHash,
+        accessPasswordHint: newHint
+      });
+      applyAccessPasswordSettings(saved || {
+        accessPasswordHash: newHash,
+        accessPasswordHint: newHint
+      });
+
+      if (!isMobileOrTabletDevice()) {
+        localStorage.setItem(
+          DESKTOP_SAVED_PASSWORD_KEY,
+          newPassword
+        );
+      }
+
+      oldInput.value = "";
+      newInput.value = "";
+      confirmInput.value = "";
+      setTimeout(() => {
+        status.textContent = "";
+      }, 3000);
+    } catch (error) {
+      status.textContent =
+        "密码同步失败：" + error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+function setupDeviceBiometricSettings() {
+  const setup = document.getElementById("setupBiometricBtn");
+  const remove = document.getElementById("removeBiometricBtn");
+  setup?.addEventListener("click", async () => {
+    try {
+      await registerDeviceBiometric();
+      alert("此设备已启用 Face ID / 生物辨识登录");
+    } catch (error) {
+      alert(error.message || "生物辨识未完成");
+    }
+  });
+  remove?.addEventListener("click", async () => {
+    if (!confirm(
+      "确认关闭此设备的 Face ID / 生物辨识登录？"
+    )) return;
+    clearDeviceBiometric();
+    await updateDeviceBiometricStatus();
+    alert("此设备已关闭生物辨识登录");
+  });
+  updateDeviceBiometricStatus();
+}
+setupAccessLock();
+
 function getSavedFairLocations(){try{return JSON.parse(localStorage.getItem("lover_fair_locations")||"[]")}catch(e){return[]}}
 function saveFairLocation(location){const loc=canonicalLocation(location);if(!loc)return;const list=getSavedFairLocations();if(!list.some(x=>canonicalLocation(x)===loc))list.push(loc);list.sort();localStorage.setItem("lover_fair_locations",JSON.stringify(list));renderFairLocationOptions()}
 function collectFairLocations(){const fromRows=[...new Set(rows.filter(r=>r.type==="fair").map(r=>canonicalLocation(r.location)).filter(Boolean))],fromStorage=getSavedFairLocations(),merged=[];[...fromRows,...fromStorage].forEach(x=>{const loc=canonicalLocation(x);if(loc&&!merged.some(y=>canonicalLocation(y)===loc))merged.push(loc)});merged.sort();localStorage.setItem("lover_fair_locations",JSON.stringify(merged));return merged}
@@ -13,7 +412,7 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V8.7: every time Live is opened, start from today's date.
+  // V8.8: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -418,7 +817,7 @@ async function saveFairSales(){
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"8.7"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"8.8"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -431,7 +830,7 @@ function updateReadOnlyMode(){
     el.textContent=closed?`${m} · 已结算 · 可修正`:history?`${m} · 历史月份 · 可编辑`:`${m} · 当前月份 · 可编辑`;
   }
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"8.7"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"8.8"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -440,9 +839,11 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV8.7 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV8.8 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){const current=monthISO();document.getElementById("monthPicker").value=current;document.getElementById("yearPicker").value=current.slice(0,4);saveActiveMonth(current)}
 initializeCurrentMonth();
+setupPasswordChange();
+setupDeviceBiometricSettings();
 
 setDateControl("saleDate",todayISO());
 
@@ -638,7 +1039,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V8.7: do not restore the previously saved date.
+  // V8.8: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -881,7 +1282,7 @@ async function saveFairCommissionSettings(){
     const fair=readFairCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...fair});
 
-    // V8.7：单击后立即套用，并由所有已开启装置自动读取最新佣金。
+    // V8.8：单击后立即套用，并由所有已开启装置自动读取最新佣金。
     if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
@@ -983,9 +1384,11 @@ async function resetLiveCommissionSettings(){
 }
 
 
-/* ================= V8.7 Backup / Restore ================= */
-function getBackupPayload(){return{system:"Lover Legend Sales System",version:"8.7",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
-function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V8_0_1_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}
+/* ================= V8.8 Backup / Restore ================= */
+function getBackupPayload(){return{system:"Lover Legend Sales System",version:"8.8",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
+accessSettings:getAccessPasswordSettings(),
+closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
+function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V8_8_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}
 async function restoreBackupFile(file){
   let payload;try{payload=JSON.parse(await file.text())}catch(e){alert("Backup 文件无法读取或不是有效 JSON。");return}
   if(!payload||!Array.isArray(payload.rows)||!payload.commissionSettings){alert("这不是有效的 Lover Legend Sales Backup。");return}

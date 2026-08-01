@@ -225,7 +225,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 @media(max-width:430px){.monthly-summary-btn{min-width:116px;padding:12px 10px;font-size:14px}.year-summary-row{gap:8px}}
 
 
-/* V8.7 Report historical month selector */
+/* V8.8 Report historical month selector */
 .report-header-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px}
 .report-header-row h2{margin-bottom:3px}
 .report-month-label{font-size:13px;font-weight:700;color:#8b0000}
@@ -234,11 +234,11 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .report-month-control input{margin:0;padding:9px 10px;font-weight:700;color:#8b0000;background:#fff}
 @media(max-width:520px){.report-header-row{align-items:stretch}.report-month-control{min-width:140px}}
 
-/* V8.7: prevent repeated commission-save clicks while syncing */
+/* V8.8: prevent repeated commission-save clicks while syncing */
 #saveFairCommissionBtn:disabled{opacity:.65;cursor:wait;}
 
 
-/* V8.7 mobile pull-down refresh */
+/* V8.8 mobile pull-down refresh */
 .pull-refresh-indicator{
   position:fixed;
   top:0;
@@ -261,3 +261,130 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .pull-refresh-indicator.visible{opacity:1}
 .pull-refresh-indicator.ready{color:#0b6b2b}
 .pull-refresh-indicator.refreshing{color:#0b6b2b}
+
+
+/* ================= V8.8 Password System ================= */
+.access-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 30000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: linear-gradient(rgba(239,247,241,.98),rgba(229,240,232,.99));
+}
+.access-lock[hidden] { display: none; }
+.access-lock-card {
+  width: min(100%, 370px);
+  padding: 27px 22px;
+  border: 1px solid #bed2c4;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 15px 42px rgba(22,66,40,.2);
+  text-align: center;
+}
+.access-lock-logo { font-size: 38px; margin-bottom: 8px; }
+.access-lock-card h1 { margin: 0 0 7px; color: #0b6b2b; font-size: 25px; }
+.access-lock-card p { margin: 0 0 17px; color: #66736b; font-size: 13px; }
+.access-lock-card form { display: grid; gap: 11px; }
+.masked-access-code {
+  -webkit-text-security: disc;
+  font-family: Arial, sans-serif;
+}
+.access-lock-card input {
+  width: 100%;
+  text-align: center;
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+.primary-access-btn { min-height: 46px; }
+.biometric-login-btn {
+  width: 100%;
+  margin-top: 11px;
+  background: #eef7f1;
+  color: #0b6b2b;
+}
+.biometric-login-status,
+.access-lock-status {
+  min-height: 21px;
+  margin-top: 8px;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 700;
+}
+.password-hint-btn {
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  color: #0b6b2b;
+  text-decoration: underline;
+}
+.access-password-hint {
+  margin-top: 8px;
+  padding: 9px;
+  border-radius: 9px;
+  background: #eef7f1;
+  color: #245a37;
+  font-weight: 800;
+}
+body.access-locked { overflow: hidden; }
+.password-change-grid {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 9px;
+  margin: 12px 0;
+}
+.password-change-grid label {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.password-change-grid input { width: 100%; }
+.current-password-hint {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: #f0f6f2;
+  color: #526259;
+  font-size: 13px;
+}
+.password-change-status {
+  min-height: 22px;
+  margin-top: 8px;
+  color: #0b6b2b;
+  font-weight: 700;
+}
+.device-biometric-box {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-top: 15px;
+  padding-top: 13px;
+  border-top: 1px solid #dce6df;
+}
+.device-biometric-box strong,
+.device-biometric-box span { display: block; }
+.device-biometric-box span {
+  margin-top: 3px;
+  color: #6b746e;
+  font-size: 12px;
+}
+.device-biometric-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+@media(max-width:620px) {
+  .password-change-grid { grid-template-columns: 1fr; }
+  .device-biometric-box {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .device-biometric-actions {
+    justify-content: stretch;
+  }
+  .device-biometric-actions button { width: 100%; }
+}

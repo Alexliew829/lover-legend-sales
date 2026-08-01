@@ -6,15 +6,56 @@
 <meta name="theme-color" content="#0b6b2b">
 <title>Lover Sales</title>
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=8.8">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 </head>
 <body>
+
+<div id="accessLock" class="access-lock">
+  <div class="access-lock-card">
+    <div class="access-lock-logo">🔐</div>
+    <h1 id="accessLockTitle">系统密码</h1>
+    <p id="accessLockDeviceText">请输入密码进入 Lover Legend Sales System</p>
+
+    <form id="accessLockForm" autocomplete="off">
+      <input id="accessPasswordInput"
+             name="salesSystemAccessCode"
+             class="masked-access-code"
+             type="text"
+             maxlength="12"
+             placeholder="输入密码"
+             autocomplete="off"
+             autocapitalize="none"
+             autocorrect="off"
+             spellcheck="false"
+             data-lpignore="true"
+             data-1p-ignore="true">
+
+      <button class="primary-access-btn" type="submit">进入系统</button>
+    </form>
+
+    <button id="biometricLoginBtn"
+            class="biometric-login-btn"
+            type="button"
+            hidden>使用 Face ID / 生物辨识</button>
+    <div id="biometricLoginStatus" class="biometric-login-status"></div>
+
+    <button id="showPasswordHintBtn"
+            class="password-hint-btn"
+            type="button">忘记密码？查看提示</button>
+    <div id="accessPasswordHint"
+         class="access-password-hint"
+         hidden></div>
+    <div id="accessLockStatus"
+         class="access-lock-status"></div>
+  </div>
+</div>
+
 <div class="app">
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo">
-    <div class="brand-title">Lover Legend<br>Sales <small>V8.7</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V8.8</small></div>
     <img src="images/Logo2.jpg" class="seal">
   </div>
 </header>
@@ -230,8 +271,41 @@
     <button class="gray" onclick="backupAllData()">💾 Backup 完整备份</button>
     <button class="gray" onclick="document.getElementById('restoreFile').click()">♻️ Restore 恢复备份</button>
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
-    <p class="note">V8.7：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
+    <p class="note">V8.8：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
   </div>
+
+  <div class="card access-settings-card">
+    <h2>更改系统密码</h2>
+    <p class="note">密码可以使用英文字母、数字或任何符号，不限最少字数，最多12个字。更改时必须输入旧密码。</p>
+
+    <div class="password-change-grid">
+      <label>旧密码
+        <input id="oldAccessPassword" class="masked-access-code" type="text" maxlength="12" autocomplete="off" data-lpignore="true">
+      </label>
+      <label>新密码
+        <input id="newAccessPassword" class="masked-access-code" type="text" maxlength="12" autocomplete="off" data-lpignore="true">
+      </label>
+      <label>确认新密码
+        <input id="confirmAccessPassword" class="masked-access-code" type="text" maxlength="12" autocomplete="off" data-lpignore="true">
+      </label>
+    </div>
+
+    <button id="changeAccessPasswordBtn" type="button">🔐 更改密码</button>
+    <div id="currentPasswordHint" class="current-password-hint">当前密码提示：6个数字</div>
+    <div id="passwordChangeStatus" class="password-change-status"></div>
+
+    <div class="device-biometric-box">
+      <div>
+        <strong>此设备 Face ID / 生物辨识</strong>
+        <span id="deviceBiometricStatus">正在检查...</span>
+      </div>
+      <div class="device-biometric-actions">
+        <button id="setupBiometricBtn" class="secondary-btn" type="button">启用 Face ID / 生物辨识</button>
+        <button id="removeBiometricBtn" class="secondary-btn" type="button" hidden>关闭 Face ID / 生物辨识</button>
+      </div>
+    </div>
+  </div>
+
 <div class="commission-mechanisms">
   <div class="commission-panel fair-commission-panel">
     <div class="commission-panel-header">
@@ -293,9 +367,9 @@
 </nav>
 
 <script>window.LOVER_API_URL="https://script.google.com/macros/s/AKfycby1OwDIiVf5quXKiD9AG8s2ppM942sLFdJSfyePp--yZtDjYY8jBtkOYLwD9c3WiC_KNw/exec";</script>
-<script src="js/utils.js"></script>
-<script src="js/sheet.js"></script>
-<script src="js/app.js"></script>
-<script src="js/update.js"></script>
+<script src="js/utils.js?v=8.8"></script>
+<script src="js/sheet.js?v=8.8"></script>
+<script src="js/app.js?v=8.8"></script>
+<script src="js/update.js?v=8.8"></script>
 </body>
 </html>

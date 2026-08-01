@@ -5,7 +5,7 @@ let pendingSyncRunning = false;
 let cloudLoadPromise = null;
 let lastCloudLoadAt = 0;
 
-const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v87";
+const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v88";
 const CLOUD_LOAD_COOLDOWN_MS = 4000;
 
 function loadLocalDataCache() {
@@ -147,6 +147,10 @@ async function loadFromSheet(options = {}) {
 
       if (json.commissionSettings && typeof applyCommissionSettings === "function") {
         applyCommissionSettings(json.commissionSettings);
+      }
+
+      if (json.accessSettings && typeof applyAccessPasswordSettings === "function") {
+        applyAccessPasswordSettings(json.accessSettings);
       }
 
       renderAll();
@@ -342,4 +346,21 @@ async function restoreBackupToSheet(payload){
   let result=await jsonp({action:"restoreBegin",restoreId:id,totalChunks:total});if(!result.ok)throw new Error(result.message||"无法开始恢复");
   for(let i=0;i<total;i++){result=await jsonp({action:"restoreChunk",restoreId:id,index:i,data:raw.slice(i*chunkSize,(i+1)*chunkSize)});if(!result.ok)throw new Error(result.message||`恢复区块 ${i+1} 失败`);setSync(`正在恢复 Backup ${i+1}/${total}...`)}
   result=await jsonp({action:"restoreCommit",restoreId:id});if(!result.ok)throw new Error(result.message||"恢复失败");return result
+}
+
+
+async function loadAccessSettingsFromSheet() {
+  const json = await jsonp({ action: "loadAccessSettings" });
+  if (!json.ok) throw new Error(json.message || "读取密码设置失败");
+  return json.accessSettings || null;
+}
+
+async function saveAccessSettingsToSheet(settings) {
+  const json = await jsonp({
+    action: "saveAccessSettings",
+    accessPasswordHash: settings.accessPasswordHash,
+    accessPasswordHint: settings.accessPasswordHint
+  });
+  if (!json.ok) throw new Error(json.message || "密码设置同步失败");
+  return json.accessSettings || null;
 }
