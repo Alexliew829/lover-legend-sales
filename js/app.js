@@ -1,5 +1,5 @@
 
-/* ================= V9.1 Access Password System ================= */
+/* ================= V9.2 Access Password System ================= */
 const DEFAULT_ACCESS_PASSWORD_HASH =
   "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
 const DEFAULT_ACCESS_PASSWORD_HINT = "6个数字";
@@ -254,9 +254,11 @@ async function tryBiometricLogin(manual = false) {
     const ok = await authenticateDeviceBiometric();
     if (ok) unlockAccessLock();
   } catch (error) {
-    if (status) status.textContent = manual
-      ? "Passkey / Face ID 未完成，可重新点击或输入密码"
-      : "可输入密码进入系统";
+    if (status) {
+      status.textContent = manual
+        ? "Passkey / Face ID 未完成，可重新点击或输入密码"
+        : "已取消 Passkey，可输入密码或点击 Use Passkey 再试";
+    }
   }
 }
 async function setupAccessLock() {
@@ -278,6 +280,8 @@ async function setupAccessLock() {
 
   if (isMobileOrTabletDevice()) {
     if (sessionUnlocked && isMobileAccessStillValid()) {
+      // 同一个运行中的 App，8小时内直接进入，
+      // 不打开 Passkey 画面。
       unlockAccessLock({
         refreshGrantedTime: false
       });
@@ -417,8 +421,18 @@ async function setupAccessLock() {
     }).catch(() => {});
   }
 
-  // V9.1：不自动弹出 Face ID。
-  // 需要认证时，用户必须主动点击 Use Passkey。
+  // V9.2：手机需要重新认证且已启用 Passkey 时，
+  // 自动打开系统原生 Sign in / Use Passkey 画面。
+  // 用户只需要在系统画面点击一次 Use Passkey，
+  // Face ID 成功后直接进入系统。
+  if (
+    isMobileOrTabletDevice() &&
+    hasDeviceBiometricCredential()
+  ) {
+    window.setTimeout(() => {
+      tryBiometricLogin(false);
+    }, 120);
+  }
 }
 function setupPasswordChange() {
   const oldInput = document.getElementById("oldAccessPassword");
@@ -490,7 +504,7 @@ function setupPasswordChange() {
     } catch (error) {
       const message = String(error?.message || error || "");
       status.textContent = /Unknown action:\s*saveAccessSettings/i.test(message)
-        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V9.1 Code.gs"
+        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V9.2 Code.gs"
         : "密码同步失败：" + message;
     } finally {
       button.disabled = false;
@@ -535,7 +549,7 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V9.1: every time Live is opened, start from today's date.
+  // V9.2: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -942,7 +956,7 @@ async function saveFairSales(){
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"9.1"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"9.2"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -955,7 +969,7 @@ function updateReadOnlyMode(){
     el.textContent=closed?`${m} · 已结算 · 可修正`:history?`${m} · 历史月份 · 可编辑`:`${m} · 当前月份 · 可编辑`;
   }
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"9.1"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"9.2"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -964,7 +978,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV9.1 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV9.2 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){const current=monthISO();document.getElementById("monthPicker").value=current;document.getElementById("yearPicker").value=current.slice(0,4);saveActiveMonth(current)}
 initializeCurrentMonth();
 setupPasswordChange();
@@ -1181,7 +1195,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V9.1: do not restore the previously saved date.
+  // V9.2: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -1424,7 +1438,7 @@ async function saveFairCommissionSettings(){
     const fair=readFairCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...fair});
 
-    // V9.1：单击后立即套用，并由所有已开启装置自动读取最新佣金。
+    // V9.2：单击后立即套用，并由所有已开启装置自动读取最新佣金。
     if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
@@ -1526,8 +1540,8 @@ async function resetLiveCommissionSettings(){
 }
 
 
-/* ================= V9.1 Backup / Restore ================= */
-function getBackupPayload(){return{system:"Lover Legend Sales System",version:"9.1",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
+/* ================= V9.2 Backup / Restore ================= */
+function getBackupPayload(){return{system:"Lover Legend Sales System",version:"9.2",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
 accessSettings:getAccessPasswordSettings(),
 closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
 function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V8_8_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}
