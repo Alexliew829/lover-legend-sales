@@ -1,5 +1,5 @@
 
-/* ================= V9.3 Access Password System ================= */
+/* ================= V9.4 Access Password System ================= */
 const DEFAULT_ACCESS_PASSWORD_HASH =
   "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
 const DEFAULT_ACCESS_PASSWORD_HINT = "6个数字";
@@ -421,7 +421,7 @@ async function setupAccessLock() {
     }).catch(() => {});
   }
 
-  // V9.3：手机需要重新认证且已启用 Passkey 时，
+  // V9.4：手机需要重新认证且已启用 Passkey 时，
   // 自动打开系统原生 Sign in / Use Passkey 画面。
   // 用户只需要在系统画面点击一次 Use Passkey，
   // Face ID 成功后直接进入系统。
@@ -504,7 +504,7 @@ function setupPasswordChange() {
     } catch (error) {
       const message = String(error?.message || error || "");
       status.textContent = /Unknown action:\s*saveAccessSettings/i.test(message)
-        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V9.3 Code.gs"
+        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V9.4 Code.gs"
         : "密码同步失败：" + message;
     } finally {
       button.disabled = false;
@@ -533,43 +533,9 @@ function setupDeviceBiometricSettings() {
   updateDeviceBiometricStatus();
 }
 
-/* ================= V9.3 Fast Login Bootstrap ================= */
-let loverSalesBusinessScriptsPromise = null;
-function loadLoverSalesBusinessScripts() {
-  if (loverSalesBusinessScriptsPromise) return loverSalesBusinessScriptsPromise;
-
-  loverSalesBusinessScriptsPromise = new Promise((resolve, reject) => {
-    const loadScript = src => new Promise((ok, fail) => {
-      const script = document.createElement("script");
-      script.src = src;
-      script.async = false;
-      script.onload = ok;
-      script.onerror = () => fail(new Error("无法载入：" + src));
-      document.body.appendChild(script);
-    });
-
-    loadScript("js/app.js?v=9.3")
-      .then(() => loadScript("js/update.js?v=9.3"))
-      .then(resolve)
-      .catch(reject);
-  });
-
-  return loverSalesBusinessScriptsPromise;
-}
-
-window.addEventListener("lover-sales-unlocked", () => {
-  loadLoverSalesBusinessScripts().catch(error => {
-    console.error(error);
-    const status = document.getElementById("accessLockStatus");
-    if (status) status.textContent = "系统载入失败，请 Refresh 后再试";
-  });
-}, { once: true });
-
+/* ================= V9.4 Fast Login Bootstrap ================= */
+// Business scripts are preloaded by index.html behind the password overlay.
+// Login therefore opens the app immediately without waiting for script downloads.
 setupAccessLock();
 setupPasswordChange();
 setupDeviceBiometricSettings();
-
-if (sessionStorage.getItem(ACCESS_UNLOCK_SESSION_KEY) === "1") {
-  loadLoverSalesBusinessScripts().catch(() => {});
-}
-

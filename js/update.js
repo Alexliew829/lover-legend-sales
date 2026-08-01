@@ -60,14 +60,14 @@
   window.addEventListener("pageshow", () => refreshCloudData("pageshow"));
   window.addEventListener("online", () => refreshCloudData("online"));
 
-  // V9.3: while the app is open, read Google Sheet periodically so changes
+  // V9.4: while the app is open, read Google Sheet periodically so changes
   // made on another phone/computer appear without manually refreshing.
   setInterval(() => {
     if (document.visibilityState === "visible") refreshCloudData("interval");
   }, AUTO_REFRESH_MS);
 
 
-  // V9.3: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
+  // V9.4: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {
     if (!("ontouchstart" in window)) return;
 

@@ -5,8 +5,8 @@ let pendingSyncRunning = false;
 let cloudLoadPromise = null;
 let lastCloudLoadAt = 0;
 
-const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v90";
-const CLOUD_LOAD_COOLDOWN_MS = 12000;
+const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v94";
+const CLOUD_LOAD_COOLDOWN_MS = 20000;
 
 function loadLocalDataCache() {
   try {
@@ -169,7 +169,7 @@ async function loadFromSheet(options = {}) {
 
     const skipLocalCache = options.skipLocalCache === true || force;
     const hasLocalData = skipLocalCache ? rows.length > 0 : loadLocalDataCache();
-    setSync(hasLocalData ? "正在读取云端最新资料..." : "同步中...");
+    setSync(hasLocalData ? "本机资料已显示 · 云端后台同步中" : "正在读取云端资料...");
 
     try {
       const json = await jsonp({ action: "load" });
