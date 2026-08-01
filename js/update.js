@@ -1,5 +1,5 @@
 (() => {
-  const RELOAD_FLAG = "lover_sales_sw_reloaded_v971";
+  const RELOAD_FLAG = "lover_sales_sw_reloaded_v98";
   const REFRESH_COOLDOWN_MS = 5000;
   const AUTO_REFRESH_MS = 30000;
   let lastCloudRefresh = 0;
@@ -115,7 +115,7 @@
   window.addEventListener("pageshow", () => refreshCloudData("pageshow", false));
   window.addEventListener("online", () => refreshCloudData("online", false));
 
-  // V9.7.1: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
+  // V9.8: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {
     if (!("ontouchstart" in window)) return;
 
@@ -132,7 +132,8 @@
     const threshold = 78;
 
     document.addEventListener("touchstart", event => {
-      if (refreshRunning || window.scrollY > 0 || !event.touches || event.touches.length !== 1) return;
+      const running = activeLoadPromise();
+      if (refreshPromise || running || window.scrollY > 1 || !event.touches || event.touches.length !== 1) return;
       const touch = event.touches[0];
       startX = touch.clientX;
       startY = touch.clientY;
@@ -200,6 +201,10 @@
     }, { passive: true });
   }
 
-  window.addEventListener("load", setupPullToRefresh);
+  if (document.readyState === "loading") {
+    window.addEventListener("DOMContentLoaded", setupPullToRefresh, { once: true });
+  } else {
+    setupPullToRefresh();
+  }
 
 })();

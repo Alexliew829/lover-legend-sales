@@ -103,6 +103,15 @@ function savePendingRows() {
   localStorage.setItem("lover_pending_rows", JSON.stringify(pendingRows));
 }
 
+function setPendingRetrySyncStatus() {
+  loadPendingRows();
+  if (pendingRows.length > 0) {
+    setSync(`有 ${pendingRows.length} 笔未同步资料，系统会自动重试`, false, true);
+  } else {
+    setSync("已同步", true);
+  }
+}
+
 function addPendingRow(row) {
   const key = syncKey(row);
   const index = pendingRows.findIndex(r => syncKey(r) === key);
@@ -363,8 +372,7 @@ async function syncPendingRows() {
     saveLocalDataCache();
     setSync("已同步", true);
   } catch (err) {
-    loadPendingRows();
-    setSync(`有 ${pendingRows.length} 笔未同步资料，系统会自动重试`, false, true);
+    setPendingRetrySyncStatus();
   } finally {
     pendingSyncRunning = false;
   }
