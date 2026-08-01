@@ -6,7 +6,7 @@ let cloudLoadPromise = null;
 let lastCloudLoadAt = 0;
 
 const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v90";
-const CLOUD_LOAD_COOLDOWN_MS = 4000;
+const CLOUD_LOAD_COOLDOWN_MS = 12000;
 
 function loadLocalDataCache() {
   try {
@@ -15,8 +15,22 @@ function loadLocalDataCache() {
 
     rows = cached.rows;
 
-    if (cached.commissionSettings && typeof applyCommissionSettings === "function") {
-      applyCommissionSettings(cached.commissionSettings);
+    if (
+      cached.commissionSettings &&
+      typeof applyCommissionSettings === "function"
+    ) {
+      applyCommissionSettings(
+        cached.commissionSettings
+      );
+    }
+
+    if (
+      cached.accessSettings &&
+      typeof applyAccessPasswordSettings === "function"
+    ) {
+      applyAccessPasswordSettings(
+        cached.accessSettings
+      );
     }
 
     renderAll();
@@ -26,15 +40,32 @@ function loadLocalDataCache() {
   }
 }
 
-function saveLocalDataCache(commissionSettings = null) {
+function saveLocalDataCache(
+  commissionSettings = null,
+  accessSettings = null
+) {
   try {
-    localStorage.setItem(LOCAL_DATA_CACHE_KEY, JSON.stringify({
-      rows,
-      commissionSettings:
-        commissionSettings ||
-        (typeof getCommissionSettings === "function" ? getCommissionSettings() : null),
-      savedAt: Date.now()
-    }));
+    localStorage.setItem(
+      LOCAL_DATA_CACHE_KEY,
+      JSON.stringify({
+        rows,
+        commissionSettings:
+          commissionSettings ||
+          (
+            typeof getCommissionSettings === "function"
+              ? getCommissionSettings()
+              : null
+          ),
+        accessSettings:
+          accessSettings ||
+          (
+            typeof getAccessPasswordSettings === "function"
+              ? getAccessPasswordSettings()
+              : null
+          ),
+        savedAt: Date.now()
+      })
+    );
   } catch (err) {}
 }
 
@@ -94,7 +125,7 @@ function jsonp(params) {
       delete window[callback];
       script.remove();
       reject(new Error("连接 Google Apps Script 超时"));
-    }, 10000);
+    }, 7000);
 
     window[callback] = data => {
       clearTimeout(timer);
@@ -128,9 +159,12 @@ async function loadFromSheet(options = {}) {
     loadPendingRows();
 
     if (pendingRows.length > 0) {
-      setSync(`有 ${pendingRows.length} 笔未同步资料，正在自动同步...`, false, true);
-      await syncPendingRows();
-      return;
+      setSync(
+        `有 ${pendingRows.length} 笔未同步资料，正在后台同步...`
+      );
+
+      // 后台同步，不阻塞本机缓存及云端读取。
+      syncPendingRows().catch(() => {});
     }
 
     const skipLocalCache = options.skipLocalCache === true || force;
@@ -154,7 +188,10 @@ async function loadFromSheet(options = {}) {
       }
 
       renderAll();
-      saveLocalDataCache(json.commissionSettings || null);
+      saveLocalDataCache(
+        json.commissionSettings || null,
+        json.accessSettings || null
+      );
       setSync("已同步", true);
     } catch (err) {
       setSync(
