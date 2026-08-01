@@ -5,12 +5,32 @@ let pendingSyncRunning = false;
 let cloudLoadPromise = null;
 let lastCloudLoadAt = 0;
 
-const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache_v95";
+const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache";
+const LEGACY_LOCAL_DATA_CACHE_KEYS = [
+  "lover_sales_data_cache_v95",
+  "lover_sales_data_cache_v94",
+  "lover_sales_data_cache_v93",
+  "lover_sales_data_cache_v92"
+];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
+
+function readLocalDataCacheRaw() {
+  let raw = localStorage.getItem(LOCAL_DATA_CACHE_KEY);
+  if (!raw) {
+    for (const key of LEGACY_LOCAL_DATA_CACHE_KEYS) {
+      raw = localStorage.getItem(key);
+      if (raw) {
+        localStorage.setItem(LOCAL_DATA_CACHE_KEY, raw);
+        break;
+      }
+    }
+  }
+  return raw;
+}
 
 function loadLocalDataCache() {
   try {
-    const cached = JSON.parse(localStorage.getItem(LOCAL_DATA_CACHE_KEY) || "null");
+    const cached = JSON.parse(readLocalDataCacheRaw() || "null");
     if (!cached || !Array.isArray(cached.rows)) return false;
 
     rows = cached.rows;
@@ -168,13 +188,14 @@ async function loadFromSheet(options = {}) {
     }
 
     const skipLocalCache = options.skipLocalCache === true || force;
-    // V9.5: app startup already loaded local cache before this background call.
+    // V9.6: app startup already loaded local cache before this background call.
     // Do not parse and render the same cache a second time.
     const hasLocalData = rows.length > 0 || (!skipLocalCache && loadLocalDataCache());
     setSync(hasLocalData ? "本机资料已显示 · 云端后台同步中" : "云端后台同步中");
 
     try {
-      const json = await jsonp({ action: "load" });
+      const year = (typeof selectedYear === "function" && selectedYear()) || String(new Date().getFullYear());
+      const json = await jsonp({ action: "loadYear", year });
       if (!json.ok) throw new Error(json.message || "读取失败");
 
       rows = json.rows || [];
