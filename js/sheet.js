@@ -4,6 +4,8 @@ let pendingRows = [];
 let pendingSyncRunning = false;
 let cloudLoadPromise = null;
 let lastCloudLoadAt = 0;
+let initialCloudSyncFinished = false;
+let initialCloudSyncPromise = null;
 
 const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache";
 const LEGACY_LOCAL_DATA_CACHE_KEYS = [
@@ -166,69 +168,118 @@ function jsonp(params) {
   });
 }
 
+function rowMonthKey(row) {
+  const iso = typeof displayToISO === "function" ? displayToISO(row && row.date) : "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.slice(0, 7) : "";
+}
+
+function mergeCloudMonthRows(month, cloudRows) {
+  const keep = rows.filter(row => rowMonthKey(row) !== month);
+  const pendingForMonth = pendingRows.filter(row => rowMonthKey(row) === month);
+  rows = typeof dedupeRows === "function"
+    ? dedupeRows([...keep, ...(cloudRows || []), ...pendingForMonth])
+    : [...keep, ...(cloudRows || []), ...pendingForMonth];
+}
+
+function mergeCloudYearRows(year, cloudRows) {
+  const keep = rows.filter(row => !rowMonthKey(row).startsWith(year + "-"));
+  const pendingForYear = pendingRows.filter(row => rowMonthKey(row).startsWith(year + "-"));
+  rows = typeof dedupeRows === "function"
+    ? dedupeRows([...keep, ...(cloudRows || []), ...pendingForYear])
+    : [...keep, ...(cloudRows || []), ...pendingForYear];
+}
+
+async function loadYearInBackground(year) {
+  try {
+    const json = await jsonp({ action: "loadYear", year });
+    if (!json.ok) throw new Error(json.message || "读取全年资料失败");
+    loadPendingRows();
+    mergeCloudYearRows(year, json.rows || []);
+    if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
+    if (json.commissionSettings && typeof applyCommissionSettings === "function") applyCommissionSettings(json.commissionSettings);
+    if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
+    renderAll();
+    saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
+    setSync("已同步", true);
+  } catch (err) {
+    console.warn("Full-year background refresh failed", err);
+  }
+}
+
+function getActiveCloudLoadPromise() {
+  return cloudLoadPromise;
+}
+
+function isInitialCloudSyncFinished() {
+  return initialCloudSyncFinished;
+}
+
+function waitForInitialCloudSync() {
+  return initialCloudSyncPromise || cloudLoadPromise || Promise.resolve();
+}
+
 async function loadFromSheet(options = {}) {
   const force = options.force === true;
+  const silent = options.silent === true;
   const now = Date.now();
-
   if (cloudLoadPromise) return cloudLoadPromise;
-  if (!force && now - lastCloudLoadAt < CLOUD_LOAD_COOLDOWN_MS) return;
-
+  if (!force && now - lastCloudLoadAt < CLOUD_LOAD_COOLDOWN_MS) {
+    return initialCloudSyncPromise || Promise.resolve();
+  }
   lastCloudLoadAt = now;
 
+  let completedSuccessfully = false;
   cloudLoadPromise = (async () => {
     loadPendingRows();
-
     if (pendingRows.length > 0) {
-      setSync(
-        `有 ${pendingRows.length} 笔未同步资料，正在后台同步...`
-      );
-
-      // 后台同步，不阻塞本机缓存及云端读取。
+      if (!silent) setSync(`有 ${pendingRows.length} 笔未同步资料，正在后台同步...`);
       syncPendingRows().catch(() => {});
     }
 
-    const skipLocalCache = options.skipLocalCache === true || force;
-    // V9.6: app startup already loaded local cache before this background call.
-    // Do not parse and render the same cache a second time.
-    const hasLocalData = rows.length > 0 || (!skipLocalCache && loadLocalDataCache());
-    setSync(hasLocalData ? "本机资料已显示 · 云端后台同步中" : "云端后台同步中");
+    const hasLocalData = rows.length > 0 || loadLocalDataCache();
+    if (!silent) {
+      setSync(hasLocalData ? "本机资料已显示 · 云端后台同步中" : "正在读取本月云端资料");
+    }
 
     try {
-      const year = (typeof selectedYear === "function" && selectedYear()) || String(new Date().getFullYear());
-      const json = await jsonp({ action: "loadYear", year });
+      const month = (typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7);
+      const json = await jsonp({ action: "loadMonth", month });
       if (!json.ok) throw new Error(json.message || "读取失败");
 
-      rows = json.rows || [];
-
+      loadPendingRows();
+      mergeCloudMonthRows(month, json.rows || []);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
-
-      if (json.commissionSettings && typeof applyCommissionSettings === "function") {
-        applyCommissionSettings(json.commissionSettings);
-      }
-
-      if (json.accessSettings && typeof applyAccessPasswordSettings === "function") {
-        applyAccessPasswordSettings(json.accessSettings);
-      }
+      if (json.commissionSettings && typeof applyCommissionSettings === "function") applyCommissionSettings(json.commissionSettings);
+      if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
 
       renderAll();
-      saveLocalDataCache(
-        json.commissionSettings || null,
-        json.accessSettings || null
-      );
-      setSync("已同步", true);
+      saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
+      if (!silent) setSync("已同步", true);
+      completedSuccessfully = true;
+
+      if (options.loadYear !== false) {
+        const year = month.slice(0, 4);
+        setTimeout(() => loadYearInBackground(year), 1200);
+      }
     } catch (err) {
-      setSync(
-        hasLocalData ? "已显示本机资料，云端同步稍后重试" : "同步失败：" + err.message,
-        false,
-        true
-      );
+      if (!silent) {
+        setSync(hasLocalData ? "已显示本机资料，云端稍后重试" : "同步失败：" + err.message, false, true);
+      }
     }
   })();
+
+  if (!initialCloudSyncPromise) initialCloudSyncPromise = cloudLoadPromise;
 
   try {
     return await cloudLoadPromise;
   } finally {
     cloudLoadPromise = null;
+    if (!initialCloudSyncFinished) {
+      initialCloudSyncFinished = true;
+      window.dispatchEvent(new CustomEvent("lover-sales-initial-sync-complete", {
+        detail: { success: completedSuccessfully }
+      }));
+    }
   }
 }
 

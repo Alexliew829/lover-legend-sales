@@ -1,22 +1,77 @@
 (() => {
-  const RELOAD_FLAG = "lover_sales_sw_reloaded_v93";
-  const REFRESH_COOLDOWN_MS = 3000;
-  const AUTO_REFRESH_MS = 15000;
+  const RELOAD_FLAG = "lover_sales_sw_reloaded_v971";
+  const REFRESH_COOLDOWN_MS = 5000;
+  const AUTO_REFRESH_MS = 30000;
   let lastCloudRefresh = 0;
-  let refreshRunning = false;
+  let refreshPromise = null;
+  let initialSyncReady = typeof isInitialCloudSyncFinished === "function" && isInitialCloudSyncFinished();
+  let autoRefreshStartTimer = null;
+  let autoRefreshInterval = null;
 
-  async function refreshCloudData(reason = "resume", force = true) {
-    const now = Date.now();
-    if (refreshRunning || (!force && now - lastCloudRefresh < REFRESH_COOLDOWN_MS) || typeof loadFromSheet !== "function") return;
-    refreshRunning = true;
-    lastCloudRefresh = now;
-    try {
-      await loadFromSheet({ force: true, skipLocalCache: true });
-    } catch (err) {
-      console.warn("Cloud refresh failed:", reason, err);
-    } finally {
-      refreshRunning = false;
+  function activeLoadPromise() {
+    return typeof getActiveCloudLoadPromise === "function"
+      ? getActiveCloudLoadPromise()
+      : null;
+  }
+
+  async function refreshCloudData(reason = "resume", force = false) {
+    if (typeof loadFromSheet !== "function") return;
+
+    const running = activeLoadPromise();
+    if (running) return running;
+    if (refreshPromise) return refreshPromise;
+
+    if (!initialSyncReady) {
+      return typeof waitForInitialCloudSync === "function"
+        ? waitForInitialCloudSync()
+        : undefined;
     }
+
+    const now = Date.now();
+    const manual = reason === "pull-down";
+    if (!manual && now - lastCloudRefresh < REFRESH_COOLDOWN_MS) return;
+
+    lastCloudRefresh = now;
+    refreshPromise = loadFromSheet({
+      force: force === true,
+      skipLocalCache: true,
+      loadYear: false,
+      silent: true
+    }).catch(err => {
+      console.warn("Cloud refresh failed:", reason, err);
+    }).finally(() => {
+      refreshPromise = null;
+    });
+
+    return refreshPromise;
+  }
+
+  function startAutomaticRefreshAfterInitialSync() {
+    if (autoRefreshStartTimer || autoRefreshInterval) return;
+    autoRefreshStartTimer = setTimeout(() => {
+      autoRefreshStartTimer = null;
+      if (document.visibilityState === "visible") {
+        refreshCloudData("post-initial-check", false);
+      }
+      autoRefreshInterval = setInterval(() => {
+        if (document.visibilityState === "visible") {
+          refreshCloudData("interval", false);
+        }
+      }, AUTO_REFRESH_MS);
+    }, 5000);
+  }
+
+  function markInitialSyncReady() {
+    if (initialSyncReady) return;
+    initialSyncReady = true;
+    lastCloudRefresh = Date.now();
+    startAutomaticRefreshAfterInitialSync();
+  }
+
+  if (initialSyncReady) {
+    startAutomaticRefreshAfterInitialSync();
+  } else {
+    window.addEventListener("lover-sales-initial-sync-complete", markInitialSyncReady, { once: true });
   }
 
   async function activateWaitingWorker(registration) {
@@ -52,22 +107,15 @@
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
       registerAndCheckForUpdates();
-      refreshCloudData("visibility");
+      refreshCloudData("visibility", false);
     }
   });
 
-  window.addEventListener("focus", () => refreshCloudData("focus"));
-  window.addEventListener("pageshow", () => refreshCloudData("pageshow"));
-  window.addEventListener("online", () => refreshCloudData("online"));
+  window.addEventListener("focus", () => refreshCloudData("focus", false));
+  window.addEventListener("pageshow", () => refreshCloudData("pageshow", false));
+  window.addEventListener("online", () => refreshCloudData("online", false));
 
-  // V9.6: while the app is open, read Google Sheet periodically so changes
-  // made on another phone/computer appear without manually refreshing.
-  setInterval(() => {
-    if (document.visibilityState === "visible") refreshCloudData("interval");
-  }, AUTO_REFRESH_MS);
-
-
-  // V9.6: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
+  // V9.7.1: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {
     if (!("ontouchstart" in window)) return;
 
@@ -153,4 +201,5 @@
   }
 
   window.addEventListener("load", setupPullToRefresh);
+
 })();
