@@ -230,10 +230,11 @@ function waitForInitialCloudSync() {
 async function loadFromSheet(options = {}) {
   const force = options.force === true;
   const silent = options.silent === true;
+  const statusText = String(options.statusText || "").trim();
   const now = Date.now();
   if (cloudLoadPromise) return cloudLoadPromise;
   if (!force && now - lastCloudLoadAt < CLOUD_LOAD_COOLDOWN_MS) {
-    return initialCloudSyncPromise || Promise.resolve();
+    return initialCloudSyncPromise || Promise.resolve({ ok:true, skipped:true });
   }
   lastCloudLoadAt = now;
 
@@ -247,7 +248,7 @@ async function loadFromSheet(options = {}) {
 
     const hasLocalData = rows.length > 0 || loadLocalDataCache();
     if (!silent) {
-      setSync(hasLocalData ? "本机资料已显示 · 云端后台同步中" : "正在读取本月云端资料");
+      setSync(statusText || (hasLocalData ? "本机资料已显示 · 云端后台同步中" : "正在读取本月云端资料"));
     }
 
     try {
@@ -263,17 +264,19 @@ async function loadFromSheet(options = {}) {
 
       renderAll();
       saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
-      if (!silent) setSync("已同步", true);
+      setSync("已同步", true);
       completedSuccessfully = true;
 
       if (options.loadYear !== false) {
         const year = month.slice(0, 4);
         setTimeout(() => loadYearInBackground(year), 1200);
       }
+      return { ok:true, month, refreshedAt:Date.now() };
     } catch (err) {
       if (!silent) {
         setSync(hasLocalData ? "已显示本机资料，云端稍后重试" : "同步失败：" + err.message, false, true);
       }
+      return { ok:false, error:err };
     }
   })();
 

@@ -1,5 +1,5 @@
 (() => {
-  const RELOAD_FLAG = "lover_sales_sw_reloaded_v98";
+  const RELOAD_FLAG = "lover_sales_sw_reloaded_v99";
   const REFRESH_COOLDOWN_MS = 5000;
   const AUTO_REFRESH_MS = 30000;
   let lastCloudRefresh = 0;
@@ -15,30 +15,43 @@
   }
 
   async function refreshCloudData(reason = "resume", force = false) {
-    if (typeof loadFromSheet !== "function") return;
+    if (typeof loadFromSheet !== "function") return { ok:false, error:new Error("同步模块尚未载入") };
 
-    const running = activeLoadPromise();
-    if (running) return running;
-    if (refreshPromise) return refreshPromise;
+    const manual = reason === "pull-down";
+
+    // 手动下拉刷新必须在现有同步结束后，再执行一次真正的强制云端读取。
+    // 自动触发则直接共用正在执行的 Promise，避免重复请求。
+    const running = activeLoadPromise() || refreshPromise;
+    if (running) {
+      if (!manual) return running;
+      try { await running; } catch (err) {}
+    }
 
     if (!initialSyncReady) {
-      return typeof waitForInitialCloudSync === "function"
+      const initial = typeof waitForInitialCloudSync === "function"
         ? waitForInitialCloudSync()
-        : undefined;
+        : null;
+      if (initial) {
+        try { await initial; } catch (err) {}
+      }
+      initialSyncReady = true;
     }
 
     const now = Date.now();
-    const manual = reason === "pull-down";
-    if (!manual && now - lastCloudRefresh < REFRESH_COOLDOWN_MS) return;
+    if (!manual && now - lastCloudRefresh < REFRESH_COOLDOWN_MS) {
+      return { ok:true, skipped:true };
+    }
 
     lastCloudRefresh = now;
     refreshPromise = loadFromSheet({
-      force: force === true,
+      force: manual || force === true,
       skipLocalCache: true,
       loadYear: false,
-      silent: true
+      silent: false,
+      statusText: manual ? "正在刷新云端资料..." : "正在检查云端更新..."
     }).catch(err => {
       console.warn("Cloud refresh failed:", reason, err);
+      return { ok:false, error:err };
     }).finally(() => {
       refreshPromise = null;
     });
@@ -115,7 +128,7 @@
   window.addEventListener("pageshow", () => refreshCloudData("pageshow", false));
   window.addEventListener("online", () => refreshCloudData("online", false));
 
-  // V9.8: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
+  // V9.9: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {
     if (!("ontouchstart" in window)) return;
 
@@ -184,13 +197,17 @@
       indicator.style.transform = "translate(-50%, 48px)";
       if (navigator.vibrate) navigator.vibrate(25);
 
-      await refreshCloudData("pull-down", true);
+      const result = await refreshCloudData("pull-down", true);
 
-      indicator.textContent = "刷新完成";
+      if (result && result.ok) {
+        indicator.textContent = "刷新完成";
+      } else {
+        indicator.textContent = "刷新失败，请稍后重试";
+      }
       setTimeout(() => {
         indicator.classList.remove("visible", "refreshing");
         indicator.style.transform = "translate(-50%, -70px)";
-      }, 650);
+      }, result && result.ok ? 650 : 1200);
     }, { passive: true });
 
     document.addEventListener("touchcancel", () => {

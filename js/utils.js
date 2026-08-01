@@ -189,7 +189,8 @@ function showTempMsg(id){
 function nowText(){
   return new Date().toLocaleTimeString("zh-MY",{
     hour:"2-digit",
-    minute:"2-digit"
+    minute:"2-digit",
+    second:"2-digit"
   });
 }
 
