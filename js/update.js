@@ -1,5 +1,5 @@
 (() => {
-  const RELOAD_FLAG = "lover_sales_sw_reloaded_v99";
+  const RELOAD_FLAG = "lover_sales_sw_reloaded_v100";
   const REFRESH_COOLDOWN_MS = 5000;
   const AUTO_REFRESH_MS = 30000;
   let lastCloudRefresh = 0;
@@ -7,6 +7,9 @@
   let initialSyncReady = typeof isInitialCloudSyncFinished === "function" && isInitialCloudSyncFinished();
   let autoRefreshStartTimer = null;
   let autoRefreshInterval = null;
+  let hiddenAt = 0;
+  let resumePromise = null;
+  let lastResumeAt = 0;
 
   function activeLoadPromise() {
     return typeof getActiveCloudLoadPromise === "function"
@@ -117,18 +120,46 @@
 
   window.addEventListener("load", () => registerAndCheckForUpdates());
 
+  function refreshAfterReopen(reason = "resume") {
+    const now = Date.now();
+    const running = activeLoadPromise() || refreshPromise || resumePromise;
+    if (running) return running;
+    if (now - lastResumeAt < 1200) return Promise.resolve({ ok:true, skipped:true });
+    lastResumeAt = now;
+
+    if (typeof markCloudCheckPending === "function") {
+      markCloudCheckPending("本机资料已显示 · 云端后台同步中");
+    } else if (typeof setSync === "function") {
+      setSync("本机资料已显示 · 云端后台同步中");
+    }
+
+    resumePromise = refreshCloudData(reason, true).finally(() => {
+      resumePromise = null;
+    });
+    return resumePromise;
+  }
+
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") {
-      registerAndCheckForUpdates();
-      refreshCloudData("visibility", false);
+    if (document.visibilityState === "hidden") {
+      hiddenAt = Date.now();
+      return;
+    }
+    registerAndCheckForUpdates();
+    if (hiddenAt && Date.now() - hiddenAt >= 300) {
+      hiddenAt = 0;
+      refreshAfterReopen("visibility-reopen");
     }
   });
 
-  window.addEventListener("focus", () => refreshCloudData("focus", false));
-  window.addEventListener("pageshow", () => refreshCloudData("pageshow", false));
-  window.addEventListener("online", () => refreshCloudData("online", false));
+  window.addEventListener("focus", () => {
+    if (hiddenAt && Date.now() - hiddenAt >= 300) refreshAfterReopen("focus-reopen");
+  });
+  window.addEventListener("pageshow", event => {
+    if (event.persisted) refreshAfterReopen("pageshow-cache");
+  });
+  window.addEventListener("online", () => refreshCloudData("online", true));
 
-  // V9.9: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
+  // V10.0: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {
     if (!("ontouchstart" in window)) return;
 

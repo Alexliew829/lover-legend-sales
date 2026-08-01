@@ -143,6 +143,12 @@ function setSync(text, good = false, error = false) {
   }
 }
 
+
+function markCloudCheckPending(text = "本机资料已显示 · 云端后台同步中") {
+  const el = document.getElementById("syncStatus");
+  if (el) el.textContent = "🟡 " + text;
+}
+
 function jsonp(params) {
   return new Promise((resolve, reject) => {
     const callback = "ll_cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
