@@ -442,7 +442,6 @@ async function saveCommissionSettingsToSheet(settings, targetMonth = "") {
     rate1: settings.rate1,
     rate2: settings.rate2,
     rate3: settings.rate3,
-    liveRate: settings.liveRate,
     liveHostRates: JSON.stringify(settings.liveHostRates || {}),
     liveHosts: JSON.stringify(settings.liveHosts || {}),
     targetMonth: targetMonth || ""

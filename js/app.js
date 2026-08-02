@@ -13,14 +13,14 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V10.0: every time Live is opened, start from today's date.
+  // V10.1: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
     updateLiveInputFromSelectedDate();
   }
 
-  // V10.0: page switching never waits for or triggers cloud sync.
+  // V10.1: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){return [r.type,r.date,r.company,canonicalLocation(r.location||"")].join("|")}
@@ -75,7 +75,6 @@ const DEFAULT_COMMISSION_SETTINGS={
   rate1:6,
   rate2:7,
   rate3:8,
-  liveRate:10,
   liveHostRates:{},
   liveHosts:{}
 };
@@ -87,7 +86,6 @@ function normalizeCommissionSettings(settings){
   const rate1=Number(source.rate1);
   const rate2=Number(source.rate2);
   const rate3=Number(source.rate3);
-  const liveRate=Number(source.liveRate);
   const liveHostRates={};
   const liveHosts={};
   Object.entries(source.liveHostRates||{}).forEach(([key,value])=>{
@@ -104,10 +102,10 @@ function normalizeCommissionSettings(settings){
     if(cleanKey&&name)liveHosts[cleanKey]=name;
   });
   Object.keys(liveHostRates).forEach(key=>{if(!liveHosts[key])liveHosts[key]=key.replace(/(^|\s)\S/g,c=>c.toUpperCase())});
-  if(![rate1,rate2,rate3,liveRate].every(Number.isFinite)||rate1<0||rate2<0||rate3<0||liveRate<0){
+  if(![rate1,rate2,rate3].every(Number.isFinite)||rate1<0||rate2<0||rate3<0){
     return{...DEFAULT_COMMISSION_SETTINGS,liveHostRates:{},liveHosts:{}};
   }
-  return{rate1,rate2,rate3,liveRate,liveHostRates,liveHosts};
+  return{rate1,rate2,rate3,liveHostRates,liveHosts};
 }
 function getCommissionSettings(){
   return{...commissionSettings,liveHostRates:{...(commissionSettings.liveHostRates||{})},liveHosts:{...(commissionSettings.liveHosts||{})}};
@@ -140,18 +138,16 @@ function loadCommissionSettingsForm(){
   const rate1=document.getElementById("commissionRate1");
   const rate2=document.getElementById("commissionRate2");
   const rate3=document.getElementById("commissionRate3");
-  const liveRate=document.getElementById("liveCommissionRate");
   if(rate1)rate1.value=settings.rate1;
   if(rate2)rate2.value=settings.rate2;
   if(rate3)rate3.value=settings.rate3;
-  if(liveRate)liveRate.value=settings.liveRate;
 }
 function getEffectiveCommissionSettings(){const snap=(systemState.commissionSnapshots||{})[selectedMonth()];return snap?normalizeCommissionSettings(snap):getCommissionSettings()}
 function getLiveHostRate(host){
   const settings=getEffectiveCommissionSettings();
   const key=normalizeLiveHostKey(host);
   const specific=Number((settings.liveHostRates||{})[key]);
-  return Number.isFinite(specific)?specific:Number(settings.liveRate||10);
+  return Number.isFinite(specific)?specific:0;
 }
 function renderLiveHostCommissionSettings(){
   const container=document.getElementById("liveHostCommissionList");
@@ -161,54 +157,11 @@ function renderLiveHostCommissionSettings(){
   container.innerHTML=hosts.length?hosts.map(host=>{
     const key=normalizeLiveHostKey(host);
     const rate=Number.isFinite(Number((settings.liveHostRates||{})[key]))
-      ?Number(settings.liveHostRates[key]):Number(settings.liveRate||10);
+      ?Number(settings.liveHostRates[key]):0;
     return `<label class="host-commission-row"><span>${host}</span><span class="commission-input-row"><input type="text" inputmode="decimal" data-live-host-key="${key}" value="${rate}"><span>%</span></span></label>`;
   }).join(""):'<div class="sub">新增 Live 主播后会自动显示在这里</div>';
 }
 
-async function saveCommissionSettings(){
-  const rate1=Number(document.getElementById("commissionRate1").value);
-  const rate2=Number(document.getElementById("commissionRate2").value);
-  const rate3=Number(document.getElementById("commissionRate3").value);
-  const settings=normalizeCommissionSettings({rate1,rate2,rate3});
-
-  if(settings.rate1!==rate1||settings.rate2!==rate2||settings.rate3!==rate3){
-    alert("请输入正确的佣金百分比");
-    return;
-  }
-
-  try{
-    setSync("正在同步佣金设置...");
-    const saved=await saveCommissionSettingsToSheet(settings);
-    applyCommissionSettings(saved||settings);
-    showTempMsg("commissionSettingsMsg");
-    setSync("已同步",true);
-  }catch(e){
-    alert("佣金设置储存失败："+e.message);
-    setSync("佣金设置同步失败",false,true);
-  }
-}
-
-async function resetCommissionSettings(){
-  const ok=confirm(
-    "确定恢复默认佣金？\n\n"+
-    "RM50,000 以下：6%\n"+
-    "RM50,000 以上：7%\n"+
-    "RM100,000 以上：8%"
-  );
-  if(!ok)return;
-
-  try{
-    setSync("正在恢复默认佣金...");
-    const saved=await resetCommissionSettingsInSheet();
-    applyCommissionSettings(saved||DEFAULT_COMMISSION_SETTINGS);
-    showTempMsg("commissionSettingsMsg");
-    setSync("已同步",true);
-  }catch(e){
-    alert("恢复默认值失败："+e.message);
-    setSync("佣金设置同步失败",false,true);
-  }
-}
 
 function getFairCommissionRate(total){
   const amount=Number(total||0);
@@ -421,7 +374,7 @@ async function saveFairSales(){
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"10.0"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"10.1"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -434,7 +387,7 @@ function updateReadOnlyMode(){
     el.textContent=closed?`${m} · 已结算 · 可修正`:history?`${m} · 历史月份 · 可编辑`:`${m} · 当前月份 · 可编辑`;
   }
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"10.0"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"10.1"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -443,7 +396,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV10.0 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV10.1 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){const current=monthISO();document.getElementById("monthPicker").value=current;document.getElementById("yearPicker").value=current.slice(0,4);saveActiveMonth(current)}
 initializeCurrentMonth();
 setDateControl("saleDate",todayISO());
@@ -507,7 +460,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V10.0: display local data immediately, but never reuse an old “已同步” state after reopening.
+// V10.1: display local data immediately, but never reuse an old “已同步” state after reopening.
 // Cloud data is refreshed only after unlock and never blocks entering the system.
 const startupCacheLoaded = typeof loadLocalDataCache === "function"
   ? loadLocalDataCache()
@@ -523,7 +476,7 @@ if (!startupCacheLoaded) renderAll();
 function startInitialSalesDataLoad() {
   if (startInitialSalesDataLoad.started) return;
   startInitialSalesDataLoad.started = true;
-  // V10.0: give the browser time to paint and accept input first.
+  // V10.1: give the browser time to paint and accept input first.
   // Cloud refresh runs later and never blocks entering Home.
   setTimeout(() => {
     if (typeof markCloudCheckPending === "function") {
@@ -676,7 +629,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V10.0: do not restore the previously saved date.
+  // V10.1: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -728,41 +681,6 @@ async function saveLiveSales(){
     if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();
     else setSync("同步暂未完成",false,true);
   }
-}
-async function saveCommissionSettings(){
-  const rate1=Number(document.getElementById("commissionRate1").value);
-  const rate2=Number(document.getElementById("commissionRate2").value);
-  const rate3=Number(document.getElementById("commissionRate3").value);
-  const liveRate=Number(document.getElementById("liveCommissionRate").value);
-  const liveHostRates={};
-  document.querySelectorAll("[data-live-host-key]").forEach(input=>{
-    const key=String(input.dataset.liveHostKey||"");
-    const rate=Number(input.value);
-    if(key&&Number.isFinite(rate)&&rate>=0)liveHostRates[key]=rate;
-  });
-  const settings=normalizeCommissionSettings({rate1,rate2,rate3,liveRate,liveHostRates});
-  if(![rate1,rate2,rate3,liveRate].every(v=>Number.isFinite(v)&&v>=0)){
-    alert("请输入正确的佣金百分比");return;
-  }
-  try{
-    setSync("正在同步佣金设置...");
-    const saved=await saveCommissionSettingsToSheet(settings);
-    applyCommissionSettings(saved||settings);
-    showTempMsg("commissionSettingsMsg");
-    setSync("已同步",true);
-  }catch(e){alert("佣金设置储存失败："+e.message);setSync("佣金设置同步失败",false,true)}
-}
-async function resetCommissionSettings(){
-  const ok=confirm("确定恢复默认佣金？\n\nFair：6% / 7% / 8%\nLive 默认：10%\n所有主播独立佣金将清除。");
-  if(!ok)return;
-  try{
-    setSync("正在恢复默认佣金...");
-    const saved=await resetCommissionSettingsInSheet();
-    applyCommissionSettings(saved||DEFAULT_COMMISSION_SETTINGS);
-    showTempMsg("commissionSettingsMsg");
-    setSync("已同步",true);
-    alert("已恢复默认值并自动储存");
-  }catch(e){alert("恢复默认值失败："+e.message);setSync("佣金设置同步失败",false,true)}
 }
 function renderDashboard(){
   const bm=totalBy("daily","balakong","month"),blm=totalBy("daily","belimbing","month"),fm=totalBy("fair","","month"),lm=totalBy("live","","month");
@@ -898,10 +816,6 @@ function readFairCommissionInputs(){
 }
 
 function readLiveCommissionInputs(){
-  const liveRate=Number(document.getElementById("liveCommissionRate").value);
-  if(!Number.isFinite(liveRate)||liveRate<0){
-    throw new Error("请输入正确的 Live 默认佣金百分比");
-  }
   const liveHostRates={};
   const liveHosts={};
   collectLiveHosts().forEach(name=>{const key=normalizeLiveHostKey(name);if(key)liveHosts[key]=canonicalLiveHost(name)});
@@ -910,7 +824,7 @@ function readLiveCommissionInputs(){
     const rate=Number(input.value);
     if(key&&Number.isFinite(rate)&&rate>=0)liveHostRates[key]=rate;
   });
-  return {liveRate,liveHostRates,liveHosts};
+  return {liveHostRates,liveHosts};
 }
 
 async function saveFairCommissionSettings(){
@@ -920,7 +834,7 @@ async function saveFairCommissionSettings(){
     const fair=readFairCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...fair});
 
-    // V10.0：单击后立即套用，并由所有已开启装置自动读取最新佣金。
+    // V10.1：单击后立即套用，并由所有已开启装置自动读取最新佣金。
     if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
@@ -996,37 +910,13 @@ async function resetFairCommissionSettings(){
   }
 }
 
-async function resetLiveCommissionSettings(){
-  if(!confirm("确定只恢复 Live 默认佣金？\n\n直播默认：10%\n所有主播独立佣金将清除。\n\nFair 佣金不会改变。"))return;
-  const previous=getCommissionSettings();
-  try{
-    const settings=normalizeCommissionSettings({...previous,liveRate:10,liveHostRates:{}});
-    applyCommissionSettings(settings);
-    renderLiveHostCommissionSettings();
-    saveLocalDataCache(settings);
-    showTempMsg("liveCommissionSettingsMsg");
-    setSync("Live 默认佣金已更新，正在后台同步...");
-
-    const saved=await saveCommissionSettingsToSheet(settings);
-    applyCommissionSettings(saved||settings);
-    saveLocalDataCache(saved||settings);
-    setSync("已同步",true);
-    alert("Live 主播佣金已恢复默认并自动储存");
-  }catch(e){
-    applyCommissionSettings(previous);
-    renderLiveHostCommissionSettings();
-    saveLocalDataCache(previous);
-    alert("Live 恢复默认失败："+e.message);
-    setSync("Live 佣金同步失败",false,true);
-  }
-}
 
 
-/* ================= V10.0 Backup / Restore ================= */
-function getBackupPayload(){return{system:"Lover Legend Sales System",version:"10.0",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
+/* ================= V10.1 Backup / Restore ================= */
+function getBackupPayload(){return{system:"Lover Legend Sales System",version:"10.1",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
 accessSettings:getAccessPasswordSettings(),
 closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
-function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V10_0_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}
+function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V10_1_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}
 async function restoreBackupFile(file){
   let payload;try{payload=JSON.parse(await file.text())}catch(e){alert("Backup 文件无法读取或不是有效 JSON。");return}
   if(!payload||!Array.isArray(payload.rows)||!payload.commissionSettings){alert("这不是有效的 Lover Legend Sales Backup。");return}
