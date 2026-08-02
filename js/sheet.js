@@ -269,6 +269,7 @@ async function loadFromSheet(options = {}) {
   }
   const force = options.force === true;
   const silent = options.silent === true;
+  const suppressStartStatus = options.suppressStartStatus === true;
   const statusText = String(options.statusText || "").trim();
   const now = Date.now();
   if (cloudLoadPromise) return cloudLoadPromise;
@@ -286,7 +287,7 @@ async function loadFromSheet(options = {}) {
     }
 
     const hasLocalData = rows.length > 0 || loadLocalDataCache();
-    if (!silent) {
+    if (!silent && !suppressStartStatus) {
       setSync(statusText || (hasLocalData ? "本机资料已显示 · 云端后台同步中" : "正在读取本月云端资料"));
     }
 

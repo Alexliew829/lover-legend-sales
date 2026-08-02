@@ -376,23 +376,7 @@
 <script>window.LOVER_API_URL="https://script.google.com/macros/s/AKfycby1OwDIiVf5quXKiD9AG8s2ppM942sLFdJSfyePp--yZtDjYY8jBtkOYLwD9c3WiC_KNw/exec";</script>
 <script>
 (function(){
-  const APP_SCRIPTS=[
-    "js/utils.js?v=10.6",
-    "js/sheet.js?v=10.6",
-    "js/app.js?v=10.6",
-    "js/update.js?v=10.6"
-  ];
   let appLoadPromise=null;
-  let prewarmPromise=null;
-
-  function prewarmAppScripts(){
-    if(prewarmPromise)return prewarmPromise;
-    prewarmPromise=Promise.allSettled(
-      APP_SCRIPTS.map(src=>fetch(src,{cache:"force-cache"}))
-    );
-    return prewarmPromise;
-  }
-
   function loadScript(src){
     return new Promise((resolve,reject)=>{
       const script=document.createElement("script");
@@ -405,11 +389,11 @@
   }
   window.startLoverSalesApp=function(){
     if(appLoadPromise)return appLoadPromise;
-    appLoadPromise=prewarmAppScripts()
-      .then(()=>loadScript(APP_SCRIPTS[0]))
-      .then(()=>loadScript(APP_SCRIPTS[1]))
-      .then(()=>loadScript(APP_SCRIPTS[2]))
-      .then(()=>loadScript(APP_SCRIPTS[3]))
+    appLoadPromise=Promise.resolve()
+      .then(()=>loadScript("js/utils.js?v=10.6"))
+      .then(()=>loadScript("js/sheet.js?v=10.6"))
+      .then(()=>loadScript("js/app.js?v=10.6"))
+      .then(()=>loadScript("js/update.js?v=10.6"))
       .catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");
@@ -418,9 +402,6 @@
     return appLoadPromise;
   };
   window.addEventListener("lover-sales-unlocked",()=>window.startLoverSalesApp(),{once:true});
-  const warm=()=>prewarmAppScripts();
-  if("requestIdleCallback" in window)requestIdleCallback(warm,{timeout:800});
-  else setTimeout(warm,250);
 })();
 </script>
 <script src="js/access.js?v=10.6"></script>

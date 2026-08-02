@@ -1,6 +1,6 @@
 (() => {
-  const RELOAD_FLAG = "lover_sales_sw_reloaded_v106";
-  const REFRESH_COOLDOWN_MS = 30000;
+  const RELOAD_FLAG = "lover_sales_sw_reloaded_v100";
+  const REFRESH_COOLDOWN_MS = 5000;
   const AUTO_REFRESH_MS = 30000;
   let lastCloudRefresh = 0;
   let refreshPromise = null;
@@ -10,10 +10,6 @@
   let hiddenAt = 0;
   let resumePromise = null;
   let lastResumeAt = 0;
-  const REOPEN_MIN_HIDDEN_MS = 15000;
-  const SW_UPDATE_CHECK_KEY = "lover_sales_sw_update_checked_v106";
-  const SW_UPDATE_CHECK_MS = 30 * 60 * 1000;
-  let swRegistrationPromise = null;
 
   function activeLoadPromise() {
     return typeof getActiveCloudLoadPromise === "function"
@@ -68,10 +64,14 @@
 
   function startAutomaticRefreshAfterInitialSync() {
     if (autoRefreshStartTimer || autoRefreshInterval) return;
-    // V10.6: do not run a second cloud read 5 seconds after startup.
-    // The interval begins only after the first sync has fully completed.
+    // V10.6: do not fire a second check 5 seconds after startup.
+    // The first automatic check starts only after a full interval from the
+    // completed startup sync, preventing duplicate requests and UI flicker.
     autoRefreshStartTimer = setTimeout(() => {
       autoRefreshStartTimer = null;
+      if (document.visibilityState === "visible") {
+        refreshCloudData("interval", false);
+      }
       autoRefreshInterval = setInterval(() => {
         if (document.visibilityState === "visible") {
           refreshCloudData("interval", false);
@@ -97,50 +97,31 @@
     if (registration && registration.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
   }
 
-  function registerAndCheckForUpdates() {
-    if (!("serviceWorker" in navigator)) return Promise.resolve(null);
-    if (swRegistrationPromise) return swRegistrationPromise;
-
-    swRegistrationPromise = navigator.serviceWorker
-      .register("./sw.js", { updateViaCache: "none" })
-      .then(registration => {
-        activateWaitingWorker(registration);
-        registration.addEventListener("updatefound", () => {
-          const worker = registration.installing;
-          if (!worker) return;
-          worker.addEventListener("statechange", () => {
-            if (worker.state === "installed" && navigator.serviceWorker.controller) {
-              worker.postMessage({ type: "SKIP_WAITING" });
-            }
-          });
+  async function registerAndCheckForUpdates() {
+    if (!("serviceWorker" in navigator)) return;
+    try {
+      const registration = await navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" });
+      await registration.update();
+      await activateWaitingWorker(registration);
+      registration.addEventListener("updatefound", () => {
+        const worker = registration.installing;
+        if (!worker) return;
+        worker.addEventListener("statechange", () => {
+          if (worker.state === "installed" && navigator.serviceWorker.controller) worker.postMessage({ type: "SKIP_WAITING" });
         });
-
-        const lastCheck = Number(localStorage.getItem(SW_UPDATE_CHECK_KEY) || 0);
-        if (Date.now() - lastCheck >= SW_UPDATE_CHECK_MS) {
-          localStorage.setItem(SW_UPDATE_CHECK_KEY, String(Date.now()));
-          // Do not await update checking; it must never hold the page in a loading state.
-          registration.update().then(() => activateWaitingWorker(registration)).catch(() => {});
-        }
-        return registration;
-      })
-      .catch(err => {
-        console.warn("Service worker registration failed:", err);
-        return null;
       });
-
-    return swRegistrationPromise;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (sessionStorage.getItem(RELOAD_FLAG) === "1") return;
+        sessionStorage.setItem(RELOAD_FLAG, "1");
+        window.location.reload();
+      });
+      setTimeout(() => sessionStorage.removeItem(RELOAD_FLAG), 10000);
+    } catch (err) {
+      console.warn("Service worker update check failed:", err);
+    }
   }
 
-  navigator.serviceWorker?.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem(RELOAD_FLAG) === "1") return;
-    sessionStorage.setItem(RELOAD_FLAG, "1");
-    window.location.reload();
-  });
-  setTimeout(() => sessionStorage.removeItem(RELOAD_FLAG), 10000);
-
-  window.addEventListener("load", () => {
-    setTimeout(registerAndCheckForUpdates, 1200);
-  }, { once:true });
+  window.addEventListener("load", () => registerAndCheckForUpdates());
 
   function refreshAfterReopen(reason = "resume") {
     const now = Date.now();
@@ -166,19 +147,20 @@
       hiddenAt = Date.now();
       return;
     }
-    const hiddenDuration = hiddenAt ? Date.now() - hiddenAt : 0;
-    hiddenAt = 0;
-    if (hiddenDuration >= REOPEN_MIN_HIDDEN_MS) {
+    registerAndCheckForUpdates();
+    if (hiddenAt && Date.now() - hiddenAt >= 300) {
+      hiddenAt = 0;
       refreshAfterReopen("visibility-reopen");
     }
   });
 
-  // V10.6: visibilitychange is the single reopen trigger.
-  // focus is intentionally not used because browsers fire both events together.
+  window.addEventListener("focus", () => {
+    if (hiddenAt && Date.now() - hiddenAt >= 300) refreshAfterReopen("focus-reopen");
+  });
   window.addEventListener("pageshow", event => {
     if (event.persisted) refreshAfterReopen("pageshow-cache");
   });
-  window.addEventListener("online", () => refreshCloudData("online", false));
+  window.addEventListener("online", () => refreshCloudData("online", true));
 
   // V10.6: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {

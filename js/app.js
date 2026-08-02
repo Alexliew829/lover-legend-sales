@@ -480,8 +480,9 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V10.6: display local data immediately, but never reuse an old “已同步” state after reopening.
-// Cloud data is refreshed only after unlock and never blocks entering the system.
+// V10.6: show local data immediately. Every new page load performs one
+// forced cloud check after unlock, while duplicate triggers in the same page
+// reuse the same startup Promise.
 const startupCacheLoaded = typeof loadLocalDataCache === "function"
   ? loadLocalDataCache()
   : false;
@@ -493,27 +494,27 @@ if (typeof markCloudCheckPending === "function") {
 attachMoneyInputs();
 if (!startupCacheLoaded) renderAll();
 
+let startupSalesSyncPromise = null;
 function startInitialSalesDataLoad() {
-  if (startInitialSalesDataLoad.started) return;
-  startInitialSalesDataLoad.started = true;
-  // V10.6: paint Home first. Start one cloud request only after the UI is idle.
-  const beginCloudLoad = () => {
-    if (typeof markCloudCheckPending === "function") {
-      markCloudCheckPending(startupCacheLoaded
-        ? "本机资料已显示 · 云端后台同步中"
-        : "正在读取云端资料");
-    }
-    loadFromSheet({background:true,force:true,loadYear:false}).then(() => {
+  if (startupSalesSyncPromise) return startupSalesSyncPromise;
+  // Let the login overlay close and Home paint first, then force exactly one
+  // fresh cloud read. This state exists only in the current page instance.
+  startupSalesSyncPromise = new Promise(resolve => setTimeout(resolve, 50))
+    .then(() => loadFromSheet({
+      background:true,
+      force:true,
+      loadYear:false,
+      suppressStartStatus:true
+    }))
+    .then(result => {
       syncFairInputs();
-    }).catch(() => {
-      // 本机资料仍可使用，不阻塞系统。
+      return result;
+    })
+    .catch(error => {
+      // Local data remains usable; loadFromSheet already shows the error state.
+      return {ok:false,error};
     });
-  };
-  if ("requestIdleCallback" in window) {
-    requestIdleCallback(beginCloudLoad, { timeout: 700 });
-  } else {
-    setTimeout(beginCloudLoad, 250);
-  }
+  return startupSalesSyncPromise;
 }
 
 if (sessionStorage.getItem(ACCESS_UNLOCK_SESSION_KEY) === "1" ||
