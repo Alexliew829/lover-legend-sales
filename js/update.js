@@ -159,7 +159,7 @@
   });
   window.addEventListener("online", () => refreshCloudData("online", true));
 
-  // V10.3: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
+  // V10.4: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {
     if (!("ontouchstart" in window)) return;
 
