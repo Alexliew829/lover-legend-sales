@@ -1,5 +1,5 @@
 (() => {
-  const RELOAD_FLAG = "lover_sales_sw_reloaded_v112";
+  const RELOAD_FLAG = "lover_sales_sw_reloaded_v113";
   const REFRESH_COOLDOWN_MS = 5000;
   const AUTO_REFRESH_MS = 30000;
   let lastCloudRefresh = 0;
@@ -64,7 +64,7 @@
 
   function startAutomaticRefreshAfterInitialSync() {
     if (autoRefreshStartTimer || autoRefreshInterval) return;
-    // V11.2: do not fire a second check 5 seconds after startup.
+    // V11.3: do not fire a second check 5 seconds after startup.
     // The first automatic check starts only after a full interval from the
     // completed startup sync, preventing duplicate requests and UI flicker.
     autoRefreshStartTimer = setTimeout(() => {
@@ -121,11 +121,30 @@
     }
   }
 
-  window.addEventListener("load", () => {
-  setTimeout(registerAndCheckForUpdates,3000);
-});
+  function scheduleServiceWorkerCheckAfterStartup() {
+    const run = () => setTimeout(registerAndCheckForUpdates, 5000);
+
+    if (initialSyncReady) {
+      run();
+      return;
+    }
+
+    window.addEventListener(
+      "lover-sales-initial-sync-complete",
+      run,
+      { once: true }
+    );
+  }
+
+  window.addEventListener("load", scheduleServiceWorkerCheckAfterStartup, { once:true });
 
   function refreshAfterReopen(reason = "resume") {
+    if (!initialSyncReady) {
+      return typeof waitForInitialCloudSync === "function"
+        ? waitForInitialCloudSync()
+        : Promise.resolve({ ok:true, skipped:true });
+    }
+
     const now = Date.now();
     const running = activeLoadPromise() || refreshPromise || resumePromise;
     if (running) return running;
@@ -149,7 +168,6 @@
       hiddenAt = Date.now();
       return;
     }
-    setTimeout(registerAndCheckForUpdates,3000);
     if (hiddenAt && Date.now() - hiddenAt >= 300) {
       hiddenAt = 0;
       refreshAfterReopen("visibility-reopen");
@@ -170,7 +188,7 @@
   });
   window.addEventListener("online", () => refreshCloudData("online", true));
 
-  // V11.2: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
+  // V11.3: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {
     if (!("ontouchstart" in window)) return;
 

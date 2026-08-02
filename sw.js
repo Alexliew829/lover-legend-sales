@@ -1,4 +1,4 @@
-const CACHE_NAME = "lover-sales-v11-2";
+const CACHE_NAME = "lover-sales-v11-3";
 
 const CORE_FILES = [
   "./",
@@ -13,8 +13,6 @@ const CORE_FILES = [
   "./js/update.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./images/logo.png",
-  "./images/Logo2.jpg"
 ];
 
 self.addEventListener("install", event => {
