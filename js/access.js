@@ -246,13 +246,20 @@ function unlockAccessLock(options = {}) {
 
   // Large brand images are intentionally deferred until after login so they
   // cannot compete with the password screen on a cold first load.
-  document.querySelectorAll("[data-deferred-src]").forEach(image => {
-    if (!image.getAttribute("src")) {
-      image.setAttribute("src", image.dataset.deferredSrc || "");
-    }
+  window.dispatchEvent(
+    new CustomEvent("lover-sales-unlocked")
+  );
+
+  requestAnimationFrame(()=>{
+    document.querySelectorAll("[data-deferred-src]").forEach(image=>{
+      if(!image.getAttribute("src")){
+        image.src=image.dataset.deferredSrc||"";
+      }
+    });
   });
 
-  window.dispatchEvent(
+  /* dispatched before loading large images */
+
     new CustomEvent("lover-sales-unlocked")
   );
 }
@@ -441,7 +448,7 @@ async function setupAccessLock() {
   ) {
     window.setTimeout(() => {
       tryBiometricLogin(false);
-    }, 120);
+    }, 600);
   }
 }
 function setupPasswordChange() {
