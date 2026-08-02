@@ -9,6 +9,7 @@ let initialCloudSyncPromise = null;
 let settingsWritePromise = null;
 let settingsWriteDepth = 0;
 let yearLoadPromises = new Map();
+let loadedCloudYears = new Set();
 
 const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache";
 const LEGACY_LOCAL_DATA_CACHE_KEYS = [
@@ -19,12 +20,12 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 
-/* V11.5: first paint must not wait for the full system render. */
+/* V11.6: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V11.5: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V11.6: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -99,7 +100,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V11.5: damaged/partial cache must never trap startup.
+    // V11.6: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -291,6 +292,7 @@ function mergeCloudYearRows(year, cloudRows) {
 
 async function loadYearInBackground(year) {
   const y = /^\d{4}$/.test(String(year || "")) ? String(year) : new Date().getFullYear().toString();
+  if (loadedCloudYears.has(y)) return { ok:true, year:y, cached:true };
   if (yearLoadPromises.has(y)) return yearLoadPromises.get(y);
 
   const task = (async () => {
@@ -309,6 +311,7 @@ async function loadYearInBackground(year) {
       renderHomeFirst();
       scheduleDeferredFullRender(0);
       saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
+      loadedCloudYears.add(y);
       setSync("已同步", true);
       return { ok:true, year:y, rows:(json.rows || []).length };
     } catch (err) {
@@ -409,10 +412,15 @@ async function loadFromSheet(options = {}) {
         setTimeout(() => syncPendingRows().catch(() => {}), 50);
       }
 
-      if (options.loadYear !== false) {
-        const year = month.slice(0, 4);
-        setTimeout(() => loadYearInBackground(year), 1200);
-      }
+      const year = month.slice(0, 4);
+
+      // V11.6: preload the full year silently after the current month is shown.
+      // This restores the old instant monthly-summary experience without
+      // delaying login or the initial Home display.
+      setTimeout(() => {
+        loadYearInBackground(year).catch(() => {});
+      }, options.loadYear === false ? 250 : 1200);
+
       return { ok:true, month, refreshedAt:Date.now() };
     } catch (err) {
       if (!silent) {

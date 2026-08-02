@@ -225,7 +225,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 @media(max-width:430px){.monthly-summary-btn{min-width:116px;padding:12px 10px;font-size:14px}.year-summary-row{gap:8px}}
 
 
-/* V11.5 Report historical month selector */
+/* V11.6 Report historical month selector */
 .report-header-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px}
 .report-header-row h2{margin-bottom:3px}
 .report-month-label{font-size:13px;font-weight:700;color:#8b0000}
@@ -234,11 +234,11 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .report-month-control input{margin:0;padding:9px 10px;font-weight:700;color:#8b0000;background:#fff}
 @media(max-width:520px){.report-header-row{align-items:stretch}.report-month-control{min-width:140px}}
 
-/* V11.5: prevent repeated commission-save clicks while syncing */
+/* V11.6: prevent repeated commission-save clicks while syncing */
 #saveFairCommissionBtn:disabled{opacity:.65;cursor:wait;}
 
 
-/* V11.5 mobile pull-down refresh */
+/* V11.6 mobile pull-down refresh */
 .pull-refresh-indicator{
   position:fixed;
   top:0;
@@ -263,7 +263,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .pull-refresh-indicator.refreshing{color:#0b6b2b}
 
 
-/* ================= V11.5 Password System ================= */
+/* ================= V11.6 Password System ================= */
 .access-lock {
   position: fixed;
   inset: 0;
@@ -391,7 +391,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V11.5 performance */
+/* V11.6 performance */
 .logo,.seal{
   content-visibility:auto;
   contain:layout paint;
@@ -405,7 +405,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V11.5 selected-date daily sales */
+/* V11.6 selected-date daily sales */
 #dashboardDate{
   color:#b00000;
   font-weight:900;
@@ -446,7 +446,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V11.5 period grouping and monthly summary */
+/* V11.6 period grouping and monthly summary */
 .period-summary-card{
   position:relative;
   padding:18px;
