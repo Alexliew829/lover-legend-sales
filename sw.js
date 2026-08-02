@@ -1,6 +1,7 @@
-const CACHE_NAME = "lover-sales-v10-7";
+const CACHE_NAME = "lover-sales-v10-8";
 
 const CORE_FILES = [
+  // V10.8 preload only essential startup assets
   "./",
   "./index.html",
   "./style.css",
@@ -13,7 +14,6 @@ const CORE_FILES = [
   "./js/update.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./images/Logo2.jpg"
 ];
 
 self.addEventListener("install", event => {
