@@ -121,7 +121,9 @@
     }
   }
 
-  window.addEventListener("load", () => registerAndCheckForUpdates());
+  window.addEventListener("load", () => {
+  setTimeout(registerAndCheckForUpdates,3000);
+});
 
   function refreshAfterReopen(reason = "resume") {
     const now = Date.now();
@@ -147,7 +149,7 @@
       hiddenAt = Date.now();
       return;
     }
-    registerAndCheckForUpdates();
+    setTimeout(registerAndCheckForUpdates,3000);
     if (hiddenAt && Date.now() - hiddenAt >= 300) {
       hiddenAt = 0;
       refreshAfterReopen("visibility-reopen");
