@@ -16,8 +16,8 @@ body.access-locked{overflow:hidden}
 .access-lock input{width:100%;box-sizing:border-box;padding:16px;border:2px solid #d9e2dc;border-radius:16px;font-size:20px;text-align:center;outline:none}.access-lock input:focus{border-color:#247543}
 .access-lock button{width:100%;box-sizing:border-box;margin-top:14px;padding:15px;border:0;border-radius:16px;font-size:18px;font-weight:700;cursor:pointer}.primary-access-btn{background:#176735;color:#fff}.biometric-login-btn{background:#eaf6ee;color:#176735;border:2px solid #247543!important}.password-hint-btn{background:transparent;color:#176735;text-decoration:underline}.access-password-hint,.access-lock-status,.biometric-login-status{min-height:22px;margin-top:10px;color:#176735;font-weight:700}.app,.bottom-nav{visibility:hidden}.access-ready .app,.access-ready .bottom-nav{visibility:visible}
 </style>
-<link rel="preload" href="style.css?v=10.8" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="style.css?v=10.8"></noscript>
+<link rel="preload" href="style.css?v=10.9" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="style.css?v=10.9"></noscript>
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 <script>
@@ -73,13 +73,13 @@ body.access-locked{overflow:hidden}
          class="access-lock-status"></div>
   </div>
 </div>
-<script src="js/access.js?v=10.8"></script>
+<script src="js/access.js?v=10.9"></script>
 
 <div class="app">
 <header class="top">
   <div class="brand">
     <img data-deferred-src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V10.8</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V10.9</small></div>
     <img data-deferred-src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -96,7 +96,7 @@ body.access-locked{overflow:hidden}
       </div>
       <button type="button" id="monthlySummaryBtn" class="monthly-summary-btn" onclick="toggleMonthlySummary()">📊 每月汇总</button>
     </div>
-    <div id="syncStatus" class="sync-line">🟡 本机资料已显示</div>
+    <div id="syncStatus" class="sync-line">🟡 正在载入本机资料</div>
     <div id="lastSync" class="last-sync">最后同步：-</div>
     <div id="monthMode" class="month-mode current-mode">当前月份 · 可编辑</div>
   </div>
@@ -295,7 +295,7 @@ body.access-locked{overflow:hidden}
     <button class="gray" onclick="backupAllData()">💾 Backup 完整备份</button>
     <button class="gray" onclick="document.getElementById('restoreFile').click()">♻️ Restore 恢复备份</button>
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
-    <p class="note">V10.8：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
+    <p class="note">V10.9：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
   </div>
 
   <div class="card access-settings-card">
@@ -389,24 +389,31 @@ body.access-locked{overflow:hidden}
 <script>
 (function(){
   let appLoadPromise=null;
-  function loadScript(src){
+  function loadScriptsInOrder(sources){
     return new Promise((resolve,reject)=>{
-      const script=document.createElement("script");
-      script.src=src;
-      script.async=true;
-      script.onload=resolve;
-      script.onerror=()=>reject(new Error("无法载入 "+src));
-      (document.head||document.body).appendChild(script);
+      let loaded=0;
+      sources.forEach((src,index)=>{
+        const script=document.createElement("script");
+        script.src=src;
+        script.async=false;
+        script.onload=()=>{
+          loaded+=1;
+          if(loaded===sources.length)resolve();
+        };
+        script.onerror=()=>reject(new Error("无法载入 "+src));
+        (document.head||document.body).appendChild(script);
+      });
     });
   }
   window.startLoverSalesApp=function(){
     if(appLoadPromise)return appLoadPromise;
-    appLoadPromise=Promise.resolve()
-      .then(()=>loadScript("js/utils.js?v=10.7"))
-      .then(()=>loadScript("js/sheet.js?v=10.7"))
-      .then(()=>loadScript("js/app.js?v=10.7"))
-      .then(()=>loadScript("js/update.js?v=10.7"))
-      .catch(error=>{
+    // Download all business scripts in parallel; async=false preserves execution order.
+    appLoadPromise=loadScriptsInOrder([
+      "js/utils.js?v=10.9",
+      "js/sheet.js?v=10.9",
+      "js/app.js?v=10.9",
+      "js/update.js?v=10.9"
+    ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");
         if(status)status.textContent="🔴 系统载入失败，请 Refresh";

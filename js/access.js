@@ -1,5 +1,5 @@
 
-/* ================= V10.7 Access Password System ================= */
+/* ================= V10.9 Access Password System ================= */
 const DEFAULT_ACCESS_PASSWORD_HASH =
   "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
 const DEFAULT_ACCESS_PASSWORD_HINT = "6个数字";
@@ -229,10 +229,7 @@ function recordAccessGrantedTime() {
 }
 
 function unlockAccessLock(options = {}) {
-  sessionStorage.setItem(
-    ACCESS_UNLOCK_SESSION_KEY,
-    "1"
-  );
+  sessionStorage.setItem(ACCESS_UNLOCK_SESSION_KEY, "1");
 
   if (options.refreshGrantedTime !== false) {
     recordAccessGrantedTime();
@@ -244,25 +241,18 @@ function unlockAccessLock(options = {}) {
   document.body.classList.remove("access-locked");
   document.documentElement.classList.add("access-ready");
 
-  // Large brand images are intentionally deferred until after login so they
-  // cannot compete with the password screen on a cold first load.
-  window.dispatchEvent(
-    new CustomEvent("lover-sales-unlocked")
-  );
+  // Start business scripts immediately. Large brand images load on the next frame.
+  window.dispatchEvent(new CustomEvent("lover-sales-unlocked"));
 
-  requestAnimationFrame(()=>{
-    document.querySelectorAll("[data-deferred-src]").forEach(image=>{
-      if(!image.getAttribute("src")){
-        image.src=image.dataset.deferredSrc||"";
+  requestAnimationFrame(() => {
+    document.querySelectorAll("[data-deferred-src]").forEach(image => {
+      if (!image.getAttribute("src")) {
+        image.src = image.dataset.deferredSrc || "";
       }
     });
   });
-
-  /* dispatched before loading large images */
-
-    new CustomEvent("lover-sales-unlocked")
-  );
 }
+
 async function tryBiometricLogin(manual = false) {
   const status = document.getElementById("biometricLoginStatus");
   try {
@@ -438,7 +428,7 @@ async function setupAccessLock() {
     }).catch(() => {});
   }
 
-  // V10.7：手机需要重新认证且已启用 Passkey 时，
+  // V10.9：手机需要重新认证且已启用 Passkey 时，
   // 自动打开系统原生 Sign in / Use Passkey 画面。
   // 用户只需要在系统画面点击一次 Use Passkey，
   // Face ID 成功后直接进入系统。
@@ -517,7 +507,7 @@ function setupPasswordChange() {
     } catch (error) {
       const message = String(error?.message || error || "");
       status.textContent = /Unknown action:\s*saveAccessSettings/i.test(message)
-        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V10.7 Code.gs"
+        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V10.9 Code.gs"
         : "密码同步失败：" + message;
     } finally {
       button.disabled = false;
@@ -546,7 +536,7 @@ function setupDeviceBiometricSettings() {
   updateDeviceBiometricStatus();
 }
 
-/* ================= V10.7 Instant Login Bootstrap ================= */
+/* ================= V10.9 Instant Login Bootstrap ================= */
 // Run the access lock as soon as its small script is parsed. Business scripts,
 // large images, Service Worker checks and cloud sync all start only after unlock.
 setupAccessLock();
