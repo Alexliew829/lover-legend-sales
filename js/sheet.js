@@ -18,6 +18,37 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 
+/* V10.8: first paint must not wait for the full system render. */
+let localCacheRenderedOnce = false;
+let deferredFullRenderTimer = null;
+
+function renderHomeFirst() {
+  if (typeof dedupeRows === "function") rows = dedupeRows(rows);
+
+  if (typeof renderDashboard === "function") {
+    renderDashboard();
+  }
+
+  if (typeof updateReadOnlyMode === "function") {
+    updateReadOnlyMode();
+  }
+}
+
+function scheduleDeferredFullRender(delay = 0) {
+  if (deferredFullRenderTimer) return;
+
+  const run = () => {
+    deferredFullRenderTimer = null;
+    if (typeof renderAll === "function") renderAll();
+  };
+
+  if (typeof requestIdleCallback === "function") {
+    deferredFullRenderTimer = requestIdleCallback(run, { timeout: Math.max(300, delay + 300) });
+  } else {
+    deferredFullRenderTimer = setTimeout(run, Math.max(0, delay));
+  }
+}
+
 function readLocalDataCacheRaw() {
   let raw = localStorage.getItem(LOCAL_DATA_CACHE_KEY);
   if (!raw) {
@@ -57,7 +88,9 @@ function loadLocalDataCache() {
       );
     }
 
-    renderAll();
+    renderHomeFirst();
+    localCacheRenderedOnce = true;
+    scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
     return false;
@@ -181,8 +214,10 @@ function jsonp(params, options = {}) {
       reject(new Error("无法连接 Google Apps Script"));
     };
 
+    script.async = true;
+    script.defer = true;
     script.src = API_URL + "?" + query;
-    document.body.appendChild(script);
+    (document.head || document.body || document.documentElement).appendChild(script);
   });
 }
 
@@ -243,7 +278,8 @@ async function loadYearInBackground(year) {
     if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
     if (json.commissionSettings && typeof applyCommissionSettings === "function") applyCommissionSettings(json.commissionSettings);
     if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
-    renderAll();
+    renderHomeFirst();
+    scheduleDeferredFullRender(0);
     saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
     setSync("已同步", true);
   } catch (err) {
@@ -286,7 +322,9 @@ async function loadFromSheet(options = {}) {
       syncPendingRows().catch(() => {});
     }
 
-    const hasLocalData = rows.length > 0 || loadLocalDataCache();
+    const hasLocalData = rows.length > 0
+      ? true
+      : loadLocalDataCache();
     if (!silent && !suppressStartStatus) {
       setSync(statusText || (hasLocalData ? "本机资料已显示 · 云端后台同步中" : "正在读取本月云端资料"));
     }
@@ -302,7 +340,8 @@ async function loadFromSheet(options = {}) {
       if (json.commissionSettings && typeof applyCommissionSettings === "function") applyCommissionSettings(json.commissionSettings);
       if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
 
-      renderAll();
+      renderHomeFirst();
+      scheduleDeferredFullRender(0);
       saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
       setSync("已同步", true);
       completedSuccessfully = true;
@@ -343,7 +382,9 @@ async function syncPendingRows() {
     loadPendingRows();
 
     if (pendingRows.length === 0) {
-      setSync("已同步", true);
+      if (initialCloudSyncFinished && !cloudLoadPromise) {
+        setSync("已同步", true);
+      }
       return;
     }
 

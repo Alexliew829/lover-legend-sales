@@ -13,14 +13,14 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V10.7: every time Live is opened, start from today's date.
+  // V10.8: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
     updateLiveInputFromSelectedDate();
   }
 
-  // V10.7: page switching never waits for or triggers cloud sync.
+  // V10.8: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){return [r.type,r.date,r.company,canonicalLocation(r.location||"")].join("|")}
@@ -147,7 +147,7 @@ function getEffectiveCommissionSettings(){
   const snapshot=(systemState.commissionSnapshots||{})[selectedMonth()];
   if(!snapshot)return current;
 
-  // V10.7: historical snapshots created before per-host commission support may
+  // V10.8: historical snapshots created before per-host commission support may
   // not contain liveHostRates/liveHosts. Keep the month Fair rates, but fall
   // back to the latest saved host commission settings instead of showing 0%.
   return normalizeCommissionSettings({
@@ -407,7 +407,7 @@ function updateReadOnlyMode(){
     el.textContent=closed?`${m} · 已结算 · 可修正`:history?`${m} · 历史月份 · 可编辑`:`${m} · 当前月份 · 可编辑`;
   }
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"10.7"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"10.8"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -416,7 +416,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV10.7 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV10.8 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){const current=monthISO();document.getElementById("monthPicker").value=current;document.getElementById("yearPicker").value=current.slice(0,4);saveActiveMonth(current)}
 initializeCurrentMonth();
 setDateControl("saleDate",todayISO());
@@ -480,41 +480,49 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V10.7: show local data immediately. Every new page load performs one
-// forced cloud check after unlock, while duplicate triggers in the same page
-// reuse the same startup Promise.
+// V10.8: render local Home first. Cloud work starts only after the browser
+// has painted the unlocked page, so the logo and cached figures are not blocked.
 const startupCacheLoaded = typeof loadLocalDataCache === "function"
   ? loadLocalDataCache()
   : false;
-if (typeof markCloudCheckPending === "function") {
-  markCloudCheckPending(startupCacheLoaded
-    ? "本机资料已显示 · 云端后台同步中"
-    : "正在读取云端资料");
-}
 attachMoneyInputs();
 if (!startupCacheLoaded) renderAll();
 
+// Do not show a stale "准备同步" state after the app becomes available.
+// A new page instance will still perform exactly one forced cloud check.
+if (typeof setSync === "function") {
+  setSync(startupCacheLoaded ? "本机资料已显示" : "系统已进入", false, false);
+}
+
 let startupSalesSyncPromise = null;
+function waitForFirstHomePaint() {
+  return new Promise(resolve => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setTimeout(resolve, 180));
+    });
+  });
+}
 function startInitialSalesDataLoad() {
   if (startupSalesSyncPromise) return startupSalesSyncPromise;
-  // Let the login overlay close and Home paint first, then force exactly one
-  // fresh cloud read. This state exists only in the current page instance.
-  startupSalesSyncPromise = new Promise(resolve => requestAnimationFrame(()=>requestAnimationFrame(resolve)))
-    .then(() => loadFromSheet({
-      background:true,
-      skipStatus:true,
-      force:true,
-      loadYear:false,
-      suppressStartStatus:true
-    }))
+  startupSalesSyncPromise = waitForFirstHomePaint()
+    .then(() => {
+      if (typeof markCloudCheckPending === "function") {
+        markCloudCheckPending(startupCacheLoaded
+          ? "本机资料已显示 · 云端后台同步中"
+          : "正在读取云端资料");
+      }
+      return loadFromSheet({
+        background:true,
+        force:true,
+        loadYear:false,
+        suppressStartStatus:true
+      });
+    })
     .then(result => {
       syncFairInputs();
       return result;
     })
-    .catch(error => {
-      // Local data remains usable; loadFromSheet already shows the error state.
-      return {ok:false,error};
-    });
+    .catch(error => ({ok:false,error}));
   return startupSalesSyncPromise;
 }
 
@@ -667,7 +675,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V10.7: do not restore the previously saved date.
+  // V10.8: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -872,7 +880,7 @@ async function saveFairCommissionSettings(){
     const fair=readFairCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...fair});
 
-    // V10.7：单击后立即套用，并由所有已开启装置自动读取最新佣金。
+    // V10.8：单击后立即套用，并由所有已开启装置自动读取最新佣金。
     if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
@@ -913,7 +921,7 @@ async function saveLiveCommissionSettings(){
     const live=readLiveCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...live});
 
-    // V10.7: apply locally first and immediately refresh Home/Report.
+    // V10.8: apply locally first and immediately refresh Home/Report.
     if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
@@ -976,7 +984,7 @@ async function resetFairCommissionSettings(){
   const settings=normalizeCommissionSettings({...previous,rate1:6,rate2:7,rate3:8});
 
   try{
-    // V10.7：确认恢复后先立即更新本机与 Home，再在后台同步 Google Sheet。
+    // V10.8：确认恢复后先立即更新本机与 Home，再在后台同步 Google Sheet。
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
       systemState.commissionSnapshots={
@@ -1025,7 +1033,7 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V10.7 Backup / Restore ================= */
+/* ================= V10.8 Backup / Restore ================= */
 function getBackupPayload(){return{system:"Lover Legend Sales System",version:"10.8",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
 accessSettings:getAccessPasswordSettings(),
 closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
