@@ -1,4 +1,4 @@
-const CACHE_NAME = "lover-sales-v10-5";
+const CACHE_NAME = "lover-sales-v10-7";
 
 const CORE_FILES = [
   "./",
@@ -13,7 +13,6 @@ const CORE_FILES = [
   "./js/update.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./images/logo.png",
   "./images/Logo2.jpg"
 ];
 
