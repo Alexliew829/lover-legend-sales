@@ -1,5 +1,5 @@
 
-/* ================= V10.2 Access Password System ================= */
+/* ================= V10.3 Access Password System ================= */
 const DEFAULT_ACCESS_PASSWORD_HASH =
   "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
 const DEFAULT_ACCESS_PASSWORD_HINT = "6个数字";
@@ -421,7 +421,7 @@ async function setupAccessLock() {
     }).catch(() => {});
   }
 
-  // V10.2：手机需要重新认证且已启用 Passkey 时，
+  // V10.3：手机需要重新认证且已启用 Passkey 时，
   // 自动打开系统原生 Sign in / Use Passkey 画面。
   // 用户只需要在系统画面点击一次 Use Passkey，
   // Face ID 成功后直接进入系统。
@@ -475,10 +475,6 @@ function setupPasswordChange() {
       `密码已更改 · 提示：${newHint} · 正在同步`;
 
     try {
-      if (typeof verifyAccessBackendVersion === "function") {
-        await verifyAccessBackendVersion();
-      }
-
       const saved = await saveAccessSettingsToSheet({
         accessPasswordHash: newHash,
         accessPasswordHint: newHint
@@ -504,7 +500,7 @@ function setupPasswordChange() {
     } catch (error) {
       const message = String(error?.message || error || "");
       status.textContent = /Unknown action:\s*saveAccessSettings/i.test(message)
-        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V10.2 Code.gs"
+        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V10.3 Code.gs"
         : "密码同步失败：" + message;
     } finally {
       button.disabled = false;
@@ -533,7 +529,7 @@ function setupDeviceBiometricSettings() {
   updateDeviceBiometricStatus();
 }
 
-/* ================= V10.2 Instant Login Bootstrap ================= */
+/* ================= V10.3 Instant Login Bootstrap ================= */
 // Heavy business scripts load only after successful login, so the password field stays responsive.
 setupAccessLock();
 setupPasswordChange();

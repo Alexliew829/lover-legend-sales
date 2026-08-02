@@ -6,6 +6,8 @@ let cloudLoadPromise = null;
 let lastCloudLoadAt = 0;
 let initialCloudSyncFinished = false;
 let initialCloudSyncPromise = null;
+let settingsWritePromise = null;
+let settingsWriteDepth = 0;
 
 const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache";
 const LEGACY_LOCAL_DATA_CACHE_KEYS = [
@@ -149,7 +151,8 @@ function markCloudCheckPending(text = "本机资料已显示 · 云端后台同�
   if (el) el.textContent = "🟡 " + text;
 }
 
-function jsonp(params) {
+function jsonp(params, options = {}) {
+  const timeoutMs = Number(options.timeoutMs || 7000);
   return new Promise((resolve, reject) => {
     const callback = "ll_cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
     params.callback = callback;
@@ -162,7 +165,7 @@ function jsonp(params) {
       delete window[callback];
       script.remove();
       reject(new Error("连接 Google Apps Script 超时"));
-    }, 7000);
+    }, timeoutMs);
 
     window[callback] = data => {
       clearTimeout(timer);
@@ -181,6 +184,32 @@ function jsonp(params) {
     script.src = API_URL + "?" + query;
     document.body.appendChild(script);
   });
+}
+
+function beginSettingsWrite() {
+  settingsWriteDepth += 1;
+}
+
+function endSettingsWrite() {
+  settingsWriteDepth = Math.max(0, settingsWriteDepth - 1);
+}
+
+function isSettingsWriteRunning() {
+  return settingsWriteDepth > 0 || !!settingsWritePromise;
+}
+
+function runSettingsWrite(task) {
+  const previous = settingsWritePromise || Promise.resolve();
+  beginSettingsWrite();
+  const current = previous
+    .catch(() => {})
+    .then(task)
+    .finally(() => {
+      endSettingsWrite();
+      if (settingsWritePromise === current) settingsWritePromise = null;
+    });
+  settingsWritePromise = current;
+  return current;
 }
 
 function rowMonthKey(row) {
@@ -205,6 +234,7 @@ function mergeCloudYearRows(year, cloudRows) {
 }
 
 async function loadYearInBackground(year) {
+  if (isSettingsWriteRunning()) return { ok:true, skipped:true };
   try {
     const json = await jsonp({ action: "loadYear", year });
     if (!json.ok) throw new Error(json.message || "读取全年资料失败");
@@ -234,6 +264,9 @@ function waitForInitialCloudSync() {
 }
 
 async function loadFromSheet(options = {}) {
+  if (settingsWritePromise) {
+    await settingsWritePromise.catch(() => {});
+  }
   const force = options.force === true;
   const silent = options.silent === true;
   const statusText = String(options.statusText || "").trim();
@@ -437,17 +470,19 @@ async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "") {
 }
 
 async function saveCommissionSettingsToSheet(settings, targetMonth = "") {
-  const json = await jsonp({
-    action: "saveCommissionSettings",
-    rate1: settings.rate1,
-    rate2: settings.rate2,
-    rate3: settings.rate3,
-    liveHostRates: JSON.stringify(settings.liveHostRates || {}),
-    liveHosts: JSON.stringify(settings.liveHosts || {}),
-    targetMonth: targetMonth || ""
+  return runSettingsWrite(async () => {
+    const json = await jsonp({
+      action: "saveCommissionSettings",
+      rate1: settings.rate1,
+      rate2: settings.rate2,
+      rate3: settings.rate3,
+      liveHostRates: JSON.stringify(settings.liveHostRates || {}),
+      liveHosts: JSON.stringify(settings.liveHosts || {}),
+      targetMonth: targetMonth || ""
+    }, { timeoutMs: 20000 });
+    if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
+    return json.commissionSettings || null;
   });
-  if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
-  return json.commissionSettings || null;
 }
 
 async function resetCommissionSettingsInSheet() {
@@ -483,13 +518,15 @@ async function loadAccessSettingsFromSheet() {
 }
 
 async function saveAccessSettingsToSheet(settings) {
-  const json = await jsonp({
-    action: "saveAccessSettings",
-    accessPasswordHash: settings.accessPasswordHash,
-    accessPasswordHint: settings.accessPasswordHint
+  return runSettingsWrite(async () => {
+    const json = await jsonp({
+      action: "saveAccessSettings",
+      accessPasswordHash: settings.accessPasswordHash,
+      accessPasswordHint: settings.accessPasswordHint
+    }, { timeoutMs: 20000 });
+    if (!json.ok) throw new Error(json.message || "密码设置同步失败");
+    return json.accessSettings || null;
   });
-  if (!json.ok) throw new Error(json.message || "密码设置同步失败");
-  return json.accessSettings || null;
 }
 
 
