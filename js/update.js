@@ -1,5 +1,5 @@
 (() => {
-  const RELOAD_FLAG = "lover_sales_sw_reloaded_v109";
+  const RELOAD_FLAG = "lover_sales_sw_reloaded_v111";
   const REFRESH_COOLDOWN_MS = 5000;
   const AUTO_REFRESH_MS = 30000;
   let lastCloudRefresh = 0;
@@ -64,7 +64,7 @@
 
   function startAutomaticRefreshAfterInitialSync() {
     if (autoRefreshStartTimer || autoRefreshInterval) return;
-    // V10.9: do not fire a second check 5 seconds after startup.
+    // V11.1: do not fire a second check 5 seconds after startup.
     // The first automatic check starts only after a full interval from the
     // completed startup sync, preventing duplicate requests and UI flicker.
     autoRefreshStartTimer = setTimeout(() => {
@@ -157,14 +157,20 @@
   });
 
   window.addEventListener("focus", () => {
-    if (hiddenAt && Date.now() - hiddenAt >= 300) refreshAfterReopen("focus-reopen");
+    if (hiddenAt && Date.now() - hiddenAt >= 300) {
+      hiddenAt = 0;
+      refreshAfterReopen("focus-reopen");
+    }
+  });
+  window.addEventListener("pagehide", () => {
+    hiddenAt = Date.now();
   });
   window.addEventListener("pageshow", event => {
     if (event.persisted) refreshAfterReopen("pageshow-cache");
   });
   window.addEventListener("online", () => refreshCloudData("online", true));
 
-  // V10.9: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
+  // V11.1: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {
     if (!("ontouchstart" in window)) return;
 

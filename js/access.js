@@ -1,5 +1,5 @@
 
-/* ================= V10.9 Access Password System ================= */
+/* ================= V11.1 Access Password System ================= */
 const DEFAULT_ACCESS_PASSWORD_HASH =
   "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
 const DEFAULT_ACCESS_PASSWORD_HINT = "6个数字";
@@ -9,6 +9,48 @@ const MOBILE_ACCESS_VALID_MS = 8 * 60 * 60 * 1000;
 const DESKTOP_SAVED_PASSWORD_KEY = "loverLegendSalesDesktopSavedPassword";
 const BIOMETRIC_CREDENTIAL_KEY = "loverLegendSalesBiometricCredentialId";
 const BIOMETRIC_USER_ID_KEY = "loverLegendSalesBiometricUserId";
+
+let backendWarmupPromise = null;
+
+function startBackendWarmup() {
+  if (backendWarmupPromise || !window.LOVER_API_URL) return backendWarmupPromise;
+
+  backendWarmupPromise = new Promise(resolve => {
+    const callback = "ll_warm_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+    const script = document.createElement("script");
+    const timer = setTimeout(() => {
+      try { delete window[callback]; } catch (error) {}
+      script.remove();
+      resolve(false);
+    }, 6000);
+
+    window[callback] = () => {
+      clearTimeout(timer);
+      try { delete window[callback]; } catch (error) {}
+      script.remove();
+      resolve(true);
+    };
+
+    script.onerror = () => {
+      clearTimeout(timer);
+      try { delete window[callback]; } catch (error) {}
+      script.remove();
+      resolve(false);
+    };
+
+    const query = new URLSearchParams({
+      action: "warmup",
+      callback,
+      _ts: String(Date.now())
+    });
+    script.async = true;
+    script.src = window.LOVER_API_URL + "?" + query.toString();
+    (document.head || document.documentElement).appendChild(script);
+  });
+
+  window.LOVER_BACKEND_WARMUP_PROMISE = backendWarmupPromise;
+  return backendWarmupPromise;
+}
 
 let accessPasswordSettings = {
   accessPasswordHash: DEFAULT_ACCESS_PASSWORD_HASH,
@@ -314,6 +356,9 @@ async function setupAccessLock() {
 
   document.body.classList.add("access-locked");
 
+  // Warm Google Apps Script while the user is entering the password.
+  startBackendWarmup();
+
   if (!isMobileOrTabletDevice()) {
     input.value =
       localStorage.getItem(
@@ -428,7 +473,7 @@ async function setupAccessLock() {
     }).catch(() => {});
   }
 
-  // V10.9：手机需要重新认证且已启用 Passkey 时，
+  // V11.1：手机需要重新认证且已启用 Passkey 时，
   // 自动打开系统原生 Sign in / Use Passkey 画面。
   // 用户只需要在系统画面点击一次 Use Passkey，
   // Face ID 成功后直接进入系统。
@@ -436,9 +481,11 @@ async function setupAccessLock() {
     isMobileOrTabletDevice() &&
     hasDeviceBiometricCredential()
   ) {
-    window.setTimeout(() => {
-      tryBiometricLogin(false);
-    }, 600);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        tryBiometricLogin(false);
+      }, 250);
+    }));
   }
 }
 function setupPasswordChange() {
@@ -507,7 +554,7 @@ function setupPasswordChange() {
     } catch (error) {
       const message = String(error?.message || error || "");
       status.textContent = /Unknown action:\s*saveAccessSettings/i.test(message)
-        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V10.9 Code.gs"
+        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V11.1 Code.gs"
         : "密码同步失败：" + message;
     } finally {
       button.disabled = false;
@@ -536,7 +583,7 @@ function setupDeviceBiometricSettings() {
   updateDeviceBiometricStatus();
 }
 
-/* ================= V10.9 Instant Login Bootstrap ================= */
+/* ================= V11.1 Instant Login Bootstrap ================= */
 // Run the access lock as soon as its small script is parsed. Business scripts,
 // large images, Service Worker checks and cloud sync all start only after unlock.
 setupAccessLock();

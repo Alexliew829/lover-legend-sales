@@ -18,7 +18,7 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 
-/* V10.9: first paint must not wait for the full system render. */
+/* V11.1: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
@@ -317,10 +317,7 @@ async function loadFromSheet(options = {}) {
   let completedSuccessfully = false;
   cloudLoadPromise = (async () => {
     loadPendingRows();
-    if (pendingRows.length > 0) {
-      if (!silent) setSync(`有 ${pendingRows.length} 笔未同步资料，正在后台同步...`);
-      syncPendingRows().catch(() => {});
-    }
+    const pendingCountAtStart = pendingRows.length;
 
     const hasLocalData = rows.length > 0
       ? true
@@ -345,6 +342,12 @@ async function loadFromSheet(options = {}) {
       saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
       setSync("已同步", true);
       completedSuccessfully = true;
+
+      // Initial read has priority. Retry pending writes only after the latest
+      // cloud month is visible, avoiding two simultaneous Apps Script calls.
+      if (pendingCountAtStart > 0) {
+        setTimeout(() => syncPendingRows().catch(() => {}), 50);
+      }
 
       if (options.loadYear !== false) {
         const year = month.slice(0, 4);

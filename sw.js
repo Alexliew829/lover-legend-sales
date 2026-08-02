@@ -1,4 +1,4 @@
-const CACHE_NAME = "lover-sales-v10-9";
+const CACHE_NAME = "lover-sales-v11-1";
 
 const CORE_FILES = [
   "./",
@@ -63,16 +63,43 @@ async function networkFirst(request) {
 self.addEventListener("fetch", event => {
   const request = event.request;
   if (request.method !== "GET") return;
-  const url = new URL(request.url);
 
-  if (url.hostname.includes("script.google.com") ||
-      url.hostname.includes("script.googleusercontent.com")) return;
+  const url = new URL(request.url);
+  if (
+    url.hostname.includes("script.google.com") ||
+    url.hostname.includes("script.googleusercontent.com")
+  ) return;
 
   if (url.origin !== self.location.origin) return;
 
-  const path = url.pathname;
   const isDocument = request.mode === "navigate" ||
-    path.endsWith("/index.html") || path.endsWith("/version.json");
+    url.pathname.endsWith("/") ||
+    url.pathname.endsWith("/index.html") ||
+    url.pathname.endsWith("/version.json");
 
-  event.respondWith(isDocument ? networkFirst(request) : cacheFirst(request));
+  if (isDocument) {
+    event.respondWith(
+      fetch(request, { cache:"no-store" })
+        .then(response => {
+          if (response && response.ok) {
+            caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(request).then(cached => {
+      if (cached) return cached;
+      return fetch(request).then(response => {
+        if (response && response.ok) {
+          caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+        }
+        return response;
+      });
+    })
+  );
 });
