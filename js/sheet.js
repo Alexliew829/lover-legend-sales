@@ -18,13 +18,12 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 
-/* V11.1: first paint must not wait for the full system render. */
+/* V11.2: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  if (typeof dedupeRows === "function") rows = dedupeRows(rows);
-
+  // V11.2: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -65,8 +64,14 @@ function readLocalDataCacheRaw() {
 
 function loadLocalDataCache() {
   try {
-    const cached = JSON.parse(readLocalDataCacheRaw() || "null");
-    if (!cached || !Array.isArray(cached.rows)) return false;
+    const raw = readLocalDataCacheRaw();
+    if (!raw) return false;
+
+    const cached = JSON.parse(raw);
+    if (!cached || !Array.isArray(cached.rows)) {
+      localStorage.removeItem(LOCAL_DATA_CACHE_KEY);
+      return false;
+    }
 
     rows = cached.rows;
 
@@ -93,8 +98,23 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
+    // V11.2: damaged/partial cache must never trap startup.
+    try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
+    rows = [];
     return false;
   }
+}
+
+function loadLocalDataCacheAsync() {
+  return new Promise(resolve => {
+    const run = () => {
+      let loaded = false;
+      try { loaded = loadLocalDataCache(); } catch (err) { loaded = false; }
+      resolve(loaded);
+    };
+    // Give the unlocked Home and logo one paint before reading/parsing cache.
+    setTimeout(run, 0);
+  });
 }
 
 function saveLocalDataCache(
@@ -185,7 +205,7 @@ function markCloudCheckPending(text = "本机资料已显示 · 云端后台同�
 }
 
 function jsonp(params, options = {}) {
-  const timeoutMs = Number(options.timeoutMs || 7000);
+  const timeoutMs = Number(options.timeoutMs || 15000);
   return new Promise((resolve, reject) => {
     const callback = "ll_cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
     params.callback = callback;
@@ -299,6 +319,10 @@ function waitForInitialCloudSync() {
   return initialCloudSyncPromise || cloudLoadPromise || Promise.resolve();
 }
 
+function salesSyncDelay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function loadFromSheet(options = {}) {
   if (settingsWritePromise) {
     await settingsWritePromise.catch(() => {});
@@ -328,8 +352,28 @@ async function loadFromSheet(options = {}) {
 
     try {
       const month = (typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7);
-      const json = await jsonp({ action: "loadMonth", month });
-      if (!json.ok) throw new Error(json.message || "读取失败");
+      let json = null;
+      let lastError = null;
+
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          json = await jsonp(
+            { action: "loadMonth", month },
+            { timeoutMs: Number(options.timeoutMs || 15000) }
+          );
+          if (!json || !json.ok) throw new Error((json && json.message) || "读取失败");
+          lastError = null;
+          break;
+        } catch (err) {
+          lastError = err;
+          if (attempt === 1) {
+            if (!silent) setSync("首次连接较慢，正在重新连接云端...");
+            await salesSyncDelay(1200);
+          }
+        }
+      }
+
+      if (lastError) throw lastError;
 
       loadPendingRows();
       mergeCloudMonthRows(month, json.rows || []);
