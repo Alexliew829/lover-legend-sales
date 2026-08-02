@@ -388,3 +388,17 @@ body.access-locked { overflow: hidden; }
   }
   .device-biometric-actions button { width: 100%; }
 }
+
+
+/* V10.8 performance */
+.logo,.seal{
+  content-visibility:auto;
+  contain:layout paint;
+}
+.card{
+  content-visibility:auto;
+  contain-intrinsic-size:300px;
+}
+.page{
+  contain:layout style paint;
+}
