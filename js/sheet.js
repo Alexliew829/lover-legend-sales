@@ -8,6 +8,7 @@ let initialCloudSyncFinished = false;
 let initialCloudSyncPromise = null;
 let settingsWritePromise = null;
 let settingsWriteDepth = 0;
+let yearLoadPromises = new Map();
 
 const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache";
 const LEGACY_LOCAL_DATA_CACHE_KEYS = [
@@ -18,12 +19,12 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 
-/* V11.4: first paint must not wait for the full system render. */
+/* V11.5: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V11.4: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V11.5: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -98,7 +99,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V11.4: damaged/partial cache must never trap startup.
+    // V11.5: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -289,22 +290,37 @@ function mergeCloudYearRows(year, cloudRows) {
 }
 
 async function loadYearInBackground(year) {
-  if (isSettingsWriteRunning()) return { ok:true, skipped:true };
-  try {
-    const json = await jsonp({ action: "loadYear", year });
-    if (!json.ok) throw new Error(json.message || "读取全年资料失败");
-    loadPendingRows();
-    mergeCloudYearRows(year, json.rows || []);
-    if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
-    if (json.commissionSettings && typeof applyCommissionSettings === "function") applyCommissionSettings(json.commissionSettings);
-    if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
-    renderHomeFirst();
-    scheduleDeferredFullRender(0);
-    saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
-    setSync("已同步", true);
-  } catch (err) {
-    console.warn("Full-year background refresh failed", err);
-  }
+  const y = /^\d{4}$/.test(String(year || "")) ? String(year) : new Date().getFullYear().toString();
+  if (yearLoadPromises.has(y)) return yearLoadPromises.get(y);
+
+  const task = (async () => {
+    if (isSettingsWriteRunning()) {
+      if (settingsWritePromise) await settingsWritePromise.catch(() => {});
+    }
+
+    try {
+      const json = await jsonp({ action: "loadYear", year: y }, { timeoutMs: 20000 });
+      if (!json.ok) throw new Error(json.message || "读取全年资料失败");
+      loadPendingRows();
+      mergeCloudYearRows(y, json.rows || []);
+      if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
+      if (json.commissionSettings && typeof applyCommissionSettings === "function") applyCommissionSettings(json.commissionSettings);
+      if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
+      renderHomeFirst();
+      scheduleDeferredFullRender(0);
+      saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
+      setSync("已同步", true);
+      return { ok:true, year:y, rows:(json.rows || []).length };
+    } catch (err) {
+      console.warn("Full-year background refresh failed", err);
+      return { ok:false, year:y, error:err };
+    }
+  })().finally(() => {
+    yearLoadPromises.delete(y);
+  });
+
+  yearLoadPromises.set(y, task);
+  return task;
 }
 
 function getActiveCloudLoadPromise() {
