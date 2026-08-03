@@ -20,12 +20,12 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 
-/* V12.3: first paint must not wait for the full system render. */
+/* V12.5: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V12.3: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V12.5: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -100,7 +100,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V12.3: damaged/partial cache must never trap startup.
+    // V12.5: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -370,7 +370,11 @@ async function loadFromSheet(options = {}) {
     }
 
     try {
-      const month = (typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7);
+      const requestedMonth = /^\d{4}-\d{2}$/.test(String(options.month || ""))
+        ? String(options.month)
+        : "";
+      const month = requestedMonth ||
+        ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
       let json = null;
       let lastError = null;
 
@@ -414,7 +418,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V12.3: preload the full year silently after the current month is shown.
+      // V12.5: preload the full year silently after the current month is shown.
       // This restores the old instant monthly-summary experience without
       // delaying login or the initial Home display.
       setTimeout(() => {

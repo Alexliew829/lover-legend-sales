@@ -18,21 +18,21 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V12.3: every time Live is opened, start from today's date.
+  // V12.5: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
     updateLiveInputFromSelectedDate();
   }
 
-  // V12.3: page switching never waits for or triggers cloud sync.
+  // V12.5: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){return [r.type,r.date,r.company,canonicalLocation(r.location||"")].join("|")}
 function dedupeRows(list){const m=new Map();list.forEach(r=>{const k=rowKey(r),old=m.get(k);if(!old||String(r.updatedAt||"")>=String(old.updatedAt||""))m.set(k,r)});return [...m.values()]}
 function upsertLocalRow(n){rows=dedupeRows([...rows,n])}
 function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&r.company===c);return f?Number(f.amount||0):0}
-function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c);document.getElementById("dailySales").value=formatAmount(a);document.getElementById("salesDateResult").textContent=`${companyNames[c]}｜${d}｜${money(a)}`}
+function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c);document.getElementById("dailySales").value=formatAmount(a);document.getElementById("salesDateResult").textContent=`${companyNames[c]}｜${d}｜${money(a)}`;renderSalesMonthlyList()}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
 function fairLocationsThisMonth(){return [...new Set(rows.filter(r=>r.type==="fair"&&sameMonth(r.date)&&Number(r.amount)>0).map(r=>canonicalLocation(r.location||"Fair")))].sort()}
 function fairByLocation(){const g={};rows.filter(r=>r.type==="fair"&&sameMonth(r.date)&&Number(r.amount)>0).forEach(r=>{const l=canonicalLocation(r.location||"Fair");g[l]=(g[l]||0)+Number(r.amount||0)});return g}
@@ -212,7 +212,7 @@ function getEffectiveCommissionSettings(){
   const snapshot=(systemState.commissionSnapshots||{})[selectedMonth()];
   if(!snapshot)return current;
 
-  // V12.3: historical snapshots created before per-host commission support may
+  // V12.5: historical snapshots created before per-host commission support may
   // not contain liveHostRates/liveHosts. Keep the month Fair rates, but fall
   // back to the latest saved host commission settings instead of showing 0%.
   return normalizeCommissionSettings({
@@ -232,14 +232,36 @@ function getEffectiveCommissionSettings(){
   });
 }
 
+function liveScheduleMonth(item){
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(item&&item.startDate||""))
+    ?String(item.startDate).slice(0,7)
+    :"";
+}
+
+function liveSchedulesForMonth(month,settings=getCommissionSettings()){
+  return (settings.liveRateSchedules||[])
+    .filter(item=>liveScheduleMonth(item)===month)
+    .sort((a,b)=>a.startDate.localeCompare(b.startDate)||String(a.endDate||"").localeCompare(String(b.endDate||"")));
+}
+
+function monthLastISO(month){
+  if(!/^\d{4}-\d{2}$/.test(String(month||"")))return "";
+  const [year,monthNumber]=month.split("-").map(Number);
+  const day=new Date(year,monthNumber,0).getDate();
+  return `${month}-${String(day).padStart(2,"0")}`;
+}
+
 function findLiveRateSchedule(date,settings=getEffectiveCommissionSettings()){
   const iso=/^\d{4}-\d{2}-\d{2}$/.test(String(date||""))
     ?String(date)
     :displayToISO(date);
   if(!iso)return null;
-  return (settings.liveRateSchedules||[]).find(item=>
-    iso>=item.startDate&&(!item.endDate||iso<=item.endDate)
-  )||null;
+  const month=iso.slice(0,7);
+  return (settings.liveRateSchedules||[]).find(item=>{
+    if(liveScheduleMonth(item)!==month)return false;
+    const effectiveEnd=item.endDate||monthLastISO(month);
+    return iso>=item.startDate&&iso<=effectiveEnd;
+  })||null;
 }
 
 function getLiveHostRate(host,date=""){
@@ -266,13 +288,13 @@ function renderLiveHostCommissionSettings(){
 function renderLiveRateSchedules(){
   const container=document.getElementById("liveRateScheduleList");
   if(!container)return;
-  const schedules=getCommissionSettings().liveRateSchedules||[];
+  const schedules=liveSchedulesForMonth(selectedMonth());
   container.innerHTML=schedules.length
     ?schedules.map(item=>`
       <div class="live-rate-schedule-row ${item.endDate?"":"is-open"}">
         <div class="live-rate-schedule-info">
           <span>${isoToDisplay(item.startDate)} 至 ${
-            item.endDate?isoToDisplay(item.endDate):'<span class="live-rate-schedule-open">进行中</span>'
+            item.endDate?isoToDisplay(item.endDate):'<span class="live-rate-schedule-open">进行中 · 月底自动结束</span>'
           }</span>
           <span class="live-rate-schedule-rate">${money(item.rate).replace(".00","")}%</span>
         </div>
@@ -282,18 +304,28 @@ function renderLiveRateSchedules(){
         </div>
       </div>
     `).join("")
-    :'<div class="live-schedule-empty">没有特别日期规则，使用各主播一般佣金</div>';
+    :`<div class="live-schedule-empty">${selectedMonth()} 没有特别日期规则，使用各主播一般佣金</div>`;
 }
 
 function validateLiveRateSchedules(schedules){
   const sorted=[...(schedules||[])].sort((a,b)=>a.startDate.localeCompare(b.startDate));
+  sorted.forEach(item=>{
+    const month=liveScheduleMonth(item);
+    if(!month)throw new Error("直播佣金开始日期格式错误");
+    if(item.endDate&&item.endDate.slice(0,7)!==month){
+      throw new Error("直播特别佣金不能跨月份，请在下个月重新新增");
+    }
+  });
+
   for(let i=0;i<sorted.length-1;i++){
     const current=sorted[i];
-    const currentEnd=current.endDate||"9999-12-31";
-    if(currentEnd>=sorted[i+1].startDate){
+    const next=sorted[i+1];
+    if(liveScheduleMonth(current)!==liveScheduleMonth(next))continue;
+    const currentEnd=current.endDate||monthLastISO(liveScheduleMonth(current));
+    if(currentEnd>=next.startDate){
       throw new Error(
         `直播佣金日期不能重叠：${isoToDisplay(current.startDate)} 至 ${
-          current.endDate?isoToDisplay(current.endDate):"进行中"
+          current.endDate?isoToDisplay(current.endDate):"月底"
         }`
       );
     }
@@ -311,6 +343,14 @@ function addLiveRateSchedule(){
 
   if(!startDate){
     alert("请选择开始日期");
+    return;
+  }
+  if(startDate.slice(0,7)!==selectedMonth()){
+    alert(`开始日期必须属于目前选择的月份：${selectedMonth()}`);
+    return;
+  }
+  if(endDate&&endDate.slice(0,7)!==startDate.slice(0,7)){
+    alert("结束日期不能跨月份；下个月请新增另一条特别佣金日期");
     return;
   }
   if(endDate&&endDate<startDate){
@@ -352,7 +392,7 @@ function editLiveRateSchedule(id){
   if(!item)return;
 
   const value=prompt(
-    `请输入结束日期（dd-mm-yyyy）\n开始日期：${isoToDisplay(item.startDate)}\n留空代表继续进行中`,
+    `请输入结束日期（dd-mm-yyyy）\n开始日期：${isoToDisplay(item.startDate)}\n留空代表继续到本月底`,
     item.endDate?isoToDisplay(item.endDate):""
   );
   if(value===null)return;
@@ -361,6 +401,10 @@ function editLiveRateSchedule(id){
   const endDate=trimmed?displayToISO(trimmed):"";
   if(trimmed&&!/^\d{4}-\d{2}-\d{2}$/.test(endDate)){
     alert("日期格式必须是 dd-mm-yyyy");
+    return;
+  }
+  if(endDate&&endDate.slice(0,7)!==item.startDate.slice(0,7)){
+    alert("结束日期不能跨月份；下个月请新增另一条特别佣金日期");
     return;
   }
   if(endDate&&endDate<item.startDate){
@@ -437,7 +481,7 @@ function renderFairCommission(total){
 function renderDashboard(){const bt=totalBy("daily","balakong","today"),blt=totalBy("daily","belimbing","today"),ft=totalBy("fair","","today"),bm=totalBy("daily","balakong","month"),blm=totalBy("daily","belimbing","month"),fm=totalBy("fair","","month"),by=totalBy("daily","balakong","year"),bly=totalBy("daily","belimbing","year"),fy=totalBy("fair","","year");document.getElementById("balakongMonth").textContent=money(bm);document.getElementById("belimbingMonth").textContent=money(blm);renderFairLocationList();document.getElementById("fairMonthTotal").textContent=money(fm);renderFairCommission(fm);document.getElementById("monthGrandTotal").textContent=money(bm+blm+fm);document.getElementById("balakongYearTotal").textContent=money(by);document.getElementById("belimbingYearTotal").textContent=money(bly);document.getElementById("fairYearTotal").textContent=money(fy);document.getElementById("yearGrandTotal").textContent=money(by+bly+fy);renderTodayCompanyStatus()}
 function sortReportRows(list){const rank=r=>r.type==="daily"&&r.company==="balakong"?0:r.type==="daily"&&r.company==="belimbing"?1:2;return [...list].sort((a,b)=>rank(a)-rank(b)||canonicalLocation(a.location).localeCompare(canonicalLocation(b.location))||displayToISO(a.date).localeCompare(displayToISO(b.date)))}
 function renderTable(){const s=sortReportRows(dedupeRows(rows).filter(r=>sameMonth(r.date)&&Number(r.amount)>0));document.getElementById("recordTable").innerHTML=s.map(r=>`<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":"每日"}</td><td>${companyNames[r.company]||r.company}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td></tr>`).join("")||'<tr><td colspan="5" style="text-align:center;">这个月份还没有记录</td></tr>'}
-function renderAll(){rows=dedupeRows(rows);renderDashboard();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions()}
+function renderAll(){rows=dedupeRows(rows);renderDashboard();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions();renderFairMonthlyList()}
 async function saveDailySales(){
   if(!ensureWritableSelection())return;
   const d=isoToDisplay(document.getElementById("saleDate").value);
@@ -604,7 +648,7 @@ async function saveFairSales(){
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"12.3"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"12.5"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -617,7 +661,7 @@ function updateReadOnlyMode(){
     el.textContent=closed?`${m} · 已结算 · 可修正`:history?`${m} · 历史月份 · 可编辑`:`${m} · 当前月份 · 可编辑`;
   }
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"12.3"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"12.5"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -626,7 +670,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV12.3 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV12.5 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){
   const current=monthISO();
   document.getElementById("monthPicker").value=current;
@@ -645,22 +689,33 @@ if(!fairSessionRestored){
   setDateControl("fairEnd",todayISO());
 }
 
-bindDateControl("saleDate",updateDailyInputFromSelectedDate);
-
-bindDateControl("fairStart",()=>{
-  saveFairSession();
-  syncFairInputs();
+bindDateControl("saleDate",async()=>{
+  updateDailyInputFromSelectedDate();
+  await ensureDateControlMonthLoaded("saleDate");
+  updateDailyInputFromSelectedDate();
 });
 
-bindDateControl("fairEnd",()=>{
+bindDateControl("fairStart",async()=>{
   saveFairSession();
   syncFairInputs();
+  renderFairMonthlyList();
+  await ensureDateControlMonthLoaded("fairStart");
+  renderFairMonthlyList();
+});
+
+bindDateControl("fairEnd",async()=>{
+  saveFairSession();
+  syncFairInputs();
+  renderFairMonthlyList();
+  await ensureDateControlMonthLoaded("fairEnd");
+  renderFairMonthlyList();
 });
 
 renderFairLocationOptions();
 
 document.getElementById("monthPicker").addEventListener("change",async()=>{
   saveActiveMonth(selectedMonth());
+  renderLiveRateSchedules();
   document.getElementById("yearPicker").value=selectedMonth().slice(0,4);
 
   const dashboardDate=document.getElementById("dashboardDate");
@@ -732,7 +787,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V12.3: paint Home immediately, then read local cache, then force one cloud refresh.
+// V12.5: paint Home immediately, then read local cache, then force one cloud refresh.
 // Every new page instance runs this path, so closing/reopening the phone still
 // checks Google Sheet instead of trusting the previous "已同步" state.
 attachMoneyInputs();
@@ -878,6 +933,133 @@ function getLiveSelectedMonth(){
   const value=String(dateEl&&dateEl.value||"");
   return /^\d{4}-\d{2}-\d{2}$/.test(value)?value.slice(0,7):selectedMonth();
 }
+
+function monthFromDateControl(id){
+  const el=document.getElementById(id);
+  const value=String(el&&el.value||"");
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)?value.slice(0,7):selectedMonth();
+}
+
+async function ensureDateControlMonthLoaded(id){
+  const month=monthFromDateControl(id);
+  if(!month)return {ok:true,skipped:true};
+
+  const hasMonth=rows.some(r=>displayToISO(r.date).slice(0,7)===month);
+  if(hasMonth)return {ok:true,cached:true,month};
+
+  if(typeof loadFromSheet==="function"){
+    return loadFromSheet({
+      force:true,
+      silent:true,
+      suppressStartStatus:true,
+      loadYear:false,
+      month
+    });
+  }
+  return {ok:true,skipped:true,month};
+}
+
+function renderSalesMonthlyList(){
+  const container=document.getElementById("salesMonthlyList");
+  const totalEl=document.getElementById("salesMonthlyTotal");
+  const titleEl=document.getElementById("salesMonthlyTitle");
+  const labelEl=document.getElementById("salesMonthlyTotalLabel");
+  if(!container||!totalEl)return;
+
+  const month=monthFromDateControl("saleDate");
+  const monthLabel=/^\d{4}-\d{2}$/.test(month)?`${month.slice(5,7)}-${month.slice(0,4)}`:"-";
+  if(titleEl)titleEl.textContent=`Sales ${monthLabel} 销售记录`;
+  if(labelEl)labelEl.textContent=`Sales ${monthLabel} 总销售额`;
+
+  const list=rows
+    .filter(r=>r.type==="daily"&&displayToISO(r.date).slice(0,7)===month&&Number(r.amount)>0)
+    .sort((a,b)=>
+      String(a.company||"").localeCompare(String(b.company||""))||
+      displayToISO(a.date).localeCompare(displayToISO(b.date))
+    );
+
+  const total=list.reduce((sum,r)=>sum+Number(r.amount||0),0);
+  if(!list.length){
+    container.innerHTML='<div class="sub">这个月份还没有 Sales 记录</div>';
+    totalEl.textContent="0.00";
+    return;
+  }
+
+  const companies=["balakong","belimbing"];
+  container.innerHTML=companies.map(company=>{
+    const companyRows=list.filter(r=>r.company===company);
+    if(!companyRows.length)return "";
+    const companyTotal=companyRows.reduce((sum,r)=>sum+Number(r.amount||0),0);
+    return `<div class="month-record-group">
+      <div class="month-record-group-title">${companyNames[company]||company}</div>
+      ${companyRows.map(r=>`<div class="month-record-row">
+        <span>${r.date}</span>
+        <strong>${money(r.amount)}</strong>
+      </div>`).join("")}
+      <div class="month-record-row month-record-total">
+        <span>总数</span>
+        <strong>${money(companyTotal)}</strong>
+      </div>
+    </div>`;
+  }).join("");
+
+  totalEl.textContent=money(total);
+}
+
+function renderFairMonthlyList(){
+  const container=document.getElementById("fairMonthlyList");
+  const totalEl=document.getElementById("fairMonthlySalesTotal");
+  const titleEl=document.getElementById("fairMonthlyTitle");
+  const labelEl=document.getElementById("fairMonthlyTotalLabel");
+  if(!container||!totalEl)return;
+
+  const month=monthFromDateControl("fairStart");
+  const monthLabel=/^\d{4}-\d{2}$/.test(month)?`${month.slice(5,7)}-${month.slice(0,4)}`:"-";
+  if(titleEl)titleEl.textContent=`Fair ${monthLabel} 销售记录`;
+  if(labelEl)labelEl.textContent=`Fair ${monthLabel} 总销售额`;
+
+  const list=rows
+    .filter(r=>r.type==="fair"&&displayToISO(r.date).slice(0,7)===month&&Number(r.amount)>0)
+    .map(r=>({...r,displayLocation:canonicalLocation(r.location||"Fair")}))
+    .sort((a,b)=>
+      a.displayLocation.localeCompare(b.displayLocation,"en",{sensitivity:"base"})||
+      displayToISO(a.date).localeCompare(displayToISO(b.date))
+    );
+
+  const total=list.reduce((sum,r)=>sum+Number(r.amount||0),0);
+  if(!list.length){
+    container.innerHTML='<div class="sub">这个月份还没有 Fair 记录</div>';
+    totalEl.textContent="0.00";
+    return;
+  }
+
+  const locations=[];
+  list.forEach(r=>{
+    let group=locations.find(item=>item.name===r.displayLocation);
+    if(!group){
+      group={name:r.displayLocation,rows:[]};
+      locations.push(group);
+    }
+    group.rows.push(r);
+  });
+
+  container.innerHTML=locations.map(group=>{
+    const locationTotal=group.rows.reduce((sum,r)=>sum+Number(r.amount||0),0);
+    return `<div class="month-record-group">
+      <div class="month-record-group-title">${group.name}</div>
+      ${group.rows.map(r=>`<div class="month-record-row">
+        <span>${r.date}</span>
+        <strong>${money(r.amount)}</strong>
+      </div>`).join("")}
+      <div class="month-record-row month-record-total">
+        <span>总数</span>
+        <strong>${money(locationTotal)}</strong>
+      </div>
+    </div>`;
+  }).join("");
+
+  totalEl.textContent=money(total);
+}
 function renderLiveMonthlyList(){
   const container=document.getElementById("liveMonthlyList");
   const totalEl=document.getElementById("liveSelectedHostTotal");
@@ -977,7 +1159,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V12.3: do not restore the previously saved date.
+  // V12.5: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -1125,7 +1307,7 @@ function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V12.3: summary opens immediately from local year data.
+  // V12.5: summary opens immediately from local year data.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 }
@@ -1203,7 +1385,7 @@ async function saveFairCommissionSettings(){
     const fair=readFairCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...fair});
 
-    // V12.3：单击后立即套用，并由所有已开启装置自动读取最新佣金。
+    // V12.5：单击后立即套用，并由所有已开启装置自动读取最新佣金。
     if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
@@ -1244,7 +1426,7 @@ async function saveLiveCommissionSettings(){
     const live=readLiveCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...live});
 
-    // V12.3: apply locally first and immediately refresh Home/Report.
+    // V12.5: apply locally first and immediately refresh Home/Report.
     if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
@@ -1309,7 +1491,7 @@ async function resetFairCommissionSettings(){
   const settings=normalizeCommissionSettings({...previous,rate1:6,rate2:7,rate3:8});
 
   try{
-    // V12.3：确认恢复后先立即更新本机与 Home，再在后台同步 Google Sheet。
+    // V12.5：确认恢复后先立即更新本机与 Home，再在后台同步 Google Sheet。
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
       systemState.commissionSnapshots={
@@ -1358,11 +1540,11 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V12.3 Backup / Restore ================= */
-function getBackupPayload(){return{system:"Lover Legend Sales System",version:"12.3",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
+/* ================= V12.5 Backup / Restore ================= */
+function getBackupPayload(){return{system:"Lover Legend Sales System",version:"12.5",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
 accessSettings:getAccessPasswordSettings(),
 closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
-function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V12_3_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}
+function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V12_5_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}
 async function restoreBackupFile(file){
   let payload;try{payload=JSON.parse(await file.text())}catch(e){alert("Backup 文件无法读取或不是有效 JSON。");return}
   if(!payload||!Array.isArray(payload.rows)||!payload.commissionSettings){alert("这不是有效的 Lover Legend Sales Backup。");return}
