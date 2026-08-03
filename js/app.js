@@ -18,14 +18,14 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V12.8: every time Live is opened, start from today's date.
+  // V12.9: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
     updateLiveInputFromSelectedDate();
   }
 
-  // V12.8: page switching never waits for or triggers cloud sync.
+  // V12.9: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){return [r.type,r.date,r.company,canonicalLocation(r.location||"")].join("|")}
@@ -212,7 +212,7 @@ function getEffectiveCommissionSettings(){
   const snapshot=(systemState.commissionSnapshots||{})[selectedMonth()];
   if(!snapshot)return current;
 
-  // V12.8: historical snapshots created before per-host commission support may
+  // V12.9: historical snapshots created before per-host commission support may
   // not contain liveHostRates/liveHosts. Keep the month Fair rates, but fall
   // back to the latest saved host commission settings instead of showing 0%.
   return normalizeCommissionSettings({
@@ -280,10 +280,12 @@ function renderLiveHostCommissionSettings(){
   container.innerHTML=hosts.length?hosts.map(host=>{
     const key=normalizeLiveHostKey(host);
     const rate=Number.isFinite(Number((settings.liveHostRates||{})[key]))
-      ?Number(settings.liveHostRates[key]):0;
+      ?Number(settings.liveHostRates[key]):10;
     return `<label class="host-commission-row"><span>${host}</span><span class="commission-input-row"><input type="text" inputmode="decimal" data-live-host-key="${key}" value="${rate}"><span>%</span></span></label>`;
   }).join(""):'<div class="sub">新增 Live 主播后会自动显示在这里</div>';
 }
+
+let liveScheduleEditingId="";
 
 function renderLiveRateSchedules(){
   const container=document.getElementById("liveRateScheduleList");
@@ -291,22 +293,20 @@ function renderLiveRateSchedules(){
   const schedules=liveSchedulesForMonth(selectedMonth());
   container.innerHTML=schedules.length
     ?schedules.map(item=>`
-      <div class="live-rate-schedule-row ${item.endDate?"":"is-open"}">
-        <div class="live-rate-schedule-info">
+      <div class="live-rate-schedule-row ${item.endDate?"":"is-open"} ${item.id===liveScheduleEditingId?"is-editing":""}">
+        <div class="live-rate-schedule-info" onclick="startEditLiveRateSchedule('${item.id}')" title="点击修改日期和佣金率">
           <span>${isoToDisplay(item.startDate)} 至 ${
             item.endDate?isoToDisplay(item.endDate):'<span class="live-rate-schedule-open">进行中 · 月底自动结束</span>'
           }</span>
-          <span class="live-rate-schedule-rate">${money(item.rate).replace(".00","")}%</span>
+          <span class="live-rate-schedule-rate">${Number(item.rate)}%</span>
         </div>
         <div class="live-rate-schedule-actions">
-          <button type="button" class="live-rate-schedule-edit" onclick="editLiveRateSchedule('${item.id}')">${item.endDate?"修改结束日期":"填写结束日期"}</button>
-          <button type="button" class="live-rate-schedule-remove" onclick="removeLiveRateSchedule('${item.id}')">删除</button>
+          <button type="button" class="live-rate-schedule-remove" onclick="event.stopPropagation();removeLiveRateSchedule('${item.id}')">删除</button>
         </div>
       </div>
     `).join("")
     :`<div class="live-schedule-empty">${selectedMonth()} 没有特别日期规则，使用各主播一般佣金</div>`;
 }
-
 function validateLiveRateSchedules(schedules){
   const sorted=[...(schedules||[])].sort((a,b)=>a.startDate.localeCompare(b.startDate));
   sorted.forEach(item=>{
@@ -333,7 +333,7 @@ function validateLiveRateSchedules(schedules){
   return sorted;
 }
 
-function addLiveRateSchedule(){
+function submitLiveRateSchedule(){
   const start=document.getElementById("liveScheduleStart");
   const end=document.getElementById("liveScheduleEnd");
   const rateEl=document.getElementById("liveScheduleRate");
@@ -363,75 +363,54 @@ function addLiveRateSchedule(){
   }
 
   const previous=getCommissionSettings();
-  const item={
-    id:`live_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
-    startDate,
-    endDate,
-    rate
-  };
-
-  try{
-    const schedules=validateLiveRateSchedules([
-      ...(previous.liveRateSchedules||[]),
-      item
-    ]);
-    applyCommissionSettings({...previous,liveRateSchedules:schedules});
-    renderLiveRateSchedules();
-    renderDashboard();
-    renderTable();
-    if(start)setDateControl("liveScheduleStart","");
-    if(end)setDateControl("liveScheduleEnd","");
-  }catch(error){
-    alert(error.message);
-  }
-}
-
-function editLiveRateSchedule(id){
-  const previous=getCommissionSettings();
-  const item=(previous.liveRateSchedules||[]).find(rule=>rule.id===id);
-  if(!item)return;
-
-  const value=prompt(
-    `请输入结束日期（dd-mm-yyyy）\n开始日期：${isoToDisplay(item.startDate)}\n留空代表继续到本月底`,
-    item.endDate?isoToDisplay(item.endDate):""
-  );
-  if(value===null)return;
-
-  const trimmed=String(value||"").trim();
-  const endDate=trimmed?displayToISO(trimmed):"";
-  if(trimmed&&!/^\d{4}-\d{2}-\d{2}$/.test(endDate)){
-    alert("日期格式必须是 dd-mm-yyyy");
-    return;
-  }
-  if(endDate&&endDate.slice(0,7)!==item.startDate.slice(0,7)){
-    alert("结束日期不能跨月份；下个月请新增另一条特别佣金日期");
-    return;
-  }
-  if(endDate&&endDate<item.startDate){
-    alert("结束日期不能早于开始日期");
-    return;
-  }
+  const existing=(previous.liveRateSchedules||[]).map(item=>({...item}));
 
   try{
     const schedules=validateLiveRateSchedules(
-      (previous.liveRateSchedules||[]).map(rule=>
-        rule.id===id?{...rule,endDate}:{...rule}
-      )
+      liveScheduleEditingId
+        ?existing.map(item=>item.id===liveScheduleEditingId?{...item,startDate,endDate,rate}:item)
+        :[...existing,{
+          id:`live_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+          startDate,
+          endDate,
+          rate
+        }]
     );
+
     applyCommissionSettings({...previous,liveRateSchedules:schedules});
     renderLiveRateSchedules();
     renderDashboard();
     renderTable();
+    renderLiveMonthlyList();
+    clearLiveScheduleInputs();
   }catch(error){
     alert(error.message);
   }
 }
 
+function startEditLiveRateSchedule(id){
+  const settings=getCommissionSettings();
+  const item=(settings.liveRateSchedules||[]).find(rule=>rule.id===id);
+  if(!item)return;
+
+  liveScheduleEditingId=id;
+  setDateControl("liveScheduleStart",item.startDate||"");
+  setDateControl("liveScheduleEnd",item.endDate||"");
+  const rateEl=document.getElementById("liveScheduleRate");
+  if(rateEl)rateEl.value=String(item.rate??"");
+
+  const button=document.getElementById("liveScheduleActionBtn");
+  if(button)button.textContent="更新特别佣金日期";
+  renderLiveRateSchedules();
+}
 function clearLiveScheduleInputs(){
   setDateControl("liveScheduleStart","");
   setDateControl("liveScheduleEnd","");
   const rateEl=document.getElementById("liveScheduleRate");
   if(rateEl)rateEl.value="";
+  liveScheduleEditingId="";
+  const button=document.getElementById("liveScheduleActionBtn");
+  if(button)button.textContent="＋ 新增特别佣金日期";
 }
 
 function removeLiveRateSchedule(id){
@@ -673,7 +652,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"12.8"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"12.9"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -686,7 +665,7 @@ function updateReadOnlyMode(){
     el.textContent=closed?`${m} · 已结算 · 可修正`:history?`${m} · 历史月份 · 可编辑`:`${m} · 当前月份 · 可编辑`;
   }
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"12.8"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"12.9"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -695,7 +674,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV12.8 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV12.9 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){
   const current=monthISO();
   document.getElementById("monthPicker").value=current;
@@ -825,7 +804,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V12.8: paint Home immediately, then read local cache, then force one cloud refresh.
+// V12.9: paint Home immediately, then read local cache, then force one cloud refresh.
 // Every new page instance runs this path, so closing/reopening the phone still
 // checks Google Sheet instead of trusting the previous "已同步" state.
 attachMoneyInputs();
@@ -1235,7 +1214,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V12.8: do not restore the previously saved date.
+  // V12.9: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -1383,7 +1362,7 @@ function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V12.8: summary opens immediately from local year data.
+  // V12.9: summary opens immediately from local year data.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 }
@@ -1464,7 +1443,7 @@ async function saveFairCommissionSettings(){
     const fair=readFairCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...fair});
 
-    // V12.8：单击后立即套用，并由所有已开启装置自动读取最新佣金。
+    // V12.9：单击后立即套用，并由所有已开启装置自动读取最新佣金。
     if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
@@ -1499,66 +1478,64 @@ async function saveFairCommissionSettings(){
 
 async function saveLiveCommissionSettings(){
   const button=document.getElementById("saveLiveCommissionBtn");
-  const previous=getCommissionSettings();
-  const previousSnapshot=(systemState.commissionSnapshots||{})[selectedMonth()]||null;
+  const message=document.getElementById("liveCommissionSettingsMsg");
+
   try{
+    const previous=getCommissionSettings();
     const live=readLiveCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...live});
 
-    // V12.8: apply locally first and immediately refresh Home/Report.
-    if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
-    if((systemState.closedMonths||[]).includes(selectedMonth())){
-      systemState.commissionSnapshots={
-        ...(systemState.commissionSnapshots||{}),
-        [selectedMonth()]:normalizeCommissionSettings({
-          ...((systemState.commissionSnapshots||{})[selectedMonth()]||{}),
-          ...settings
-        })
-      };
-    }
     renderLiveHostCommissionSettings();
     renderLiveRateSchedules();
     renderDashboard();
     renderTable();
+    renderLiveMonthlyList();
     saveLocalDataCache(settings);
-    showTempMsg("liveCommissionSettingsMsg");
-    setSync("Live 佣金已更新，正在后台同步...");
 
-    const saved=await saveLiveCommissionSettingsToSheet(settings,selectedMonth());
-    const confirmed=normalizeCommissionSettings(saved||settings);
-    applyCommissionSettings(confirmed);
-    if((systemState.closedMonths||[]).includes(selectedMonth())){
-      systemState.commissionSnapshots={
-        ...(systemState.commissionSnapshots||{}),
-        [selectedMonth()]:normalizeCommissionSettings({
-          ...((systemState.commissionSnapshots||{})[selectedMonth()]||{}),
-          ...confirmed
-        })
-      };
+    if(button){
+      button.disabled=false;
+      button.textContent="💾 储存直播佣金制度";
     }
-    renderLiveHostCommissionSettings();
-    renderLiveRateSchedules();
-    renderDashboard();
-    renderTable();
-    saveLocalDataCache(confirmed);
-    setSync("已同步",true);
-  }catch(e){
-    applyCommissionSettings(previous);
-    if(previousSnapshot){
-      systemState.commissionSnapshots={
-        ...(systemState.commissionSnapshots||{}),
-        [selectedMonth()]:previousSnapshot
-      };
+    if(message){
+      message.textContent="本机已储存，云端同步中…";
+      message.classList.remove("hidden");
     }
-    renderLiveHostCommissionSettings();
-    renderDashboard();
-    renderTable();
-    saveLocalDataCache(previous);
-    alert("Live 主播佣金储存失败："+e.message);
-    setSync("Live 佣金同步失败",false,true);
-  }finally{
-    if(button){button.disabled=false;button.textContent="💾 储存直播佣金制度";}
+    setSync("Live 佣金本机已更新，云端同步中...");
+
+    saveLiveCommissionSettingsToSheet(settings,selectedMonth())
+      .then(saved=>{
+        const confirmed=normalizeCommissionSettings(saved||settings);
+        applyCommissionSettings(confirmed);
+        saveLocalDataCache(confirmed);
+        renderLiveHostCommissionSettings();
+        renderLiveRateSchedules();
+        renderDashboard();
+        renderTable();
+        renderLiveMonthlyList();
+        if(message){
+          message.textContent="✅ Live 佣金制度已同步";
+          message.classList.remove("hidden");
+        }
+        setSync("已同步",true);
+      })
+      .catch(error=>{
+        console.warn("Live commission cloud sync delayed",error);
+        if(message){
+          message.textContent="本机已储存，云端稍后重试";
+          message.classList.remove("hidden");
+        }
+        setSync("Live 佣金云端稍后重试",false,true);
+      });
+  }catch(error){
+    if(message){
+      message.textContent=error.message||"Live 佣金制度储存失败";
+      message.classList.remove("hidden");
+    }
+    if(button){
+      button.disabled=false;
+      button.textContent="💾 储存直播佣金制度";
+    }
   }
 }
 
@@ -1570,7 +1547,7 @@ async function resetFairCommissionSettings(){
   const settings=normalizeCommissionSettings({...previous,rate1:6,rate2:7,rate3:8});
 
   try{
-    // V12.8：确认恢复后先立即更新本机与 Home，再在后台同步 Google Sheet。
+    // V12.9：确认恢复后先立即更新本机与 Home，再在后台同步 Google Sheet。
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
       systemState.commissionSnapshots={
@@ -1619,8 +1596,8 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V12.8 Backup / Restore ================= */
-function getBackupPayload(){return{system:"Lover Legend Sales System",version:"12.8",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
+/* ================= V12.9 Backup / Restore ================= */
+function getBackupPayload(){return{system:"Lover Legend Sales System",version:"12.9",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
 accessSettings:getAccessPasswordSettings(),
 closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
 function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V12_5_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}

@@ -20,12 +20,12 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 
-/* V12.8: first paint must not wait for the full system render. */
+/* V12.9: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V12.8: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V12.9: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -100,7 +100,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V12.8: damaged/partial cache must never trap startup.
+    // V12.9: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -418,7 +418,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V12.8: preload the full year silently after the current month is shown.
+      // V12.9: preload the full year silently after the current month is shown.
       // This restores the old instant monthly-summary experience without
       // delaying login or the initial Home display.
       setTimeout(() => {
@@ -616,13 +616,12 @@ async function saveCommissionFastRequest_(action, settings, targetMonth = "") {
   };
 
   try {
-    const json = await jsonp(params, { timeoutMs: 12000 });
+    const json = await jsonp(params, { timeoutMs: 8000 });
     if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
     return json.commissionSettings || null;
   } catch (firstError) {
-    // Apps Script 偶尔冷启动；只重试一次，不触发完整系统同步。
-    await new Promise(resolve => setTimeout(resolve, 800));
-    const json = await jsonp(params, { timeoutMs: 15000 });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const json = await jsonp(params, { timeoutMs: 10000 });
     if (!json.ok) throw new Error(json.message || firstError.message || "佣金设置储存失败");
     return json.commissionSettings || null;
   }
