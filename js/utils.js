@@ -332,6 +332,22 @@ function setDateControl(id,iso){
   }
 }
 
+function bindSingleClickDatePicker(id){
+  const hidden=document.getElementById(id);
+  const display=document.getElementById(id+"Display");
+  if(!hidden||!display||display.dataset.pickerBound==="1")return;
+  display.dataset.pickerBound="1";
+  const field=display.closest(".date-field");
+  const button=field&&field.querySelector(".date-btn");
+  const openPicker=(event)=>{
+    if(event){event.preventDefault();event.stopPropagation();}
+    try{if(typeof hidden.showPicker==="function")hidden.showPicker();else hidden.click();}
+    catch(err){hidden.focus();hidden.click();}
+  };
+  display.addEventListener("click",openPicker);
+  if(button)button.addEventListener("click",openPicker);
+}
+
 function bindDateControl(id,onChange){
   const hidden=document.getElementById(id);
   const display=document.getElementById(id+"Display");
@@ -357,4 +373,6 @@ function bindDateControl(id,onChange){
       onChange();
     }
   });
+
+  bindSingleClickDatePicker(id);
 }
