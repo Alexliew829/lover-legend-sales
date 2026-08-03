@@ -1,5 +1,5 @@
 
-/* ================= V12.9 Access Password System ================= */
+/* ================= V13.0 Access Password System ================= */
 const DEFAULT_ACCESS_PASSWORD_HASH =
   "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
 const DEFAULT_ACCESS_PASSWORD_HINT = "6个数字";
@@ -283,7 +283,7 @@ function unlockAccessLock(options = {}) {
   document.body.classList.remove("access-locked");
   document.documentElement.classList.add("access-ready");
 
-  // V12.9: keep a replayable unlock flag. On desktop Refresh, access.js may
+  // V13.0: keep a replayable unlock flag. On desktop Refresh, access.js may
   // unlock before the business-script loader at the bottom of index.html exists.
   // The loader can now detect this flag and start exactly once.
   window.LOVER_SALES_UNLOCKED = true;
@@ -476,7 +476,7 @@ async function setupAccessLock() {
     }).catch(() => {});
   }
 
-  // V12.9：手机需要重新认证且已启用 Passkey 时，
+  // V13.0：手机需要重新认证且已启用 Passkey 时，
   // 自动打开系统原生 Sign in / Use Passkey 画面。
   // 用户只需要在系统画面点击一次 Use Passkey，
   // Face ID 成功后直接进入系统。
@@ -557,7 +557,7 @@ function setupPasswordChange() {
     } catch (error) {
       const message = String(error?.message || error || "");
       status.textContent = /Unknown action:\s*saveAccessSettings/i.test(message)
-        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V12.9 Code.gs"
+        ? "密码同步失败：Google Apps Script 仍是旧部署，请重新部署 V13.0 Code.gs"
         : "密码同步失败：" + message;
     } finally {
       button.disabled = false;
@@ -586,7 +586,7 @@ function setupDeviceBiometricSettings() {
   updateDeviceBiometricStatus();
 }
 
-/* ================= V12.9 Instant Login Bootstrap ================= */
+/* ================= V13.0 Instant Login Bootstrap ================= */
 // Run the access lock as soon as its small script is parsed. Business scripts,
 // large images, Service Worker checks and cloud sync all start only after unlock.
 setupAccessLock();
