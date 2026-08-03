@@ -20,12 +20,12 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 
-/* V13.2: first paint must not wait for the full system render. */
+/* V13.3: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V13.2: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V13.3: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -100,7 +100,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V13.2: damaged/partial cache must never trap startup.
+    // V13.3: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -424,7 +424,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V13.2: preload the full year silently after the current month is shown.
+      // V13.3: preload the full year silently after the current month is shown.
       // This restores the old instant monthly-summary experience without
       // delaying login or the initial Home display.
       setTimeout(() => {

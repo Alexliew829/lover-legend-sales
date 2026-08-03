@@ -18,7 +18,7 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V13.2: every time Live is opened, start from today's date.
+  // V13.3: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -29,7 +29,7 @@ function showPage(name,el){
   if(name==="home")renderDashboard();
   if(name==="report")renderTable();
 
-  // V13.2: page switching never waits for or triggers cloud sync.
+  // V13.3: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){return [r.type,r.date,r.company,canonicalLocation(r.location||"")].join("|")}
@@ -246,14 +246,20 @@ function loadCommissionSettingsForm(){
   if(rate2)rate2.value=settings.rate2;
   if(rate3)rate3.value=settings.rate3;
 }
-function getEffectiveCommissionSettings(){
+function commissionConfigMonth(){
+  const current=String(systemState&&systemState.currentMonth||monthISO());
+  return /^\d{4}-\d{2}$/.test(current)?current:monthISO();
+}
+
+function getCommissionSettingsForMonth(month){
   const current=getCommissionSettings();
-  const snapshot=(systemState.commissionSnapshots||{})[selectedMonth()];
+  const target=/^\d{4}-\d{2}$/.test(String(month||""))?String(month):selectedMonth();
+  const snapshot=(systemState.commissionSnapshots||{})[target];
   if(!snapshot)return current;
 
-  // V13.2: historical snapshots created before per-host commission support may
-  // not contain liveHostRates/liveHosts. Keep the month Fair rates, but fall
-  // back to the latest saved host commission settings instead of showing 0%.
+  // V13.3: historical Fair rates come from that month's snapshot, while the
+  // Live schedule is selected by the actual Live record date. This prevents
+  // Home's history month selector from blocking the current month's More setup.
   return normalizeCommissionSettings({
     ...current,
     ...snapshot,
@@ -265,10 +271,11 @@ function getEffectiveCommissionSettings(){
       ...(current.liveHosts||{}),
       ...((snapshot&&snapshot.liveHosts)||{})
     },
-    liveRateSchedules:Array.isArray(snapshot&&snapshot.liveRateSchedules)
-      ?snapshot.liveRateSchedules
-      :(current.liveRateSchedules||[])
+    liveRateSchedules:(current.liveRateSchedules||[])
   });
+}
+function getEffectiveCommissionSettings(){
+  return getCommissionSettingsForMonth(selectedMonth());
 }
 
 function liveScheduleMonth(item){
@@ -290,13 +297,14 @@ function monthLastISO(month){
   return `${month}-${String(day).padStart(2,"0")}`;
 }
 
-function findLiveRateSchedule(date,settings=getEffectiveCommissionSettings()){
+function findLiveRateSchedule(date,settings=null){
   const iso=/^\d{4}-\d{2}-\d{2}$/.test(String(date||""))
     ?String(date)
     :displayToISO(date);
   if(!iso)return null;
   const month=iso.slice(0,7);
-  return (settings.liveRateSchedules||[]).find(item=>{
+  const effectiveSettings=settings||getCommissionSettingsForMonth(month);
+  return (effectiveSettings.liveRateSchedules||[]).find(item=>{
     if(liveScheduleMonth(item)!==month)return false;
     const effectiveEnd=item.endDate||monthLastISO(month);
     return iso>=item.startDate&&iso<=effectiveEnd;
@@ -304,7 +312,9 @@ function findLiveRateSchedule(date,settings=getEffectiveCommissionSettings()){
 }
 
 function getLiveHostRate(host,date=""){
-  const settings=getEffectiveCommissionSettings();
+  const iso=/^\d{4}-\d{2}-\d{2}$/.test(String(date||""))?String(date):displayToISO(date);
+  const targetMonth=iso?iso.slice(0,7):getLiveSelectedMonth();
+  const settings=getCommissionSettingsForMonth(targetMonth);
   const schedule=findLiveRateSchedule(date,settings);
   if(schedule)return Number(schedule.rate||0);
   const key=normalizeLiveHostKey(host);
@@ -375,7 +385,7 @@ async function removeLiveHost(hostKey){
   setSync("主播已停用，云端同步中...");
 
   try{
-    const saved=await saveLiveCommissionSettingsToSheet(nextSettings,selectedMonth());
+    const saved=await saveLiveCommissionSettingsToSheet(nextSettings,commissionConfigMonth());
     const confirmed=normalizeCommissionSettings(saved||nextSettings);
     applyCommissionSettings(confirmed);
     saveLocalDataCache(confirmed);
@@ -403,7 +413,7 @@ let liveScheduleEditingId="";
 function renderLiveRateSchedules(){
   const container=document.getElementById("liveRateScheduleList");
   if(!container)return;
-  const schedules=liveSchedulesForMonth(selectedMonth());
+  const schedules=liveSchedulesForMonth(commissionConfigMonth());
   container.innerHTML=schedules.length
     ?schedules.map(item=>`
       <div class="live-rate-schedule-row ${item.endDate?"":"is-open"} ${item.id===liveScheduleEditingId?"is-editing":""}">
@@ -418,7 +428,7 @@ function renderLiveRateSchedules(){
         </div>
       </div>
     `).join("")
-    :`<div class="live-schedule-empty">${selectedMonth()} 没有特别日期规则，使用各主播一般佣金</div>`;
+    :`<div class="live-schedule-empty">${commissionConfigMonth()} 没有特别日期规则，使用各主播一般佣金</div>`;
 }
 function validateLiveRateSchedules(schedules){
   const sorted=[...(schedules||[])].sort((a,b)=>a.startDate.localeCompare(b.startDate));
@@ -456,23 +466,24 @@ function submitLiveRateSchedule(){
 
   if(!startDate){
     alert("请选择开始日期");
-    return;
+    return false;
   }
-  if(startDate.slice(0,7)!==selectedMonth()){
-    alert(`开始日期必须属于目前选择的月份：${selectedMonth()}`);
-    return;
+  const configMonth=commissionConfigMonth();
+  if(startDate.slice(0,7)!==configMonth){
+    alert(`开始日期必须属于当前佣金设置月份：${configMonth}`);
+    return false;
   }
   if(endDate&&endDate.slice(0,7)!==startDate.slice(0,7)){
     alert("结束日期不能跨月份；下个月请新增另一条特别佣金日期");
-    return;
+    return false;
   }
   if(endDate&&endDate<startDate){
     alert("结束日期不能早于开始日期");
-    return;
+    return false;
   }
   if(!Number.isFinite(rate)||rate<0){
     alert("请输入正确的直播佣金百分比");
-    return;
+    return false;
   }
 
   const previous=getCommissionSettings();
@@ -497,8 +508,10 @@ function submitLiveRateSchedule(){
     renderDashboard();
     renderTable();
     renderLiveMonthlyList();
+    return true;
   }catch(error){
     alert(error.message);
+    return false;
   }
 }
 
@@ -768,7 +781,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"13.2"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"13.3"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -781,7 +794,7 @@ function updateReadOnlyMode(){
     el.textContent=closed?`${m} · 已结算 · 可修正`:history?`${m} · 历史月份 · 可编辑`:`${m} · 当前月份 · 可编辑`;
   }
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"13.2"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"13.3"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -790,7 +803,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV13.2 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV13.3 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){
   const current=monthISO();
   document.getElementById("monthPicker").value=current;
@@ -920,7 +933,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V13.2: paint Home immediately, then read local cache, then force one cloud refresh.
+// V13.3: paint Home immediately, then read local cache, then force one cloud refresh.
 // Every new page instance runs this path, so closing/reopening the phone still
 // checks Google Sheet instead of trusting the previous "已同步" state.
 attachMoneyInputs();
@@ -1015,7 +1028,7 @@ function getSavedLiveHosts(){
 function collectLiveHosts(){
   const merged=[];
   const cloudHosts=Object.values((getCommissionSettings().liveHosts)||{});
-  // V13.2: active host list is independent from historical Live records.
+  // V13.3: active host list is independent from historical Live records.
   // Deleted hosts stay in old reports but do not return to current host options.
   [...cloudHosts,...getSavedLiveHosts()]
     .filter(Boolean)
@@ -1332,7 +1345,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V13.2: do not restore the previously saved date.
+  // V13.3: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -1513,7 +1526,7 @@ function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V13.2: summary opens immediately from local year data.
+  // V13.3: summary opens immediately from local year data.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 }
@@ -1594,7 +1607,7 @@ async function saveFairCommissionSettings(){
     const fair=readFairCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...fair});
 
-    // V13.2：单击后立即套用，并由所有已开启装置自动读取最新佣金。
+    // V13.3：单击后立即套用，并由所有已开启装置自动读取最新佣金。
     if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
@@ -1633,6 +1646,12 @@ async function saveLiveCommissionSettings(){
 
   try{
     const previous=getCommissionSettings();
+    const pendingStart=String(document.getElementById("liveScheduleStart")?.value||"");
+    const pendingEnd=String(document.getElementById("liveScheduleEnd")?.value||"");
+    const pendingRate=String(document.getElementById("liveScheduleRate")?.value||"").trim();
+    if(pendingStart||pendingEnd||pendingRate){
+      if(!submitLiveRateSchedule())return;
+    }
     const live=readLiveCommissionInputs();
     const settings=normalizeCommissionSettings({...previous,...live});
 
@@ -1655,7 +1674,7 @@ async function saveLiveCommissionSettings(){
     }
     setSync("Live 佣金本机已更新，云端同步中...");
 
-    saveLiveCommissionSettingsToSheet(settings,selectedMonth())
+    saveLiveCommissionSettingsToSheet(settings,commissionConfigMonth())
       .then(saved=>{
         const confirmed=normalizeCommissionSettings(saved||settings);
         liveCommissionDraftDirty=false;
@@ -1700,7 +1719,7 @@ async function resetFairCommissionSettings(){
   const settings=normalizeCommissionSettings({...previous,rate1:6,rate2:7,rate3:8});
 
   try{
-    // V13.2：确认恢复后先立即更新本机与 Home，再在后台同步 Google Sheet。
+    // V13.3：确认恢复后先立即更新本机与 Home，再在后台同步 Google Sheet。
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
       systemState.commissionSnapshots={
@@ -1749,8 +1768,8 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V13.2 Backup / Restore ================= */
-function getBackupPayload(){return{system:"Lover Legend Sales System",version:"13.2",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
+/* ================= V13.3 Backup / Restore ================= */
+function getBackupPayload(){return{system:"Lover Legend Sales System",version:"13.3",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
 accessSettings:getAccessPasswordSettings(),
 closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
 function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V13_1_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}

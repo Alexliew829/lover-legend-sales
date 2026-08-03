@@ -225,7 +225,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 @media(max-width:430px){.monthly-summary-btn{min-width:116px;padding:12px 10px;font-size:14px}.year-summary-row{gap:8px}}
 
 
-/* V13.2 Report historical month selector */
+/* V13.3 Report historical month selector */
 .report-header-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px}
 .report-header-row h2{margin-bottom:3px}
 .report-month-label{font-size:13px;font-weight:700;color:#8b0000}
@@ -234,11 +234,11 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .report-month-control input{margin:0;padding:9px 10px;font-weight:700;color:#8b0000;background:#fff}
 @media(max-width:520px){.report-header-row{align-items:stretch}.report-month-control{min-width:140px}}
 
-/* V13.2: prevent repeated commission-save clicks while syncing */
+/* V13.3: prevent repeated commission-save clicks while syncing */
 #saveFairCommissionBtn:disabled{opacity:.65;cursor:wait;}
 
 
-/* V13.2 mobile pull-down refresh */
+/* V13.3 mobile pull-down refresh */
 .pull-refresh-indicator{
   position:fixed;
   top:0;
@@ -263,7 +263,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .pull-refresh-indicator.refreshing{color:#0b6b2b}
 
 
-/* ================= V13.2 Password System ================= */
+/* ================= V13.3 Password System ================= */
 .access-lock {
   position: fixed;
   inset: 0;
@@ -391,7 +391,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V13.2 performance */
+/* V13.3 performance */
 .logo,.seal{
   content-visibility:auto;
   contain:layout paint;
@@ -405,7 +405,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V13.2 selected-date daily sales */
+/* V13.3 selected-date daily sales */
 #dashboardDate{
   color:#b00000;
   font-weight:900;
@@ -446,7 +446,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V13.2 period grouping and monthly summary */
+/* V13.3 period grouping and monthly summary */
 .period-summary-card{
   position:relative;
   padding:18px;
@@ -470,7 +470,7 @@ body.access-locked { overflow: hidden; }
 #monthlySummaryBtn:disabled{opacity:.72;cursor:wait;}
 
 
-/* V13.2 final UI consistency */
+/* V13.3 final UI consistency */
 .dashboard-date-field input[type=text]{
   color:#b00000;
   font-weight:900;
@@ -487,7 +487,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V13.2 selected-date Fair, Live and Total */
+/* V13.3 selected-date Fair, Live and Total */
 .daily-total-line{
   display:inline-block;
   margin-top:5px;
@@ -501,7 +501,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V13.2 Balakong / Belimbing monthly cards side by side */
+/* V13.3 Balakong / Belimbing monthly cards side by side */
 #dashboard .dash{
   grid-template-columns:minmax(0,1fr) minmax(0,1fr);
   gap:10px;
@@ -544,7 +544,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V13.2 日 / 月 / 年独立区块 */
+/* V13.3 日 / 月 / 年独立区块 */
 .daily-summary-frame{
   border-color:#d66b6b;
   background:#fffafa;
@@ -566,7 +566,7 @@ body.access-locked { overflow: hidden; }
   box-sizing:border-box;
 }
 
-/* V13.2 monthly company cards remain side by side */
+/* V13.3 monthly company cards remain side by side */
 #page-home .month-summary-frame .dash{
   grid-template-columns:minmax(0,1fr) minmax(0,1fr);
   gap:10px;
@@ -603,7 +603,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V13.2 Live 日期区间佣金 */
+/* V13.3 Live 日期区间佣金 */
 .live-schedule-title{
   margin-top:22px;
 }
@@ -681,7 +681,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V13.2 Live special commission and record details */
+/* V13.3 Live special commission and record details */
 .live-rate-schedule-row.is-open{
   border-color:#d08b2f;
   background:#fff9ec;
@@ -749,7 +749,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V13.2 Sales / Fair monthly record lists */
+/* V13.3 Sales / Fair monthly record lists */
 .month-record-group{
   margin-bottom:12px;
   padding:12px;
@@ -787,13 +787,13 @@ body.access-locked { overflow: hidden; }
   .month-record-row{font-size:14px}
 }
 
-/* V13.2 */
+/* V13.3 */
 .fair-view-only-hint{margin-top:8px;margin-bottom:10px}
 #fairEndWrap.hidden,#fairEditArea.hidden{display:none!important}
 #fairDateRange.view-only{grid-template-columns:1fr}
 .date-field input[type=text],.date-field .date-btn{cursor:pointer;touch-action:manipulation}
 
-/* V13.2 selected day summary */
+/* V13.3 selected day summary */
 .daily-summary-list{display:flex;flex-direction:column;gap:7px}
 .daily-summary-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:7px 0}
 .daily-summary-row+.daily-summary-row{border-top:1px dashed #e2e2e2}
@@ -801,7 +801,7 @@ body.access-locked { overflow: hidden; }
 .daily-summary-empty{padding:10px 0;color:#777}
 
 
-/* V13.2 editable Live special commission rules */
+/* V13.3 editable Live special commission rules */
 .live-rate-schedule-info{cursor:pointer}
 .live-rate-schedule-info:hover{opacity:.82}
 .live-rate-schedule-row.is-editing{
@@ -809,7 +809,7 @@ body.access-locked { overflow: hidden; }
   outline-offset:2px;
 }
 
-/* V13.2: remove inactive Live host without touching historical records */
+/* V13.3: remove inactive Live host without touching historical records */
 .host-commission-name{font-weight:700;overflow-wrap:anywhere;min-width:90px}
 .host-commission-controls{display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end}
 .host-commission-controls .commission-input-row{width:min(210px,58%);margin:0}
