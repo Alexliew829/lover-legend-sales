@@ -11,6 +11,7 @@ let settingsWritePromise = null;
 let settingsWriteDepth = 0;
 let yearLoadPromises = new Map();
 let loadedCloudYears = new Set();
+const localRowMutationAt = new Map();
 
 const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache";
 const LEGACY_LOCAL_DATA_CACHE_KEYS = [
@@ -21,12 +22,12 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 
-/* V13.7: first paint must not wait for the full system render. */
+/* V13.8: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V13.7: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V13.8: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -101,7 +102,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V13.7: damaged/partial cache must never trap startup.
+    // V13.8: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -275,20 +276,30 @@ function rowMonthKey(row) {
   return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.slice(0, 7) : "";
 }
 
-function mergeCloudMonthRows(month, cloudRows) {
-  const keep = rows.filter(row => rowMonthKey(row) !== month);
-  const pendingForMonth = pendingRows.filter(row => rowMonthKey(row) === month);
-  rows = typeof dedupeRows === "function"
-    ? dedupeRows([...keep, ...(cloudRows || []), ...pendingForMonth])
-    : [...keep, ...(cloudRows || []), ...pendingForMonth];
+function markLocalRowMutation(row, timestamp = Date.now()) {
+  localRowMutationAt.set(syncKey(row), Number(timestamp) || Date.now());
 }
 
-function mergeCloudYearRows(year, cloudRows) {
+function mergeCloudRowsSafely(existingRows, cloudRows, pending, requestStartedAt) {
+  const protectedLocal = (existingRows || []).filter(row =>
+    Number(localRowMutationAt.get(syncKey(row)) || 0) > Number(requestStartedAt || 0)
+  );
+  const combined = [...(cloudRows || []), ...protectedLocal, ...(pending || [])];
+  return typeof dedupeRows === "function" ? dedupeRows(combined) : combined;
+}
+
+function mergeCloudMonthRows(month, cloudRows, requestStartedAt = 0) {
+  const keep = rows.filter(row => rowMonthKey(row) !== month);
+  const localForMonth = rows.filter(row => rowMonthKey(row) === month);
+  const pendingForMonth = pendingRows.filter(row => rowMonthKey(row) === month);
+  rows = [...keep, ...mergeCloudRowsSafely(localForMonth, cloudRows, pendingForMonth, requestStartedAt)];
+}
+
+function mergeCloudYearRows(year, cloudRows, requestStartedAt = 0) {
   const keep = rows.filter(row => !rowMonthKey(row).startsWith(year + "-"));
+  const localForYear = rows.filter(row => rowMonthKey(row).startsWith(year + "-"));
   const pendingForYear = pendingRows.filter(row => rowMonthKey(row).startsWith(year + "-"));
-  rows = typeof dedupeRows === "function"
-    ? dedupeRows([...keep, ...(cloudRows || []), ...pendingForYear])
-    : [...keep, ...(cloudRows || []), ...pendingForYear];
+  rows = [...keep, ...mergeCloudRowsSafely(localForYear, cloudRows, pendingForYear, requestStartedAt)];
 }
 
 async function loadYearInBackground(year) {
@@ -297,6 +308,7 @@ async function loadYearInBackground(year) {
   if (yearLoadPromises.has(y)) return yearLoadPromises.get(y);
 
   const task = (async () => {
+    const requestStartedAt = Date.now();
     if (isSettingsWriteRunning()) {
       if (settingsWritePromise) await settingsWritePromise.catch(() => {});
     }
@@ -305,7 +317,7 @@ async function loadYearInBackground(year) {
       const json = await jsonp({ action: "loadYear", year: y }, { timeoutMs: 20000 });
       if (!json.ok) throw new Error(json.message || "读取全年资料失败");
       loadPendingRows();
-      mergeCloudYearRows(y, json.rows || []);
+      mergeCloudYearRows(y, json.rows || [], requestStartedAt);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
       if (json.commissionSettings) {
         if (typeof applyCloudCommissionSettings === "function") applyCloudCommissionSettings(json.commissionSettings);
@@ -381,6 +393,7 @@ async function loadFromSheet(options = {}) {
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
       let json = null;
       let lastError = null;
+      const requestStartedAt = Date.now();
 
       for (let attempt = 1; attempt <= 2; attempt += 1) {
         try {
@@ -403,7 +416,7 @@ async function loadFromSheet(options = {}) {
       if (lastError) throw lastError;
 
       loadPendingRows();
-      mergeCloudMonthRows(month, json.rows || []);
+      mergeCloudMonthRows(month, json.rows || [], requestStartedAt);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
       if (json.commissionSettings) {
         if (typeof applyCloudCommissionSettings === "function") applyCloudCommissionSettings(json.commissionSettings);
@@ -425,7 +438,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V13.7 mobile performance: startup loads only the selected month.
+      // V13.8 mobile performance: startup loads only the selected month.
       // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
         setTimeout(() => {
