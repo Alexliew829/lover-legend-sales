@@ -299,17 +299,24 @@ function monthAfter(m){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
 }
 
+
+// V14.0: Fair 地点键值忽略所有空格及英文字母大小写，但保留符号。
+// 例如 "JB AEON Mall , Terbau City" 与 "JB AEON Mall,Terbau City" 是同一地点。
+function normalizeFairLocationKey(value){
+  return canonicalLocation(value||"")
+    .replace(/\s+/g,"")
+    .toLowerCase();
+}
+
 function yearAfter(y){
   return String(Number(y)+1);
 }
 
 function syncKey(row){
-  return[
-    row.type,
-    row.date,
-    row.company,
-    canonicalLocation(row.location||"")
-  ].join("|");
+  const location=row.type==="live"
+    ? String(row.location||"").replace(/\s+/g,"").toLowerCase()
+    : normalizeFairLocationKey(row.location||"");
+  return[row.type,row.date,row.company,location].join("|");
 }
 
 function openDatePicker(id){

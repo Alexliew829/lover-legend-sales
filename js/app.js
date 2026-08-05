@@ -26,7 +26,7 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V13.9: every time Live is opened, start from today's date.
+  // V14.0: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -37,10 +37,10 @@ function showPage(name,el){
   if(name==="home")renderDashboard();
   if(name==="report")renderTable();
 
-  // V13.9: page switching never waits for or triggers cloud sync.
+  // V14.0: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
-function rowKey(r){return [r.type,r.date,r.company,canonicalLocation(r.location||"")].join("|")}
+function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");return [r.type,r.date,r.company,location].join("|")}
 function dedupeRows(list){const m=new Map();list.forEach(r=>{const k=rowKey(r),old=m.get(k);if(!old||String(r.updatedAt||"")>=String(old.updatedAt||""))m.set(k,r)});return [...m.values()]}
 function upsertLocalRow(n){rows=dedupeRows([...rows,n])}
 function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&r.company===c);return f?Number(f.amount||0):0}
@@ -311,7 +311,7 @@ function applyCloudCommissionSettings(settings){
   const incomingRevision=Number(incoming.liveRevision||0);
   const localRevision=Number(local.liveRevision||0);
 
-  // V13.9: an older cloud response may arrive after a newer local delete/edit.
+  // V14.0: an older cloud response may arrive after a newer local delete/edit.
   // Accept current Fair rates, but never let stale Live data restore a deleted rule/host.
   if(liveCommissionDraftDirty||incomingRevision<localRevision){
     applyCommissionSettings({
@@ -408,7 +408,7 @@ function getCommissionSettingsForMonth(month){
   const snapshot=(systemState.commissionSnapshots||{})[target];
   if(!snapshot)return current;
 
-  // V13.9: historical Fair rates come from that month's snapshot, while the
+  // V14.0: historical Fair rates come from that month's snapshot, while the
   // Live schedule is selected by the actual Live record date. This prevents
   // Home's history month selector from blocking the current month's More setup.
   return normalizeCommissionSettings({
@@ -547,7 +547,7 @@ async function removeLiveHost(hostKey){
     if(message){message.textContent="✅ 主播已设为离职／停用";message.classList.remove("hidden");}
     setSync("已同步",true);
   }catch(error){
-    // V13.9: timeout must not undo the user's local action.
+    // V14.0: timeout must not undo the user's local action.
     console.warn("Inactive host cloud sync delayed",error);
     liveCommissionDraftDirty=true;
     queueLiveCommissionRetry(nextSettings,commissionConfigMonth());
@@ -845,7 +845,7 @@ function updateFairPageMode(){
   }
 }
 
-function syncFairInputs(){const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value,loc=canonicalLocation(document.getElementById("fairLocation").value.trim());if(!start||!end||new Date(start)>new Date(end)){document.getElementById("fairInputs").innerHTML="";return}let html="<h3>Fair 每日营业额</h3>";dateRange(start,end).forEach(d=>{const old=rows.find(r=>r.type==="fair"&&r.date===d&&canonicalLocation(r.location)===loc);html+=`<label>${d} 营业额</label><input type="text" class="fairAmount money-input" data-date="${d}" value="${old?formatAmount(old.amount):"0.00"}" inputmode="decimal">`});document.getElementById("fairInputs").innerHTML=html;attachMoneyInputs()}
+function syncFairInputs(){const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value,loc=canonicalLocation(document.getElementById("fairLocation").value.trim());if(!start||!end||new Date(start)>new Date(end)){document.getElementById("fairInputs").innerHTML="";return}let html="<h3>Fair 每日营业额</h3>";dateRange(start,end).forEach(d=>{const old=rows.find(r=>r.type==="fair"&&r.date===d&&normalizeFairLocationKey(r.location)===normalizeFairLocationKey(loc));html+=`<label>${d} 营业额</label><input type="text" class="fairAmount money-input" data-date="${d}" value="${old?formatAmount(old.amount):"0.00"}" inputmode="decimal">`});document.getElementById("fairInputs").innerHTML=html;attachMoneyInputs()}
 async function saveFairSales(){const fairLocationValue=String(document.getElementById("fairLocation")?.value||"").trim();if(!fairLocationValue){alert("请先输入 Fair 地点");return;}
   if(!ensureWritableSelection())return;
   const loc=canonicalLocation(document.getElementById("fairLocation").value.trim());
@@ -888,7 +888,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
         r.type==="fair" &&
         r.date===i.date &&
         r.company==="belimbing" &&
-        canonicalLocation(r.location)===loc
+        normalizeFairLocationKey(r.location)===normalizeFairLocationKey(loc)
       ));
     }else{
       upsertLocalRow(row);
@@ -906,9 +906,9 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     setSync("已储存，正在后台同步...");
     const result=await saveFairBatchToSheet(loc,records);
 
-    // V13.9: the optimistic batch above is the single Memory update and single
-    // Render. The server response only confirms the write and clears pending rows,
-    // avoiding a second mutation/render cycle that could flash stale data.
+    // V14.0: local Fair values are direct replacements, never additions. The server
+    // also removes duplicate Sheet rows whose location differs only by spaces/case.
+    // The response confirms the authoritative overwrite and clears pending rows.
     records.forEach(i=>clearPendingRow({
       type:"fair",
       date:i.date,
@@ -924,7 +924,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"13.9"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"14.0"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -937,7 +937,7 @@ function updateReadOnlyMode(){
     el.textContent=closed?`${m} · 已结算 · 可修正`:history?`${m} · 历史月份 · 可编辑`:`${m} · 当前月份 · 可编辑`;
   }
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"13.9"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"14.0"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -946,7 +946,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV13.9 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV14.0 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){
   const current=monthISO();
   document.getElementById("monthPicker").value=current;
@@ -1076,7 +1076,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V13.9: paint Home immediately, then read local cache, then force one cloud refresh.
+// V14.0: paint Home immediately, then read local cache, then force one cloud refresh.
 // Every new page instance runs this path, so closing/reopening the phone still
 // checks Google Sheet instead of trusting the previous "已同步" state.
 attachMoneyInputs();
@@ -1162,7 +1162,7 @@ function canonicalLiveHost(value){
 function rowKey(r){
   const location=r.type==="live"
     ? normalizeLiveHostKey(r.location||"")
-    : canonicalLocation(r.location||"");
+    : normalizeFairLocationKey(r.location||"");
   return [r.type,r.date,r.company,location].join("|");
 }
 function getSavedLiveHosts(){
@@ -1171,7 +1171,7 @@ function getSavedLiveHosts(){
 function collectLiveHosts(){
   const merged=[];
   const cloudHosts=Object.values((getCommissionSettings().liveHosts)||{});
-  // V13.9: active host list is independent from historical Live records.
+  // V14.0: active host list is independent from historical Live records.
   // Deleted hosts stay in old reports but do not return to current host options.
   [...cloudHosts,...getSavedLiveHosts()]
     .filter(Boolean)
@@ -1488,7 +1488,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V13.9: do not restore the previously saved date.
+  // V14.0: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -1617,7 +1617,7 @@ function renderTable(){
   document.getElementById("recordTable").innerHTML=s.map(r=>{const rate=r.type==="live"?getLiveHostRate(r.location,r.date):r.type==="fair"?getFairCommissionRate(totalBy("fair","","month"))*100:0;const commission=(r.type==="live"||r.type==="fair")?Number(r.amount||0)*rate/100:0;return `<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":r.type==="live"?"Live":"每日"}</td><td>${r.type==="live"?"Live":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td><td>${rate?Number(rate.toFixed(2))+"%":"-"}</td><td>${rate?money(commission):"-"}</td></tr>`}).join("")||'<tr><td colspan="7" style="text-align:center;">这个月份还没有记录</td></tr>';
 }
 function renderAll(){
-  // V13.9: one complete render path. This replaces the older partial duplicate
+  // V14.0: one complete render path. This replaces the older partial duplicate
   // so Fair daily/monthly totals, Home totals and Report always refresh together.
   rows=dedupeRows(rows);
   renderDashboard();
@@ -1676,7 +1676,7 @@ async function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V13.9: show cached figures immediately, then fetch the full year only on demand.
+  // V14.0: show cached figures immediately, then fetch the full year only on demand.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 
@@ -1784,7 +1784,7 @@ async function saveFairCommissionSettings(){
       return;
     }
 
-    // V13.9：单击后立即套用，并由所有已开启装置自动读取最新佣金。
+    // V14.0：单击后立即套用，并由所有已开启装置自动读取最新佣金。
     if(button){button.disabled=true;button.textContent="正在储存...";}
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
@@ -1913,7 +1913,7 @@ async function resetFairCommissionSettings(){
   const settings=normalizeCommissionSettings({...previous,rate1:6,rate2:7,rate3:8});
 
   try{
-    // V13.9：确认恢复后先立即更新本机与 Home，再在后台同步 Google Sheet。
+    // V14.0：确认恢复后先立即更新本机与 Home，再在后台同步 Google Sheet。
     applyCommissionSettings(settings);
     if((systemState.closedMonths||[]).includes(selectedMonth())){
       systemState.commissionSnapshots={
@@ -1962,8 +1962,8 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V13.9 Backup / Restore ================= */
-function getBackupPayload(){return{system:"Lover Legend Sales System",version:"13.9",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
+/* ================= V14.0 Backup / Restore ================= */
+function getBackupPayload(){return{system:"Lover Legend Sales System",version:"14.0",createdAt:new Date().toISOString(),rows:dedupeRows(rows),commissionSettings:getCommissionSettings(),
 accessSettings:getAccessPasswordSettings(),
 closedMonths:[...systemState.closedMonths],commissionSnapshots:{...(systemState.commissionSnapshots||{})},currentMonth:systemState.currentMonth,fairLocations:getSavedFairLocations(),liveHosts:getSavedLiveHosts?getSavedLiveHosts():[]}}
 function backupAllData(){const payload=getBackupPayload();const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);downloadFile(`Lover_Legend_Sales_V13_1_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8;")}
