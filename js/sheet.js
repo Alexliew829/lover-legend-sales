@@ -23,7 +23,7 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
   "lover_sales_data_cache_v92"
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
-const REVISION_CHECK_TIMEOUT_MS = 6000;
+const REVISION_CHECK_TIMEOUT_MS = 2500;
 
 
 function applyLocalDataRevision(value) {
@@ -60,12 +60,12 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-/* V14.1: first paint must not wait for the full system render. */
+/* V14.2: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V14.1: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V14.2: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -141,7 +141,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V14.1: damaged/partial cache must never trap startup.
+    // V14.2: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -432,7 +432,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V14.1: opening/resuming first checks one tiny revision value.
+      // V14.2: opening/resuming first checks one tiny revision value.
       // Full month data is downloaded only when another device changed data.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
@@ -444,9 +444,23 @@ async function loadFromSheet(options = {}) {
               completedSuccessfully = true;
               return { ok:true, month, revisionOnly:true, dataRevision:cloudRevision };
             }
+          } else {
+            setSync("本机资料已显示 · 云端暂未确认", false, true);
+            completedSuccessfully = true;
+            return { ok:true, month, revisionUnconfirmed:true };
           }
         } catch (revisionError) {
-          // If the lightweight check fails, fall back to the existing safe month load.
+          // V14.2: when local data exists, a slow/failed revision check must not
+          // trigger the expensive full-month download. Keep the visible local
+          // data and let the next foreground/interval/manual check try again.
+          setSync("本机资料已显示 · 云端暂未确认", false, true);
+          completedSuccessfully = true;
+          return {
+            ok: true,
+            month,
+            revisionUnconfirmed: true,
+            error: revisionError
+          };
         }
       }
       let json = null;
@@ -494,7 +508,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V14.1 mobile performance: startup loads only the selected month.
+      // V14.2 mobile performance: startup loads only the selected month.
       // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
         setTimeout(() => {

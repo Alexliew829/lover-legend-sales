@@ -64,7 +64,7 @@
 
   function startAutomaticRefreshAfterInitialSync() {
     if (autoRefreshStartTimer || autoRefreshInterval) return;
-    // V14.1: do not fire a second check 5 seconds after startup.
+    // V14.2: do not fire a second check 5 seconds after startup.
     // The first automatic check starts only after a full interval from the
     // completed startup sync, preventing duplicate requests and UI flicker.
     autoRefreshStartTimer = setTimeout(() => {
@@ -152,9 +152,9 @@
     lastResumeAt = now;
 
     if (typeof markCloudCheckPending === "function") {
-      markCloudCheckPending("本机资料已显示 · 云端后台同步中");
+      markCloudCheckPending("正在快速确认云端...");
     } else if (typeof setSync === "function") {
-      setSync("本机资料已显示 · 云端后台同步中");
+      setSync("正在快速确认云端...");
     }
 
     resumePromise = refreshCloudData(reason, false).finally(() => {
@@ -188,7 +188,7 @@
   });
   window.addEventListener("online", () => refreshCloudData("online", false));
 
-  // V14.1: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
+  // V14.2: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {
     if (!("ontouchstart" in window)) return;
 
