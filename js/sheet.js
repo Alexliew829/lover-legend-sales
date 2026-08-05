@@ -7,6 +7,8 @@ const cloudLoadPromisesByMonth = new Map();
 let lastCloudLoadAt = 0;
 let initialCloudSyncFinished = false;
 let initialCloudSyncPromise = null;
+let localDataRevision = 0;
+let revisionCheckPromise = null;
 let settingsWritePromise = null;
 let settingsWriteDepth = 0;
 let yearLoadPromises = new Map();
@@ -21,6 +23,27 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
   "lover_sales_data_cache_v92"
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
+const REVISION_CHECK_TIMEOUT_MS = 6000;
+
+
+function applyLocalDataRevision(value) {
+  const revision = Number(value || 0);
+  if (Number.isFinite(revision) && revision >= 0) localDataRevision = revision;
+  return localDataRevision;
+}
+
+function getLocalDataRevision() {
+  return Number(localDataRevision || 0);
+}
+
+async function checkCloudRevisionShared(timeoutMs = REVISION_CHECK_TIMEOUT_MS) {
+  if (revisionCheckPromise) return revisionCheckPromise;
+  revisionCheckPromise = jsonp(
+    { action: "revisionCheck" },
+    { timeoutMs: Number(timeoutMs || REVISION_CHECK_TIMEOUT_MS) }
+  ).finally(() => { revisionCheckPromise = null; });
+  return revisionCheckPromise;
+}
 
 async function loadMonthCloudShared(month, timeoutMs = 15000) {
   const key = /^\d{4}-\d{2}$/.test(String(month || "")) ? String(month) : new Date().toISOString().slice(0, 7);
@@ -37,12 +60,12 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-/* V14.0: first paint must not wait for the full system render. */
+/* V14.1: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V14.0: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V14.1: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -93,6 +116,7 @@ function loadLocalDataCache() {
     }
 
     rows = cached.rows;
+    applyLocalDataRevision(cached.dataRevision);
 
     if (
       cached.commissionSettings &&
@@ -117,7 +141,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V14.0: damaged/partial cache must never trap startup.
+    // V14.1: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -159,6 +183,7 @@ function saveLocalDataCache(
               ? getAccessPasswordSettings()
               : null
           ),
+        dataRevision: getLocalDataRevision(),
         savedAt: Date.now()
       })
     );
@@ -406,6 +431,24 @@ async function loadFromSheet(options = {}) {
         : "";
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
+
+      // V14.1: opening/resuming first checks one tiny revision value.
+      // Full month data is downloaded only when another device changed data.
+      if (!force && hasLocalData && options.skipRevisionCheck !== true) {
+        try {
+          const revisionResult = await checkCloudRevisionShared(Number(options.revisionTimeoutMs || REVISION_CHECK_TIMEOUT_MS));
+          if (revisionResult && revisionResult.ok) {
+            const cloudRevision = Number(revisionResult.dataRevision || 0);
+            if (cloudRevision === getLocalDataRevision()) {
+              setSync("已同步", true);
+              completedSuccessfully = true;
+              return { ok:true, month, revisionOnly:true, dataRevision:cloudRevision };
+            }
+          }
+        } catch (revisionError) {
+          // If the lightweight check fails, fall back to the existing safe month load.
+        }
+      }
       let json = null;
       let lastError = null;
       const requestStartedAt = Date.now();
@@ -429,6 +472,7 @@ async function loadFromSheet(options = {}) {
 
       loadPendingRows();
       mergeCloudMonthRows(month, json.rows || [], requestStartedAt);
+      applyLocalDataRevision(json.dataRevision);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
       if (json.commissionSettings) {
         if (typeof applyCloudCommissionSettings === "function") applyCloudCommissionSettings(json.commissionSettings);
@@ -450,7 +494,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V14.0 mobile performance: startup loads only the selected month.
+      // V14.1 mobile performance: startup loads only the selected month.
       // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
         setTimeout(() => {
@@ -580,6 +624,7 @@ async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "") {
   });
 
   if (!json.ok) throw new Error(json.message || "储存失败");
+  applyLocalDataRevision(json.dataRevision);
   return json.row || null;
 }
 
@@ -591,6 +636,7 @@ async function saveFairBatchToSheet(location, records) {
   });
 
   if (!json.ok) throw new Error(json.message || "Fair 储存失败");
+  applyLocalDataRevision(json.dataRevision);
   return json;
 }
 
@@ -616,6 +662,7 @@ async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "") {
     clientUpdatedAt
   });
   if (!json.ok) throw new Error(json.message || "Live 储存失败");
+  applyLocalDataRevision(json.dataRevision);
   return json.row || null;
 }
 
@@ -634,6 +681,7 @@ async function saveCommissionSettingsToSheet(settings, targetMonth = "") {
       targetMonth: targetMonth || ""
     }, { timeoutMs: 20000 });
     if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
+    applyLocalDataRevision(json.dataRevision);
     return json.commissionSettings || null;
   });
 }
@@ -655,11 +703,13 @@ async function saveCommissionFastRequest_(action, settings, targetMonth = "") {
   try {
     const json = await jsonp(params, { timeoutMs: 6000 });
     if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
+    applyLocalDataRevision(json.dataRevision);
     return json.commissionSettings || null;
   } catch (firstError) {
     await new Promise(resolve => setTimeout(resolve, 350));
     const json = await jsonp(params, { timeoutMs: 7000 });
     if (!json.ok) throw new Error(json.message || firstError.message || "佣金设置储存失败");
+    applyLocalDataRevision(json.dataRevision);
     return json.commissionSettings || null;
   }
 }
@@ -679,6 +729,7 @@ async function saveLiveCommissionSettingsToSheet(settings, targetMonth = "") {
 async function resetCommissionSettingsInSheet() {
   const json = await jsonp({ action: "resetCommissionSettings" });
   if (!json.ok) throw new Error(json.message || "恢复默认值失败");
+  applyLocalDataRevision(json.dataRevision);
   return json.commissionSettings || null;
 }
 

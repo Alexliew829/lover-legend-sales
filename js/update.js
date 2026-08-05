@@ -1,7 +1,7 @@
 (() => {
   const RELOAD_FLAG = "lover_sales_sw_reloaded_v129";
   const REFRESH_COOLDOWN_MS = 5000;
-  const AUTO_REFRESH_MS = 30000;
+  const AUTO_REFRESH_MS = 300000;
   let lastCloudRefresh = 0;
   let refreshPromise = null;
   let initialSyncReady = typeof isInitialCloudSyncFinished === "function" && isInitialCloudSyncFinished();
@@ -64,7 +64,7 @@
 
   function startAutomaticRefreshAfterInitialSync() {
     if (autoRefreshStartTimer || autoRefreshInterval) return;
-    // V14.0: do not fire a second check 5 seconds after startup.
+    // V14.1: do not fire a second check 5 seconds after startup.
     // The first automatic check starts only after a full interval from the
     // completed startup sync, preventing duplicate requests and UI flicker.
     autoRefreshStartTimer = setTimeout(() => {
@@ -157,7 +157,7 @@
       setSync("本机资料已显示 · 云端后台同步中");
     }
 
-    resumePromise = refreshCloudData(reason, true).finally(() => {
+    resumePromise = refreshCloudData(reason, false).finally(() => {
       resumePromise = null;
     });
     return resumePromise;
@@ -186,9 +186,9 @@
   window.addEventListener("pageshow", event => {
     if (event.persisted) refreshAfterReopen("pageshow-cache");
   });
-  window.addEventListener("online", () => refreshCloudData("online", true));
+  window.addEventListener("online", () => refreshCloudData("online", false));
 
-  // V14.0: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
+  // V14.1: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {
     if (!("ontouchstart" in window)) return;
 
