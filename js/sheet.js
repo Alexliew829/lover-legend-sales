@@ -45,38 +45,6 @@ async function checkCloudRevisionShared(timeoutMs = REVISION_CHECK_TIMEOUT_MS) {
   return revisionCheckPromise;
 }
 
-// V14.3: before any sales write, confirm that this device has not missed
-// another device's update. If cloud is newer, fetch the selected month first.
-async function ensureLatestRevisionBeforeSave(options = {}) {
-  const timeoutMs = Number(options.timeoutMs || 4000);
-  const localRevision = getLocalDataRevision();
-  let result;
-  try {
-    result = await checkCloudRevisionShared(timeoutMs);
-  } catch (error) {
-    const err = new Error("无法确认云端最新资料，请检查网络后再储存");
-    err.code = "REVISION_UNCONFIRMED";
-    err.cause = error;
-    throw err;
-  }
-  if (!result || !result.ok) {
-    const err = new Error((result && result.message) || "无法确认云端最新资料");
-    err.code = "REVISION_UNCONFIRMED";
-    throw err;
-  }
-  const cloudRevision = Number(result.dataRevision || 0);
-  if (cloudRevision !== localRevision) {
-    setSync("发现其他设备的新资料，正在先同步...");
-    await loadCloudData(true, {
-      month: (typeof selectedMonth === "function" ? selectedMonth() : ""),
-      skipRevisionCheck: true,
-      timeoutMs: 15000,
-      silent: true
-    });
-  }
-  return getLocalDataRevision();
-}
-
 async function loadMonthCloudShared(month, timeoutMs = 15000) {
   const key = /^\d{4}-\d{2}$/.test(String(month || "")) ? String(month) : new Date().toISOString().slice(0, 7);
   if (cloudLoadPromisesByMonth.has(key)) return cloudLoadPromisesByMonth.get(key);
@@ -92,12 +60,12 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-/* V14.3: first paint must not wait for the full system render. */
+/* V14.2: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V14.3: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V14.2: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -173,7 +141,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V14.3: damaged/partial cache must never trap startup.
+    // V14.2: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -464,7 +432,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V14.3: opening/resuming first checks one tiny revision value.
+      // V14.2: opening/resuming first checks one tiny revision value.
       // Full month data is downloaded only when another device changed data.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
@@ -482,7 +450,7 @@ async function loadFromSheet(options = {}) {
             return { ok:true, month, revisionUnconfirmed:true };
           }
         } catch (revisionError) {
-          // V14.3: when local data exists, a slow/failed revision check must not
+          // V14.2: when local data exists, a slow/failed revision check must not
           // trigger the expensive full-month download. Keep the visible local
           // data and let the next foreground/interval/manual check try again.
           setSync("本机资料已显示 · 云端暂未确认", false, true);
@@ -540,7 +508,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V14.3 mobile performance: startup loads only the selected month.
+      // V14.2 mobile performance: startup loads only the selected month.
       // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
         setTimeout(() => {
@@ -660,37 +628,16 @@ async function syncPendingRows() {
   }
 }
 
-async function recoverFromRevisionConflict(localRows) {
-  (Array.isArray(localRows) ? localRows : [localRows]).filter(Boolean).forEach(row => clearPendingRow(row));
-  try {
-    await loadCloudData(true, {
-      month: (typeof selectedMonth === "function" ? selectedMonth() : ""),
-      skipRevisionCheck: true,
-      timeoutMs: 15000,
-      silent: true
-    });
-  } finally {
-    if (typeof renderAll === "function") renderAll();
-    if (typeof saveLocalDataCache === "function") saveLocalDataCache();
-  }
-}
-
 async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "") {
   const json = await jsonp({
     action: "saveDaily",
     date,
     company,
     amount,
-    clientUpdatedAt,
-    baseRevision: getLocalDataRevision()
+    clientUpdatedAt
   });
 
-  if (!json.ok) {
-    const error = new Error(json.message || "储存失败");
-    error.code = json.code || "";
-    error.currentRevision = Number(json.currentRevision || 0);
-    throw error;
-  }
+  if (!json.ok) throw new Error(json.message || "储存失败");
   applyLocalDataRevision(json.dataRevision);
   return json.row || null;
 }
@@ -699,16 +646,10 @@ async function saveFairBatchToSheet(location, records) {
   const json = await jsonp({
     action: "saveFairBatch",
     location,
-    records: JSON.stringify(records),
-    baseRevision: getLocalDataRevision()
+    records: JSON.stringify(records)
   });
 
-  if (!json.ok) {
-    const error = new Error(json.message || "Fair 储存失败");
-    error.code = json.code || "";
-    error.currentRevision = Number(json.currentRevision || 0);
-    throw error;
-  }
+  if (!json.ok) throw new Error(json.message || "Fair 储存失败");
   applyLocalDataRevision(json.dataRevision);
   return json;
 }
@@ -732,15 +673,9 @@ async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "") {
     date,
     host,
     amount,
-    clientUpdatedAt,
-    baseRevision: getLocalDataRevision()
+    clientUpdatedAt
   });
-  if (!json.ok) {
-    const error = new Error(json.message || "Live 储存失败");
-    error.code = json.code || "";
-    error.currentRevision = Number(json.currentRevision || 0);
-    throw error;
-  }
+  if (!json.ok) throw new Error(json.message || "Live 储存失败");
   applyLocalDataRevision(json.dataRevision);
   return json.row || null;
 }
