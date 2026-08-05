@@ -22,12 +22,27 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 
-/* V13.8: first paint must not wait for the full system render. */
+async function loadMonthCloudShared(month, timeoutMs = 15000) {
+  const key = /^\d{4}-\d{2}$/.test(String(month || "")) ? String(month) : new Date().toISOString().slice(0, 7);
+  if (cloudLoadPromisesByMonth.has(key)) return cloudLoadPromisesByMonth.get(key);
+
+  const request = jsonp(
+    { action: "loadMonth", month: key },
+    { timeoutMs: Number(timeoutMs || 15000) }
+  ).finally(() => {
+    if (cloudLoadPromisesByMonth.get(key) === request) cloudLoadPromisesByMonth.delete(key);
+  });
+
+  cloudLoadPromisesByMonth.set(key, request);
+  return request;
+}
+
+/* V13.9: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V13.8: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V13.9: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -102,7 +117,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V13.8: damaged/partial cache must never trap startup.
+    // V13.9: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -397,10 +412,7 @@ async function loadFromSheet(options = {}) {
 
       for (let attempt = 1; attempt <= 2; attempt += 1) {
         try {
-          json = await jsonp(
-            { action: "loadMonth", month },
-            { timeoutMs: Number(options.timeoutMs || 15000) }
-          );
+          json = await loadMonthCloudShared(month, Number(options.timeoutMs || 15000));
           if (!json || !json.ok) throw new Error((json && json.message) || "读取失败");
           lastError = null;
           break;
@@ -438,7 +450,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V13.8 mobile performance: startup loads only the selected month.
+      // V13.9 mobile performance: startup loads only the selected month.
       // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
         setTimeout(() => {
