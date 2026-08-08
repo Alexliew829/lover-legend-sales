@@ -60,12 +60,12 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-/* V14.2: first paint must not wait for the full system render. */
+/* V14.3: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V14.2: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V14.3: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -141,7 +141,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V14.2: damaged/partial cache must never trap startup.
+    // V14.3: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -356,6 +356,9 @@ async function loadYearInBackground(year) {
     try {
       const json = await jsonp({ action: "loadYear", year: y }, { timeoutMs: 20000 });
       if (!json.ok) throw new Error(json.message || "读取全年资料失败");
+      const fairDraftDirtyBeforeCloud = typeof fairInputsHaveUnsavedChanges === "function"
+        ? fairInputsHaveUnsavedChanges()
+        : false;
       loadPendingRows();
       mergeCloudYearRows(y, json.rows || [], requestStartedAt);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
@@ -366,6 +369,12 @@ async function loadYearInBackground(year) {
       if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
       renderHomeFirst();
       scheduleDeferredFullRender(0);
+      // V14.3: if Fair is currently open, repaint its date inputs from the
+      // newly merged cloud rows, unless the user has an unsaved Fair draft.
+      const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
+      if (fairPageActive && !fairDraftDirtyBeforeCloud && typeof refreshFairInputsFromRows === "function") {
+        refreshFairInputsFromRows(false);
+      }
       saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
       loadedCloudYears.add(y);
       setSync("已同步", true);
@@ -432,7 +441,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V14.2: opening/resuming first checks one tiny revision value.
+      // V14.3: opening/resuming first checks one tiny revision value.
       // Full month data is downloaded only when another device changed data.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
@@ -450,7 +459,7 @@ async function loadFromSheet(options = {}) {
             return { ok:true, month, revisionUnconfirmed:true };
           }
         } catch (revisionError) {
-          // V14.2: when local data exists, a slow/failed revision check must not
+          // V14.3: when local data exists, a slow/failed revision check must not
           // trigger the expensive full-month download. Keep the visible local
           // data and let the next foreground/interval/manual check try again.
           setSync("本机资料已显示 · 云端暂未确认", false, true);
@@ -484,6 +493,9 @@ async function loadFromSheet(options = {}) {
 
       if (lastError) throw lastError;
 
+      const fairDraftDirtyBeforeCloud = typeof fairInputsHaveUnsavedChanges === "function"
+        ? fairInputsHaveUnsavedChanges()
+        : false;
       loadPendingRows();
       mergeCloudMonthRows(month, json.rows || [], requestStartedAt);
       applyLocalDataRevision(json.dataRevision);
@@ -496,6 +508,12 @@ async function loadFromSheet(options = {}) {
 
       renderHomeFirst();
       scheduleDeferredFullRender(0);
+      // V14.3: keep Fair's visible daily amount inputs consistent with rows after
+      // cloud refresh. Do not overwrite any unsaved Fair edits.
+      const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
+      if (typeof refreshFairInputsFromRows === "function" && !fairDraftDirtyBeforeCloud && (fairPageActive || options.refreshFairInputs === true)) {
+        refreshFairInputsFromRows(false);
+      }
       saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
       setSync("已同步", true);
       completedSuccessfully = true;
@@ -508,7 +526,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V14.2 mobile performance: startup loads only the selected month.
+      // V14.3 mobile performance: startup loads only the selected month.
       // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
         setTimeout(() => {

@@ -51,7 +51,8 @@
       skipLocalCache: true,
       loadYear: false,
       silent: false,
-      statusText: manual ? "正在刷新云端资料..." : "正在检查云端更新..."
+      statusText: manual ? "正在刷新云端资料..." : "正在检查云端更新...",
+      refreshFairInputs: manual
     }).catch(err => {
       console.warn("Cloud refresh failed:", reason, err);
       return { ok:false, error:err };
@@ -64,7 +65,7 @@
 
   function startAutomaticRefreshAfterInitialSync() {
     if (autoRefreshStartTimer || autoRefreshInterval) return;
-    // V14.2: do not fire a second check 5 seconds after startup.
+    // V14.3: do not fire a second check 5 seconds after startup.
     // The first automatic check starts only after a full interval from the
     // completed startup sync, preventing duplicate requests and UI flicker.
     autoRefreshStartTimer = setTimeout(() => {
@@ -188,7 +189,7 @@
   });
   window.addEventListener("online", () => refreshCloudData("online", false));
 
-  // V14.2: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
+  // V14.3: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {
     if (!("ontouchstart" in window)) return;
 
