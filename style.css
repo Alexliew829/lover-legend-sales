@@ -225,7 +225,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 @media(max-width:430px){.monthly-summary-btn{min-width:116px;padding:12px 10px;font-size:14px}.year-summary-row{gap:8px}}
 
 
-/* V14.5 Report historical month selector */
+/* V14.6 Report historical month selector */
 .report-header-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px}
 .report-header-row h2{margin-bottom:3px}
 .report-month-label{font-size:13px;font-weight:700;color:#8b0000}
@@ -234,11 +234,11 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .report-month-control input{margin:0;padding:9px 10px;font-weight:700;color:#8b0000;background:#fff}
 @media(max-width:520px){.report-header-row{align-items:stretch}.report-month-control{min-width:140px}}
 
-/* V14.5: prevent repeated commission-save clicks while syncing */
+/* V14.6: prevent repeated commission-save clicks while syncing */
 #saveFairCommissionBtn:disabled{opacity:.65;cursor:wait;}
 
 
-/* V14.5 mobile pull-down refresh */
+/* V14.6 mobile pull-down refresh */
 .pull-refresh-indicator{
   position:fixed;
   top:0;
@@ -263,135 +263,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .pull-refresh-indicator.refreshing{color:#0b6b2b}
 
 
-/* ================= V14.5 Password System ================= */
-.access-lock {
-  position: fixed;
-  inset: 0;
-  z-index: 30000;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: linear-gradient(rgba(239,247,241,.98),rgba(229,240,232,.99));
-}
-.access-lock[hidden] { display: none; }
-.access-lock-card {
-  width: min(100%, 370px);
-  padding: 27px 22px;
-  border: 1px solid #bed2c4;
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 15px 42px rgba(22,66,40,.2);
-  text-align: center;
-}
-.access-lock-logo { font-size: 38px; margin-bottom: 8px; }
-.access-lock-card h1 { margin: 0 0 7px; color: #0b6b2b; font-size: 25px; }
-.access-lock-card p { margin: 0 0 17px; color: #66736b; font-size: 13px; }
-.access-lock-card form { display: grid; gap: 11px; }
-.masked-access-code {
-  -webkit-text-security: disc;
-  font-family: Arial, sans-serif;
-}
-.access-lock-card input {
-  width: 100%;
-  text-align: center;
-  font-size: 18px;
-  letter-spacing: 1px;
-}
-.primary-access-btn { min-height: 46px; }
-.biometric-login-btn {
-  width: 100%;
-  margin-top: 11px;
-  background: #eef7f1;
-  color: #0b6b2b;
-}
-.biometric-login-btn[hidden] { display:block!important; visibility:hidden; pointer-events:none; }
-.biometric-login-status,
-.access-lock-status {
-  min-height: 21px;
-  margin-top: 8px;
-  color: #b42318;
-  font-size: 13px;
-  font-weight: 700;
-}
-.password-hint-btn {
-  margin-top: 8px;
-  border: 0;
-  background: transparent;
-  color: #0b6b2b;
-  text-decoration: underline;
-}
-.access-password-hint {
-  margin-top: 8px;
-  padding: 9px;
-  border-radius: 9px;
-  background: #eef7f1;
-  color: #245a37;
-  font-weight: 800;
-}
-body.access-locked { overflow: hidden; }
-.password-change-grid {
-  display: grid;
-  grid-template-columns: repeat(3,minmax(0,1fr));
-  gap: 9px;
-  margin: 12px 0;
-}
-.password-change-grid label {
-  display: grid;
-  gap: 5px;
-  font-size: 13px;
-  font-weight: 700;
-}
-.password-change-grid input { width: 100%; }
-.current-password-hint {
-  margin-top: 10px;
-  padding: 9px 11px;
-  border-radius: 9px;
-  background: #f0f6f2;
-  color: #526259;
-  font-size: 13px;
-}
-.password-change-status {
-  min-height: 22px;
-  margin-top: 8px;
-  color: #0b6b2b;
-  font-weight: 700;
-}
-.device-biometric-box {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-  margin-top: 15px;
-  padding-top: 13px;
-  border-top: 1px solid #dce6df;
-}
-.device-biometric-box strong,
-.device-biometric-box span { display: block; }
-.device-biometric-box span {
-  margin-top: 3px;
-  color: #6b746e;
-  font-size: 12px;
-}
-.device-biometric-actions {
-  display: flex;
-  gap: 7px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-@media(max-width:620px) {
-  .password-change-grid { grid-template-columns: 1fr; }
-  .device-biometric-box {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .device-biometric-actions {
-    justify-content: stretch;
-  }
-  .device-biometric-actions button { width: 100%; }
-}
-
-
-/* V14.5 performance */
+/* V14.6 performance */
 .logo,.seal{
   content-visibility:auto;
   contain:layout paint;
@@ -405,7 +277,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V14.5 selected-date daily sales */
+/* V14.6 selected-date daily sales */
 #dashboardDate{
   color:#b00000;
   font-weight:900;
@@ -446,7 +318,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V14.5 period grouping and monthly summary */
+/* V14.6 period grouping and monthly summary */
 .period-summary-card{
   position:relative;
   padding:18px;
@@ -470,7 +342,7 @@ body.access-locked { overflow: hidden; }
 #monthlySummaryBtn:disabled{opacity:.72;cursor:wait;}
 
 
-/* V14.5 final UI consistency */
+/* V14.6 final UI consistency */
 .dashboard-date-field input[type=text]{
   color:#b00000;
   font-weight:900;
@@ -487,7 +359,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V14.5 selected-date Fair, Live and Total */
+/* V14.6 selected-date Fair, Live and Total */
 .daily-total-line{
   display:inline-block;
   margin-top:5px;
@@ -501,7 +373,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V14.5 Balakong / Belimbing monthly cards side by side */
+/* V14.6 Balakong / Belimbing monthly cards side by side */
 #dashboard .dash{
   grid-template-columns:minmax(0,1fr) minmax(0,1fr);
   gap:10px;
@@ -544,7 +416,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V14.5 日 / 月 / 年独立区块 */
+/* V14.6 日 / 月 / 年独立区块 */
 .daily-summary-frame{
   border-color:#d66b6b;
   background:#fffafa;
@@ -566,7 +438,7 @@ body.access-locked { overflow: hidden; }
   box-sizing:border-box;
 }
 
-/* V14.5 monthly company cards remain side by side */
+/* V14.6 monthly company cards remain side by side */
 #page-home .month-summary-frame .dash{
   grid-template-columns:minmax(0,1fr) minmax(0,1fr);
   gap:10px;
@@ -603,7 +475,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V14.5 Live 日期区间佣金 */
+/* V14.6 Live 日期区间佣金 */
 .live-schedule-title{
   margin-top:22px;
 }
@@ -681,7 +553,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V14.5 Live special commission and record details */
+/* V14.6 Live special commission and record details */
 .live-rate-schedule-row.is-open{
   border-color:#d08b2f;
   background:#fff9ec;
@@ -749,7 +621,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V14.5 Sales / Fair monthly record lists */
+/* V14.6 Sales / Fair monthly record lists */
 .month-record-group{
   margin-bottom:12px;
   padding:12px;
@@ -787,13 +659,13 @@ body.access-locked { overflow: hidden; }
   .month-record-row{font-size:14px}
 }
 
-/* V14.5 */
+/* V14.6 */
 .fair-view-only-hint{margin-top:8px;margin-bottom:10px}
 #fairEndWrap.hidden,#fairEditArea.hidden{display:none!important}
 #fairDateRange.view-only{grid-template-columns:1fr}
 .date-field input[type=text],.date-field .date-btn{cursor:pointer;touch-action:manipulation}
 
-/* V14.5 selected day summary */
+/* V14.6 selected day summary */
 .daily-summary-list{display:flex;flex-direction:column;gap:7px}
 .daily-summary-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:7px 0}
 .daily-summary-row+.daily-summary-row{border-top:1px dashed #e2e2e2}
@@ -801,7 +673,7 @@ body.access-locked { overflow: hidden; }
 .daily-summary-empty{padding:10px 0;color:#777}
 
 
-/* V14.5 editable Live special commission rules */
+/* V14.6 editable Live special commission rules */
 .live-rate-schedule-info{cursor:pointer}
 .live-rate-schedule-info:hover{opacity:.82}
 .live-rate-schedule-row.is-editing{
@@ -809,7 +681,7 @@ body.access-locked { overflow: hidden; }
   outline-offset:2px;
 }
 
-/* V14.5: remove inactive Live host without touching historical records */
+/* V14.6: remove inactive Live host without touching historical records */
 .host-commission-name{font-weight:700;overflow-wrap:anywhere;min-width:90px}
 .host-commission-controls{display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end}
 .host-commission-controls .commission-input-row{width:min(210px,58%);margin:0}
@@ -822,7 +694,7 @@ body.access-locked { overflow: hidden; }
 }
 
 
-/* V14.5 mobile native date picker: the invisible native input covers the field.
+/* V14.6 mobile native date picker: the invisible native input covers the field.
    This avoids iOS Safari blocking programmatic showPicker()/click(). */
 @media (max-width: 768px), (pointer: coarse) {
   .date-field { position: relative; }
