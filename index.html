@@ -20,7 +20,19 @@ html,body{margin:0;min-height:100%;font-family:Arial,"Microsoft YaHei","PingFang
 
 
 
-\n<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>\n<script>\nwindow.OneSignalDeferred = window.OneSignalDeferred || [];\nOneSignalDeferred.push(async function(OneSignal) {\n  await OneSignal.init({\n    appId: "c6c0be13-4f8e-42cf-8567-efde17a483b3",\n    serviceWorkerPath: "OneSignalSDKWorker.js",\n    serviceWorkerParam: { scope: "./" },\n    notifyButton: { enable: false }\n  });\n});\n</script>\n</head>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+OneSignalDeferred.push(async function(OneSignal) {
+  await OneSignal.init({
+    appId: "c6c0be13-4f8e-42cf-8567-efde17a483b3",
+    serviceWorkerPath: "OneSignalSDKWorker.js",
+    serviceWorkerParam: { scope: "./" },
+    notifyButton: { enable: false }
+  });
+});
+</script>
+</head>
 <body>
 
 <script>window.LOVER_API_URL="https://script.google.com/macros/s/AKfycby1OwDIiVf5quXKiD9AG8s2ppM942sLFdJSfyePp--yZtDjYY8jBtkOYLwD9c3WiC_KNw/exec";</script>
