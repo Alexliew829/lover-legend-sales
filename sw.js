@@ -1,11 +1,11 @@
-const CACHE_NAME = "lover-sales-v14-8";
+const CACHE_NAME = "lover-sales-v15-0";
 
 const CORE_FILES = [
   "./",
   "./index.html",
   "./style.css",
   "./manifest.json",
-  "./version.json",
+  "./version.json",\n  "./OneSignalSDKWorker.js",
   "./js/utils.js",
   "./js/sheet.js",
   "./js/app.js",
