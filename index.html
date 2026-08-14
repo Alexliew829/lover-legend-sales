@@ -22,8 +22,8 @@ html,body{margin:0;min-height:100%;font-family:Arial,"Microsoft YaHei","PingFang
 }
 #loading-screen img{width:120px;height:auto}
 </style>
-<link rel="preload" href="style.css?v=16.1" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="style.css?v=16.1"></noscript>
+<link rel="preload" href="style.css?v=16.2" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="style.css?v=16.2"></noscript>
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preload" href="images/logo.png" as="image">
 <link rel="preload" href="images/Logo2.jpg" as="image">
@@ -41,7 +41,7 @@ OneSignalDeferred.push(async function(OneSignal) {
     notifyButton: { enable: false }
   });
 
-  // V16.1: make sure this browser becomes a OneSignal subscription
+  // V16.2: make sure this browser becomes a OneSignal subscription
   try {
     if (!OneSignal.User.PushSubscription.optedIn) {
       try {
@@ -64,7 +64,7 @@ OneSignalDeferred.push(async function(OneSignal) {
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V16.1</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V16.2</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -127,8 +127,11 @@ OneSignalDeferred.push(async function(OneSignal) {
 
   <div id="dailyTotalsCard" class="card daily-totals-card hidden">
     <div class="daily-totals-header">
-      <div>
-        <h2>每日营业额总数</h2>
+      <div class="daily-totals-heading">
+        <div class="daily-totals-title-line">
+          <h2>每日营业额总数</h2>
+          <strong id="dailyTotalsMonthGrandTotal" class="daily-totals-month-grand-total">RM0.00</strong>
+        </div>
         <p>Balakong + Belimbing + Fair + Live</p>
       </div>
       <button type="button" class="summary-close-btn" onclick="toggleDailyTotals(false)">✕</button>
@@ -357,7 +360,7 @@ OneSignalDeferred.push(async function(OneSignal) {
     <button class="gray" onclick="backupAllData()">💾 Backup 完整备份</button>
     <button class="gray" onclick="document.getElementById('restoreFile').click()">♻️ Restore 恢复备份</button>
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
-    <p class="note">V16.1：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
+    <p class="note">V16.2：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
   </div>
 
   
@@ -466,10 +469,10 @@ OneSignalDeferred.push(async function(OneSignal) {
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=16.1",
-      "js/sheet.js?v=16.1",
-      "js/app.js?v=16.1",
-      "js/update.js?v=16.1"
+      "js/utils.js?v=16.2",
+      "js/sheet.js?v=16.2",
+      "js/app.js?v=16.2",
+      "js/update.js?v=16.2"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");
@@ -477,7 +480,7 @@ OneSignalDeferred.push(async function(OneSignal) {
       });
     return appLoadPromise;
   };
-  // V16.1: no access gate; start business scripts immediately.
+  // V16.2: no access gate; start business scripts immediately.
   window.startLoverSalesApp().finally(function(){
   var loading=document.getElementById("loading-screen");
   if(loading) loading.style.display="none";
