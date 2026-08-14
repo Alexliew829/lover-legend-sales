@@ -714,3 +714,24 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
     pointer-events: none !important;
   }
 }
+
+/* V16.1 每日营业额总数 */
+.daily-summary-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.daily-summary-title-row h2{margin:0;color:#9b1c1c}
+.daily-totals-btn{width:auto;margin:0;padding:10px 13px;border:0;border-radius:10px;background:#9b1c1c;color:#fff;font-weight:800;white-space:nowrap}
+.daily-totals-btn.active{background:#6f1111}
+.daily-totals-card{border:2px solid #d9a2a2;background:#fffdfd}
+.daily-totals-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.daily-totals-header h2{margin:0;color:#9b1c1c}
+.daily-totals-header p{margin:4px 0 0;color:#666;font-size:13px}
+.daily-totals-toolbar{display:flex;align-items:center;gap:12px;margin:14px 0 10px}
+.daily-totals-toolbar label{margin:0;white-space:nowrap;font-weight:700}
+.daily-totals-toolbar input{margin:0;flex:1}
+.daily-totals-status{min-height:20px;color:#777;font-size:13px;margin:2px 0 8px}
+.daily-totals-list{border:1px solid #e2caca;border-radius:12px;overflow:hidden;background:#fff}
+.daily-total-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 14px;border-bottom:1px dashed #e1d6d6}
+.daily-total-row:last-child{border-bottom:0}
+.daily-total-row .daily-total-date{font-weight:700}
+.daily-total-row .daily-total-amount{font-weight:900;color:#9b1c1c;white-space:nowrap}
+.daily-total-empty{padding:18px;text-align:center;color:#777}
+@media(max-width:430px){.daily-summary-title-row{gap:8px}.daily-totals-btn{padding:9px 10px;font-size:14px}.daily-totals-toolbar{align-items:stretch;flex-direction:column;gap:6px}.daily-totals-toolbar input{width:100%}}
