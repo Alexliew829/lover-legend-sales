@@ -213,14 +213,17 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .monthly-summary-header h2{margin:0}
 .monthly-summary-header p{margin:4px 0 0;color:#666;font-size:13px}
 .summary-close-btn{width:auto;margin:0;padding:6px 10px;background:#eee;color:#333;border:0;border-radius:8px}
-.monthly-summary-table-wrap{overflow-x:auto;margin-top:12px}
-.monthly-summary-table{min-width:720px;width:100%;border-collapse:collapse}
-.monthly-summary-table th,.monthly-summary-table td{padding:10px 8px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap}
-.monthly-summary-table th:first-child,.monthly-summary-table td:first-child{text-align:left}
-.monthly-summary-row{cursor:pointer}
-.monthly-summary-row:hover{background:#f2faf4}
-.monthly-summary-row.active{background:#e2f3e7}
-.monthly-summary-row td:last-child{color:#a30000}
+.monthly-summary-grid{display:grid;grid-template-columns:minmax(92px,1fr) minmax(112px,1.25fr) minmax(112px,1.25fr);margin-top:12px;border:1px solid #d9e6dc;border-radius:12px;overflow:hidden}
+.monthly-summary-grid>*{min-width:0;padding:11px 10px;border-bottom:1px solid #e1e1e1}
+.monthly-grid-head-label,.monthly-month-head{font-weight:900;background:#f3f5f3}
+.monthly-grid-head-label{display:flex;align-items:center}
+.monthly-month-head{border:0;border-left:1px solid #e1e1e1;font:inherit;font-weight:900;cursor:pointer}
+.monthly-month-head.active{color:#b00000;background:#edf8f0}
+.monthly-grid-label{font-weight:900;background:#fbfdfb}
+.monthly-grid-value{text-align:right;font-weight:800;border-left:1px solid #e1e1e1;white-space:nowrap}
+.monthly-summary-grid>*:nth-last-child(-n+3){border-bottom:0}
+.monthly-summary-grid .summary-empty{grid-column:1/-1;text-align:center;color:#777}
+@media(max-width:430px){.monthly-summary-grid{grid-template-columns:minmax(82px,.9fr) minmax(100px,1.15fr) minmax(100px,1.15fr)}.monthly-summary-grid>*{padding:10px 7px;font-size:13px}.monthly-grid-value{font-size:12.5px}}
 .summary-empty{text-align:center!important;color:#777;padding:22px!important}
 @media(max-width:430px){.monthly-summary-btn{min-width:116px;padding:12px 10px;font-size:14px}.year-summary-row{gap:8px}}
 
@@ -715,7 +718,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* V16.3 每日营业额总数 */
+/* V16.4 每日营业额总数 */
 .daily-summary-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .daily-summary-title-row h2{margin:0;color:#9b1c1c}
 .daily-totals-btn{width:auto;margin:0;padding:10px 13px;border:0;border-radius:10px;background:#9b1c1c;color:#fff;font-weight:800;white-space:nowrap}
