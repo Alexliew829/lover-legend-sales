@@ -158,15 +158,16 @@ function downloadFile(filename,content,type){
   const b=new Blob([content],{type});
   const u=URL.createObjectURL(b);
   const l=document.createElement("a");
-
   l.href=u;
   l.download=filename;
-
+  l.rel="noopener";
+  l.style.display="none";
   document.body.appendChild(l);
   l.click();
-  document.body.removeChild(l);
-
-  URL.revokeObjectURL(u);
+  setTimeout(()=>{
+    try{document.body.removeChild(l)}catch(e){}
+    URL.revokeObjectURL(u);
+  },1000);
 }
 
 function getLastDayOfMonth(m){
@@ -300,7 +301,7 @@ function monthAfter(m){
 }
 
 
-// V16.6: Fair 地点键值忽略所有空格及英文字母大小写，但保留符号。
+// V16.7: Fair 地点键值忽略所有空格及英文字母大小写，但保留符号。
 // 例如 "JB AEON Mall , Terbau City" 与 "JB AEON Mall,Terbau City" 是同一地点。
 function normalizeFairLocationKey(value){
   return canonicalLocation(value||"")
