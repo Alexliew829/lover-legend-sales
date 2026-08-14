@@ -715,7 +715,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* V16.2 每日营业额总数 */
+/* V16.3 每日营业额总数 */
 .daily-summary-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .daily-summary-title-row h2{margin:0;color:#9b1c1c}
 .daily-totals-btn{width:auto;margin:0;padding:10px 13px;border:0;border-radius:10px;background:#9b1c1c;color:#fff;font-weight:800;white-space:nowrap}
