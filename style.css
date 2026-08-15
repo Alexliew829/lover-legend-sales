@@ -717,7 +717,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* V16.9 当月营业额总数 */
+/* V17.0 当月营业额总数 */
 .daily-summary-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .daily-summary-title-row h2{margin:0;color:#9b1c1c}
 .daily-totals-btn{width:auto;margin:0;padding:10px 13px;border:0;border-radius:10px;background:#9b1c1c;color:#fff;font-weight:800;white-space:nowrap}
@@ -741,7 +741,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .daily-total-empty{padding:18px;text-align:center;color:#777}
 @media(max-width:430px){.daily-summary-title-row{gap:8px}.daily-totals-btn{padding:9px 10px;font-size:14px}.daily-totals-title-line{gap:10px}.daily-totals-month-grand-total{font-size:18px}.daily-totals-toolbar{align-items:stretch;flex-direction:column;gap:6px}.daily-totals-toolbar input{width:100%}}
 
-/* V16.9 monthly summary total row: every month total is green */
+/* V17.0 monthly summary total row: every month total is green */
 .monthly-summary-grid .monthly-total-cell{
   font-weight:900;
   color:#08752f;
@@ -749,11 +749,39 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   background:#f2faf4;
 }
 
-/* V16.9 month titles: same deep red; current month differs by background only */
+/* V17.0 month titles: same deep red; current month differs by background only */
 .monthly-summary-grid .monthly-month-head,
 .monthly-summary-grid .monthly-month-head.active{
   color:#b00000 !important;
 }
 .monthly-summary-grid .monthly-month-head.active{
   background:#edf8f0;
+}
+
+
+/* V17.0 Top 3 business performance */
+.top3-toggle-btn{
+  width:100%;
+  margin:12px 0 0;
+  padding:10px 12px;
+  border:1px solid #d7b5b5;
+  border-radius:10px;
+  background:#fff7f7;
+  color:#8d1717;
+  font-weight:800;
+  cursor:pointer;
+}
+.top3-toggle-btn.active{background:#8d1717;color:#fff;border-color:#8d1717}
+.top3-panel{margin-top:8px;border:1px solid #ead4d4;border-radius:10px;overflow:hidden;background:#fff}
+.top3-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-bottom:1px dashed #eadede;font-size:13px}
+.top3-row:last-child{border-bottom:0}
+.top3-meta{min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:2px;color:#333}
+.top3-rank{margin-right:4px}
+.top3-name{font-weight:800;color:#14743a}
+.top3-sep{color:#aaa}
+.top3-row strong{white-space:nowrap;color:#9b1c1c}
+.top3-empty{padding:12px;text-align:center;color:#777;font-size:13px}
+@media(max-width:430px){
+  .top3-row{align-items:flex-start;flex-direction:column;gap:5px}
+  .top3-row strong{padding-left:26px}
 }
