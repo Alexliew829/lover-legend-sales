@@ -26,7 +26,7 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V16.9: every time Live is opened, start from today's date.
+  // V17.0: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -38,7 +38,7 @@ function showPage(name,el){
   if(name==="report")renderTable();
   if(name==="fair"&&typeof refreshFairInputsFromRows==="function")refreshFairInputsFromRows(false);
 
-  // V16.9: page switching never waits for or triggers cloud sync.
+  // V17.0: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");return [r.type,r.date,r.company,location].join("|")}
@@ -47,6 +47,71 @@ function upsertLocalRow(n){rows=dedupeRows([...rows,n])}
 function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&r.company===c);return f?Number(f.amount||0):0}
 function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c);document.getElementById("dailySales").value=formatAmount(a);document.getElementById("salesDateResult").textContent=`${companyNames[c]}｜${d}｜${money(a)}`;renderSalesMonthlyList()}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
+
+// V17.0: Top 3 business performance. Uses rows already loaded in memory only;
+// opening/closing Top 3 never triggers an extra cloud request.
+function weekdayZh(displayDate){
+  const iso=displayToISO(displayDate);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso))return "";
+  const parts=iso.split("-").map(Number);
+  const d=new Date(parts[0],parts[1]-1,parts[2]);
+  return ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"][d.getDay()];
+}
+function top3RowsForMonth(type,month,company=""){
+  return dedupeRows(rows)
+    .filter(r=>r.type===type)
+    .filter(r=>company?r.company===company:true)
+    .filter(r=>displayToISO(r.date).slice(0,7)===month)
+    .filter(r=>Number(r.amount||0)>0)
+    .sort((a,b)=>Number(b.amount||0)-Number(a.amount||0)||displayToISO(b.date).localeCompare(displayToISO(a.date)))
+    .slice(0,3);
+}
+function renderTop3List(elId,list,kind){
+  const el=document.getElementById(elId);
+  if(!el)return;
+  const medals=["🥇","🥈","🥉"];
+  if(!list.length){
+    el.innerHTML='<div class="top3-empty">这个月份还没有营业额记录</div>';
+    return;
+  }
+  el.innerHTML=list.map((r,i)=>{
+    const weekday=weekdayZh(r.date);
+    let lead="";
+    if(kind==="fair")lead=`<span class="top3-name">${canonicalLocation(r.location||"Fair")}</span><span class="top3-sep"> · </span>`;
+    else if(kind==="live")lead=`<span class="top3-name">${canonicalLiveHost(r.location||"")||"未注明主播"}</span><span class="top3-sep"> · </span>`;
+    return `<div class="top3-row">
+      <div class="top3-meta"><span class="top3-rank">${medals[i]||"#"+(i+1)}</span>${lead}<span>${r.date}</span><span class="top3-sep"> · </span><span>${weekday}</span></div>
+      <strong>RM${money(r.amount)}</strong>
+    </div>`;
+  }).join("");
+}
+function renderBusinessTop3(){
+  const month=selectedMonth();
+  renderTop3List("balakongTop3",top3RowsForMonth("daily",month,"balakong"),"daily");
+  renderTop3List("belimbingTop3",top3RowsForMonth("daily",month,"belimbing"),"daily");
+  renderTop3List("fairHomeTop3",top3RowsForMonth("fair",month),"fair");
+  renderTop3List("liveHomeTop3",top3RowsForMonth("live",month),"live");
+}
+function renderFairPageTop3(){
+  const month=monthFromDateControl("fairStart");
+  renderTop3List("fairPageTop3",top3RowsForMonth("fair",month),"fair");
+}
+function renderLivePageTop3(){
+  const month=getLiveSelectedMonth();
+  renderTop3List("livePageTop3",top3RowsForMonth("live",month),"live");
+}
+function toggleTop3(id,btn){
+  const panel=document.getElementById(id);
+  if(!panel)return;
+  const show=panel.classList.contains("hidden");
+  panel.classList.toggle("hidden",!show);
+  if(btn)btn.classList.toggle("active",show);
+  if(show){
+    if(id==="fairPageTop3")renderFairPageTop3();
+    else if(id==="livePageTop3")renderLivePageTop3();
+    else renderBusinessTop3();
+  }
+}
 function fairLocationsThisMonth(){return [...new Set(rows.filter(r=>r.type==="fair"&&sameMonth(r.date)&&Number(r.amount)>0).map(r=>canonicalLocation(r.location||"Fair")))].sort()}
 function fairByLocation(){const g={};rows.filter(r=>r.type==="fair"&&sameMonth(r.date)&&Number(r.amount)>0).forEach(r=>{const l=canonicalLocation(r.location||"Fair");g[l]=(g[l]||0)+Number(r.amount||0)});return g}
 function renderFairLocationList(){const g=fairByLocation(),locs=Object.keys(g).sort(),c=document.getElementById("fairLocationList");if(!locs.length){c.innerHTML='<div class="sub">这个月份还没有 Fair 记录</div>';return}const fairTotal=Object.values(g).reduce((sum,value)=>sum+Number(value||0),0);const rate=getFairCommissionRate(fairTotal)*100;c.innerHTML='<div class="fair-location-grid">'+locs.map(l=>`<div class="fair-location-card"><div class="fair-location-title">${l}</div><div class="fair-location-row"><span>营业额</span><b>${money(g[l])}</b></div><div class="fair-location-row"><span>佣金 ${Number(rate.toFixed(2))}%</span><b>${money(g[l]*rate/100)}</b></div></div>`).join("")+'</div>'}
@@ -316,7 +381,7 @@ function applyCloudCommissionSettings(settings){
   const incomingLiveRevision=Number(incoming.liveRevision||0);
   const localLiveRevision=Number(local.liveRevision||0);
 
-  // V16.9: Fair and Live each have their own revision.
+  // V17.0: Fair and Live each have their own revision.
   // A stale device/cloud response can never overwrite a newer saved setting.
   const keepLocalFair=incomingFairRevision<localFairRevision;
   const keepLocalLive=liveCommissionDraftDirty||incomingLiveRevision<localLiveRevision;
@@ -453,7 +518,7 @@ function getCommissionSettingsForMonth(month){
   const snapshot=(systemState.commissionSnapshots||{})[target];
   if(!snapshot)return current;
 
-  // V16.9: historical Fair rates come from that month's snapshot, while the
+  // V17.0: historical Fair rates come from that month's snapshot, while the
   // Live schedule is selected by the actual Live record date. This prevents
   // Home's history month selector from blocking the current month's More setup.
   return normalizeCommissionSettings({
@@ -592,7 +657,7 @@ async function removeLiveHost(hostKey){
     if(message){message.textContent="✅ 主播已设为离职／停用";message.classList.remove("hidden");}
     setSync("已同步",true);
   }catch(error){
-    // V16.9: timeout must not undo the user's local action.
+    // V17.0: timeout must not undo the user's local action.
     console.warn("Inactive host cloud sync delayed",error);
     liveCommissionDraftDirty=true;
     queueLiveCommissionRetry(nextSettings,commissionConfigMonth());
@@ -790,7 +855,7 @@ function renderFairCommission(total){
 function renderDashboard(){const bt=totalBy("daily","balakong","today"),blt=totalBy("daily","belimbing","today"),ft=totalBy("fair","","today"),bm=totalBy("daily","balakong","month"),blm=totalBy("daily","belimbing","month"),fm=totalBy("fair","","month"),by=totalBy("daily","balakong","year"),bly=totalBy("daily","belimbing","year"),fy=totalBy("fair","","year");document.getElementById("balakongMonth").textContent=money(bm);document.getElementById("belimbingMonth").textContent=money(blm);renderFairLocationList();document.getElementById("fairMonthTotal").textContent=money(fm);renderFairCommission(fm);document.getElementById("monthGrandTotal").textContent=money(bm+blm+fm);document.getElementById("balakongYearTotal").textContent=money(by);document.getElementById("belimbingYearTotal").textContent=money(bly);document.getElementById("fairYearTotal").textContent=money(fy);document.getElementById("yearGrandTotal").textContent=money(by+bly+fy);renderTodayCompanyStatus()}
 function sortReportRows(list){const rank=r=>r.type==="daily"&&r.company==="balakong"?0:r.type==="daily"&&r.company==="belimbing"?1:2;return [...list].sort((a,b)=>rank(a)-rank(b)||canonicalLocation(a.location).localeCompare(canonicalLocation(b.location))||displayToISO(a.date).localeCompare(displayToISO(b.date)))}
 function renderTable(){const s=sortReportRows(dedupeRows(rows).filter(r=>sameMonth(r.date)&&Number(r.amount)>0));document.getElementById("recordTable").innerHTML=s.map(r=>`<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":"每日"}</td><td>${companyNames[r.company]||r.company}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td></tr>`).join("")||'<tr><td colspan="5" style="text-align:center;">这个月份还没有记录</td></tr>'}
-function renderAll(){rows=dedupeRows(rows);renderDashboard();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions();updateFairPageMode();renderFairMonthlyList();renderFairDailySummary();renderLiveDailySummary();renderLiveMonthlyList()}
+function renderAll(){rows=dedupeRows(rows);renderDashboard();renderBusinessTop3();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions();updateFairPageMode();renderFairMonthlyList();renderFairDailySummary();renderFairPageTop3();renderLiveDailySummary();renderLiveMonthlyList();renderLivePageTop3()}
 async function saveDailySales(){
   if(!ensureWritableSelection())return;
   const d=isoToDisplay(document.getElementById("saleDate").value);
@@ -818,7 +883,7 @@ async function saveDailySales(){
   renderAll();
   showTempMsg("saveMsg");
 
-  // V16.9 mobile-safe save: return control immediately after the local durable
+  // V17.0 mobile-safe save: return control immediately after the local durable
   // write. Fire a keepalive request now, then confirm in the background.
   if(typeof saveLocalDataCache==="function")saveLocalDataCache();
   setSync("已储存 · 云端后台同步中...");
@@ -979,7 +1044,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     setSync("已储存，正在后台同步...");
     const result=await saveFairBatchToSheet(loc,records);
 
-    // V16.9: local Fair values are direct replacements, never additions. The server
+    // V17.0: local Fair values are direct replacements, never additions. The server
     // also removes duplicate Sheet rows whose location differs only by spaces/case.
     // The response confirms the authoritative overwrite and clears pending rows.
     records.forEach(i=>clearPendingRow({
@@ -997,7 +1062,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"16.9"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"17.0"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1010,7 +1075,7 @@ function updateReadOnlyMode(){
     el.textContent=closed?`${m} · 已结算 · 可修正`:history?`${m} · 历史月份 · 可编辑`:`${m} · 当前月份 · 可编辑`;
   }
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"16.9"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=Array.isArray(state.closedMonths)?state.closedMonths:[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"17.0"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1019,7 +1084,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV16.9 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV17.0 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){
   const current=monthISO();
   document.getElementById("monthPicker").value=current;
@@ -1158,7 +1223,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V16.9: paint Home immediately, restore local cache, then perform only a
+// V17.0: paint Home immediately, restore local cache, then perform only a
 // lightweight Revision check. Full month data is downloaded only when the
 // cloud Revision proves that another device changed data.
 attachMoneyInputs();
@@ -1223,7 +1288,7 @@ async function startInitialSalesDataLoad() {
   return startupSalesSyncPromise;
 }
 
-// V16.9: start cached Home immediately, then warm the current year's historical
+// V17.0: start cached Home immediately, then warm the current year's historical
 // months in the background so Monthly Summary is complete on first open.
 startInitialSalesDataLoad().finally(()=>{
   const startupYear=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
@@ -1252,7 +1317,7 @@ function getSavedLiveHosts(){
 function collectLiveHosts(){
   const merged=[];
   const cloudHosts=Object.values((getCommissionSettings().liveHosts)||{});
-  // V16.9: active host list is independent from historical Live records.
+  // V17.0: active host list is independent from historical Live records.
   // Deleted hosts stay in old reports but do not return to current host options.
   [...cloudHosts,...getSavedLiveHosts()]
     .filter(Boolean)
@@ -1355,6 +1420,7 @@ function renderSalesMonthlyList(){
   if(!list.length){
     container.innerHTML='<div class="sub">这个月份还没有 Sales 记录</div>';
     totalEl.textContent="0.00";
+    renderFairPageTop3();
     return;
   }
 
@@ -1469,6 +1535,7 @@ function renderFairMonthlyList(){
   }).join("");
 
   totalEl.textContent=money(total);
+  renderFairPageTop3();
 }
 function renderLiveMonthlyList(){
   const container=document.getElementById("liveMonthlyList");
@@ -1551,6 +1618,7 @@ function renderLiveMonthlyList(){
 
   totalEl.textContent=money(total);
   if(commissionTotalEl)commissionTotalEl.textContent=money(commissionTotal);
+  renderLivePageTop3();
 }
 
 const LIVE_LAST_SESSION_KEY="lover_live_last_saved_session_v72";
@@ -1560,6 +1628,7 @@ function saveLastLiveSession(host,dateISO){
   try{
     localStorage.setItem(LIVE_LAST_SESSION_KEY,JSON.stringify({host:cleanHost,dateISO}));
   }catch(e){}
+  renderLivePageTop3();
 }
 function restoreLastLiveSession(){
   const hostEl=document.getElementById("liveHost");
@@ -1569,7 +1638,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V16.9: do not restore the previously saved date.
+  // V17.0: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -1683,6 +1752,7 @@ function renderDashboard(){
   document.getElementById("liveYearTotal").textContent=money(ly);
   document.getElementById("yearGrandTotal").textContent=money(by+bly+fy+ly);
   renderTodayCompanyStatus();
+  renderBusinessTop3();
 }
 function sortReportRows(list){
   const rank=r=>r.type==="daily"&&r.company==="balakong"?0:r.type==="daily"&&r.company==="belimbing"?1:r.type==="fair"?2:3;
@@ -1698,7 +1768,7 @@ function renderTable(){
   document.getElementById("recordTable").innerHTML=s.map(r=>{const rate=r.type==="live"?getLiveHostRate(r.location,r.date):r.type==="fair"?getFairCommissionRate(totalBy("fair","","month"))*100:0;const commission=(r.type==="live"||r.type==="fair")?Number(r.amount||0)*rate/100:0;return `<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":r.type==="live"?"Live":"每日"}</td><td>${r.type==="live"?"Live":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td><td>${rate?Number(rate.toFixed(2))+"%":"-"}</td><td>${rate?money(commission):"-"}</td></tr>`}).join("")||'<tr><td colspan="7" style="text-align:center;">这个月份还没有记录</td></tr>';
 }
 function renderAll(){
-  // V16.9: one complete render path. This replaces the older partial duplicate
+  // V17.0: one complete render path. This replaces the older partial duplicate
   // so Fair daily/monthly totals, Home totals and Report always refresh together.
   rows=dedupeRows(rows);
   renderDashboard();
@@ -1740,7 +1810,7 @@ function buildMonthlySummary(){
   });
   return [...map.values()].map(item=>({...item,total:item.balakong+item.belimbing+item.fair+item.live})).sort((a,b)=>b.month.localeCompare(a.month));
 }
-// V16.9: expandable daily total list. It uses cached rows immediately and only
+// V17.0: expandable daily total list. It uses cached rows immediately and only
 // reads the selected historical month from cloud when the user asks for it.
 function buildDailyTotals(month){
   const totals=new Map();
@@ -1773,7 +1843,7 @@ async function loadDailyTotalsMonth(month){
   const status=document.getElementById("dailyTotalsStatus");
   renderDailyTotals();
 
-  // V16.9: current month already follows the normal Home sync flow.
+  // V17.0: current month already follows the normal Home sync flow.
   // Do not make a second cloud request just because the daily summary is opened.
   // This keeps startup / Home sync speed unchanged.
   const currentMonth=selectedMonth();
@@ -1848,7 +1918,7 @@ async function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V16.9: show cache immediately and complete historical months in background.
+  // V17.0: show cache immediately and complete historical months in background.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 
@@ -1962,7 +2032,7 @@ async function saveFairCommissionSettings(){
       fairRevision:nextFairCommissionRevision(previous.fairRevision)
     });
 
-    // V16.9: save locally immediately. Do not make the user wait for Apps Script.
+    // V17.0: save locally immediately. Do not make the user wait for Apps Script.
     applyCommissionSettings(settings);
     setSavedCommissionSnapshots(settings,{fair:true,live:false});
     updateFairCommissionDraftState();
@@ -2022,7 +2092,7 @@ async function saveLiveCommissionSettings(){
     const live=readLiveCommissionInputs();
     const candidate=normalizeCommissionSettings({...previous,...live});
     const comparable=x=>JSON.stringify({liveHostRates:x.liveHostRates||{},liveHosts:x.liveHosts||{},inactiveLiveHosts:x.inactiveLiveHosts||{},liveRateSchedules:x.liveRateSchedules||[]});
-    // V16.9: deleting the last special commission rule leaves candidate and
+    // V17.0: deleting the last special commission rule leaves candidate and
     // previous structurally identical because the delete was already applied
     // locally.  A dirty draft must still be written to cloud so [] overwrites
     // the old month snapshot instead of letting the deleted rule return.
@@ -2143,11 +2213,11 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V16.9 Backup / Restore ================= */
+/* ================= V17.0 Backup / Restore ================= */
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"16.9",
+    version:"17.0",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
