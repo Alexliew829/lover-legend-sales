@@ -65,7 +65,7 @@
 
   function startAutomaticRefreshAfterInitialSync() {
     if (autoRefreshStartTimer || autoRefreshInterval) return;
-    // V17.2: do not fire a second check 5 seconds after startup.
+    // V17.3: do not fire a second check 5 seconds after startup.
     // The first automatic check starts only after a full interval from the
     // completed startup sync, preventing duplicate requests and UI flicker.
     autoRefreshStartTimer = setTimeout(() => {
@@ -189,7 +189,7 @@
   });
   window.addEventListener("online", () => refreshCloudData("online", false));
 
-  // V17.2: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
+  // V17.3: mobile pull-down-to-refresh. Horizontal dragging never triggers it.
   function setupPullToRefresh() {
     if (!("ontouchstart" in window)) return;
 
