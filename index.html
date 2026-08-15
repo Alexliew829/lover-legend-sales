@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="style.css?v=18.1">
+<link rel="stylesheet" href="style.css?v=18.2">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
@@ -19,52 +19,104 @@ window.OneSignalDeferred = window.OneSignalDeferred || [];
 window.LoverSalesOneSignal = null;
 
 
-function getRegisteredSubscriptionIdLocal(){
-  try{return localStorage.getItem("lover_sales_registered_subscription_id")||""}
-  catch(e){return ""}
-}
-function saveRegisteredSubscriptionIdLocal(id){
-  try{if(id)localStorage.setItem("lover_sales_registered_subscription_id",String(id))}
-  catch(e){}
-}
-function registerLoverSalesSubscriptionAsync(OneSignal){
+
+let loverPushRegisterInFlight=false;
+let loverPushLastRegisterAttempt=0;
+
+function currentLoverSubscriptionId(OneSignal){
   try{
     const push=OneSignal&&OneSignal.User&&OneSignal.User.PushSubscription;
-    const id=push&&push.id?String(push.id):"";
+    return push&&push.id?String(push.id):"";
+  }catch(e){return ""}
+}
+
+function registerLoverSalesSubscriptionAsync(OneSignal,force){
+  try{
+    const id=currentLoverSubscriptionId(OneSignal);
     if(!id)return;
-    if(getRegisteredSubscriptionIdLocal()===id)return;
+
+    const now=Date.now();
+    if(!force && loverPushRegisterInFlight)return;
+    if(!force && now-loverPushLastRegisterAttempt<15000)return;
+
     if(typeof jsonp!=="function"){
-      setTimeout(()=>registerLoverSalesSubscriptionAsync(OneSignal),800);
+      setTimeout(()=>registerLoverSalesSubscriptionAsync(OneSignal,force),700);
       return;
     }
+
+    loverPushRegisterInFlight=true;
+    loverPushLastRegisterAttempt=now;
+
     jsonp({
       action:"registerPushSubscription",
       subscriptionId:id,
-      clientVersion:"18.1"
+      clientVersion:"18.2"
     },{timeoutMs:15000}).then(result=>{
       if(result&&result.ok){
-        saveRegisteredSubscriptionIdLocal(id);
-        refreshRegisteredPushStatus();
+        try{localStorage.setItem("lover_sales_registered_subscription_id",id)}catch(e){}
+        console.log("Push subscription registered:",id.slice(0,8)+"…");
       }else{
         console.warn("Push subscription registration failed:",result);
       }
-    }).catch(err=>console.warn("Push subscription registration error:",err));
+      refreshRegisteredPushStatus(OneSignal);
+    }).catch(err=>{
+      console.warn("Push subscription registration error:",err);
+    }).finally(()=>{
+      loverPushRegisterInFlight=false;
+    });
   }catch(e){
+    loverPushRegisterInFlight=false;
     console.warn("Push subscription registration exception:",e);
   }
 }
-function refreshRegisteredPushStatus(){
+
+function refreshRegisteredPushStatus(OneSignal){
   const el=document.getElementById("notificationRegistered");
   if(!el)return;
+
   if(typeof jsonp!=="function"){
-    setTimeout(refreshRegisteredPushStatus,800);
+    setTimeout(()=>refreshRegisteredPushStatus(OneSignal||window.LoverSalesOneSignal),700);
     return;
   }
-  jsonp({action:"pushSubscriptionStatus"},{timeoutMs:12000}).then(result=>{
-    if(result&&result.ok)el.textContent=`设备登记：${Number(result.count||0)} 台`;
-    else el.textContent="设备登记：无法读取";
-  }).catch(()=>{el.textContent="设备登记：无法读取"});
+
+  const id=currentLoverSubscriptionId(OneSignal||window.LoverSalesOneSignal);
+  const params={action:"pushSubscriptionStatus"};
+  if(id)params.subscriptionId=id;
+
+  jsonp(params,{timeoutMs:12000}).then(result=>{
+    if(!result||!result.ok){
+      el.textContent="设备登记：无法读取";
+      return;
+    }
+
+    const count=Number(result.count||0);
+    const registered=Boolean(result.registered);
+
+    if(id && registered){
+      el.textContent=`设备登记：✅ 本机已登记 · 共 ${count} 台`;
+      el.className="notification-registered ok";
+    }else if(id){
+      el.textContent=`设备登记：⚠️ 本机未登记 · 共 ${count} 台`;
+      el.className="notification-registered warn";
+      registerLoverSalesSubscriptionAsync(OneSignal||window.LoverSalesOneSignal,false);
+    }else{
+      el.textContent=`设备登记：共 ${count} 台 · 等待 Subscription ID`;
+      el.className="notification-registered";
+    }
+  }).catch(()=>{
+    el.textContent="设备登记：无法读取";
+    el.className="notification-registered warn";
+  });
 }
+
+function forceRegisterLoverSalesSubscription(){
+  if(window.LoverSalesOneSignal){
+    registerLoverSalesSubscriptionAsync(window.LoverSalesOneSignal,true);
+    const el=document.getElementById("notificationRegistered");
+    if(el)el.textContent="设备登记：正在重新登记…";
+  }
+}
+
 
 function updateLoverNotificationUI(OneSignal){
   const status=document.getElementById("notificationStatus");
@@ -85,7 +137,7 @@ function updateLoverNotificationUI(OneSignal){
       status.textContent="🟢 销售通知已开启";
       btn.textContent="✅ 通知已开启"; btn.disabled=false;
       if(detail)detail.textContent="Subscription ID："+String(id).slice(0,8)+"…";
-      registerLoverSalesSubscriptionAsync(OneSignal);
+      registerLoverSalesSubscriptionAsync(OneSignal,false);
     }else if(permission){
       status.textContent="🟡 已允许通知，正在建立 OneSignal 订阅";
       btn.textContent="🔧 重新建立订阅"; btn.disabled=false;
@@ -131,7 +183,7 @@ OneSignalDeferred.push(async function(OneSignal){
       notifyButton:{enable:false}
     });
     window.LoverSalesOneSignal=OneSignal;
-    OneSignal.User.PushSubscription.addEventListener("change",()=>{updateLoverNotificationUI(OneSignal);registerLoverSalesSubscriptionAsync(OneSignal);});
+    OneSignal.User.PushSubscription.addEventListener("change",()=>{updateLoverNotificationUI(OneSignal);registerLoverSalesSubscriptionAsync(OneSignal,true);});
     OneSignal.Notifications.addEventListener("permissionChange",()=>updateLoverNotificationUI(OneSignal));
     updateLoverNotificationUI(OneSignal);
 
@@ -181,7 +233,7 @@ function renderLastNotificationDispatchStatus(){
 window.addEventListener("lover-sales-notification-status",renderLastNotificationDispatchStatus);
 document.addEventListener("DOMContentLoaded",renderLastNotificationDispatchStatus);
 
-document.addEventListener("DOMContentLoaded",()=>setTimeout(refreshRegisteredPushStatus,1200));
+document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegisteredPushStatus(window.LoverSalesOneSignal),1200));
 </script>
 </head>
 <body>
@@ -190,7 +242,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(refreshRegisteredPus
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V18.1</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V18.2</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -498,7 +550,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(refreshRegisteredPus
     <button class="gray" onclick="backupAllData()">💾 Backup 完整备份</button>
     <button class="gray" onclick="document.getElementById('restoreFile').click()">♻️ Restore 恢复备份</button>
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
-    <p class="note">V18.1：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
+    <p class="note">V18.2：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
   </div>
 
   
@@ -515,6 +567,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(refreshRegisteredPus
   <div id="notificationDetail" class="notification-detail"></div>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
   <div id="notificationRegistered" class="notification-registered">设备登记：等待确认</div>
+  <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
 
@@ -622,10 +675,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(refreshRegisteredPus
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=18.1",
-      "js/sheet.js?v=18.1",
-      "js/app.js?v=18.1",
-      "js/update.js?v=18.1"
+      "js/utils.js?v=18.2",
+      "js/sheet.js?v=18.2",
+      "js/app.js?v=18.2",
+      "js/update.js?v=18.2"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");
@@ -633,7 +686,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(refreshRegisteredPus
       });
     return appLoadPromise;
   };
-  // V18.1: critical CSS is loaded synchronously; no splash/loading overlay is used.
+  // V18.2: critical CSS is loaded synchronously; no splash/loading overlay is used.
   window.startLoverSalesApp();
 })();
 </script>

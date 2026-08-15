@@ -717,7 +717,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* V18.1 当月营业额总数 */
+/* V18.2 当月营业额总数 */
 .daily-summary-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .daily-summary-title-row h2{margin:0;color:#9b1c1c}
 .daily-totals-btn{width:auto;margin:0;padding:10px 13px;border:0;border-radius:10px;background:#9b1c1c;color:#fff;font-weight:800;white-space:nowrap}
@@ -741,7 +741,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .daily-total-empty{padding:18px;text-align:center;color:#777}
 @media(max-width:430px){.daily-summary-title-row{gap:8px}.daily-totals-btn{padding:9px 10px;font-size:14px}.daily-totals-title-line{gap:10px}.daily-totals-month-grand-total{font-size:18px}.daily-totals-toolbar{align-items:stretch;flex-direction:column;gap:6px}.daily-totals-toolbar input{width:100%}}
 
-/* V18.1 monthly summary total row: every month total is green */
+/* V18.2 monthly summary total row: every month total is green */
 .monthly-summary-grid .monthly-total-cell{
   font-weight:900;
   color:#08752f;
@@ -749,7 +749,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   background:#f2faf4;
 }
 
-/* V18.1 month titles: same deep red; current month differs by background only */
+/* V18.2 month titles: same deep red; current month differs by background only */
 .monthly-summary-grid .monthly-month-head,
 .monthly-summary-grid .monthly-month-head.active{
   color:#b00000 !important;
@@ -759,7 +759,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* V18.1 Top 3 business performance */
+/* V18.2 Top 3 business performance */
 .top3-toggle-btn{
   width:100%;
   margin:12px 0 0;
@@ -787,7 +787,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* V18.1: keep Balakong / Belimbing cards clean; Top 3 controls live on their own row */
+/* V18.2: keep Balakong / Belimbing cards clean; Top 3 controls live on their own row */
 .company-top3-row{
   grid-column:1/-1;
   display:grid;
@@ -826,7 +826,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* V18.1 Top 5 compact layout
+/* V18.2 Top 5 compact layout
    Designed for single-day amounts up to RM999,999.99 without breaking mobile width. */
 .top3-row{
   display:grid;
@@ -889,7 +889,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* V18.1 historical record: lazy-loaded only after Top 5 is expanded */
+/* V18.2 historical record: lazy-loaded only after Top 5 is expanded */
 .history-record-host{border-bottom:1px solid #eadede}
 .history-record{
   display:grid;
@@ -920,7 +920,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   .history-record strong{font-size:12px}
 }
 
-/* V18.1: historical record amount stands out in green; record gap is a separate action cue. */
+/* V18.2: historical record amount stands out in green; record gap is a separate action cue. */
 .history-record-gap{
   padding:7px 10px 8px;
   background:#fffaf0;
@@ -933,10 +933,10 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .history-record-achieved{color:#087a36;background:#eef9f1}
 @media(max-width:430px){.history-record-gap{padding:6px 8px 7px;font-size:11.5px}.history-record-gap strong{font-size:12px}}
 
-/* V18.1: five-character historical-high label stays on one line on mobile. */
+/* V18.2: five-character historical-high label stays on one line on mobile. */
 .history-record-label{white-space:nowrap}
 
-/* V18.1 OneSignal notification setup */
+/* V18.2 OneSignal notification setup */
 .notification-settings-card{border:2px solid #9ac7a8}
 .notification-settings-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .notification-settings-head h2{margin:0 0 4px;color:#08752f}.notification-settings-head .note{margin:0}
@@ -956,4 +956,12 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .notification-registered{
   margin-top:6px;padding:7px 10px;border-radius:8px;background:#eef6ff;color:#24527a;
   border:1px solid #c8dff2;font-size:12px
+}
+
+/* V18.2 push-device registration verification */
+.notification-registered.ok{background:#eef9f1;color:#08752f;border-color:#b9dfc5}
+.notification-registered.warn{background:#fff8e8;color:#8a5a00;border-color:#efd28c}
+.notification-reregister-btn{
+  width:100%;margin-top:6px;padding:8px 10px;border:1px solid #cfd8df;border-radius:8px;
+  background:#fff;color:#24527a;font-size:12px;font-weight:800
 }
