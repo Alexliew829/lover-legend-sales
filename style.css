@@ -717,7 +717,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* V17.1 当月营业额总数 */
+/* V17.2 当月营业额总数 */
 .daily-summary-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .daily-summary-title-row h2{margin:0;color:#9b1c1c}
 .daily-totals-btn{width:auto;margin:0;padding:10px 13px;border:0;border-radius:10px;background:#9b1c1c;color:#fff;font-weight:800;white-space:nowrap}
@@ -741,7 +741,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .daily-total-empty{padding:18px;text-align:center;color:#777}
 @media(max-width:430px){.daily-summary-title-row{gap:8px}.daily-totals-btn{padding:9px 10px;font-size:14px}.daily-totals-title-line{gap:10px}.daily-totals-month-grand-total{font-size:18px}.daily-totals-toolbar{align-items:stretch;flex-direction:column;gap:6px}.daily-totals-toolbar input{width:100%}}
 
-/* V17.1 monthly summary total row: every month total is green */
+/* V17.2 monthly summary total row: every month total is green */
 .monthly-summary-grid .monthly-total-cell{
   font-weight:900;
   color:#08752f;
@@ -749,7 +749,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   background:#f2faf4;
 }
 
-/* V17.1 month titles: same deep red; current month differs by background only */
+/* V17.2 month titles: same deep red; current month differs by background only */
 .monthly-summary-grid .monthly-month-head,
 .monthly-summary-grid .monthly-month-head.active{
   color:#b00000 !important;
@@ -759,7 +759,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* V17.1 Top 3 business performance */
+/* V17.2 Top 3 business performance */
 .top3-toggle-btn{
   width:100%;
   margin:12px 0 0;
@@ -787,7 +787,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* V17.1: keep Balakong / Belimbing cards clean; Top 3 controls live on their own row */
+/* V17.2: keep Balakong / Belimbing cards clean; Top 3 controls live on their own row */
 .company-top3-row{
   grid-column:1/-1;
   display:grid;
@@ -822,5 +822,68 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
   .company-top3-col .top3-row{
     padding:8px;
+  }
+}
+
+
+/* V17.2 Top 5 compact layout
+   Designed for single-day amounts up to RM999,999.99 without breaking mobile width. */
+.top3-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  column-gap:10px;
+  row-gap:4px;
+}
+.top3-meta{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:2px;
+}
+.top3-row strong{
+  min-width:92px;
+  text-align:right;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+  font-size:13px;
+}
+.company-top3-btn{
+  min-height:46px;
+}
+
+@media(max-width:430px){
+  .top3-row{
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+    padding:9px 8px;
+    gap:6px;
+  }
+  .top3-meta{
+    font-size:12px;
+    line-height:1.35;
+  }
+  .top3-row strong{
+    min-width:88px;
+    padding-left:0;
+    font-size:12px;
+    text-align:right;
+  }
+  .company-top3-btn{
+    min-height:46px;
+    padding:9px 6px;
+    font-size:12.5px;
+  }
+}
+
+@media(max-width:360px){
+  .top3-row{
+    grid-template-columns:1fr;
+  }
+  .top3-row strong{
+    min-width:0;
+    text-align:left;
+    padding-left:26px;
   }
 }
