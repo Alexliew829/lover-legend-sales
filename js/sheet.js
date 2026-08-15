@@ -24,21 +24,40 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 const REVISION_CHECK_TIMEOUT_MS = 2500;
-// V17.9: notifications use the same proven JSONP transport as business saves.
+// V18.1: notifications use the same proven JSONP transport as business saves.
 // This promise is never awaited by Sales/Fair/Live saving, so push cannot slow sync.
-function dispatchSalesNotificationAsync(envelope){
-  if(!envelope||!envelope.payload||!envelope.signature)return;
+function setLastNotificationDispatchStatus(result){
+  try{
+    const payload={
+      at:new Date().toISOString(),
+      ok:Boolean(result&&result.ok),
+      result:result||null
+    };
+    localStorage.setItem("lover_sales_last_notification_dispatch_v180",JSON.stringify(payload));
+    window.dispatchEvent(new CustomEvent("lover-sales-notification-status",{detail:payload}));
+  }catch(e){}
+}
 
+function dispatchSalesNotificationAsync(envelope){
+  if(!envelope||!envelope.payload||!envelope.signature){
+    setLastNotificationDispatchStatus({ok:false,message:"没有 notificationEnvelope"});
+    return;
+  }
   Promise.resolve().then(()=>{
-    if(typeof jsonp!=="function")return null;
+    if(typeof jsonp!=="function")throw new Error("JSONP transport unavailable");
     return jsonp({
       action:"dispatchSalesNotification",
       payload:envelope.payload,
-      signature:envelope.signature
-    },{timeoutMs:15000});
+      signature:envelope.signature,
+      clientVersion:"18.1"
+    },{timeoutMs:20000});
   }).then(result=>{
-    if(result&&!result.ok)console.warn("Sales notification dispatch failed:",result);
+    setLastNotificationDispatchStatus(result||{ok:false,message:"空白通知结果"});
+    if(!result||!result.ok)console.warn("Sales notification dispatch failed:",result);
+    else console.log("Sales notification dispatch OK:",result);
   }).catch(err=>{
+    const result={ok:false,message:String(err&&err.message||err)};
+    setLastNotificationDispatchStatus(result);
     console.warn("Sales notification dispatch error:",err);
   });
 }
@@ -79,12 +98,12 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-/* V17.9: first paint must not wait for the full system render. */
+/* V18.1: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V17.9: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V18.1: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -160,7 +179,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V17.9: damaged/partial cache must never trap startup.
+    // V18.1: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -267,7 +286,7 @@ function markCloudCheckPending(text = "本机资料已显示 · 云端后台同�
   if (el) el.textContent = "🟡 " + text;
 }
 
-// V17.9: best-effort immediate cloud dispatch for mobile saves.
+// V18.1: best-effort immediate cloud dispatch for mobile saves.
 // The row stays in pendingRows until a normal JSONP confirmation succeeds, so
 // closing/suspending the page cannot silently lose the user's entry.
 function dispatchKeepalive(params) {
@@ -420,7 +439,7 @@ async function loadYearInBackground(year) {
       if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
       renderHomeFirst();
       scheduleDeferredFullRender(0);
-      // V17.9: if Fair is currently open, repaint its date inputs from the
+      // V18.1: if Fair is currently open, repaint its date inputs from the
       // newly merged cloud rows, unless the user has an unsaved Fair draft.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (fairPageActive && !fairDraftDirtyBeforeCloud && typeof refreshFairInputsFromRows === "function") {
@@ -492,7 +511,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V17.9: opening/resuming first checks one tiny revision value.
+      // V18.1: opening/resuming first checks one tiny revision value.
       // Full month data is downloaded only when another device changed data.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
@@ -510,7 +529,7 @@ async function loadFromSheet(options = {}) {
             return { ok:true, month, revisionUnconfirmed:true };
           }
         } catch (revisionError) {
-          // V17.9: when local data exists, a slow/failed revision check must not
+          // V18.1: when local data exists, a slow/failed revision check must not
           // trigger the expensive full-month download. Keep the visible local
           // data and let the next foreground/interval/manual check try again.
           setSync("本机资料已显示 · 云端暂未确认", false, true);
@@ -559,7 +578,7 @@ async function loadFromSheet(options = {}) {
 
       renderHomeFirst();
       scheduleDeferredFullRender(0);
-      // V17.9: keep Fair's visible daily amount inputs consistent with rows after
+      // V18.1: keep Fair's visible daily amount inputs consistent with rows after
       // cloud refresh. Do not overwrite any unsaved Fair edits.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (typeof refreshFairInputsFromRows === "function" && !fairDraftDirtyBeforeCloud && (fairPageActive || options.refreshFairInputs === true)) {
@@ -577,7 +596,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V17.9 mobile performance: startup loads only the selected month.
+      // V18.1 mobile performance: startup loads only the selected month.
       // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
         setTimeout(() => {
