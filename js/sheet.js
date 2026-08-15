@@ -24,6 +24,18 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 const REVISION_CHECK_TIMEOUT_MS = 2500;
+// V17.6: notifications are fire-and-forget after a successful save.
+function dispatchSalesNotificationAsync(envelope){
+  if(!envelope||!envelope.payload||!envelope.signature||!window.LOVER_API_URL)return;
+  try{
+    const url=new URL(window.LOVER_API_URL);
+    url.searchParams.set("action","dispatchSalesNotification");
+    url.searchParams.set("payload",envelope.payload);
+    url.searchParams.set("signature",envelope.signature);
+    fetch(url.toString(),{method:"GET",mode:"no-cors",cache:"no-store",keepalive:true}).catch(()=>{});
+  }catch(e){console.warn("Notification dispatch skipped:",e);}
+}
+
 
 
 function applyLocalDataRevision(value) {
@@ -60,12 +72,12 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-/* V17.5: first paint must not wait for the full system render. */
+/* V17.6: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V17.5: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V17.6: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -141,7 +153,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V17.5: damaged/partial cache must never trap startup.
+    // V17.6: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -248,7 +260,7 @@ function markCloudCheckPending(text = "本机资料已显示 · 云端后台同�
   if (el) el.textContent = "🟡 " + text;
 }
 
-// V17.5: best-effort immediate cloud dispatch for mobile saves.
+// V17.6: best-effort immediate cloud dispatch for mobile saves.
 // The row stays in pendingRows until a normal JSONP confirmation succeeds, so
 // closing/suspending the page cannot silently lose the user's entry.
 function dispatchKeepalive(params) {
@@ -401,7 +413,7 @@ async function loadYearInBackground(year) {
       if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
       renderHomeFirst();
       scheduleDeferredFullRender(0);
-      // V17.5: if Fair is currently open, repaint its date inputs from the
+      // V17.6: if Fair is currently open, repaint its date inputs from the
       // newly merged cloud rows, unless the user has an unsaved Fair draft.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (fairPageActive && !fairDraftDirtyBeforeCloud && typeof refreshFairInputsFromRows === "function") {
@@ -473,7 +485,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V17.5: opening/resuming first checks one tiny revision value.
+      // V17.6: opening/resuming first checks one tiny revision value.
       // Full month data is downloaded only when another device changed data.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
@@ -491,7 +503,7 @@ async function loadFromSheet(options = {}) {
             return { ok:true, month, revisionUnconfirmed:true };
           }
         } catch (revisionError) {
-          // V17.5: when local data exists, a slow/failed revision check must not
+          // V17.6: when local data exists, a slow/failed revision check must not
           // trigger the expensive full-month download. Keep the visible local
           // data and let the next foreground/interval/manual check try again.
           setSync("本机资料已显示 · 云端暂未确认", false, true);
@@ -540,7 +552,7 @@ async function loadFromSheet(options = {}) {
 
       renderHomeFirst();
       scheduleDeferredFullRender(0);
-      // V17.5: keep Fair's visible daily amount inputs consistent with rows after
+      // V17.6: keep Fair's visible daily amount inputs consistent with rows after
       // cloud refresh. Do not overwrite any unsaved Fair edits.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (typeof refreshFairInputsFromRows === "function" && !fairDraftDirtyBeforeCloud && (fairPageActive || options.refreshFairInputs === true)) {
@@ -558,7 +570,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V17.5 mobile performance: startup loads only the selected month.
+      // V17.6 mobile performance: startup loads only the selected month.
       // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
         setTimeout(() => {
@@ -689,6 +701,7 @@ async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "") {
 
   if (!json.ok) throw new Error(json.message || "储存失败");
   applyLocalDataRevision(json.dataRevision);
+  dispatchSalesNotificationAsync(json.notificationEnvelope);
   return json.row || null;
 }
 
@@ -701,6 +714,7 @@ async function saveFairBatchToSheet(location, records) {
 
   if (!json.ok) throw new Error(json.message || "Fair 储存失败");
   applyLocalDataRevision(json.dataRevision);
+  dispatchSalesNotificationAsync(json.notificationEnvelope);
   return json;
 }
 
@@ -727,6 +741,7 @@ async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "") {
   });
   if (!json.ok) throw new Error(json.message || "Live 储存失败");
   applyLocalDataRevision(json.dataRevision);
+  dispatchSalesNotificationAsync(json.notificationEnvelope);
   return json.row || null;
 }
 

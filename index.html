@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="style.css?v=17.3">
+<link rel="stylesheet" href="style.css?v=17.6">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
@@ -16,25 +16,88 @@
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script>
 window.OneSignalDeferred = window.OneSignalDeferred || [];
-OneSignalDeferred.push(async function(OneSignal) {
-  await OneSignal.init({
-    appId: "c6c0be13-4f8e-42cf-8567-efde17a483b3",
-    serviceWorkerPath: "/lover-legend-sales/push/onesignal/OneSignalSDKWorker.js",
-    serviceWorkerParam: { scope: "/lover-legend-sales/push/onesignal/" },
-    notifyButton: { enable: false }
-  });
+window.LoverSalesOneSignal = null;
 
-  // V17.5: make sure this browser becomes a OneSignal subscription
-  try {
-    if (!OneSignal.User.PushSubscription.optedIn) {
-      try {
-        await OneSignal.Slidedown.promptPush();
-      } catch(e) {
-        await OneSignal.Notifications.requestPermission();
-      }
+function updateLoverNotificationUI(OneSignal){
+  const status=document.getElementById("notificationStatus");
+  const btn=document.getElementById("notificationEnableBtn");
+  const detail=document.getElementById("notificationDetail");
+  if(!status||!btn)return;
+  try{
+    const supported=OneSignal.Notifications.isPushSupported();
+    const permission=Boolean(OneSignal.Notifications.permission);
+    const push=OneSignal.User.PushSubscription;
+    const optedIn=Boolean(push.optedIn);
+    const id=push.id||"", token=push.token||"";
+    if(!supported){
+      status.textContent="⚪ 此装置不支持 Web Push";
+      btn.textContent="无法开启"; btn.disabled=true;
+      if(detail)detail.textContent="";
+    }else if(permission && optedIn && id && token){
+      status.textContent="🟢 销售通知已开启";
+      btn.textContent="✅ 通知已开启"; btn.disabled=false;
+      if(detail)detail.textContent="Subscription ID："+String(id).slice(0,8)+"…";
+    }else if(permission){
+      status.textContent="🟡 已允许通知，正在建立 OneSignal 订阅";
+      btn.textContent="🔧 重新建立订阅"; btn.disabled=false;
+      if(detail)detail.textContent="如果 OneSignal 后台仍是 0，请点击这里重新建立。";
+    }else{
+      status.textContent="🔴 销售通知尚未开启";
+      btn.textContent="🔔 开启销售通知"; btn.disabled=false;
+      if(detail)detail.textContent="iPhone 必须从主画面的 Lover Sales App 打开后再点击开启。";
     }
-  } catch(e) {
-    console.log("OneSignal subscription check:", e);
+  }catch(e){
+    status.textContent="🟡 通知状态检查中";
+    btn.textContent="🔔 开启销售通知"; btn.disabled=false;
+  }
+}
+
+async function enableLoverSalesNotifications(){
+  const btn=document.getElementById("notificationEnableBtn");
+  if(btn)btn.disabled=true;
+  window.OneSignalDeferred.push(async function(OneSignal){
+    try{
+      if(!OneSignal.Notifications.isPushSupported()){ updateLoverNotificationUI(OneSignal); return; }
+      await OneSignal.User.PushSubscription.optIn();
+      for(let i=0;i<20;i++){
+        updateLoverNotificationUI(OneSignal);
+        if(OneSignal.User.PushSubscription.id && OneSignal.User.PushSubscription.token)break;
+        await new Promise(resolve=>setTimeout(resolve,300));
+      }
+      updateLoverNotificationUI(OneSignal);
+    }catch(e){
+      console.warn("OneSignal opt-in:",e);
+      updateLoverNotificationUI(OneSignal);
+    }finally{ if(btn)btn.disabled=false; }
+  });
+}
+
+OneSignalDeferred.push(async function(OneSignal){
+  try{
+    await OneSignal.init({
+      appId:"c6c0be13-4f8e-42cf-8567-efde17a483b3",
+      serviceWorkerPath:"lover-legend-sales/push/onesignal/OneSignalSDKWorker.js",
+      serviceWorkerParam:{scope:"/lover-legend-sales/push/onesignal/"},
+      autoResubscribe:true,
+      notifyButton:{enable:false}
+    });
+    window.LoverSalesOneSignal=OneSignal;
+    OneSignal.User.PushSubscription.addEventListener("change",()=>updateLoverNotificationUI(OneSignal));
+    OneSignal.Notifications.addEventListener("permissionChange",()=>updateLoverNotificationUI(OneSignal));
+    updateLoverNotificationUI(OneSignal);
+
+    if(OneSignal.Notifications.permission &&
+       (!OneSignal.User.PushSubscription.id ||
+        !OneSignal.User.PushSubscription.token ||
+        !OneSignal.User.PushSubscription.optedIn)){
+      try{ await OneSignal.User.PushSubscription.optIn(); }
+      catch(e){ console.warn("OneSignal auto-resubscribe repair:",e); }
+      updateLoverNotificationUI(OneSignal);
+    }
+  }catch(e){
+    console.warn("OneSignal init:",e);
+    const status=document.getElementById("notificationStatus");
+    if(status)status.textContent="🔴 通知服务初始化失败";
   }
 });
 </script>
@@ -45,7 +108,7 @@ OneSignalDeferred.push(async function(OneSignal) {
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V17.5</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V17.6</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -353,10 +416,23 @@ OneSignalDeferred.push(async function(OneSignal) {
     <button class="gray" onclick="backupAllData()">💾 Backup 完整备份</button>
     <button class="gray" onclick="document.getElementById('restoreFile').click()">♻️ Restore 恢复备份</button>
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
-    <p class="note">V17.5：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
+    <p class="note">V17.6：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
   </div>
 
   
+
+<div class="card notification-settings-card">
+  <div class="notification-settings-head">
+    <div>
+      <h2>🔔 销售通知</h2>
+      <p class="note">Daily / Fair / Live 新增、修改、删除后发送通知。通知注册独立运行，不参与营业数据同步。</p>
+    </div>
+    <span class="notification-badge">PUSH</span>
+  </div>
+  <div id="notificationStatus" class="notification-status">🟡 通知状态检查中</div>
+  <div id="notificationDetail" class="notification-detail"></div>
+  <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
+</div>
 
 <div class="commission-mechanisms">
   <div class="commission-panel fair-commission-panel">
@@ -462,10 +538,10 @@ OneSignalDeferred.push(async function(OneSignal) {
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=17.3",
-      "js/sheet.js?v=17.3",
-      "js/app.js?v=17.3",
-      "js/update.js?v=17.3"
+      "js/utils.js?v=17.6",
+      "js/sheet.js?v=17.6",
+      "js/app.js?v=17.6",
+      "js/update.js?v=17.6"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");
@@ -473,7 +549,7 @@ OneSignalDeferred.push(async function(OneSignal) {
       });
     return appLoadPromise;
   };
-  // V17.5: critical CSS is loaded synchronously; no splash/loading overlay is used.
+  // V17.6: critical CSS is loaded synchronously; no splash/loading overlay is used.
   window.startLoverSalesApp();
 })();
 </script>
