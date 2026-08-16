@@ -301,7 +301,7 @@ function monthAfter(m){
 }
 
 
-// V19.0: Fair 地点键值忽略所有空格及英文字母大小写，但保留符号。
+// V19.1: Fair 地点键值忽略所有空格及英文字母大小写，但保留符号。
 // 例如 "JB AEON Mall , Terbau City" 与 "JB AEON Mall,Terbau City" 是同一地点。
 function normalizeFairLocationKey(value){
   return canonicalLocation(value||"")
