@@ -1,6 +1,19 @@
-Lover Legend Sales V20.0
+Lover Legend Sales V20.1
 
-V20.0 Home company comparison fixed columns:
+V20.1 Home monthly comparison small UI cleanup:
+- 取消展开区重复标题「Balakong 本月销售记录」。
+- 取消展开区重复标题「Belimbing 本月销售记录」。
+- 保留月份（例如 08-2026）。
+- 保留绿色本月总数。
+- 保留每日日期 + 每日销售金额。
+- 保留左右固定比较结构。
+- 保留缺失日期自动补 RM0.00。
+- 保留一次点击立即展开 / 再点击收起。
+- 不修改 Sales / Fair / Live / Report / 通知 / 同步 / Device Registry 逻辑。
+- Apps Script 无业务逻辑更新；Code.gs 仅同步版本号。
+Lover Legend Sales V20.1
+
+V20.1 Home company comparison fixed columns:
 - Balakong 永远固定左栏。
 - Belimbing 永远固定右栏。
 - 收起 Balakong：只隐藏 Balakong 本月销售记录，Belimbing 原位不动。
@@ -10,7 +23,7 @@ V20.0 Home company comparison fixed columns:
 - 保留 V19.9 已修好的：一次点击立即展开、展开区绿色总数、每日金额红色、缺失日期补 RM0.00。
 - 不修改 Sales / Fair / Live / Report / 通知 / 同步 / Device Registry 业务逻辑。
 - Apps Script 无业务逻辑更新；Code.gs 仅同步版本号。
-Lover Legend Sales V20.0
+Lover Legend Sales V20.1
 
 Home 本月公司销售记录修复：
 - 保留 V19.8 已修好的「一次点击立即展开」。
