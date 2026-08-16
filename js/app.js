@@ -26,7 +26,7 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V18.3: every time Live is opened, start from today's date.
+  // V18.4: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -38,7 +38,7 @@ function showPage(name,el){
   if(name==="report")renderTable();
   if(name==="fair"&&typeof refreshFairInputsFromRows==="function")refreshFairInputsFromRows(false);
 
-  // V18.3: page switching never waits for or triggers cloud sync.
+  // V18.4: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");return [r.type,r.date,r.company,location].join("|")}
@@ -48,7 +48,7 @@ function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&
 function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c);document.getElementById("dailySales").value=formatAmount(a);document.getElementById("salesDateResult").textContent=`${companyNames[c]}｜${d}｜${money(a)}`;renderSalesMonthlyList()}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
 
-// V18.3: Top 5 business performance. Uses rows already loaded in memory only;
+// V18.4: Top 5 business performance. Uses rows already loaded in memory only;
 // opening/closing Top 5 never triggers an extra cloud request.
 function weekdayZh(displayDate){
   const iso=displayToISO(displayDate);
@@ -235,7 +235,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V18.3: historical record is lazy. Top 5 opens instantly from local rows;
+    // V18.4: historical record is lazy. Top 5 opens instantly from local rows;
     // one shared history request runs only after the user explicitly expands Top 5.
     setTimeout(()=>{ ensureHistoricalHighs(); },0);
   }
@@ -509,7 +509,7 @@ function applyCloudCommissionSettings(settings){
   const incomingLiveRevision=Number(incoming.liveRevision||0);
   const localLiveRevision=Number(local.liveRevision||0);
 
-  // V18.3: Fair and Live each have their own revision.
+  // V18.4: Fair and Live each have their own revision.
   // A stale device/cloud response can never overwrite a newer saved setting.
   const keepLocalFair=incomingFairRevision<localFairRevision;
   const keepLocalLive=liveCommissionDraftDirty||incomingLiveRevision<localLiveRevision;
@@ -646,7 +646,7 @@ function getCommissionSettingsForMonth(month){
   const snapshot=(systemState.commissionSnapshots||{})[target];
   if(!snapshot)return current;
 
-  // V18.3: historical Fair rates come from that month's snapshot, while the
+  // V18.4: historical Fair rates come from that month's snapshot, while the
   // Live schedule is selected by the actual Live record date. This prevents
   // Home's history month selector from blocking the current month's More setup.
   return normalizeCommissionSettings({
@@ -785,7 +785,7 @@ async function removeLiveHost(hostKey){
     if(message){message.textContent="✅ 主播已设为离职／停用";message.classList.remove("hidden");}
     setSync("已同步",true);
   }catch(error){
-    // V18.3: timeout must not undo the user's local action.
+    // V18.4: timeout must not undo the user's local action.
     console.warn("Inactive host cloud sync delayed",error);
     liveCommissionDraftDirty=true;
     queueLiveCommissionRetry(nextSettings,commissionConfigMonth());
@@ -1011,7 +1011,7 @@ async function saveDailySales(){
   renderAll();
   showTempMsg("saveMsg");
 
-  // V18.3 mobile-safe save: return control immediately after the local durable
+  // V18.4 mobile-safe save: return control immediately after the local durable
   // write. Fire a keepalive request now, then confirm in the background.
   if(typeof saveLocalDataCache==="function")saveLocalDataCache();
   setSync("已储存 · 云端后台同步中...");
@@ -1172,7 +1172,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     setSync("已储存，正在后台同步...");
     const result=await saveFairBatchToSheet(loc,records);
 
-    // V18.3: local Fair values are direct replacements, never additions. The server
+    // V18.4: local Fair values are direct replacements, never additions. The server
     // also removes duplicate Sheet rows whose location differs only by spaces/case.
     // The response confirms the authoritative overwrite and clears pending rows.
     records.forEach(i=>clearPendingRow({
@@ -1212,7 +1212,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV18.3 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV18.4 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){
   const current=monthISO();
   document.getElementById("monthPicker").value=current;
@@ -1351,7 +1351,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V18.3: paint Home immediately, restore local cache, then perform only a
+// V18.4: paint Home immediately, restore local cache, then perform only a
 // lightweight Revision check. Full month data is downloaded only when the
 // cloud Revision proves that another device changed data.
 attachMoneyInputs();
@@ -1416,7 +1416,7 @@ async function startInitialSalesDataLoad() {
   return startupSalesSyncPromise;
 }
 
-// V18.3: start cached Home immediately, then warm the current year's historical
+// V18.4: start cached Home immediately, then warm the current year's historical
 // months in the background so Monthly Summary is complete on first open.
 startInitialSalesDataLoad().finally(()=>{
   const startupYear=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
@@ -1445,7 +1445,7 @@ function getSavedLiveHosts(){
 function collectLiveHosts(){
   const merged=[];
   const cloudHosts=Object.values((getCommissionSettings().liveHosts)||{});
-  // V18.3: active host list is independent from historical Live records.
+  // V18.4: active host list is independent from historical Live records.
   // Deleted hosts stay in old reports but do not return to current host options.
   [...cloudHosts,...getSavedLiveHosts()]
     .filter(Boolean)
@@ -1766,7 +1766,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V18.3: do not restore the previously saved date.
+  // V18.4: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -1896,7 +1896,7 @@ function renderTable(){
   document.getElementById("recordTable").innerHTML=s.map(r=>{const rate=r.type==="live"?getLiveHostRate(r.location,r.date):r.type==="fair"?getFairCommissionRate(totalBy("fair","","month"))*100:0;const commission=(r.type==="live"||r.type==="fair")?Number(r.amount||0)*rate/100:0;return `<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":r.type==="live"?"Live":"每日"}</td><td>${r.type==="live"?"Live":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td><td>${rate?Number(rate.toFixed(2))+"%":"-"}</td><td>${rate?money(commission):"-"}</td></tr>`}).join("")||'<tr><td colspan="7" style="text-align:center;">这个月份还没有记录</td></tr>';
 }
 function renderAll(){
-  // V18.3: one complete render path. This replaces the older partial duplicate
+  // V18.4: one complete render path. This replaces the older partial duplicate
   // so Fair daily/monthly totals, Home totals and Report always refresh together.
   rows=dedupeRows(rows);
   renderDashboard();
@@ -1938,7 +1938,7 @@ function buildMonthlySummary(){
   });
   return [...map.values()].map(item=>({...item,total:item.balakong+item.belimbing+item.fair+item.live})).sort((a,b)=>b.month.localeCompare(a.month));
 }
-// V18.3: expandable daily total list. It uses cached rows immediately and only
+// V18.4: expandable daily total list. It uses cached rows immediately and only
 // reads the selected historical month from cloud when the user asks for it.
 function buildDailyTotals(month){
   const totals=new Map();
@@ -1971,7 +1971,7 @@ async function loadDailyTotalsMonth(month){
   const status=document.getElementById("dailyTotalsStatus");
   renderDailyTotals();
 
-  // V18.3: current month already follows the normal Home sync flow.
+  // V18.4: current month already follows the normal Home sync flow.
   // Do not make a second cloud request just because the daily summary is opened.
   // This keeps startup / Home sync speed unchanged.
   const currentMonth=selectedMonth();
@@ -2046,7 +2046,7 @@ async function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V18.3: show cache immediately and complete historical months in background.
+  // V18.4: show cache immediately and complete historical months in background.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 
@@ -2160,7 +2160,7 @@ async function saveFairCommissionSettings(){
       fairRevision:nextFairCommissionRevision(previous.fairRevision)
     });
 
-    // V18.3: save locally immediately. Do not make the user wait for Apps Script.
+    // V18.4: save locally immediately. Do not make the user wait for Apps Script.
     applyCommissionSettings(settings);
     setSavedCommissionSnapshots(settings,{fair:true,live:false});
     updateFairCommissionDraftState();
@@ -2220,7 +2220,7 @@ async function saveLiveCommissionSettings(){
     const live=readLiveCommissionInputs();
     const candidate=normalizeCommissionSettings({...previous,...live});
     const comparable=x=>JSON.stringify({liveHostRates:x.liveHostRates||{},liveHosts:x.liveHosts||{},inactiveLiveHosts:x.inactiveLiveHosts||{},liveRateSchedules:x.liveRateSchedules||[]});
-    // V18.3: deleting the last special commission rule leaves candidate and
+    // V18.4: deleting the last special commission rule leaves candidate and
     // previous structurally identical because the delete was already applied
     // locally.  A dirty draft must still be written to cloud so [] overwrites
     // the old month snapshot instead of letting the deleted rule return.
@@ -2341,7 +2341,7 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V18.3 Backup / Restore ================= */
+/* ================= V18.4 Backup / Restore ================= */
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
