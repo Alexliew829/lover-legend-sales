@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="style.css?v=19.1">
+<link rel="stylesheet" href="style.css?v=19.5">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
@@ -118,7 +118,7 @@ async function registerLoverSalesSubscriptionAsync(OneSignal,force){
       installationId:getLoverInstallationId(),
       deviceKey,
       onesignalUserId:getLoverOneSignalUserId(OneSignal),
-      clientVersion:"19.1"
+      clientVersion:"19.5"
     },{timeoutMs:15000}).then(result=>{
       if(result&&result.ok){
         try{localStorage.setItem("lover_sales_registered_subscription_id",id)}catch(e){}
@@ -780,10 +780,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=19.1",
-      "js/sheet.js?v=19.1",
-      "js/app.js?v=19.1",
-      "js/update.js?v=19.1"
+      "js/utils.js?v=19.5",
+      "js/sheet.js?v=19.5",
+      "js/app.js?v=19.5",
+      "js/update.js?v=19.5"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");

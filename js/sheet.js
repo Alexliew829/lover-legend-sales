@@ -49,7 +49,7 @@ function dispatchSalesNotificationAsync(envelope){
       action:"dispatchSalesNotification",
       payload:envelope.payload,
       signature:envelope.signature,
-      clientVersion:"19.1"
+      clientVersion:"19.5"
     },{timeoutMs:20000});
   }).then(result=>{
     setLastNotificationDispatchStatus(result||{ok:false,message:"空白通知结果"});
@@ -315,7 +315,7 @@ function flushPendingRowsKeepalive() {
           amount:row.amount,
           clientUpdatedAt:row.clientUpdatedAt||"",
           notifyInline:"1",
-          clientVersion:"19.1"
+          clientVersion:"19.5"
         });
       } else if (row.type === "live") {
         dispatchKeepalive({
@@ -325,7 +325,7 @@ function flushPendingRowsKeepalive() {
           amount:row.amount,
           clientUpdatedAt:row.clientUpdatedAt||"",
           notifyInline:"1",
-          clientVersion:"19.1"
+          clientVersion:"19.5"
         });
       } else if (row.type === "fair") {
         const loc=canonicalLocation(row.location);
@@ -344,7 +344,7 @@ function flushPendingRowsKeepalive() {
         location,
         records:JSON.stringify(records),
         notifyInline:"1",
-        clientVersion:"19.1"
+        clientVersion:"19.5"
       });
     });
   } catch (err) {}
