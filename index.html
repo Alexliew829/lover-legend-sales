@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="style.css?v=20.6">
+<link rel="stylesheet" href="style.css?v=18.6">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
@@ -118,7 +118,7 @@ async function registerLoverSalesSubscriptionAsync(OneSignal,force){
       installationId:getLoverInstallationId(),
       deviceKey,
       onesignalUserId:getLoverOneSignalUserId(OneSignal),
-      clientVersion:"19.5"
+      clientVersion:"18.6"
     },{timeoutMs:15000}).then(result=>{
       if(result&&result.ok){
         try{localStorage.setItem("lover_sales_registered_subscription_id",id)}catch(e){}
@@ -315,7 +315,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V20.6</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V18.6</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -392,47 +392,30 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     <h2>本月营业额</h2>
 
     <div class="dash">
-      <div class="box company-sales-box company-month-card company-month-toggle"
-           role="button" tabindex="0"
-           aria-expanded="false"
-           aria-controls="balakongMonthDetails"
-           onclick="toggleCompanyMonthDetails('balakong')"
-           onkeydown="handleCompanyMonthToggleKey(event,'balakong')">
+      <div class="box company-sales-box company-month-card" onclick="toggleCompanyDailyV186('balakong')">
         <div class="company-sales-values">
           <div class="company-month-value">
-            <div class="name">Balakong 本月 <span class="company-month-chevron" id="balakongMonthChevron">⌄</span></div>
+            <div class="name">Balakong 本月</div>
             <div class="amount" id="balakongMonth">0.00</div>
           </div>
         </div>
       </div>
 
-      <div class="box company-sales-box company-month-card company-month-toggle"
-           role="button" tabindex="0"
-           aria-expanded="false"
-           aria-controls="belimbingMonthDetails"
-           onclick="toggleCompanyMonthDetails('belimbing')"
-           onkeydown="handleCompanyMonthToggleKey(event,'belimbing')">
+      <div class="box company-sales-box company-month-card" onclick="toggleCompanyDailyV186('belimbing')">
         <div class="company-sales-values">
           <div class="company-month-value">
-            <div class="name">Belimbing 本月 <span class="company-month-chevron" id="belimbingMonthChevron">⌄</span></div>
+            <div class="name">Belimbing 本月</div>
             <div class="amount" id="belimbingMonth">0.00</div>
           </div>
         </div>
       </div>
 
-      <div class="company-month-details-row">
-        <div class="company-month-details-col">
-          <div id="balakongMonthDetails" class="company-month-details hidden">
-            <div id="balakongMonthDetailsList" class="company-month-details-list"></div>
-          </div>
+      <div class="company-month-daily-row">
+        <div class="company-month-daily-col">
+          <div id="balakongMonthDaily" class="company-month-daily-panel hidden"></div>
         </div>
-
-        <div class="company-month-details-col">
-          <div id="belimbingMonthDetails" class="company-month-details hidden">
-            <div id="belimbingMonthDetailsList" class="company-month-details-list"></div>
-          </div>
-        </div>
-      </div>
+        <div class="company-month-daily-col">
+          <div id="belimbingMonthDaily" class="company-month-daily-panel hidden"></div>
         </div>
       </div>
 
@@ -649,7 +632,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     <button class="gray" onclick="backupAllData()">💾 Backup 完整备份</button>
     <button class="gray" onclick="document.getElementById('restoreFile').click()">♻️ Restore 恢复备份</button>
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
-    <p class="note">V20.6：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
+    <p class="note">V18.6：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
   </div>
 
   
@@ -665,7 +648,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationStatus" class="notification-status">🟡 通知状态检查中</div>
   <div id="notificationDetail" class="notification-detail"></div>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V20.6 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V18.6 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -774,10 +757,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=20.6",
-      "js/sheet.js?v=20.6",
-      "js/app.js?v=20.6",
-      "js/update.js?v=20.6"
+      "js/utils.js?v=18.6",
+      "js/sheet.js?v=18.6",
+      "js/app.js?v=18.6",
+      "js/update.js?v=18.6"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");
@@ -785,7 +768,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
       });
     return appLoadPromise;
   };
-  // V20.6: critical CSS is loaded synchronously; no splash/loading overlay is used.
+  // V18.6: critical CSS is loaded synchronously; no splash/loading overlay is used.
   window.startLoverSalesApp();
 })();
 </script>
