@@ -24,7 +24,7 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 const REVISION_CHECK_TIMEOUT_MS = 2500;
-// V18.5: notifications use the same proven JSONP transport as business saves.
+// V18.6: notifications use the same proven JSONP transport as business saves.
 // This promise is never awaited by Sales/Fair/Live saving, so push cannot slow sync.
 function setLastNotificationDispatchStatus(result){
   try{
@@ -49,7 +49,7 @@ function dispatchSalesNotificationAsync(envelope){
       action:"dispatchSalesNotification",
       payload:envelope.payload,
       signature:envelope.signature,
-      clientVersion:"18.5"
+      clientVersion:"18.6"
     },{timeoutMs:20000});
   }).then(result=>{
     setLastNotificationDispatchStatus(result||{ok:false,message:"空白通知结果"});
@@ -98,12 +98,12 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-/* V18.5: first paint must not wait for the full system render. */
+/* V18.6: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V18.5: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V18.6: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -179,7 +179,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V18.5: damaged/partial cache must never trap startup.
+    // V18.6: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -286,7 +286,7 @@ function markCloudCheckPending(text = "本机资料已显示 · 云端后台同�
   if (el) el.textContent = "🟡 " + text;
 }
 
-// V18.5: best-effort immediate cloud dispatch for mobile saves.
+// V18.6: best-effort immediate cloud dispatch for mobile saves.
 // The row stays in pendingRows until a normal JSONP confirmation succeeds, so
 // closing/suspending the page cannot silently lose the user's entry.
 function dispatchKeepalive(params) {
@@ -315,7 +315,7 @@ function flushPendingRowsKeepalive() {
           amount:row.amount,
           clientUpdatedAt:row.clientUpdatedAt||"",
           notifyInline:"1",
-          clientVersion:"18.5"
+          clientVersion:"18.6"
         });
       } else if (row.type === "live") {
         dispatchKeepalive({
@@ -325,7 +325,7 @@ function flushPendingRowsKeepalive() {
           amount:row.amount,
           clientUpdatedAt:row.clientUpdatedAt||"",
           notifyInline:"1",
-          clientVersion:"18.5"
+          clientVersion:"18.6"
         });
       } else if (row.type === "fair") {
         const loc=canonicalLocation(row.location);
@@ -344,7 +344,7 @@ function flushPendingRowsKeepalive() {
         location,
         records:JSON.stringify(records),
         notifyInline:"1",
-        clientVersion:"18.5"
+        clientVersion:"18.6"
       });
     });
   } catch (err) {}
@@ -476,7 +476,7 @@ async function loadYearInBackground(year) {
       if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
       renderHomeFirst();
       scheduleDeferredFullRender(0);
-      // V18.5: if Fair is currently open, repaint its date inputs from the
+      // V18.6: if Fair is currently open, repaint its date inputs from the
       // newly merged cloud rows, unless the user has an unsaved Fair draft.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (fairPageActive && !fairDraftDirtyBeforeCloud && typeof refreshFairInputsFromRows === "function") {
@@ -548,7 +548,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V18.5: opening/resuming first checks one tiny revision value.
+      // V18.6: opening/resuming first checks one tiny revision value.
       // Full month data is downloaded only when another device changed data.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
@@ -566,7 +566,7 @@ async function loadFromSheet(options = {}) {
             return { ok:true, month, revisionUnconfirmed:true };
           }
         } catch (revisionError) {
-          // V18.5: when local data exists, a slow/failed revision check must not
+          // V18.6: when local data exists, a slow/failed revision check must not
           // trigger the expensive full-month download. Keep the visible local
           // data and let the next foreground/interval/manual check try again.
           setSync("本机资料已显示 · 云端暂未确认", false, true);
@@ -615,7 +615,7 @@ async function loadFromSheet(options = {}) {
 
       renderHomeFirst();
       scheduleDeferredFullRender(0);
-      // V18.5: keep Fair's visible daily amount inputs consistent with rows after
+      // V18.6: keep Fair's visible daily amount inputs consistent with rows after
       // cloud refresh. Do not overwrite any unsaved Fair edits.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (typeof refreshFairInputsFromRows === "function" && !fairDraftDirtyBeforeCloud && (fairPageActive || options.refreshFairInputs === true)) {
@@ -633,7 +633,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V18.5 mobile performance: startup loads only the selected month.
+      // V18.6 mobile performance: startup loads only the selected month.
       // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
         setTimeout(() => {
