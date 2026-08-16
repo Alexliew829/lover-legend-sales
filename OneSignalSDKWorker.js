@@ -1,1 +1,1 @@
-// V20.4 - keep this URL stable for existing OneSignal subscriptions.\nimportScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");\n
+// V20.5 - keep this URL stable for existing OneSignal subscriptions.\nimportScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");\n
