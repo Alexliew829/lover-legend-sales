@@ -24,7 +24,7 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 const REVISION_CHECK_TIMEOUT_MS = 2500;
-// V19.6: notification dispatch uses the existing keepalive transport.
+// V19.7: notification dispatch uses the existing keepalive transport.
 // It is fire-and-forget after a successful business save, so OneSignal never
 // blocks the Sales/Fair/Live save or cloud-sync path on mobile or desktop.
 function getSalesLaunchUrlV194(){
@@ -60,7 +60,7 @@ function dispatchSalesNotificationAsync(envelope){
     action:"dispatchSalesNotification",
     payload:envelope.payload,
     signature:envelope.signature,
-    clientVersion:"19.6",
+    clientVersion:"19.7",
     launchUrl:getSalesLaunchUrlV194()
   });
 
@@ -107,12 +107,12 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-/* V19.6: first paint must not wait for the full system render. */
+/* V19.7: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V19.6: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V19.7: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -188,7 +188,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V19.6: damaged/partial cache must never trap startup.
+    // V19.7: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -295,7 +295,7 @@ function markCloudCheckPending(text = "本机资料已显示 · 云端后台同�
   if (el) el.textContent = "🟡 " + text;
 }
 
-// V19.6: best-effort immediate cloud dispatch for mobile saves.
+// V19.7: best-effort immediate cloud dispatch for mobile saves.
 // The row stays in pendingRows until a normal JSONP confirmation succeeds, so
 // closing/suspending the page cannot silently lose the user's entry.
 function dispatchKeepalive(params) {
@@ -324,7 +324,7 @@ function flushPendingRowsKeepalive() {
           amount:row.amount,
           clientUpdatedAt:row.clientUpdatedAt||"",
           notifyInline:"1",
-          clientVersion:"19.6",
+          clientVersion:"19.7",
           launchUrl:getSalesLaunchUrlV194()
         });
       } else if (row.type === "live") {
@@ -335,7 +335,7 @@ function flushPendingRowsKeepalive() {
           amount:row.amount,
           clientUpdatedAt:row.clientUpdatedAt||"",
           notifyInline:"1",
-          clientVersion:"19.6",
+          clientVersion:"19.7",
           launchUrl:getSalesLaunchUrlV194()
         });
       } else if (row.type === "fair") {
@@ -355,7 +355,7 @@ function flushPendingRowsKeepalive() {
         location,
         records:JSON.stringify(records),
         notifyInline:"1",
-        clientVersion:"19.6",
+        clientVersion:"19.7",
         launchUrl:getSalesLaunchUrlV194()
       });
     });
@@ -488,7 +488,7 @@ async function loadYearInBackground(year) {
       if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
       renderHomeFirst();
       scheduleDeferredFullRender(0);
-      // V19.6: if Fair is currently open, repaint its date inputs from the
+      // V19.7: if Fair is currently open, repaint its date inputs from the
       // newly merged cloud rows, unless the user has an unsaved Fair draft.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (fairPageActive && !fairDraftDirtyBeforeCloud && typeof refreshFairInputsFromRows === "function") {
@@ -560,7 +560,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V19.6: opening/resuming first checks one tiny revision value.
+      // V19.7: opening/resuming first checks one tiny revision value.
       // Full month data is downloaded only when another device changed data.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
@@ -578,7 +578,7 @@ async function loadFromSheet(options = {}) {
             return { ok:true, month, revisionUnconfirmed:true };
           }
         } catch (revisionError) {
-          // V19.6: when local data exists, a slow/failed revision check must not
+          // V19.7: when local data exists, a slow/failed revision check must not
           // trigger the expensive full-month download. Keep the visible local
           // data and let the next foreground/interval/manual check try again.
           setSync("本机资料已显示 · 云端暂未确认", false, true);
@@ -627,7 +627,7 @@ async function loadFromSheet(options = {}) {
 
       renderHomeFirst();
       scheduleDeferredFullRender(0);
-      // V19.6: keep Fair's visible daily amount inputs consistent with rows after
+      // V19.7: keep Fair's visible daily amount inputs consistent with rows after
       // cloud refresh. Do not overwrite any unsaved Fair edits.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (typeof refreshFairInputsFromRows === "function" && !fairDraftDirtyBeforeCloud && (fairPageActive || options.refreshFairInputs === true)) {
@@ -645,7 +645,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V19.6 mobile performance: startup loads only the selected month.
+      // V19.7 mobile performance: startup loads only the selected month.
       // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
         setTimeout(() => {
@@ -903,9 +903,10 @@ window.addEventListener("online", () => {
 async function closeMonthInSheet(month){const json=await jsonp({action:"closeMonth",month});if(!json.ok)throw new Error(json.message||"月底结算失败");return json}
 async function restoreBackupToSheet(payload){
   const raw=JSON.stringify(payload),id="restore_"+Date.now()+"_"+Math.floor(Math.random()*100000),chunkSize=3200,total=Math.ceil(raw.length/chunkSize);
-  let result=await jsonp({action:"restoreBegin",restoreId:id,totalChunks:total});if(!result.ok)throw new Error(result.message||"无法开始恢复");
-  for(let i=0;i<total;i++){result=await jsonp({action:"restoreChunk",restoreId:id,index:i,data:raw.slice(i*chunkSize,(i+1)*chunkSize)});if(!result.ok)throw new Error(result.message||`恢复区块 ${i+1} 失败`);setSync(`正在恢复 Backup ${i+1}/${total}...`)}
-  result=await jsonp({action:"restoreCommit",restoreId:id});if(!result.ok)throw new Error(result.message||"恢复失败");return result
+  let result=await jsonp({action:"restoreBegin",restoreId:id,totalChunks:total},{timeoutMs:30000});if(!result.ok)throw new Error(result.message||"无法开始恢复");
+  for(let i=0;i<total;i++){result=await jsonp({action:"restoreChunk",restoreId:id,index:i,data:raw.slice(i*chunkSize,(i+1)*chunkSize)},{timeoutMs:30000});if(!result.ok)throw new Error(result.message||`恢复区块 ${i+1} 失败`);setSync(`正在恢复 Backup ${i+1}/${total}...`)}
+  setSync("正在写回 Google Sheet，请勿关闭页面…");
+  result=await jsonp({action:"restoreCommit",restoreId:id},{timeoutMs:180000});if(!result.ok)throw new Error(result.message||"恢复失败");return result
 }
 
 
