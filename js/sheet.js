@@ -24,8 +24,20 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 const REVISION_CHECK_TIMEOUT_MS = 2500;
-// V19.3: notifications use the same proven JSONP transport as business saves.
-// This promise is never awaited by Sales/Fair/Live saving, so push cannot slow sync.
+// V19.4: notification dispatch uses the existing keepalive transport.
+// It is fire-and-forget after a successful business save, so OneSignal never
+// blocks the Sales/Fair/Live save or cloud-sync path on mobile or desktop.
+function getSalesLaunchUrlV194(){
+  try{
+    const url=new URL(window.location.href);
+    url.hash="";
+    url.search="";
+    if(/\/index\.html$/i.test(url.pathname))url.pathname=url.pathname.replace(/index\.html$/i,"");
+    else if(!url.pathname.endsWith("/"))url.pathname=url.pathname.replace(/[^/]+$/,"");
+    return url.href;
+  }catch(e){return "";}
+}
+
 function setLastNotificationDispatchStatus(result){
   try{
     const payload={
@@ -43,23 +55,20 @@ function dispatchSalesNotificationAsync(envelope){
     setLastNotificationDispatchStatus({ok:true,skipped:true,message:"没有新的营业额变化，无需重复通知"});
     return;
   }
-  Promise.resolve().then(()=>{
-    if(typeof jsonp!=="function")throw new Error("JSONP transport unavailable");
-    return jsonp({
-      action:"dispatchSalesNotification",
-      payload:envelope.payload,
-      signature:envelope.signature,
-      clientVersion:"19.3"
-    },{timeoutMs:20000});
-  }).then(result=>{
-    setLastNotificationDispatchStatus(result||{ok:false,message:"空白通知结果"});
-    if(!result||!result.ok)console.warn("Sales notification dispatch failed:",result);
-    else console.log("Sales notification dispatch OK:",result);
-  }).catch(err=>{
-    const result={ok:false,message:String(err&&err.message||err)};
-    setLastNotificationDispatchStatus(result);
-    console.warn("Sales notification dispatch error:",err);
+
+  const submitted=dispatchKeepalive({
+    action:"dispatchSalesNotification",
+    payload:envelope.payload,
+    signature:envelope.signature,
+    clientVersion:"19.4",
+    launchUrl:getSalesLaunchUrlV194()
   });
+
+  if(submitted){
+    setLastNotificationDispatchStatus({ok:true,queued:true,attempted:1,sent:1,message:"通知已提交后台发送"});
+  }else{
+    setLastNotificationDispatchStatus({ok:false,message:"通知后台提交失败"});
+  }
 }
 
 
@@ -98,12 +107,12 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-/* V19.3: first paint must not wait for the full system render. */
+/* V19.4: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V19.3: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V19.4: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -179,7 +188,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V19.3: damaged/partial cache must never trap startup.
+    // V19.4: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -286,7 +295,7 @@ function markCloudCheckPending(text = "本机资料已显示 · 云端后台同�
   if (el) el.textContent = "🟡 " + text;
 }
 
-// V19.3: best-effort immediate cloud dispatch for mobile saves.
+// V19.4: best-effort immediate cloud dispatch for mobile saves.
 // The row stays in pendingRows until a normal JSONP confirmation succeeds, so
 // closing/suspending the page cannot silently lose the user's entry.
 function dispatchKeepalive(params) {
@@ -315,7 +324,8 @@ function flushPendingRowsKeepalive() {
           amount:row.amount,
           clientUpdatedAt:row.clientUpdatedAt||"",
           notifyInline:"1",
-          clientVersion:"19.3"
+          clientVersion:"19.4",
+          launchUrl:getSalesLaunchUrlV194()
         });
       } else if (row.type === "live") {
         dispatchKeepalive({
@@ -325,7 +335,8 @@ function flushPendingRowsKeepalive() {
           amount:row.amount,
           clientUpdatedAt:row.clientUpdatedAt||"",
           notifyInline:"1",
-          clientVersion:"19.3"
+          clientVersion:"19.4",
+          launchUrl:getSalesLaunchUrlV194()
         });
       } else if (row.type === "fair") {
         const loc=canonicalLocation(row.location);
@@ -344,7 +355,8 @@ function flushPendingRowsKeepalive() {
         location,
         records:JSON.stringify(records),
         notifyInline:"1",
-        clientVersion:"19.3"
+        clientVersion:"19.4",
+        launchUrl:getSalesLaunchUrlV194()
       });
     });
   } catch (err) {}
@@ -476,7 +488,7 @@ async function loadYearInBackground(year) {
       if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
       renderHomeFirst();
       scheduleDeferredFullRender(0);
-      // V19.3: if Fair is currently open, repaint its date inputs from the
+      // V19.4: if Fair is currently open, repaint its date inputs from the
       // newly merged cloud rows, unless the user has an unsaved Fair draft.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (fairPageActive && !fairDraftDirtyBeforeCloud && typeof refreshFairInputsFromRows === "function") {
@@ -548,7 +560,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V19.3: opening/resuming first checks one tiny revision value.
+      // V19.4: opening/resuming first checks one tiny revision value.
       // Full month data is downloaded only when another device changed data.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
@@ -566,7 +578,7 @@ async function loadFromSheet(options = {}) {
             return { ok:true, month, revisionUnconfirmed:true };
           }
         } catch (revisionError) {
-          // V19.3: when local data exists, a slow/failed revision check must not
+          // V19.4: when local data exists, a slow/failed revision check must not
           // trigger the expensive full-month download. Keep the visible local
           // data and let the next foreground/interval/manual check try again.
           setSync("本机资料已显示 · 云端暂未确认", false, true);
@@ -615,7 +627,7 @@ async function loadFromSheet(options = {}) {
 
       renderHomeFirst();
       scheduleDeferredFullRender(0);
-      // V19.3: keep Fair's visible daily amount inputs consistent with rows after
+      // V19.4: keep Fair's visible daily amount inputs consistent with rows after
       // cloud refresh. Do not overwrite any unsaved Fair edits.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (typeof refreshFairInputsFromRows === "function" && !fairDraftDirtyBeforeCloud && (fairPageActive || options.refreshFairInputs === true)) {
@@ -633,7 +645,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V19.3 mobile performance: startup loads only the selected month.
+      // V19.4 mobile performance: startup loads only the selected month.
       // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
         setTimeout(() => {
