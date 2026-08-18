@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="style.css?v=19.5">
+<link rel="stylesheet" href="style.css?v=19.6">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
@@ -118,7 +118,7 @@ async function registerLoverSalesSubscriptionAsync(OneSignal,force){
       installationId:getLoverInstallationId(),
       deviceKey,
       onesignalUserId:getLoverOneSignalUserId(OneSignal),
-      clientVersion:"19.5"
+      clientVersion:"19.6"
     },{timeoutMs:15000}).then(result=>{
       if(result&&result.ok){
         try{localStorage.setItem("lover_sales_registered_subscription_id",id)}catch(e){}
@@ -359,7 +359,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V19.5</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V19.6</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -676,7 +676,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     <button class="gray" onclick="backupAllData()">💾 Backup 完整备份</button>
     <button class="gray" onclick="document.getElementById('restoreFile').click()">♻️ Restore 恢复备份</button>
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
-    <p class="note">V19.5：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
+    <p class="note">V19.6：进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
   </div>
 
   
@@ -693,7 +693,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V19.5 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V19.6 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -802,10 +802,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=19.5",
-      "js/sheet.js?v=19.5",
-      "js/app.js?v=19.5",
-      "js/update.js?v=19.5"
+      "js/utils.js?v=19.6",
+      "js/sheet.js?v=19.6",
+      "js/app.js?v=19.6",
+      "js/update.js?v=19.6"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");
@@ -813,7 +813,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
       });
     return appLoadPromise;
   };
-  // V19.5: critical CSS is loaded synchronously; no splash/loading overlay is used.
+  // V19.6: critical CSS is loaded synchronously; no splash/loading overlay is used.
   window.startLoverSalesApp();
 })();
 </script>
