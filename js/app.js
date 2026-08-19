@@ -26,7 +26,7 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V19.8: every time Live is opened, start from today's date.
+  // V19.9: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -38,7 +38,7 @@ function showPage(name,el){
   if(name==="report")renderTable();
   if(name==="fair"&&typeof refreshFairInputsFromRows==="function")refreshFairInputsFromRows(false);
 
-  // V19.8: page switching never waits for or triggers cloud sync.
+  // V19.9: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");return [r.type,r.date,r.company,location].join("|")}
@@ -48,7 +48,7 @@ function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&
 function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c);document.getElementById("dailySales").value=formatAmount(a);document.getElementById("salesDateResult").textContent=`${companyNames[c]}｜${d}｜${money(a)}`;renderSalesMonthlyList()}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
 
-// V19.8: Top 5 business performance. Uses rows already loaded in memory only;
+// V19.9: Top 5 business performance. Uses rows already loaded in memory only;
 // opening/closing Top 5 never triggers an extra cloud request.
 function weekdayZh(displayDate){
   const iso=displayToISO(displayDate);
@@ -235,7 +235,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V19.8: historical record is lazy. Top 5 opens instantly from local rows;
+    // V19.9: historical record is lazy. Top 5 opens instantly from local rows;
     // one shared history request runs only after the user explicitly expands Top 5.
     setTimeout(()=>{ ensureHistoricalHighs(); },0);
   }
@@ -509,7 +509,7 @@ function applyCloudCommissionSettings(settings){
   const incomingLiveRevision=Number(incoming.liveRevision||0);
   const localLiveRevision=Number(local.liveRevision||0);
 
-  // V19.8: Fair and Live each have their own revision.
+  // V19.9: Fair and Live each have their own revision.
   // A stale device/cloud response can never overwrite a newer saved setting.
   const keepLocalFair=incomingFairRevision<localFairRevision;
   const keepLocalLive=liveCommissionDraftDirty||incomingLiveRevision<localLiveRevision;
@@ -646,7 +646,7 @@ function getCommissionSettingsForMonth(month){
   const snapshot=(systemState.commissionSnapshots||{})[target];
   if(!snapshot)return current;
 
-  // V19.8: historical Fair rates come from that month's snapshot, while the
+  // V19.9: historical Fair rates come from that month's snapshot, while the
   // Live schedule is selected by the actual Live record date. This prevents
   // Home's history month selector from blocking the current month's More setup.
   return normalizeCommissionSettings({
@@ -785,7 +785,7 @@ async function removeLiveHost(hostKey){
     if(message){message.textContent="✅ 主播已设为离职／停用";message.classList.remove("hidden");}
     setSync("已同步",true);
   }catch(error){
-    // V19.8: timeout must not undo the user's local action.
+    // V19.9: timeout must not undo the user's local action.
     console.warn("Inactive host cloud sync delayed",error);
     liveCommissionDraftDirty=true;
     queueLiveCommissionRetry(nextSettings,commissionConfigMonth());
@@ -1038,7 +1038,7 @@ async function saveDailySales(){
   renderAll();
   showTempMsg("saveMsg");
 
-  // V19.8: normal Save uses exactly one cloud write.
+  // V19.9: normal Save uses exactly one cloud write.
   // This prevents the immediate keepalive request from racing the normal save,
   // which could turn a real change such as RM9,999 -> RM0 into a later 0 -> 0
   // comparison and suppress the modification notification.
@@ -1200,7 +1200,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     setSync("已储存，正在后台同步...");
     const result=await saveFairBatchToSheet(loc,records);
 
-    // V19.8: local Fair values are direct replacements, never additions. The server
+    // V19.9: local Fair values are direct replacements, never additions. The server
     // also removes duplicate Sheet rows whose location differs only by spaces/case.
     // The response confirms the authoritative overwrite and clears pending rows.
     records.forEach(i=>clearPendingRow({
@@ -1218,7 +1218,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"1908"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"1909"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1236,7 +1236,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"1908"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"1909"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1246,7 +1246,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV19.8 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV19.9 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){
   const current=monthISO();
   document.getElementById("monthPicker").value=current;
@@ -1385,7 +1385,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V19.8: paint Home immediately, restore local cache, then perform only a
+// V19.9: paint Home immediately, restore local cache, then perform only a
 // lightweight Revision check. Full month data is downloaded only when the
 // cloud Revision proves that another device changed data.
 attachMoneyInputs();
@@ -1450,7 +1450,7 @@ async function startInitialSalesDataLoad() {
   return startupSalesSyncPromise;
 }
 
-// V19.8: start cached Home immediately, then warm the current year's historical
+// V19.9: start cached Home immediately, then warm the current year's historical
 // months in the background so Monthly Summary is complete on first open.
 startInitialSalesDataLoad().finally(()=>{
   const startupYear=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
@@ -1479,7 +1479,7 @@ function getSavedLiveHosts(){
 function collectLiveHosts(){
   const merged=[];
   const cloudHosts=Object.values((getCommissionSettings().liveHosts)||{});
-  // V19.8: active host list is independent from historical Live records.
+  // V19.9: active host list is independent from historical Live records.
   // Deleted hosts stay in old reports but do not return to current host options.
   [...cloudHosts,...getSavedLiveHosts()]
     .filter(Boolean)
@@ -1557,6 +1557,96 @@ async function ensureDateControlMonthLoaded(id){
     });
   }
   return {ok:true,skipped:true,month};
+}
+
+
+/* ================= V19.9 on-demand 新增 / 修改记录 ================= */
+const salesChangeLogOpenV199={daily:false,fair:false,live:false};
+
+function changeLogPanelIdV199(type){
+  return type==="daily"?"salesChangeLogPanel":type==="fair"?"fairChangeLogPanel":"liveChangeLogPanel";
+}
+function selectedChangeLogDateV199(type){
+  const id=type==="daily"?"saleDate":type==="fair"?"fairStart":"liveDate";
+  const iso=String(document.getElementById(id)?.value||"");
+  return isoToDisplay(iso);
+}
+function escapeChangeLogHtmlV199(value){
+  return String(value==null?"":value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
+}
+function changeLogEntityNameV199(type,item){
+  if(type==="daily")return companyNames[item.company]||item.company||"Sales";
+  if(type==="fair")return canonicalLocation(item.location||"Fair");
+  return canonicalLiveHost(item.location||"Live");
+}
+function renderChangeLogTimelineV199(type,date,items){
+  const panel=document.getElementById(changeLogPanelIdV199(type));
+  if(!panel)return;
+  const clean=Array.isArray(items)?items:[];
+  const groups=[];
+  clean.forEach(item=>{
+    const name=changeLogEntityNameV199(type,item);
+    const key=type==="daily"?String(item.company||""):type==="fair"?normalizeFairLocationKey(name):normalizeLiveHostKey(name);
+    let group=groups.find(g=>g.key===key);
+    if(!group){group={key,name,items:[]};groups.push(group);}
+    group.items.push(item);
+  });
+
+  // A single original entry is not considered an "新增 / 修改记录". Once a
+  // second real change exists, show the complete timeline including the first sale.
+  const changedGroups=groups.filter(g=>g.items.length>=2);
+  if(!changedGroups.length){
+    panel.innerHTML=`<div class="change-log-date-title">${escapeChangeLogHtmlV199(date||"-")}</div><div class="change-log-empty">没有新增 / 修改记录</div>`;
+    return;
+  }
+
+  panel.innerHTML=`<div class="change-log-date-title">${escapeChangeLogHtmlV199(date)} · 新增 / 修改记录</div>`+changedGroups.map(group=>{
+    const ordered=[...group.items].sort((a,b)=>Number(a.timestampMs||0)-Number(b.timestampMs||0));
+    const rowsHtml=ordered.map((item,index)=>{
+      const oldAmount=Number(item.oldAmount||0);
+      const newAmount=Number(item.newAmount||0);
+      const delta=Number(item.delta||0);
+      let kind="第一笔销售";
+      let amountText=money(newAmount);
+      let cls="positive";
+      if(index>0){
+        if(delta>=0){kind="新增销售";amountText="+"+money(delta);cls="positive";}
+        else{kind="修正";amountText="-"+money(Math.abs(delta));cls="negative";}
+      }
+      return `<div class="change-log-row"><span class="change-log-time">${escapeChangeLogHtmlV199(item.time||"")}</span><span class="change-log-kind">${kind}</span><strong class="change-log-amount ${cls}">${amountText}</strong></div>`;
+    }).join("");
+    const finalTotal=ordered.length?Number(ordered[ordered.length-1].newAmount||0):0;
+    return `<div class="change-log-group"><div class="change-log-group-title">${escapeChangeLogHtmlV199(group.name)}</div>${rowsHtml}<div class="change-log-total"><span>总数</span><strong>${money(finalTotal)}</strong></div></div>`;
+  }).join("");
+}
+async function toggleSalesChangeLogV199(type,button){
+  const panel=document.getElementById(changeLogPanelIdV199(type));
+  if(!panel)return;
+  const date=selectedChangeLogDateV199(type);
+  if(!date){alert("请先选择日期");return;}
+  // Same selected date: second click closes. If the user changed the date while
+  // the panel stayed open, one click refreshes directly to the newly selected date.
+  if(salesChangeLogOpenV199[type]&&String(panel.dataset.logDate||"")===date){
+    salesChangeLogOpenV199[type]=false;
+    panel.classList.add("hidden");
+    panel.innerHTML="";
+    panel.dataset.logDate="";
+    if(button)button.classList.remove("active");
+    return;
+  }
+  salesChangeLogOpenV199[type]=true;
+  panel.dataset.logDate=date;
+  panel.classList.remove("hidden");
+  panel.innerHTML=`<div class="change-log-loading">正在读取 ${escapeChangeLogHtmlV199(date)} 记录...</div>`;
+  if(button)button.classList.add("active");
+  try{
+    const data=await loadSalesChangeLogFromSheetV199(type,date);
+    if(!salesChangeLogOpenV199[type]||String(panel.dataset.logDate||"")!==date)return;
+    renderChangeLogTimelineV199(type,date,data&&data.logs);
+  }catch(error){
+    if(!salesChangeLogOpenV199[type]||String(panel.dataset.logDate||"")!==date)return;
+    panel.innerHTML=`<div class="change-log-empty">读取失败，请稍后再试</div>`;
+  }
 }
 
 function renderSalesMonthlyList(){
@@ -1800,7 +1890,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V19.8: do not restore the previously saved date.
+  // V19.9: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -1930,7 +2020,7 @@ function renderTable(){
   document.getElementById("recordTable").innerHTML=s.map(r=>{const rate=r.type==="live"?getLiveHostRate(r.location,r.date):r.type==="fair"?getFairCommissionRate(totalBy("fair","","month"))*100:0;const commission=(r.type==="live"||r.type==="fair")?Number(r.amount||0)*rate/100:0;return `<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":r.type==="live"?"Live":"每日"}</td><td>${r.type==="live"?"Live":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td><td>${rate?Number(rate.toFixed(2))+"%":"-"}</td><td>${rate?money(commission):"-"}</td></tr>`}).join("")||'<tr><td colspan="7" style="text-align:center;">这个月份还没有记录</td></tr>';
 }
 function renderAll(){
-  // V19.8: one complete render path. This replaces the older partial duplicate
+  // V19.9: one complete render path. This replaces the older partial duplicate
   // so Fair daily/monthly totals, Home totals and Report always refresh together.
   rows=dedupeRows(rows);
   renderDashboard();
@@ -1972,7 +2062,7 @@ function buildMonthlySummary(){
   });
   return [...map.values()].map(item=>({...item,total:item.balakong+item.belimbing+item.fair+item.live})).sort((a,b)=>b.month.localeCompare(a.month));
 }
-// V19.8: expandable daily total list. It uses cached rows immediately and only
+// V19.9: expandable daily total list. It uses cached rows immediately and only
 // reads the selected historical month from cloud when the user asks for it.
 function buildDailyTotals(month){
   const totals=new Map();
@@ -2005,7 +2095,7 @@ async function loadDailyTotalsMonth(month){
   const status=document.getElementById("dailyTotalsStatus");
   renderDailyTotals();
 
-  // V19.8: current month already follows the normal Home sync flow.
+  // V19.9: current month already follows the normal Home sync flow.
   // Do not make a second cloud request just because the daily summary is opened.
   // This keeps startup / Home sync speed unchanged.
   const currentMonth=selectedMonth();
@@ -2080,7 +2170,7 @@ async function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V19.8: show cache immediately and complete historical months in background.
+  // V19.9: show cache immediately and complete historical months in background.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 
@@ -2209,7 +2299,7 @@ async function saveFairCommissionSettings(){
       fairRevision:nextFairCommissionRevision(previous.fairRevision)
     });
 
-    // V19.8: save locally immediately. Do not make the user wait for Apps Script.
+    // V19.9: save locally immediately. Do not make the user wait for Apps Script.
     applyCommissionSettings(settings);
     setSavedCommissionSnapshots(settings,{fair:true,live:false});
     updateFairCommissionDraftState();
@@ -2269,7 +2359,7 @@ async function saveLiveCommissionSettings(){
     const live=readLiveCommissionInputs();
     const candidate=normalizeCommissionSettings({...previous,...live});
     const comparable=x=>JSON.stringify({liveHostRates:x.liveHostRates||{},liveHosts:x.liveHosts||{},inactiveLiveHosts:x.inactiveLiveHosts||{},liveRateSchedules:x.liveRateSchedules||[]});
-    // V19.8: deleting the last special commission rule leaves candidate and
+    // V19.9: deleting the last special commission rule leaves candidate and
     // previous structurally identical because the delete was already applied
     // locally.  A dirty draft must still be written to cloud so [] overwrites
     // the old month snapshot instead of letting the deleted rule return.
@@ -2390,11 +2480,11 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V19.8 Backup / Restore ================= */
+/* ================= V19.9 Backup / Restore ================= */
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"1908",
+    version:"1909",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -2410,7 +2500,7 @@ function backupAllData(){
   try{
     const payload=getBackupPayload();
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    downloadFile(`Lover_Legend_Sales_V19_7_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+    downloadFile(`Lover_Legend_Sales_V19_9_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
   }catch(e){
     console.error("Backup failed",e);
     alert("Backup 失败："+(e&&e.message?e.message:e));

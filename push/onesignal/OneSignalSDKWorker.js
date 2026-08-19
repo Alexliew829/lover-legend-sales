@@ -1,2 +1,2 @@
-// V19.8 - OneSignal Web Push worker. Keep this path stable.
+// V19.9 - OneSignal Web Push worker. Keep this path stable.
 importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
