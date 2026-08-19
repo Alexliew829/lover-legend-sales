@@ -1,2 +1,2 @@
-// V19.9 - Legacy OneSignal worker path retained for existing subscriptions.
+// V20.1 - Legacy OneSignal worker path retained for existing subscriptions.
 importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
