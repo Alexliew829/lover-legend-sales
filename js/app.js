@@ -26,7 +26,7 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V20.5: every time Live is opened, start from today's date.
+  // V20.6: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -38,7 +38,7 @@ function showPage(name,el){
   if(name==="report")renderTable();
   if(name==="fair"&&typeof refreshFairInputsFromRows==="function")refreshFairInputsFromRows(false);
 
-  // V20.5: page switching never waits for or triggers cloud sync.
+  // V20.6: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");return [r.type,r.date,r.company,location].join("|")}
@@ -48,7 +48,7 @@ function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&
 function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c);document.getElementById("dailySales").value=formatAmount(a);document.getElementById("salesDateResult").textContent=`${companyNames[c]}｜${d}｜${money(a)}`;renderSalesMonthlyList()}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
 
-// V20.5: Top 5 business performance. Uses rows already loaded in memory only;
+// V20.6: Top 5 business performance. Uses rows already loaded in memory only;
 // opening/closing Top 5 never triggers an extra cloud request.
 function weekdayZh(displayDate){
   const iso=displayToISO(displayDate);
@@ -235,7 +235,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V20.5: historical record is lazy. Top 5 opens instantly from local rows;
+    // V20.6: historical record is lazy. Top 5 opens instantly from local rows;
     // one shared history request runs only after the user explicitly expands Top 5.
     setTimeout(()=>{ ensureHistoricalHighs(); },0);
   }
@@ -509,7 +509,7 @@ function applyCloudCommissionSettings(settings){
   const incomingLiveRevision=Number(incoming.liveRevision||0);
   const localLiveRevision=Number(local.liveRevision||0);
 
-  // V20.5: Fair and Live each have their own revision.
+  // V20.6: Fair and Live each have their own revision.
   // A stale device/cloud response can never overwrite a newer saved setting.
   const keepLocalFair=incomingFairRevision<localFairRevision;
   const keepLocalLive=liveCommissionDraftDirty||incomingLiveRevision<localLiveRevision;
@@ -646,7 +646,7 @@ function getCommissionSettingsForMonth(month){
   const snapshot=(systemState.commissionSnapshots||{})[target];
   if(!snapshot)return current;
 
-  // V20.5: historical Fair rates come from that month's snapshot, while the
+  // V20.6: historical Fair rates come from that month's snapshot, while the
   // Live schedule is selected by the actual Live record date. This prevents
   // Home's history month selector from blocking the current month's More setup.
   return normalizeCommissionSettings({
@@ -785,7 +785,7 @@ async function removeLiveHost(hostKey){
     if(message){message.textContent="✅ 主播已设为离职／停用";message.classList.remove("hidden");}
     setSync("已同步",true);
   }catch(error){
-    // V20.5: timeout must not undo the user's local action.
+    // V20.6: timeout must not undo the user's local action.
     console.warn("Inactive host cloud sync delayed",error);
     liveCommissionDraftDirty=true;
     queueLiveCommissionRetry(nextSettings,commissionConfigMonth());
@@ -1038,7 +1038,7 @@ async function saveDailySales(){
   renderAll();
   showTempMsg("saveMsg");
 
-  // V20.5: normal Save uses exactly one cloud write.
+  // V20.6: normal Save uses exactly one cloud write.
   // This prevents the immediate keepalive request from racing the normal save,
   // which could turn a real change such as RM9,999 -> RM0 into a later 0 -> 0
   // comparison and suppress the modification notification.
@@ -1200,7 +1200,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     setSync("已储存，正在后台同步...");
     const result=await saveFairBatchToSheet(loc,records);
 
-    // V20.5: local Fair values are direct replacements, never additions. The server
+    // V20.6: local Fair values are direct replacements, never additions. The server
     // also removes duplicate Sheet rows whose location differs only by spaces/case.
     // The response confirms the authoritative overwrite and clears pending rows.
     records.forEach(i=>clearPendingRow({
@@ -1218,7 +1218,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"2005"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"2006"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1236,7 +1236,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"2005"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"2006"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1246,7 +1246,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV20.5 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV20.6 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){
   const current=monthISO();
   document.getElementById("monthPicker").value=current;
@@ -1385,7 +1385,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V20.5: paint Home immediately, restore local cache, then perform only a
+// V20.6: paint Home immediately, restore local cache, then perform only a
 // lightweight Revision check. Full month data is downloaded only when the
 // cloud Revision proves that another device changed data.
 attachMoneyInputs();
@@ -1450,7 +1450,7 @@ async function startInitialSalesDataLoad() {
   return startupSalesSyncPromise;
 }
 
-// V20.5: start cached Home immediately, then warm the current year's historical
+// V20.6: start cached Home immediately, then warm the current year's historical
 // months in the background so Monthly Summary is complete on first open.
 startInitialSalesDataLoad().finally(()=>{
   const startupYear=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
@@ -1479,7 +1479,7 @@ function getSavedLiveHosts(){
 function collectLiveHosts(){
   const merged=[];
   const cloudHosts=Object.values((getCommissionSettings().liveHosts)||{});
-  // V20.5: active host list is independent from historical Live records.
+  // V20.6: active host list is independent from historical Live records.
   // Deleted hosts stay in old reports but do not return to current host options.
   [...cloudHosts,...getSavedLiveHosts()]
     .filter(Boolean)
@@ -1560,7 +1560,7 @@ async function ensureDateControlMonthLoaded(id){
 }
 
 
-/* ================= V20.5 on-demand 新增 / 修改记录 ================= */
+/* ================= V20.6 on-demand 新增 / 修改记录 ================= */
 const salesChangeLogOpenV200={daily:false,fair:false,live:false};
 
 function changeLogPanelIdV200(type){
@@ -1592,7 +1592,7 @@ function renderChangeLogTimelineV200(type,date,items){
     group.items.push(item);
   });
 
-  // V20.5 display rule:
+  // V20.6 display rule:
   // 1) any real audit row must be shown, including a single first sale (0 -> amount).
   // 2) later changes keep the first/original amount in the full timeline.
   // 3) downward correction is attached to the amount BEFORE that correction, so every row explains what happened next.
@@ -1915,7 +1915,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V20.5: do not restore the previously saved date.
+  // V20.6: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -1975,43 +1975,69 @@ function reactivateLiveHostIfNeeded(name){
 }
 
 
-/* ================= V20.5 optional bonsai product association ================= */
-let productLinkItemSeqV205=0;
-function toggleProductLinkBoxV205(type){
-  const pre=type==="live"?"live":"fair",box=document.getElementById(pre+"ProductLinkBox"),body=document.getElementById(pre+"ProductLinkBody");
-  if(!box||!body)return;const opening=body.classList.contains("hidden");body.classList.toggle("hidden",!opening);box.classList.toggle("product-link-collapsed",!opening);
-  const btn=box.querySelector(".product-link-toggle");if(btn)btn.setAttribute("aria-expanded",opening?"true":"false");
-  if(opening){if(type==="fair")syncFairProductDatesV203();const items=document.getElementById(pre+"ProductItems");if(items&&!items.children.length)addProductLinkItemV205(type);}
-}
-function liveDeliveryDefaultV203(price){const n=Number(price||0);if(n<=0)return 0;if(n<500)return 50;if(n<2000)return 80;return 120}
-function productLinkItemHtmlV205(type,id){
-  const live=type==="live";
-  return `<div class="product-link-item" data-product-link-item="${id}">
-    <div class="product-link-item-head"><b>盆栽 ${id}</b><button type="button" class="product-link-remove-btn" onclick="removeProductLinkItemV205('${type}',${id})">删除</button></div>
-    <label>进口产品</label><input class="product-link-name" placeholder="输入盆栽产品名称（下一阶段接 Import Cost System）">
-    <div class="product-link-grid"><div><label>数量</label><input class="product-link-qty qty-input-no-spinner" type="number" min="1" step="1" inputmode="numeric" value="1"></div><div><label>实际售价</label><input class="product-link-price money-input" inputmode="decimal" value="0.00" ${live?'oninput="applyLiveDeliveryDefaultItemV205(this)"':''}></div></div>
-    ${live?'<div class="product-link-grid"><div><label>本地运费</label><input class="product-link-delivery money-input" inputmode="decimal" value="0.00" data-manual="0" oninput="this.dataset.manual=\'1\'"></div><div><label>附加费用</label><input class="product-link-extra money-input" inputmode="decimal" value="0.00"></div></div>':''}
-    <label>备注（可空白）</label><input class="product-link-remark" maxlength="100" placeholder="顾客名字、电话或其他讯息">
-  </div>`;
-}
-function addProductLinkItemV205(type){const pre=type==="live"?"live":"fair",wrap=document.getElementById(pre+"ProductItems");if(!wrap)return;const id=++productLinkItemSeqV205;wrap.insertAdjacentHTML("beforeend",productLinkItemHtmlV205(type,id));}
-function removeProductLinkItemV205(type,id){const pre=type==="live"?"live":"fair",wrap=document.getElementById(pre+"ProductItems"),el=wrap?.querySelector(`[data-product-link-item="${id}"]`);if(el)el.remove();if(wrap&&!wrap.children.length)addProductLinkItemV205(type);}
-function applyLiveDeliveryDefaultItemV205(priceInput){const item=priceInput?.closest('.product-link-item'),d=item?.querySelector('.product-link-delivery');if(!d||d.dataset.manual==='1')return;d.value=formatAmount(liveDeliveryDefaultV203(toAmount(priceInput.value||0)));}
-function syncFairProductDatesV203(){const sel=document.getElementById("fairProductDate");if(!sel)return;const start=document.getElementById("fairStart")?.value,end=document.getElementById("fairEnd")?.value||start;if(!start||!end){sel.innerHTML="";return}const current=sel.value;const dates=dateRange(start,end);sel.innerHTML=dates.map(d=>`<option value="${d}">${d}</option>`).join("");if(dates.includes(current))sel.value=current;}
-function collectProductLinksV205(type){
-  const pre=type==="live"?"live":"fair",wrap=document.getElementById(pre+"ProductItems"),items=[...(wrap?.querySelectorAll('.product-link-item')||[])];
+/* ================= V20.6 optional bonsai product association ================= */
+let productLinkItemSeqV206=0;
+function productLinkContextV206(type){
+  const pre=type==="live"?"live":"fair";
   const date=type==="live"?isoToDisplay(document.getElementById("liveDate")?.value||""):String(document.getElementById("fairProductDate")?.value||"");
   const location=type==="live"?selectedLiveHost():canonicalLocation(String(document.getElementById("fairLocation")?.value||"").trim());
-  return items.map(item=>({type,date,location,productId:"",productName:String(item.querySelector('.product-link-name')?.value||"").trim(),quantity:Math.max(0,Number(item.querySelector('.product-link-qty')?.value||0)),actualPrice:toAmount(item.querySelector('.product-link-price')?.value||0),localDelivery:type==="live"?toAmount(item.querySelector('.product-link-delivery')?.value||0):0,extraFee:type==="live"?toAmount(item.querySelector('.product-link-extra')?.value||0):0,remark:String(item.querySelector('.product-link-remark')?.value||"").trim()})).filter(x=>x.productName||x.actualPrice||x.remark);
+  return{pre,date,location};
 }
-function resetProductLinksV205(type){const pre=type==="live"?"live":"fair",wrap=document.getElementById(pre+"ProductItems");if(wrap){wrap.innerHTML="";addProductLinkItemV205(type)}}
-async function saveProductLinksV205(type){
-  const items=collectProductLinksV205(type);if(!items.length){alert("请至少输入一棵盆栽资料；如果这次没有盆栽，可以保持收起，不需要保存。");return null}
+function toggleProductLinkBoxV206(type){
+  const {pre}=productLinkContextV206(type),box=document.getElementById(pre+"ProductLinkBox"),body=document.getElementById(pre+"ProductLinkBody");
+  if(!box||!body)return;const opening=body.classList.contains("hidden");body.classList.toggle("hidden",!opening);box.classList.toggle("product-link-collapsed",!opening);
+  const btn=box.querySelector(".product-link-toggle");if(btn)btn.setAttribute("aria-expanded",opening?"true":"false");
+  if(opening){if(type==="fair")syncFairProductDatesV203();loadProductLinksIntoEditorV206(type);}
+}
+function liveDeliveryDefaultV203(price){const n=Number(price||0);if(n<=0)return 0;if(n<500)return 50;if(n<2000)return 80;return 120}
+function productLinkItemHtmlV206(type,id,data={}){
+  const live=type==="live",linkId=String(data.linkId||""),saved=!!linkId,qty=Math.max(1,Number(data.quantity||1));
+  const price=formatAmount(Number(data.actualPrice||0)),delivery=formatAmount(Number(data.localDelivery||0)),extra=formatAmount(Number(data.extraFee||0));
+  const productName=escapeHtml(String(data.productName||"")),remark=escapeHtml(String(data.remark||""));
+  return `<div class="product-link-item" data-product-link-item="${id}" data-link-id="${escapeHtml(linkId)}" data-saved="${saved?'1':'0'}">
+    <div class="product-link-item-head"><b>盆栽 ${id}${saved?' · <span class="product-link-saved-tag">已保存</span>':''}</b><button type="button" class="product-link-remove-btn" onclick="removeProductLinkItemV206('${type}',${id})">删除</button></div>
+    <label>进口产品</label><input class="product-link-name" value="${productName}" placeholder="输入盆栽产品名称（下一阶段接 Import Cost System）">
+    <div class="product-link-grid"><div><label>数量</label><input class="product-link-qty qty-input-no-spinner" type="number" min="1" step="1" inputmode="numeric" value="${qty}"></div><div><label>实际售价</label><input class="product-link-price money-input" inputmode="decimal" value="${price}" ${live?'oninput="applyLiveDeliveryDefaultItemV206(this)"':''}></div></div>
+    ${live?`<div class="product-link-grid"><div><label>本地运费</label><input class="product-link-delivery money-input" inputmode="decimal" value="${delivery}" data-manual="${saved||Number(data.localDelivery||0)>0?'1':'0'}" oninput="this.dataset.manual='1'"></div><div><label>附加费用</label><input class="product-link-extra money-input" inputmode="decimal" value="${extra}"></div></div>`:''}
+    <label>备注（可空白）</label><input class="product-link-remark" maxlength="100" value="${remark}" placeholder="顾客名字、电话或其他讯息">
+  </div>`;
+}
+function addProductLinkItemV206(type,data={}){const {pre}=productLinkContextV206(type),wrap=document.getElementById(pre+"ProductItems");if(!wrap)return;const id=++productLinkItemSeqV206;wrap.insertAdjacentHTML("beforeend",productLinkItemHtmlV206(type,id,data));}
+async function removeProductLinkItemV206(type,id){
+  const {pre}=productLinkContextV206(type),wrap=document.getElementById(pre+"ProductItems"),el=wrap?.querySelector(`[data-product-link-item="${id}"]`);if(!el)return;
+  const linkId=String(el.dataset.linkId||""),saved=el.dataset.saved==="1";
+  if(linkId&&saved){
+    if(!confirm("确定删除这棵已保存的盆栽关联？\n\n这会同步删除 Google Sheet 的 Sales_Product_Links 记录。"))return;
+    try{setSync("正在删除盆栽关联...");await deleteSalesProductLinkV206(linkId);el.remove();setSync("盆栽关联已删除",true);alert("盆栽关联已删除。");}
+    catch(e){alert("删除盆栽关联失败："+(e.message||e));setSync("盆栽关联删除失败",false,true);return;}
+  }else el.remove();
+  if(wrap&&!wrap.children.length)addProductLinkItemV206(type);
+}
+function applyLiveDeliveryDefaultItemV206(priceInput){const item=priceInput?.closest('.product-link-item'),d=item?.querySelector('.product-link-delivery');if(!d||d.dataset.manual==='1')return;d.value=formatAmount(liveDeliveryDefaultV203(toAmount(priceInput.value||0)));}
+function syncFairProductDatesV203(){const sel=document.getElementById("fairProductDate");if(!sel)return;const start=document.getElementById("fairStart")?.value,end=document.getElementById("fairEnd")?.value||start;if(!start||!end){sel.innerHTML="";return}const current=sel.value;const dates=dateRange(start,end);sel.innerHTML=dates.map(d=>`<option value="${d}">${d}</option>`).join("");if(dates.includes(current))sel.value=current;}
+function collectProductLinksV206(type){
+  const {pre,date,location}=productLinkContextV206(type),wrap=document.getElementById(pre+"ProductItems"),items=[...(wrap?.querySelectorAll('.product-link-item')||[])];
+  return items.map(item=>{
+    let linkId=String(item.dataset.linkId||"");
+    const productName=String(item.querySelector('.product-link-name')?.value||"").trim(),actualPrice=toAmount(item.querySelector('.product-link-price')?.value||0),remark=String(item.querySelector('.product-link-remark')?.value||"").trim();
+    if(!linkId&&(productName||actualPrice||remark)){linkId="spl_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,10);item.dataset.linkId=linkId;}
+    return{linkId,type,date,location,productId:"",productName,quantity:Math.max(0,Number(item.querySelector('.product-link-qty')?.value||0)),actualPrice,localDelivery:type==="live"?toAmount(item.querySelector('.product-link-delivery')?.value||0):0,extraFee:type==="live"?toAmount(item.querySelector('.product-link-extra')?.value||0):0,remark};
+  }).filter(x=>x.linkId||x.productName||x.actualPrice||x.remark);
+}
+function renderProductLinksEditorV206(type,links){const {pre}=productLinkContextV206(type),wrap=document.getElementById(pre+"ProductItems");if(!wrap)return;wrap.innerHTML="";const list=Array.isArray(links)?links:[];if(list.length)list.forEach(x=>addProductLinkItemV206(type,x));else addProductLinkItemV206(type);}
+async function loadProductLinksIntoEditorV206(type){
+  const {date,location}=productLinkContextV206(type);if(!date||!location){renderProductLinksEditorV206(type,[]);return}
+  try{setSync("正在读取已保存盆栽...");const links=await loadSalesProductLinksV206(type,date,location);renderProductLinksEditorV206(type,links);setSync("已同步",true);}
+  catch(e){renderProductLinksEditorV206(type,[]);setSync("盆栽关联读取失败",false,true);}
+}
+async function saveProductLinksV206(type){
+  const items=collectProductLinksV206(type);if(!items.length){alert("请至少输入一棵盆栽资料；如果这次没有盆栽，可以保持收起，不需要保存。");return null}
   const first=items[0];if(!first.date||!first.location){alert(type==="live"?"请先选择日期和主播":"请先选择 Fair 日期和地点");return null}
   for(const x of items){if(!x.productName){alert("每一项盆栽都需要填写产品名称。");return null}if(!Number.isFinite(Number(x.quantity))||Number(x.quantity)<=0){alert("每一项盆栽数量必须大于 0。");return null}}
   const official=dedupeRows(rows).filter(r=>r.type===type&&r.date===first.date&&(type==="live"?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(first.location):normalizeFairLocationKey(r.location)===normalizeFairLocationKey(first.location))).reduce((m,r)=>Math.max(m,Number(r.amount||0)),0);
-  const batchTotal=items.reduce((s,x)=>s+Number(x.actualPrice||0),0);if(official>0&&batchTotal>official+0.005){alert(`本次盆栽实际售价合计 RM${formatAmount(batchTotal)} 已超过当天营业额 RM${formatAmount(official)}。`);return null}
-  try{setSync("盆栽资料同步中...");const result=await saveSalesProductLinksV205(items);resetProductLinksV205(type);showTempMsg(type==="live"?"liveProductLinkMsg":"fairProductLinkMsg");setSync("已同步",true);if(result?.warning)alert(result.warning);return result}catch(e){alert("盆栽资料保存失败："+(e.message||e));setSync("盆栽资料同步失败",false,true);return null}
+  const batchTotal=items.reduce((s,x)=>s+Number(x.actualPrice||0),0);if(official>0&&batchTotal>official+0.005){alert(`盆栽实际售价合计 RM${formatAmount(batchTotal)} 已超过当天营业额 RM${formatAmount(official)}。`);return null}
+  try{setSync("盆栽资料同步中...");const result=await saveSalesProductLinksV206(items);renderProductLinksEditorV206(type,result?.links||[]);setSync("盆栽资料已保存",true);alert("盆栽资料保存成功。");if(result?.warning)alert(result.warning);return result}
+  catch(e){alert("盆栽资料保存失败："+(e.message||e));setSync("盆栽资料同步失败",false,true);return null}
 }
 async function saveLiveSales(){
   if(!ensureWritableSelection())return;
@@ -2084,7 +2110,7 @@ function renderTable(){
   document.getElementById("recordTable").innerHTML=s.map(r=>{const rate=r.type==="live"?getLiveHostRate(r.location,r.date):r.type==="fair"?getFairCommissionRate(totalBy("fair","","month"))*100:0;const commission=(r.type==="live"||r.type==="fair")?Number(r.amount||0)*rate/100:0;return `<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":r.type==="live"?"Live":"每日"}</td><td>${r.type==="live"?"Live":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td><td>${rate?Number(rate.toFixed(2))+"%":"-"}</td><td>${rate?money(commission):"-"}</td></tr>`}).join("")||'<tr><td colspan="7" style="text-align:center;">这个月份还没有记录</td></tr>';
 }
 function renderAll(){
-  // V20.5: one complete render path. This replaces the older partial duplicate
+  // V20.6: one complete render path. This replaces the older partial duplicate
   // so Fair daily/monthly totals, Home totals and Report always refresh together.
   rows=dedupeRows(rows);
   renderDashboard();
@@ -2126,7 +2152,7 @@ function buildMonthlySummary(){
   });
   return [...map.values()].map(item=>({...item,total:item.balakong+item.belimbing+item.fair+item.live})).sort((a,b)=>b.month.localeCompare(a.month));
 }
-// V20.5: expandable daily total list. It uses cached rows immediately and only
+// V20.6: expandable daily total list. It uses cached rows immediately and only
 // reads the selected historical month from cloud when the user asks for it.
 function buildDailyTotals(month){
   const totals=new Map();
@@ -2159,7 +2185,7 @@ async function loadDailyTotalsMonth(month){
   const status=document.getElementById("dailyTotalsStatus");
   renderDailyTotals();
 
-  // V20.5: current month already follows the normal Home sync flow.
+  // V20.6: current month already follows the normal Home sync flow.
   // Do not make a second cloud request just because the daily summary is opened.
   // This keeps startup / Home sync speed unchanged.
   const currentMonth=selectedMonth();
@@ -2234,7 +2260,7 @@ async function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V20.5: show cache immediately and complete historical months in background.
+  // V20.6: show cache immediately and complete historical months in background.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 
@@ -2363,7 +2389,7 @@ async function saveFairCommissionSettings(){
       fairRevision:nextFairCommissionRevision(previous.fairRevision)
     });
 
-    // V20.5: save locally immediately. Do not make the user wait for Apps Script.
+    // V20.6: save locally immediately. Do not make the user wait for Apps Script.
     applyCommissionSettings(settings);
     setSavedCommissionSnapshots(settings,{fair:true,live:false});
     updateFairCommissionDraftState();
@@ -2423,7 +2449,7 @@ async function saveLiveCommissionSettings(){
     const live=readLiveCommissionInputs();
     const candidate=normalizeCommissionSettings({...previous,...live});
     const comparable=x=>JSON.stringify({liveHostRates:x.liveHostRates||{},liveHosts:x.liveHosts||{},inactiveLiveHosts:x.inactiveLiveHosts||{},liveRateSchedules:x.liveRateSchedules||[]});
-    // V20.5: deleting the last special commission rule leaves candidate and
+    // V20.6: deleting the last special commission rule leaves candidate and
     // previous structurally identical because the delete was already applied
     // locally.  A dirty draft must still be written to cloud so [] overwrites
     // the old month snapshot instead of letting the deleted rule return.
@@ -2544,11 +2570,11 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V20.5 Backup / Restore ================= */
+/* ================= V20.6 Backup / Restore ================= */
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"2005",
+    version:"2006",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
