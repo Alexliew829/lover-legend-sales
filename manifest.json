@@ -1,6 +1,6 @@
 {
-  "name": "Lover Legend Sales System V20.2",
-  "short_name": "Lover Sales V20.2",
+  "name": "Lover Legend Sales System V20.3",
+  "short_name": "Lover Sales V20.3",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f3f6f1",
@@ -18,6 +18,6 @@
       "type": "image/png"
     }
   ],
-  "version": "2002",
-  "description": "Lover Legend Sales System V20.2"
+  "version": "2003",
+  "description": "Lover Legend Sales System V20.3"
 }
