@@ -26,7 +26,7 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V21.5: every time Live is opened, start from today's date.
+  // V21.6: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -38,7 +38,7 @@ function showPage(name,el){
   if(name==="report")renderTable();
   if(name==="fair"&&typeof refreshFairInputsFromRows==="function")refreshFairInputsFromRows(false);
 
-  // V21.5: page switching never waits for or triggers cloud sync.
+  // V21.6: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");return [r.type,r.date,r.company,location].join("|")}
@@ -48,7 +48,7 @@ function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&
 function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c);document.getElementById("dailySales").value=formatAmount(a);document.getElementById("salesDateResult").textContent=`${companyNames[c]}｜${d}｜${money(a)}`;renderSalesMonthlyList()}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
 
-// V21.5: Top 5 business performance. Uses rows already loaded in memory only;
+// V21.6: Top 5 business performance. Uses rows already loaded in memory only;
 // opening/closing Top 5 never triggers an extra cloud request.
 function weekdayZh(displayDate){
   const iso=displayToISO(displayDate);
@@ -235,7 +235,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V21.5: historical record is lazy. Top 5 opens instantly from local rows;
+    // V21.6: historical record is lazy. Top 5 opens instantly from local rows;
     // one shared history request runs only after the user explicitly expands Top 5.
     setTimeout(()=>{ ensureHistoricalHighs(); },0);
   }
@@ -509,7 +509,7 @@ function applyCloudCommissionSettings(settings){
   const incomingLiveRevision=Number(incoming.liveRevision||0);
   const localLiveRevision=Number(local.liveRevision||0);
 
-  // V21.5: Fair and Live each have their own revision.
+  // V21.6: Fair and Live each have their own revision.
   // A stale device/cloud response can never overwrite a newer saved setting.
   const keepLocalFair=incomingFairRevision<localFairRevision;
   const keepLocalLive=liveCommissionDraftDirty||incomingLiveRevision<localLiveRevision;
@@ -646,7 +646,7 @@ function getCommissionSettingsForMonth(month){
   const snapshot=(systemState.commissionSnapshots||{})[target];
   if(!snapshot)return current;
 
-  // V21.5: historical Fair rates come from that month's snapshot, while the
+  // V21.6: historical Fair rates come from that month's snapshot, while the
   // Live schedule is selected by the actual Live record date. This prevents
   // Home's history month selector from blocking the current month's More setup.
   return normalizeCommissionSettings({
@@ -785,7 +785,7 @@ async function removeLiveHost(hostKey){
     if(message){message.textContent="✅ 主播已设为离职／停用";message.classList.remove("hidden");}
     setSync("已同步",true);
   }catch(error){
-    // V21.5: timeout must not undo the user's local action.
+    // V21.6: timeout must not undo the user's local action.
     console.warn("Inactive host cloud sync delayed",error);
     liveCommissionDraftDirty=true;
     queueLiveCommissionRetry(nextSettings,commissionConfigMonth());
@@ -1038,7 +1038,7 @@ async function saveDailySales(){
   renderAll();
   showTempMsg("saveMsg");
 
-  // V21.5: normal Save uses exactly one cloud write.
+  // V21.6: normal Save uses exactly one cloud write.
   // This prevents the immediate keepalive request from racing the normal save,
   // which could turn a real change such as RM9,999 -> RM0 into a later 0 -> 0
   // comparison and suppress the modification notification.
@@ -1200,7 +1200,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     setSync("已储存，正在后台同步...");
     const result=await saveFairBatchToSheet(loc,records);
 
-    // V21.5: local Fair values are direct replacements, never additions. The server
+    // V21.6: local Fair values are direct replacements, never additions. The server
     // also removes duplicate Sheet rows whose location differs only by spaces/case.
     // The response confirms the authoritative overwrite and clears pending rows.
     records.forEach(i=>clearPendingRow({
@@ -1218,7 +1218,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"2150"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"2160"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1236,7 +1236,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"2150"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"2160"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1246,7 +1246,7 @@ async function monthClose(){
   if(!ok)return;
   try{setSync("正在完成月底结算...");const result=await closeMonthInSheet(m);applySystemState(result.systemState);setSync("月底结算已完成",true);alert(`${m} 月底结算已完成。\n目前仍停留在 ${m}，资料仍可在以后发现错误时修正。\n系统日期进入新月份后会自动切换。`)}catch(e){alert("月底结算失败："+e.message);setSync("月底结算失败",false,true)}
 }
-function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV21.5 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
+function yearClose(){const y=selectedYear();if(!confirm(`确定导出 ${y} 全年 Excel？\n\nV21.6 不会提前切换年份；系统日期进入新年份后自动进入新月份。`))return;exportCSV("year")}
 function initializeCurrentMonth(){
   const current=monthISO();
   document.getElementById("monthPicker").value=current;
@@ -1387,7 +1387,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V21.5: paint Home immediately, restore local cache, then perform only a
+// V21.6: paint Home immediately, restore local cache, then perform only a
 // lightweight Revision check. Full month data is downloaded only when the
 // cloud Revision proves that another device changed data.
 attachMoneyInputs();
@@ -1452,7 +1452,7 @@ async function startInitialSalesDataLoad() {
   return startupSalesSyncPromise;
 }
 
-// V21.5: start cached Home immediately, then warm the current year's historical
+// V21.6: start cached Home immediately, then warm the current year's historical
 // months in the background so Monthly Summary is complete on first open.
 startInitialSalesDataLoad().finally(()=>{
   const startupYear=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
@@ -1481,7 +1481,7 @@ function getSavedLiveHosts(){
 function collectLiveHosts(){
   const merged=[];
   const cloudHosts=Object.values((getCommissionSettings().liveHosts)||{});
-  // V21.5: active host list is independent from historical Live records.
+  // V21.6: active host list is independent from historical Live records.
   // Deleted hosts stay in old reports but do not return to current host options.
   [...cloudHosts,...getSavedLiveHosts()]
     .filter(Boolean)
@@ -1562,7 +1562,7 @@ async function ensureDateControlMonthLoaded(id){
 }
 
 
-/* ================= V21.5 on-demand 新增 / 修改记录 ================= */
+/* ================= V21.6 on-demand 新增 / 修改记录 ================= */
 const salesChangeLogOpenV200={daily:false,fair:false,live:false};
 
 function changeLogPanelIdV200(type){
@@ -1594,7 +1594,7 @@ function renderChangeLogTimelineV200(type,date,items){
     group.items.push(item);
   });
 
-  // V21.5 display rule:
+  // V21.6 display rule:
   // 1) any real audit row must be shown, including a single first sale (0 -> amount).
   // 2) later changes keep the first/original amount in the full timeline.
   // 3) downward correction is attached to the amount BEFORE that correction, so every row explains what happened next.
@@ -1917,7 +1917,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V21.5: do not restore the previously saved date.
+  // V21.6: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -1977,7 +1977,7 @@ function reactivateLiveHostIfNeeded(name){
 }
 
 
-/* ================= V21.5 Import Cost System product search ================= */
+/* ================= V21.6 Import Cost System product search ================= */
 // Search/mapping behavior mirrors Lover Legend Cost and Pricing Calculator V8.2.
 const IMPORT_SYSTEM_CLOUD_URL_V214="https://script.google.com/macros/s/AKfycbxWKdEC7vy_7pZ2_CPie-9L5DeIofPggZlLuwB7gW-31HqWXEOxshtCR-HB-m5qLYS6/exec";
 let importProductsV214=[];
@@ -2298,7 +2298,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox){
   nameInput.addEventListener("blur",()=>{blurTimer=setTimeout(close,180);});
 }
 
-/* ================= V21.5 optional bonsai product association ================= */
+/* ================= V21.6 optional bonsai product association ================= */
 
 let productLinkItemSeqV206=0;
 function productLinkContextV206(type){
@@ -2321,7 +2321,7 @@ function toggleProductLinkBoxV206(type){
   body.classList.toggle("hidden",!opening);box.classList.toggle("product-link-collapsed",!opening);
   const btn=box.querySelector(".product-link-toggle");if(btn)btn.setAttribute("aria-expanded",opening?"true":"false");
   if(opening){
-    // V21.5: show the first editable card immediately. This is a pure front-end action
+    // V21.6: show the first editable card immediately. This is a pure front-end action
     // and must never wait for date/host context or a Google Apps Script response.
     ensureProductLinkFirstCardV208(type);
     if(type==="fair")syncFairProductDatesV203();
@@ -2338,7 +2338,7 @@ function liveDeliveryDefaultV203(price){
   return 150;
 }
 function productLinkDefaultCommissionRateV211(type){
-  // V21.5: Live linked-product commission defaults to 10%; editable per card.
+  // V21.6: Live linked-product commission defaults to 10%; editable per card.
   return String(type||"").toLowerCase()==="live"?10:0;
 }
 function recalcProductLinkProfitV211(item){
@@ -2432,14 +2432,14 @@ function buildProductLinkItemV209(type,id,data={}){
 }
 function addProductLinkItemV209(type,data={}){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
-  if(!wrap){console.error("V21.5 product item container missing",type);return false}
+  if(!wrap){console.error("V21.6 product item container missing",type);return false}
   const id=++productLinkItemSeqV206;
   const item=buildProductLinkItemV209(type,id,data);
   wrap.appendChild(item);
   return true;
 }
 function addProductLinkItemV206(type,data={}){return addProductLinkItemV209(type,data)}
-// Explicit globals keep both legacy and V21.5 button bindings reliable.
+// Explicit globals keep both legacy and V21.6 button bindings reliable.
 window.addProductLinkItemV206=addProductLinkItemV206;
 window.addProductLinkItemV209=addProductLinkItemV209;
 window.toggleProductLinkBoxV206=toggleProductLinkBoxV206;
@@ -2473,14 +2473,21 @@ function productLinkBoxIsOpenV210(type){
 }
 function refreshProductLinkContextV210(type){
   if(!productLinkBoxIsOpenV210(type))return;
-  // Never leave the previous host/location cards on screen while the new context is loading.
-  renderProductLinksEditorV206(type,[]);
   Promise.resolve(loadProductLinksIntoEditorV206(type)).catch(()=>{});
 }
 async function loadProductLinksIntoEditorV206(type){
-  const {date,location}=productLinkContextV206(type);if(!date||!location){renderProductLinksEditorV206(type,[]);return}
-  try{setSync("正在读取已保存盆栽...");const links=await loadSalesProductLinksV206(type,date,location);renderProductLinksEditorV206(type,links);setSync("已同步",true);}
-  catch(e){renderProductLinksEditorV206(type,[]);setSync("盆栽关联读取失败",false,true);}
+  const {date,location}=productLinkContextV206(type);
+  if(!date||!location){renderProductLinksEditorV206(type,[]);return}
+  const cached=(typeof getCachedSalesProductLinksV216==="function")?getCachedSalesProductLinksV216(type,date,location):null;
+  if(Array.isArray(cached))renderProductLinksEditorV206(type,cached);
+  else ensureProductLinkFirstCardV208(type);
+  try{
+    const links=await loadSalesProductLinksV206(type,date,location,{force:!Array.isArray(cached),maxAgeMs:60000});
+    const current=productLinkContextV206(type);
+    if(current.date===date&&String(current.location||"")===String(location||""))renderProductLinksEditorV206(type,links);
+  }catch(e){
+    if(!Array.isArray(cached))setSync("盆栽关联读取失败",false,true);
+  }
 }
 async function saveProductLinksV206(type){
   const items=collectProductLinksV206(type);if(!items.length){alert("请至少输入一棵盆栽资料；如果这次没有盆栽，可以保持收起，不需要保存。");return null}
@@ -2492,151 +2499,100 @@ async function saveProductLinksV206(type){
   catch(e){alert("盆栽资料保存失败："+(e.message||e));setSync("盆栽资料同步失败",false,true);return null}
 }
 
-/* ================= V21.5 same-day linked bonsai profit summary ================= */
-const productProfitSummaryOpenV215={live:false,fair:false};
-
-function productProfitOfficialSalesV215(type,date,location){
-  const list=dedupeRows(rows).filter(r=>{
-    if(r.type!==type||r.date!==date)return false;
-    return type==="live"
-      ?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(location)
-      :normalizeFairLocationKey(r.location)===normalizeFairLocationKey(location);
+/* ================= V21.6 same-day linked bonsai profit summary ================= */
+const productProfitSummaryOpenV216={live:false,fair:false};
+function productProfitSummaryPanelV216(type){return document.getElementById(productLinkPreV208(type)+"ProductProfitSummary")}
+function productProfitSelectedDateV216(type){
+  return type==="live"?isoToDisplay(document.getElementById("liveDate")?.value||""):String(document.getElementById("fairProductDate")?.value||"");
+}
+function productProfitGroupKeyV216(type,value){return type==="live"?normalizeLiveHostKey(value):normalizeFairLocationKey(value)}
+function productProfitSalesByGroupV216(type,date){
+  const map=new Map();
+  dedupeRows(rows).forEach(r=>{
+    if(r.type!==type||r.date!==date)return;
+    const name=String(r.location||"").trim();if(!name)return;
+    const key=productProfitGroupKeyV216(type,name);
+    const rec=map.get(key)||{name,sales:0};
+    rec.sales=Math.max(rec.sales,Number(r.amount||0));map.set(key,rec);
   });
-  return list.reduce((m,r)=>Math.max(m,Number(r.amount||0)),0);
+  return map;
 }
-function productProfitSummaryPanelV215(type){
-  return document.getElementById(productLinkPreV208(type)+"ProductProfitSummary");
+function productProfitGroupLinksV216(type,date,links){
+  const groups=new Map();
+  (links||[]).filter(x=>String(x.type||"")===type&&String(x.date||"")===date&&String(x.productName||"").trim()).forEach(x=>{
+    const name=String(x.location||"").trim()||"未指定",key=productProfitGroupKeyV216(type,name)||name;
+    if(!groups.has(key))groups.set(key,{name,links:[]});
+    groups.get(key).links.push(x);
+  });
+  return groups;
 }
-function productProfitSummaryTitleV215(type,date,location){
-  return `${date} · ${type==="live"?"主播":"地点"}：${location}`;
+function productProfitGroupStatsV216(group,salesMap,type){
+  const totalProfit=group.links.reduce((s,x)=>s+Number(x.profit||0),0);
+  const sales=Number(salesMap.get(productProfitGroupKeyV216(type,group.name))?.sales||0);
+  return{totalProfit,sales,overallRate:sales>0?totalProfit/sales*100:0};
 }
-function renderProductProfitSummaryV215(type,links){
-  const panel=productProfitSummaryPanelV215(type);
-  if(!panel)return;
-  const {date,location}=productLinkContextV206(type);
-  const list=(Array.isArray(links)?links:[]).filter(x=>String(x.productName||"").trim());
-  const totalProfit=list.reduce((s,x)=>s+Number(x.profit||0),0);
-  const sales=productProfitOfficialSalesV215(type,date,location);
-  const overallRate=sales>0?totalProfit/sales*100:0;
-
-  panel.innerHTML=`
-    <div class="product-profit-summary-head">
-      <div><b>${productProfitSummaryTitleV215(type,date,location)}</b></div>
-      <button type="button" class="secondary-btn product-profit-export-btn" onclick="exportProductProfitExcelV215('${type}')">📈 导出 Excel</button>
-    </div>
-    <div class="product-profit-table-wrap">
-      <table class="product-profit-table">
-        <thead><tr><th>产品名</th><th>成本</th><th>售价</th><th>利润</th><th>利润率</th></tr></thead>
-        <tbody>${list.length?list.map(x=>`
-          <tr>
-            <td>${escapeChangeLogHtmlV200(String(x.productName||""))}</td>
-            <td>RM${formatAmount(Number(x.averageCost||0)*Math.max(1,Number(x.quantity||1)))}</td>
-            <td>RM${formatAmount(Number(x.actualPrice||0))}</td>
-            <td>RM${formatAmount(Number(x.profit||0))}</td>
-            <td>${Number(x.profitRate||0).toFixed(2)}%</td>
-          </tr>`).join(""):`<tr><td colspan="5" class="product-profit-empty">当天还没有已保存的关联盆栽资料</td></tr>`}
-        </tbody>
-      </table>
-    </div>
-    <div class="product-profit-total"><span>总利润</span><b>RM${formatAmount(totalProfit)}</b></div>
-    <div class="product-profit-total"><span>整体利润率</span><b>${overallRate.toFixed(2)}%</b></div>
-    <div class="product-profit-formula">全部利润总和 ÷ ${type==="live"?"该主播":"该地点"}销售额 RM${formatAmount(sales)}</div>`;
+function productProfitDesktopRowsV216(list){
+  return list.map(x=>`<tr><td>${escapeChangeLogHtmlV200(String(x.productName||""))}</td><td>RM${formatAmount(Number(x.averageCost||0)*Math.max(1,Number(x.quantity||1)))}</td><td>RM${formatAmount(Number(x.actualPrice||0))}</td><td>RM${formatAmount(Number(x.profit||0))}</td><td>${Number(x.profitRate||0).toFixed(2)}%</td></tr>`).join("");
+}
+function productProfitMobileCardsV216(list){
+  return list.map(x=>`<div class="product-profit-mobile-card"><div class="product-profit-mobile-name">${escapeChangeLogHtmlV200(String(x.productName||""))}</div><div class="product-profit-mobile-grid"><div><span>成本</span><b>RM${formatAmount(Number(x.averageCost||0)*Math.max(1,Number(x.quantity||1)))}</b></div><div><span>售价</span><b>RM${formatAmount(Number(x.actualPrice||0))}</b></div><div><span>利润</span><b>RM${formatAmount(Number(x.profit||0))}</b></div><div><span>利润率</span><b>${Number(x.profitRate||0).toFixed(2)}%</b></div></div></div>`).join("");
+}
+function renderProductProfitSummaryV216(type,allLinks){
+  const panel=productProfitSummaryPanelV216(type);if(!panel)return;
+  const date=productProfitSelectedDateV216(type),salesMap=productProfitSalesByGroupV216(type,date),groups=productProfitGroupLinksV216(type,date,allLinks);
+  salesMap.forEach((rec,key)=>{if(!groups.has(key))groups.set(key,{name:rec.name,links:[]})});
+  const ordered=Array.from(groups.values()).sort((a,b)=>String(a.name).localeCompare(String(b.name),"zh-Hans-CN",{numeric:true,sensitivity:"base"}));
+  let dayProfit=0,daySales=0;
+  const sections=ordered.map(group=>{
+    const s=productProfitGroupStatsV216(group,salesMap,type);dayProfit+=s.totalProfit;daySales+=s.sales;
+    return `<section class="product-profit-group"><div class="product-profit-group-title">${type==="live"?"主播":"地点"}：${escapeChangeLogHtmlV200(group.name)}</div><div class="product-profit-table-wrap"><table class="product-profit-table"><thead><tr><th>产品名</th><th>成本</th><th>售价</th><th>利润</th><th>利润率</th></tr></thead><tbody>${group.links.length?productProfitDesktopRowsV216(group.links):`<tr><td colspan="5" class="product-profit-empty">没有已保存的关联盆栽资料</td></tr>`}</tbody></table></div><div class="product-profit-mobile-list">${group.links.length?productProfitMobileCardsV216(group.links):`<div class="product-profit-empty">没有已保存的关联盆栽资料</div>`}</div><div class="product-profit-total profit-highlight"><span>总利润</span><b>RM${formatAmount(s.totalProfit)}</b></div><div class="product-profit-total profit-highlight"><span>整体利润率</span><b>${s.overallRate.toFixed(2)}%</b></div><div class="product-profit-formula">全部利润总和 ÷ ${type==="live"?"该主播":"该地点"}销售额 RM${formatAmount(s.sales)}</div></section>`;
+  }).join("");
+  const dayRate=daySales>0?dayProfit/daySales*100:0;
+  panel.innerHTML=`<div class="product-profit-summary-head"><div><b>${date} · ${type==="live"?"全部主播":"全部地点"}</b></div><button type="button" class="secondary-btn product-profit-export-btn" onclick="exportProductProfitExcelV216('${type}')">📈 导出 Excel</button></div>${sections||`<div class="product-profit-empty">当天还没有关联盆栽资料</div>`}<div class="product-profit-day-summary"><div class="product-profit-total profit-highlight"><span>当天总利润</span><b>RM${formatAmount(dayProfit)}</b></div><div class="product-profit-total profit-highlight"><span>当天整体利润率</span><b>${dayRate.toFixed(2)}%</b></div></div>`;
   panel.dataset.summaryDate=date;
-  panel.dataset.summaryLocation=location;
-  panel.dataset.summaryLinks=JSON.stringify(list);
+  panel.dataset.summaryLinks=JSON.stringify((allLinks||[]).filter(x=>String(x.type||"")===type&&String(x.date||"")===date));
 }
-async function toggleProductProfitSummaryV215(type,button){
-  const panel=productProfitSummaryPanelV215(type);
-  if(!panel)return;
-  const {date,location}=productLinkContextV206(type);
-  if(!date||!location){alert(type==="live"?"请先选择日期和主播":"请先选择 Fair 日期和地点");return}
-  if(productProfitSummaryOpenV215[type]&&!panel.classList.contains("hidden")){
-    productProfitSummaryOpenV215[type]=false;
-    panel.classList.add("hidden");
-    panel.innerHTML="";
-    if(button)button.textContent="📊 当天利润";
-    return;
-  }
+async function toggleProductProfitSummaryV216(type,button){
+  const panel=productProfitSummaryPanelV216(type);if(!panel)return;
+  const date=productProfitSelectedDateV216(type);if(!date){alert("请先选择日期");return}
+  if(productProfitSummaryOpenV216[type]&&!panel.classList.contains("hidden")){productProfitSummaryOpenV216[type]=false;panel.classList.add("hidden");panel.innerHTML="";if(button)button.textContent="📊 当天利润";return}
   try{
-    if(button){button.disabled=true;button.textContent="读取中...";}
-    const links=await loadSalesProductLinksV206(type,date,location);
-    renderProductProfitSummaryV215(type,links);
-    panel.classList.remove("hidden");
-    productProfitSummaryOpenV215[type]=true;
-    if(button)button.textContent="📊 收起利润";
-  }catch(e){
-    alert("读取当天利润失败："+(e.message||e));
-  }finally{
-    if(button)button.disabled=false;
-  }
+    if(button){button.disabled=true;button.textContent="读取中..."}
+    const links=await loadAllSalesProductLinksV203({maxAgeMs:60000});
+    renderProductProfitSummaryV216(type,links);panel.classList.remove("hidden");productProfitSummaryOpenV216[type]=true;if(button)button.textContent="📊 收起利润";
+  }catch(e){alert("读取当天利润失败："+(e.message||e))}
+  finally{if(button)button.disabled=false}
 }
-function buildProductProfitXlsxV215(type,list,date,location,sales){
-  const totalProfit=list.reduce((s,x)=>s+Number(x.profit||0),0);
-  const overallRate=sales>0?totalProfit/sales*100:0;
-  const table=[
-    ["日期",date],
-    [type==="live"?"主播":"地点",location],
-    [],
-    ["产品名","成本","售价","利润","利润率"]
-  ];
-  list.forEach(x=>table.push([
-    String(x.productName||""),
-    Number(x.averageCost||0)*Math.max(1,Number(x.quantity||1)),
-    Number(x.actualPrice||0),
-    Number(x.profit||0),
-    Number(x.profitRate||0)/100
-  ]));
-  table.push([]);
-  table.push(["总利润",totalProfit]);
-  table.push(["销售额",sales]);
-  table.push(["整体利润率",overallRate/100]);
-
-  const widths=Array.from({length:5},(_,c)=>Math.min(50,Math.max(c===0?16:12,...table.map(row=>String(row[c]??"").length+2))));
+function xlsxVisualWidthV216(value){
+  let width=0;for(const ch of String(value??""))width+=/[\u2E80-\u9FFF\uF900-\uFAFF]/.test(ch)?2:1;return width;
+}
+function buildProductProfitXlsxV216(type,list,date,salesMap){
+  const groups=productProfitGroupLinksV216(type,date,list);salesMap.forEach((rec,key)=>{if(!groups.has(key))groups.set(key,{name:rec.name,links:[]})});
+  const ordered=Array.from(groups.values()).sort((a,b)=>String(a.name).localeCompare(String(b.name),"zh-Hans-CN",{numeric:true,sensitivity:"base"}));
+  const table=[["日期",date],[]];let dayProfit=0,daySales=0;
+  ordered.forEach(group=>{
+    const s=productProfitGroupStatsV216(group,salesMap,type);dayProfit+=s.totalProfit;daySales+=s.sales;
+    table.push([type==="live"?"主播":"地点",group.name]);table.push(["产品名","成本","售价","利润","利润率","备注"]);
+    group.links.forEach(x=>table.push([String(x.productName||""),Number(x.averageCost||0)*Math.max(1,Number(x.quantity||1)),Number(x.actualPrice||0),Number(x.profit||0),Number(x.profitRate||0)/100,String(x.remark||"")]));
+    table.push(["总利润",s.totalProfit]);table.push(["销售额",s.sales]);table.push(["整体利润率",s.overallRate/100]);table.push([]);
+  });
+  const dayRate=daySales>0?dayProfit/daySales*100:0;table.push(["当天总利润",dayProfit]);table.push(["当天销售额",daySales]);table.push(["当天整体利润率",dayRate/100]);
+  const colCount=6,widths=Array.from({length:colCount},(_,c)=>{let max=c===0?34:(c===5?28:12);table.forEach(row=>max=Math.max(max,xlsxVisualWidthV216(row[c])+3));return Math.min(60,max)});
   const cols=widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("");
-  const rowsXml=table.map((row,ri)=>`<row r="${ri+1}">${Array.from({length:5},(_,ci)=>{
-    const v=row[ci],ref=xlsxColNameV196(ci)+(ri+1);
-    const header=ri===3;
-    if(v===undefined||v===null)return "";
-    if(header)return `<c r="${ref}" t="inlineStr" s="1"><is><t>${xlsxXmlEscapeV196(v)}</t></is></c>`;
-    const isProductRow=ri>=4&&ri<4+list.length;
-    const isTotalProfit=ri===5+list.length;
-    const isSales=ri===6+list.length;
-    const isOverall=ri===7+list.length;
-    if((isProductRow&&(ci===1||ci===2||ci===3))||((isTotalProfit||isSales)&&ci===1))
-      return `<c r="${ref}" s="2"><v>${Number(v).toFixed(2)}</v></c>`;
-    if((isProductRow&&ci===4)||(isOverall&&ci===1))
-      return `<c r="${ref}" s="4"><v>${Number(v).toFixed(6)}</v></c>`;
-    return `<c r="${ref}" t="inlineStr"><is><t>${xlsxXmlEscapeV196(v)}</t></is></c>`;
-  }).join("")}</row>`).join("");
-
+  const rowsXml=table.map((row,ri)=>`<row r="${ri+1}">${Array.from({length:colCount},(_,ci)=>{const v=row[ci],ref=xlsxColNameV196(ci)+(ri+1);if(v===undefined||v===null||v==="")return"";const header=row[0]==="产品名";if(header)return`<c r="${ref}" t="inlineStr" s="1"><is><t>${xlsxXmlEscapeV196(v)}</t></is></c>`;const label=String(row[0]||""),productRow=row.length>=6&&typeof row[1]==="number"&&!["总利润","销售额"].includes(label);if(productRow&&(ci===1||ci===2||ci===3))return`<c r="${ref}" s="2"><v>${Number(v).toFixed(2)}</v></c>`;if(productRow&&ci===4)return`<c r="${ref}" s="4"><v>${Number(v).toFixed(6)}</v></c>`;if(["总利润","销售额","当天总利润","当天销售额"].includes(label)&&ci===1)return`<c r="${ref}" s="2"><v>${Number(v).toFixed(2)}</v></c>`;if(["整体利润率","当天整体利润率"].includes(label)&&ci===1)return`<c r="${ref}" s="4"><v>${Number(v).toFixed(6)}</v></c>`;return`<c r="${ref}" t="inlineStr"><is><t>${xlsxXmlEscapeV196(v)}</t></is></c>`}).join("")}</row>`).join("");
   const sheetXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>${cols}</cols><sheetData>${rowsXml}</sheetData></worksheet>`;
   const styles=`<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="2" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="10" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>`;
-  return [
-    {name:"[Content_Types].xml",data:`<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},
-    {name:"_rels/.rels",data:`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
-    {name:"xl/workbook.xml",data:`<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Profit" sheetId="1" r:id="rId1"/></sheets></workbook>`},
-    {name:"xl/_rels/workbook.xml.rels",data:`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
-    {name:"xl/styles.xml",data:styles},
-    {name:"xl/worksheets/sheet1.xml",data:sheetXml}
-  ];
+  return[{name:"[Content_Types].xml",data:`<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},{name:"_rels/.rels",data:`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},{name:"xl/workbook.xml",data:`<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Profit" sheetId="1" r:id="rId1"/></sheets></workbook>`},{name:"xl/_rels/workbook.xml.rels",data:`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},{name:"xl/styles.xml",data:styles},{name:"xl/worksheets/sheet1.xml",data:sheetXml}];
 }
-function exportProductProfitExcelV215(type){
-  const panel=productProfitSummaryPanelV215(type);
-  if(!panel)return;
-  const date=String(panel.dataset.summaryDate||"");
-  const location=String(panel.dataset.summaryLocation||"");
-  let list=[];try{list=JSON.parse(panel.dataset.summaryLinks||"[]")}catch(_){}
-  const sales=productProfitOfficialSalesV215(type,date,location);
-  const files=buildProductProfitXlsxV215(type,list,date,location,sales);
-  const blob=new Blob([zipStoreV196(files)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
-  const u=URL.createObjectURL(blob),a=document.createElement("a");
-  a.href=u;
-  const safe=String(location||"").replace(/[\\/:*?"<>|]+/g,"_");
-  a.download=`Lover_${type==="live"?"Live":"Fair"}_Profit_${date}_${safe}.xlsx`;
-  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);
+function exportProductProfitExcelV216(type){
+  const panel=productProfitSummaryPanelV216(type);if(!panel)return;
+  const date=String(panel.dataset.summaryDate||productProfitSelectedDateV216(type)||"");let list=[];try{list=JSON.parse(panel.dataset.summaryLinks||"[]")}catch(_){}
+  const files=buildProductProfitXlsxV216(type,list,date,productProfitSalesByGroupV216(type,date));
+  const blob=new Blob([zipStoreV196(files)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),u=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=u;a.download=`Lover_${type==="live"?"Live":"Fair"}_Profit_${date}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);
 }
-window.toggleProductProfitSummaryV215=toggleProductProfitSummaryV215;
-window.exportProductProfitExcelV215=exportProductProfitExcelV215;
+window.toggleProductProfitSummaryV216=toggleProductProfitSummaryV216;
+window.exportProductProfitExcelV216=exportProductProfitExcelV216;
 
 async function saveLiveSales(){
   if(!ensureWritableSelection())return;
@@ -2709,7 +2665,7 @@ function renderTable(){
   document.getElementById("recordTable").innerHTML=s.map(r=>{const rate=r.type==="live"?getLiveHostRate(r.location,r.date):r.type==="fair"?getFairCommissionRate(totalBy("fair","","month"))*100:0;const commission=(r.type==="live"||r.type==="fair")?Number(r.amount||0)*rate/100:0;return `<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":r.type==="live"?"Live":"每日"}</td><td>${r.type==="live"?"Live":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td><td>${rate?Number(rate.toFixed(2))+"%":"-"}</td><td>${rate?money(commission):"-"}</td></tr>`}).join("")||'<tr><td colspan="7" style="text-align:center;">这个月份还没有记录</td></tr>';
 }
 function renderAll(){
-  // V21.5: one complete render path. This replaces the older partial duplicate
+  // V21.6: one complete render path. This replaces the older partial duplicate
   // so Fair daily/monthly totals, Home totals and Report always refresh together.
   rows=dedupeRows(rows);
   renderDashboard();
@@ -2751,7 +2707,7 @@ function buildMonthlySummary(){
   });
   return [...map.values()].map(item=>({...item,total:item.balakong+item.belimbing+item.fair+item.live})).sort((a,b)=>b.month.localeCompare(a.month));
 }
-// V21.5: expandable daily total list. It uses cached rows immediately and only
+// V21.6: expandable daily total list. It uses cached rows immediately and only
 // reads the selected historical month from cloud when the user asks for it.
 function buildDailyTotals(month){
   const totals=new Map();
@@ -2784,7 +2740,7 @@ async function loadDailyTotalsMonth(month){
   const status=document.getElementById("dailyTotalsStatus");
   renderDailyTotals();
 
-  // V21.5: current month already follows the normal Home sync flow.
+  // V21.6: current month already follows the normal Home sync flow.
   // Do not make a second cloud request just because the daily summary is opened.
   // This keeps startup / Home sync speed unchanged.
   const currentMonth=selectedMonth();
@@ -2859,7 +2815,7 @@ async function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V21.5: show cache immediately and complete historical months in background.
+  // V21.6: show cache immediately and complete historical months in background.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 
@@ -2991,7 +2947,7 @@ async function saveFairCommissionSettings(){
       fairRevision:nextFairCommissionRevision(previous.fairRevision)
     });
 
-    // V21.5: save locally immediately. Do not make the user wait for Apps Script.
+    // V21.6: save locally immediately. Do not make the user wait for Apps Script.
     applyCommissionSettings(settings);
     setSavedCommissionSnapshots(settings,{fair:true,live:false});
     updateFairCommissionDraftState();
@@ -3051,7 +3007,7 @@ async function saveLiveCommissionSettings(){
     const live=readLiveCommissionInputs();
     const candidate=normalizeCommissionSettings({...previous,...live});
     const comparable=x=>JSON.stringify({liveHostRates:x.liveHostRates||{},liveHosts:x.liveHosts||{},inactiveLiveHosts:x.inactiveLiveHosts||{},liveRateSchedules:x.liveRateSchedules||[]});
-    // V21.5: deleting the last special commission rule leaves candidate and
+    // V21.6: deleting the last special commission rule leaves candidate and
     // previous structurally identical because the delete was already applied
     // locally.  A dirty draft must still be written to cloud so [] overwrites
     // the old month snapshot instead of letting the deleted rule return.
@@ -3172,11 +3128,11 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V21.5 Backup / Restore ================= */
+/* ================= V21.6 Backup / Restore ================= */
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"2150",
+    version:"2160",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
