@@ -261,6 +261,7 @@
       const result = await refreshCloudData("pull-down", true);
 
       if (result && result.ok) {
+        if (typeof window.clearUnsavedSalesCardEditorsV221 === "function") window.clearUnsavedSalesCardEditorsV221();
         indicator.textContent = "刷新完成";
       } else {
         indicator.textContent = "刷新失败，请稍后重试";
