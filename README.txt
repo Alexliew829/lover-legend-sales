@@ -1,40 +1,14 @@
-Lover Legend Sales V20.1
+Lover Legend Sales System V22.4 PERFECT STABLE
 
-V20.1 Home monthly comparison small UI cleanup:
-- 取消展开区重复标题「Balakong 本月销售记录」。
-- 取消展开区重复标题「Belimbing 本月销售记录」。
-- 保留月份（例如 08-2026）。
-- 保留绿色本月总数。
-- 保留每日日期 + 每日销售金额。
-- 保留左右固定比较结构。
-- 保留缺失日期自动补 RM0.00。
-- 保留一次点击立即展开 / 再点击收起。
-- 不修改 Sales / Fair / Live / Report / 通知 / 同步 / Device Registry 逻辑。
-- Apps Script 无业务逻辑更新；Code.gs 仅同步版本号。
-Lover Legend Sales V20.1
+V22.4:
+1. Home 本年度累计五个项目均可点击展开/收起每月营业额，并显示总数与 RM 格式。
+2. 年度列表沿用 Monthly Summary / 年度历史月份资料来源，保留月结后的历史月份。
+3. 手机下拉 Refresh 只清除未保存的销售卡；已保存销售卡保留。
+4. Refresh 不收起销售卡、不跳页；清理后保留/新增空白销售卡，方便继续输入。
+5. Import System 产品资料加入本机缓存，并在系统启动后后台预加载，减少第一次搜索等待。
+6. 搜索与映射逻辑保持原有：产品名、原购买单价、内地杂费、平均成本、最低售价、海外运费、Batch 状态。
+7. 所有版本标记更新为 V22.4 / 2240 / ?v=22.4。
 
-V20.1 Home company comparison fixed columns:
-- Balakong 永远固定左栏。
-- Belimbing 永远固定右栏。
-- 收起 Balakong：只隐藏 Balakong 本月销售记录，Belimbing 原位不动。
-- 收起 Belimbing：只隐藏 Belimbing 本月销售记录，Balakong 原位不动。
-- 两边都展开：保持左右比较。
-- 两边都收起：只保留上方两张本月总数卡。
-- 保留 V19.9 已修好的：一次点击立即展开、展开区绿色总数、每日金额红色、缺失日期补 RM0.00。
-- 不修改 Sales / Fair / Live / Report / 通知 / 同步 / Device Registry 业务逻辑。
-- Apps Script 无业务逻辑更新；Code.gs 仅同步版本号。
-Lover Legend Sales V20.1
-
-Home 本月公司销售记录修复：
-- 保留 V19.8 已修好的「一次点击立即展开」。
-- Balakong / Belimbing 顶部本月总数卡永久保留。
-- 两家公司仍然左右并排、独立展开，可同时比较。
-- 展开区恢复「Balakong 本月销售记录 / Belimbing 本月销售记录」。
-- 展开区顶部恢复本月总数，使用绿色字体。
-- 总数采用 Top 5 金额相同的防截断思路：nowrap、tabular nums、独立完整宽度，RM33,602.40 等可完整显示。
-- 左右两家公司共用同一套日期轴；任何一边某日没有销售，自动显示 RM0.00。
-- 每日金额继续红色。
-- 不增加 Google Sheet 请求，不改 Sales / Fair / Live / Report / 通知 / 同步 / Device Registry。
-
-Apps Script：无业务逻辑更新，仅版本号同步。
-
+Apps Script / Code.gs：需要更新（版本标记已同步为 V22.4 / 2240；业务资料结构未改变）。
+appsscript.json：不需要更新。
+Import Cost System：不需要更新。
