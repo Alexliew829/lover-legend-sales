@@ -35,7 +35,7 @@ function showPage(name,el){
   if(el)el.classList.add("active");
   try{localStorage.setItem(LAST_PAGE_KEY_V238,name)}catch(e){}
 
-  // V23.8: every time Live is opened, start from today's date.
+  // V23.9: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -47,7 +47,7 @@ function showPage(name,el){
   if(name==="report")renderTable();
   if(name==="fair"&&typeof refreshFairInputsFromRows==="function")refreshFairInputsFromRows(false);
 
-  // V23.8: page switching never waits for or triggers cloud sync.
+  // V23.9: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");return [r.type,r.date,r.company,location].join("|")}
@@ -57,7 +57,7 @@ function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&
 function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c);document.getElementById("dailySales").value=formatAmount(a);document.getElementById("salesDateResult").textContent=`${companyNames[c]}｜${d}｜${money(a)}`;renderSalesMonthlyList()}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
 
-// V23.8: Top 5 business performance. Uses rows already loaded in memory only;
+// V23.9: Top 5 business performance. Uses rows already loaded in memory only;
 // opening/closing Top 5 never triggers an extra cloud request.
 function weekdayZh(displayDate){
   const iso=displayToISO(displayDate);
@@ -244,7 +244,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V23.8: historical record is lazy. Top 5 opens instantly from local rows;
+    // V23.9: historical record is lazy. Top 5 opens instantly from local rows;
     // one shared history request runs only after the user explicitly expands Top 5.
     setTimeout(()=>{ ensureHistoricalHighs(); },0);
   }
@@ -518,7 +518,7 @@ function applyCloudCommissionSettings(settings){
   const incomingLiveRevision=Number(incoming.liveRevision||0);
   const localLiveRevision=Number(local.liveRevision||0);
 
-  // V23.8: Fair and Live each have their own revision.
+  // V23.9: Fair and Live each have their own revision.
   // A stale device/cloud response can never overwrite a newer saved setting.
   const keepLocalFair=incomingFairRevision<localFairRevision;
   const keepLocalLive=liveCommissionDraftDirty||incomingLiveRevision<localLiveRevision;
@@ -655,7 +655,7 @@ function getCommissionSettingsForMonth(month){
   const snapshot=(systemState.commissionSnapshots||{})[target];
   if(!snapshot)return current;
 
-  // V23.8: historical Fair rates come from that month's snapshot, while the
+  // V23.9: historical Fair rates come from that month's snapshot, while the
   // Live schedule is selected by the actual Live record date. This prevents
   // Home's history month selector from blocking the current month's More setup.
   return normalizeCommissionSettings({
@@ -794,7 +794,7 @@ async function removeLiveHost(hostKey){
     if(message){message.textContent="✅ 主播已设为离职／停用";message.classList.remove("hidden");}
     setSync("已同步",true);
   }catch(error){
-    // V23.8: timeout must not undo the user's local action.
+    // V23.9: timeout must not undo the user's local action.
     console.warn("Inactive host cloud sync delayed",error);
     liveCommissionDraftDirty=true;
     queueLiveCommissionRetry(nextSettings,commissionConfigMonth());
@@ -1047,7 +1047,7 @@ async function saveDailySales(){
   renderAll();
   showTempMsg("saveMsg");
 
-  // V23.8: normal Save uses exactly one cloud write.
+  // V23.9: normal Save uses exactly one cloud write.
   // This prevents the immediate keepalive request from racing the normal save,
   // which could turn a real change such as RM9,999 -> RM0 into a later 0 -> 0
   // comparison and suppress the modification notification.
@@ -1209,7 +1209,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     setSync("已储存，正在后台同步...");
     const result=await saveFairBatchToSheet(loc,records);
 
-    // V23.8: local Fair values are direct replacements, never additions. The server
+    // V23.9: local Fair values are direct replacements, never additions. The server
     // also removes duplicate Sheet rows whose location differs only by spaces/case.
     // The response confirms the authoritative overwrite and clears pending rows.
     records.forEach(i=>clearPendingRow({
@@ -1227,7 +1227,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"2380"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"2390"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1245,7 +1245,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"2380"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"2390"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1405,7 +1405,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V23.8: paint Home immediately, restore local cache, then perform only a
+// V23.9: paint Home immediately, restore local cache, then perform only a
 // lightweight Revision check. Full month data is downloaded only when the
 // cloud Revision proves that another device changed data.
 attachMoneyInputs();
@@ -1479,7 +1479,7 @@ async function startInitialSalesDataLoad() {
   return startupSalesSyncPromise;
 }
 
-// V23.8: start cached Home immediately, then warm the current year's historical
+// V23.9: start cached Home immediately, then warm the current year's historical
 // months in the background so Monthly Summary is complete on first open.
 startInitialSalesDataLoad().finally(()=>{
   const startupYear=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
@@ -1508,7 +1508,7 @@ function getSavedLiveHosts(){
 function collectLiveHosts(){
   const merged=[];
   const cloudHosts=Object.values((getCommissionSettings().liveHosts)||{});
-  // V23.8: active host list is independent from historical Live records.
+  // V23.9: active host list is independent from historical Live records.
   // Deleted hosts stay in old reports but do not return to current host options.
   [...cloudHosts,...getSavedLiveHosts()]
     .filter(Boolean)
@@ -1589,7 +1589,7 @@ async function ensureDateControlMonthLoaded(id){
 }
 
 
-/* ================= V23.8 on-demand 修改 / 销售记录 ================= */
+/* ================= V23.9 on-demand 修改 / 销售记录 ================= */
 const salesChangeLogOpenV200={daily:false,fair:false,live:false};
 
 function changeLogPanelIdV200(type){
@@ -1621,7 +1621,7 @@ function renderChangeLogTimelineV200(type,date,items){
     group.items.push(item);
   });
 
-  // V23.8 display rule:
+  // V23.9 display rule:
   // 1) any real audit row must be shown, including a single first sale (0 -> amount).
   // 2) later changes keep the first/original amount in the full timeline.
   // 3) downward correction is attached to the amount BEFORE that correction, so every row explains what happened next.
@@ -1950,7 +1950,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V23.8: do not restore the previously saved date.
+  // V23.9: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -2010,7 +2010,7 @@ function reactivateLiveHostIfNeeded(name){
 }
 
 
-/* ================= V23.8 Import Cost System product search ================= */
+/* ================= V23.9 Import Cost System product search ================= */
 // Search/mapping behavior mirrors Lover Legend Cost and Pricing Calculator V8.2.
 const IMPORT_SYSTEM_CLOUD_URL_V214="https://script.google.com/macros/s/AKfycbxWKdEC7vy_7pZ2_CPie-9L5DeIofPggZlLuwB7gW-31HqWXEOxshtCR-HB-m5qLYS6/exec";
 let importProductsV214=[];
@@ -2035,7 +2035,7 @@ function unorderedImportProductMatchV214(sourceValue,queryValue){
   const query=normalizeImportProductSearchTextV214(queryValue);
   if(!query)return true;
   if(isExactProductCodeQueryV214(query)){
-    // V23.8: code search supports case-insensitive prefix/partial entry.
+    // V23.9: code search supports case-insensitive prefix/partial entry.
     const codes=extractImportProductCodesV214(sourceValue);
     return codes.some(code=>code===query||code.startsWith(query));
   }
@@ -2290,7 +2290,7 @@ function updateProductLinkMinimumWarningV214(item){
   if(priceInput)priceInput.classList.toggle("below-minimum-price",low);
 }
 function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
-  // V23.8: iPhone/iOS safe search state.
+  // V23.9: iPhone/iOS safe search state.
   // The dropdown remains open through async Import loading, keyboard candidate changes,
   // transient blur/focus changes and background sales-card loading.
   let searchOpen=false;
@@ -2365,7 +2365,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
 
         row.append(line1,line2);
 
-        // V23.8: distinguish an intentional tap from list scrolling on iPhone/iOS.
+        // V23.9: distinguish an intentional tap from list scrolling on iPhone/iOS.
         let touchStartX=0,touchStartY=0,touchMoved=false,touchHandled=false;
         const chooseRecord=e=>{
           if(e){
@@ -2455,7 +2455,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
 }
 
 
-/* ================= V23.8 Sales Card unsaved-change protection ================= */
+/* ================= V23.9 Sales Card unsaved-change protection ================= */
 function markSalesCardDirtyV238(item){
   if(!item)return;
   item.dataset.dirty="1";
@@ -2482,7 +2482,7 @@ function confirmDiscardSalesCardChangesV238(type){
   return ok;
 }
 
-/* ================= V23.8 optional bonsai product association ================= */
+/* ================= V23.9 optional bonsai product association ================= */
 
 let productLinkItemSeqV206=0;
 function productLinkContextV206(type){
@@ -2506,13 +2506,13 @@ function toggleProductLinkBoxV206(type){
   body.classList.toggle("hidden",!opening);box.classList.toggle("product-link-collapsed",!opening);
   const btn=box.querySelector(".product-link-toggle");if(btn)btn.setAttribute("aria-expanded",opening?"true":"false");
   if(opening){
-    // V23.8: Sales Cards and Daily Profit are mutually exclusive.
+    // V23.9: Sales Cards and Daily Profit are mutually exclusive.
     const profitPanel=productProfitSummaryPanelV216(type);
     if(profitPanel){profitPanel.classList.add("hidden");profitPanel.innerHTML=""}
     productProfitSummaryOpenV216[type]=false;
     const profitBtn=document.querySelector(`#${pre}ProductLinkBox .product-profit-toggle-btn`);
     if(profitBtn){profitBtn.textContent="📊 当天利润";profitBtn.disabled=false}
-    // V23.8: saved cards first. Do not flash a fake 0.00 card while cloud data loads.
+    // V23.9: saved cards first. Do not flash a fake 0.00 card while cloud data loads.
     if(type==="fair")syncFairProductDatesV203();
     Promise.resolve(loadProductLinksIntoEditorV206(type)).catch(()=>{});
   }
@@ -2635,14 +2635,14 @@ function buildProductLinkItemV209(type,id,data={}){
 }
 function addProductLinkItemV209(type,data={}){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
-  if(!wrap){console.error("V23.8 product item container missing",type);return false}
+  if(!wrap){console.error("V23.9 product item container missing",type);return false}
   const id=++productLinkItemSeqV206;
   const item=buildProductLinkItemV209(type,id,data);
   wrap.appendChild(item);
   return true;
 }
 function addProductLinkItemV206(type,data={}){return addProductLinkItemV209(type,data)}
-// Explicit globals keep both legacy and V23.8 button bindings reliable.
+// Explicit globals keep both legacy and V23.9 button bindings reliable.
 window.addProductLinkItemV206=addProductLinkItemV206;
 window.addProductLinkItemV209=addProductLinkItemV209;
 window.toggleProductLinkBoxV206=toggleProductLinkBoxV206;
@@ -2726,7 +2726,7 @@ async function loadProductLinksIntoEditorV206(type){
 
   const cached=(typeof getCachedSalesProductLinksV216==="function")?getCachedSalesProductLinksV216(type,date,location):null;
 
-  // V23.8: memory/local persistent cache renders first, cloud verifies silently.
+  // V23.9: memory/local persistent cache renders first, cloud verifies silently.
   if(Array.isArray(cached)){
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
   }else{
@@ -2779,7 +2779,381 @@ async function saveProductLinksV206(type){
   catch(e){alert("销售卡保存失败："+(e.message||e));setSync("销售卡同步失败",false,true);return null}
 }
 
-/* ================= V23.8 same-day linked bonsai profit summary ================= */
+
+/* ================= V23.9 multi-product Sales Card ================= */
+let salesCardSeqV239=0;
+
+function salesCardTxnIdV239(data={}){
+  return String(data.transactionId||"").trim()||("txn_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,9));
+}
+function salesCardWrappersV239(type){
+  const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
+  return [...(wrap?.querySelectorAll(".sales-card-transaction-v239")||[])];
+}
+function markSalesCardTransactionDirtyV239(card){
+  if(!card)return;
+  card.dataset.dirty="1";
+  card.querySelectorAll(".product-link-item").forEach(x=>x.dataset.dirty="1");
+}
+function clearSalesCardTransactionDirtyV239(card){
+  if(!card)return;
+  card.dataset.dirty="0";
+  card.querySelectorAll(".product-link-item").forEach(x=>x.dataset.dirty="0");
+}
+function salesCardProductsV239(card){
+  return [...(card?.querySelectorAll(".product-link-item")||[])];
+}
+function salesCardSharedValuesV239(card){
+  return{
+    commissionRate:Math.max(0,Number(String(card.querySelector(".sales-card-commission-rate-v239")?.value||"0").replace(/[^0-9.\-]/g,""))||0),
+    deliveryTotal:Math.max(0,toAmount(card.querySelector(".sales-card-delivery-total-v239")?.value||0)),
+    extraTotal:Math.max(0,toAmount(card.querySelector(".sales-card-extra-total-v239")?.value||0)),
+    remark:String(card.querySelector(".sales-card-remark-v239")?.value||"").trim()
+  };
+}
+function salesCardAutoDeliveryForItemV239(item){
+  const price=toAmount(item.querySelector(".product-link-price")?.value||0);
+  return liveDeliveryDefaultV203(price);
+}
+function allocateSalesCardSharedCostsV239(card){
+  const products=salesCardProductsV239(card);
+  const shared=salesCardSharedValuesV239(card);
+  const prices=products.map(x=>Math.max(0,toAmount(x.querySelector(".product-link-price")?.value||0)));
+  const defaults=products.map(salesCardAutoDeliveryForItemV239);
+  const priceTotal=prices.reduce((a,b)=>a+b,0);
+  const defaultDeliveryTotal=defaults.reduce((a,b)=>a+b,0);
+  const deliveryManual=card.dataset.deliveryManual==="1";
+
+  return products.map((item,i)=>{
+    let delivery=defaults[i];
+    if(deliveryManual){
+      const denom=defaultDeliveryTotal>0?defaultDeliveryTotal:priceTotal;
+      const weight=denom>0?(defaultDeliveryTotal>0?defaults[i]/denom:prices[i]/denom):(products.length?1/products.length:0);
+      delivery=shared.deliveryTotal*weight;
+    }
+    const extraWeight=priceTotal>0?prices[i]/priceTotal:(products.length?1/products.length:0);
+    const extra=shared.extraTotal*extraWeight;
+    const commission=prices[i]*shared.commissionRate/100;
+    return{delivery,extra,commission,price:prices[i],commissionRate:shared.commissionRate};
+  });
+}
+function recalcSalesCardTransactionV239(card){
+  if(!card)return;
+  const products=salesCardProductsV239(card);
+  if(card.dataset.deliveryManual!=="1"){
+    const autoTotal=products.reduce((s,x)=>s+salesCardAutoDeliveryForItemV239(x),0);
+    const d=card.querySelector(".sales-card-delivery-total-v239");
+    if(d)d.value=formatAmount(autoTotal);
+  }
+  const alloc=allocateSalesCardSharedCostsV239(card);
+  let totalPrice=0,totalCost=0,totalProfit=0,totalCommission=0;
+  products.forEach((item,i)=>{
+    const qty=Math.max(0,Number(item.querySelector(".product-link-qty")?.value||0));
+    const avgCost=toAmount(item.querySelector(".product-link-avg-cost")?.value||0);
+    const cost=avgCost*qty,price=alloc[i]?.price||0;
+    const profit=price-(alloc[i]?.commission||0)-cost-(alloc[i]?.delivery||0)-(alloc[i]?.extra||0);
+    const rate=price>0?profit/price*100:0;
+    totalPrice+=price;totalCost+=cost;totalProfit+=profit;totalCommission+=(alloc[i]?.commission||0);
+    item.dataset.allocatedDelivery=String(alloc[i]?.delivery||0);
+    item.dataset.allocatedExtra=String(alloc[i]?.extra||0);
+    const profitEl=item.querySelector(".product-link-profit");
+    const rateEl=item.querySelector(".product-link-profit-rate");
+    const shipEl=item.querySelector(".product-item-auto-delivery-v239");
+    if(profitEl)profitEl.textContent=formatAmount(profit);
+    if(rateEl)rateEl.textContent=(Number.isFinite(rate)?rate:0).toFixed(2)+"%";
+    if(shipEl)shipEl.textContent="运费 "+formatAmount(alloc[i]?.delivery||0);
+  });
+  const rate=totalPrice>0?totalProfit/totalPrice*100:0;
+  const set=(sel,val)=>{const el=card.querySelector(sel);if(el)el.textContent=val};
+  set(".sales-card-price-total-v239","RM"+formatAmount(totalPrice));
+  set(".sales-card-cost-total-v239","RM"+formatAmount(totalCost));
+  set(".sales-card-commission-amount-v239","RM"+formatAmount(totalCommission));
+  set(".sales-card-profit-total-v239","RM"+formatAmount(totalProfit));
+  set(".sales-card-profit-rate-v239",(Number.isFinite(rate)?rate:0).toFixed(2)+"%");
+  const official=dedupeRows(rows).filter(r=>{
+    const ctx=productLinkContextV206(card.dataset.type);
+    if(r.type!==card.dataset.type||r.date!==ctx.date)return false;
+    return card.dataset.type==="live"?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(ctx.location):normalizeFairLocationKey(r.location)===normalizeFairLocationKey(ctx.location);
+  }).reduce((m,r)=>Math.max(m,Number(r.amount||0)),0);
+  const warn=card.querySelector(".sales-card-total-warning-v239");
+  if(warn){
+    warn.hidden=!(official>0&&totalPrice>official+0.005);
+    warn.textContent=warn.hidden?"":`这张销售卡售价合计 RM${formatAmount(totalPrice)} 已超过当天营业额 RM${formatAmount(official)}`;
+  }
+}
+
+function buildProductSubItemV239(type,card,data={},order=1){
+  const id=++productLinkItemSeqV206;
+  const linkId=String(data.linkId||""),saved=!!linkId,qty=Math.max(1,Number(data.quantity||1));
+  const item=document.createElement("div");
+  item.className="product-link-item product-link-subitem-v239";
+  item.dataset.productLinkItem=String(id);
+  item.dataset.linkId=linkId;
+  item.dataset.saved=saved?"1":"0";
+  item.dataset.dirty="0";
+  item.dataset.minimumPrice=String(Number(data.minimumPrice||0));
+  item.dataset.importMapped=String(data.productId||"")?"1":"0";
+  item.dataset.productOrder=String(order);
+
+  const head=document.createElement("div");head.className="product-subitem-head-v239";
+  const title=document.createElement("b");title.className="product-subitem-title-v239";title.textContent=`产品 ${order}`;
+  const remove=document.createElement("button");remove.type="button";remove.className="product-subitem-remove-v239";remove.textContent="删除产品";
+  head.append(title,remove);item.appendChild(head);
+
+  const label=(text)=>{const el=document.createElement("label");el.textContent=text;return el};
+  const input=(cls,value,placeholder)=>{const el=document.createElement("input");el.className=cls;el.value=value??"";if(placeholder)el.placeholder=placeholder;return el};
+
+  item.appendChild(label("搜索或输入产品"));
+  const name=input("product-link-name",String(data.productName||""),"输入产品名称搜索，或直接手动输入");
+  name.dataset.productId=String(data.productId||"");
+  const searchWrap=document.createElement("div");searchWrap.className="product-link-search-wrap";
+  const searchInputRow=document.createElement("div");searchInputRow.className="product-link-search-input-row";
+  searchInputRow.appendChild(name);
+  const searchClose=document.createElement("button");searchClose.type="button";searchClose.className="product-link-search-close";searchClose.textContent="×";searchClose.setAttribute("aria-label","收起产品列表");
+  searchInputRow.appendChild(searchClose);searchWrap.appendChild(searchInputRow);
+  const searchResults=document.createElement("div");searchResults.className="product-link-search-results";searchResults.hidden=true;
+  searchWrap.appendChild(searchResults);item.appendChild(searchWrap);
+  setupImportProductSearchV214(item,name,searchResults,searchClose);
+
+  const grid=document.createElement("div");grid.className="product-subitem-grid-v239";
+  const qWrap=document.createElement("div");qWrap.appendChild(label("数量"));
+  const q=input("product-link-qty qty-input-no-spinner",String(qty));q.type="number";q.min="1";q.step="1";q.inputMode="numeric";qWrap.appendChild(q);
+  const cWrap=document.createElement("div");cWrap.appendChild(label("平均成本"));
+  const c=input("product-link-avg-cost money-input",formatAmount(Number(data.averageCost||0)));c.inputMode="decimal";cWrap.appendChild(c);
+  const pWrap=document.createElement("div");pWrap.appendChild(label("这棵售价"));
+  const p=input("product-link-price money-input",formatAmount(Number(data.actualPrice||0)));p.inputMode="decimal";pWrap.appendChild(p);
+  const minWarn=document.createElement("div");minWarn.className="product-link-minimum-warning";minWarn.hidden=true;pWrap.appendChild(minWarn);
+  grid.append(qWrap,cWrap,pWrap);item.appendChild(grid);
+
+  const result=document.createElement("div");result.className="product-subitem-result-v239";
+  const ship=document.createElement("span");ship.className="product-item-auto-delivery-v239";ship.textContent="运费 0.00";
+  const profit=document.createElement("span");profit.innerHTML='利润 <b class="product-link-profit">0.00</b>';
+  const rate=document.createElement("span");rate.innerHTML='利润率 <b class="product-link-profit-rate">0.00%</b>';
+  result.append(ship,profit,rate);item.appendChild(result);
+
+  const onEdit=()=>{markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)};
+  [name,q,c,p].forEach(el=>el.addEventListener("input",onEdit));
+  [c,p].forEach(el=>el.addEventListener("blur",()=>{el.value=formatAmount(toAmount(el.value||0));recalcSalesCardTransactionV239(card)}));
+  p.addEventListener("input",()=>updateProductLinkMinimumWarningV214(item));
+  remove.addEventListener("click",()=>removeProductFromTransactionV239(type,card,item));
+  setTimeout(()=>{updateProductLinkMinimumWarningV214(item);recalcSalesCardTransactionV239(card)},0);
+  return item;
+}
+
+function renumberTransactionProductsV239(card){
+  salesCardProductsV239(card).forEach((item,i)=>{
+    item.dataset.productOrder=String(i+1);
+    const title=item.querySelector(".product-subitem-title-v239");
+    if(title)title.textContent=`产品 ${i+1}`;
+  });
+}
+function addProductToTransactionV239(type,txnId,data={}){
+  const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
+  const card=[...(wrap?.querySelectorAll(".sales-card-transaction-v239")||[])].find(x=>x.dataset.transactionId===txnId);
+  if(!card)return false;
+  const list=card.querySelector(".sales-card-products-v239");
+  const item=buildProductSubItemV239(type,card,data,salesCardProductsV239(card).length+1);
+  list.appendChild(item);
+  markSalesCardTransactionDirtyV239(card);
+  recalcSalesCardTransactionV239(card);
+  return true;
+}
+window.addProductToTransactionV239=addProductToTransactionV239;
+
+async function removeProductFromTransactionV239(type,card,item){
+  const products=salesCardProductsV239(card);
+  if(products.length<=1){alert("一张销售卡至少需要保留一个产品。");return}
+  const linkId=String(item.dataset.linkId||"");
+  if(linkId&&item.dataset.saved==="1"){
+    if(!confirm("确定删除这个已保存产品？"))return;
+    try{setSync("正在删除销售卡产品...");await deleteSalesProductLinkV206(linkId);}
+    catch(e){alert("删除产品失败："+(e.message||e));return}
+  }
+  item.remove();renumberTransactionProductsV239(card);markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card);
+}
+
+async function deleteSalesCardTransactionV239(type,txnId){
+  const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
+  const card=[...(wrap?.querySelectorAll(".sales-card-transaction-v239")||[])].find(x=>x.dataset.transactionId===txnId);
+  if(!card)return;
+  const saved=salesCardProductsV239(card).filter(x=>x.dataset.saved==="1"&&String(x.dataset.linkId||""));
+  if(saved.length&&!confirm(`确定删除这张销售卡？\n\n这会删除卡内 ${saved.length} 个已保存产品。`))return;
+  try{
+    for(const item of saved)await deleteSalesProductLinkV206(String(item.dataset.linkId));
+    card.remove();
+    if(!salesCardWrappersV239(type).length)addProductLinkItemV209(type);
+    setSync("销售卡已删除",true);
+  }catch(e){alert("删除销售卡失败："+(e.message||e))}
+}
+window.deleteSalesCardTransactionV239=deleteSalesCardTransactionV239;
+
+function buildSalesCardTransactionV239(type,dataList=[]){
+  const list=Array.isArray(dataList)&&dataList.length?dataList:[{}];
+  const seed=list[0]||{},txnId=salesCardTxnIdV239(seed);
+  const card=document.createElement("section");
+  card.className="sales-card-transaction-v239";
+  card.dataset.transactionId=txnId;
+  card.dataset.type=type;
+  card.dataset.dirty="0";
+  card.dataset.deliveryManual="0";
+
+  const header=document.createElement("div");header.className="sales-card-header-v239";
+  const title=document.createElement("b");title.textContent=list.some(x=>x.linkId)?"已保存销售卡":"新销售卡";
+  const total=document.createElement("b");total.className="sales-card-price-total-v239";total.textContent="RM0.00";
+  header.append(title,total);card.appendChild(header);
+
+  const products=document.createElement("div");products.className="sales-card-products-v239";card.appendChild(products);
+  list.sort((a,b)=>Number(a.productOrder||0)-Number(b.productOrder||0)).forEach((x,i)=>products.appendChild(buildProductSubItemV239(type,card,x,i+1)));
+
+  const add=document.createElement("button");add.type="button";add.className="secondary-btn sales-card-add-product-v239";add.textContent="＋ 新增产品";
+  add.addEventListener("click",()=>addProductToTransactionV239(type,txnId,{}));card.appendChild(add);
+
+  const shared=document.createElement("div");shared.className="sales-card-shared-v239";
+  const make=(labelText,cls,value,readonly=false)=>{
+    const w=document.createElement("div"),lab=document.createElement("label"),inp=document.createElement("input");
+    lab.textContent=labelText;inp.className=cls;inp.value=value;inp.inputMode="decimal";if(readonly)inp.readOnly=true;w.append(lab,inp);return{w,inp};
+  };
+  const defaultRate=seed.commissionRate!==undefined&&seed.commissionRate!==null?Number(seed.commissionRate):productLinkDefaultCommissionRateV211(type);
+  const commission=make(type==="live"?"主播佣金 %":"Fair 佣金 %","sales-card-commission-rate-v239",Number(defaultRate||0).toFixed(2));
+  const delivery=make("本地运费总数","sales-card-delivery-total-v239",formatAmount(list.reduce((s,x)=>s+Number(x.localDelivery||0),0)));
+  const extra=make("附加费用 花盆/苔藓","sales-card-extra-total-v239",formatAmount(list.reduce((s,x)=>s+Number(x.extraFee||0),0)));
+  shared.append(commission.w,delivery.w,extra.w);card.appendChild(shared);
+
+  const commissionHint=document.createElement("div");commissionHint.className="sales-card-commission-hint-v239";commissionHint.innerHTML='佣金一次计算：<b class="sales-card-commission-amount-v239">RM0.00</b>';card.appendChild(commissionHint);
+
+  const summary=document.createElement("div");summary.className="sales-card-summary-v239";
+  summary.innerHTML='<div><span>总成本</span><b class="sales-card-cost-total-v239">RM0.00</b></div><div><span>总利润</span><b class="sales-card-profit-total-v239">RM0.00</b></div><div><span>整体利润率</span><b class="sales-card-profit-rate-v239">0.00%</b></div>';
+  card.appendChild(summary);
+
+  const warn=document.createElement("div");warn.className="sales-card-total-warning-v239";warn.hidden=true;card.appendChild(warn);
+
+  const rlab=document.createElement("label");rlab.textContent="备注（顾客网络名字或电话号码）";card.appendChild(rlab);
+  const remark=document.createElement("input");remark.className="sales-card-remark-v239";remark.maxLength=100;remark.placeholder="顾客名字、电话或其他讯息";remark.value=String(list.find(x=>String(x.remark||"").trim())?.remark||"");card.appendChild(remark);
+
+  const remove=document.createElement("button");remove.type="button";remove.className="product-link-remove-btn product-link-remove-bottom";remove.textContent="删除销售卡";
+  remove.addEventListener("click",()=>deleteSalesCardTransactionV239(type,txnId));card.appendChild(remove);
+
+  const sharedEdit=()=>{markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)};
+  commission.inp.addEventListener("input",sharedEdit);
+  delivery.inp.addEventListener("input",()=>{card.dataset.deliveryManual="1";sharedEdit()});
+  extra.inp.addEventListener("input",sharedEdit);
+  remark.addEventListener("input",()=>markSalesCardTransactionDirtyV239(card));
+  [delivery.inp,extra.inp].forEach(x=>x.addEventListener("blur",()=>{x.value=formatAmount(toAmount(x.value||0));recalcSalesCardTransactionV239(card)}));
+  commission.inp.addEventListener("blur",()=>{commission.inp.value=(Math.max(0,Number(commission.inp.value)||0)).toFixed(2);recalcSalesCardTransactionV239(card)});
+
+  // Existing saved rows may contain the exact auto sum; only mark manual when different.
+  const autoSum=list.reduce((s,x)=>s+liveDeliveryDefaultV203(Number(x.actualPrice||0)),0);
+  const savedDelivery=list.reduce((s,x)=>s+Number(x.localDelivery||0),0);
+  card.dataset.deliveryManual=(list.some(x=>x.linkId)&&Math.abs(savedDelivery-autoSum)>0.01)?"1":"0";
+  setTimeout(()=>{clearSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)},0);
+  return card;
+}
+
+function addProductLinkItemV209(type,data={}){
+  const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
+  if(!wrap){console.error("V23.9 sales card container missing",type);return false}
+  const card=buildSalesCardTransactionV239(type,[data||{}]);
+  wrap.appendChild(card);
+  return true;
+}
+function addProductLinkItemV206(type,data={}){return addProductLinkItemV209(type,data)}
+window.addProductLinkItemV206=addProductLinkItemV206;
+window.addProductLinkItemV209=addProductLinkItemV209;
+
+function renderProductLinksEditorV206(type,links){
+  const {pre}=productLinkContextV206(type),wrap=document.getElementById(pre+"ProductItems");if(!wrap)return;
+  wrap.innerHTML="";
+  const list=Array.isArray(links)?links:[];
+  if(!list.length){addProductLinkItemV209(type);return}
+  const groups=new Map();
+  list.forEach((x,i)=>{
+    const txn=String(x.transactionId||"").trim()||("legacy_"+String(x.linkId||i));
+    if(!groups.has(txn))groups.set(txn,[]);
+    groups.get(txn).push({...x,transactionId:txn,productOrder:Number(x.productOrder||groups.get(txn).length+1)});
+  });
+  groups.forEach(items=>wrap.appendChild(buildSalesCardTransactionV239(type,items)));
+}
+
+function collectProductLinksV206(type){
+  const {pre,date,location}=productLinkContextV206(type),wrap=document.getElementById(pre+"ProductItems");
+  const result=[];
+  salesCardWrappersV239(type).forEach(card=>{
+    const txnId=String(card.dataset.transactionId||salesCardTxnIdV239());
+    const shared=salesCardSharedValuesV239(card);
+    const products=salesCardProductsV239(card);
+    const alloc=allocateSalesCardSharedCostsV239(card);
+    products.forEach((item,i)=>{
+      let linkId=String(item.dataset.linkId||"");
+      const productName=String(item.querySelector(".product-link-name")?.value||"").trim();
+      const actualPrice=toAmount(item.querySelector(".product-link-price")?.value||0);
+      if(!linkId&&(productName||actualPrice||shared.remark)){linkId="spl_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,10);item.dataset.linkId=linkId}
+      const quantity=Math.max(0,Number(item.querySelector(".product-link-qty")?.value||0));
+      const averageCost=toAmount(item.querySelector(".product-link-avg-cost")?.value||0);
+      const productId=String(item.querySelector(".product-link-name")?.dataset.productId||"");
+      const minimumPrice=Math.max(0,Number(item.dataset.minimumPrice||0));
+      const localDelivery=alloc[i]?.delivery||0,extraFee=alloc[i]?.extra||0,commissionRate=shared.commissionRate;
+      const commissionAmount=actualPrice*commissionRate/100;
+      const profit=actualPrice-commissionAmount-(averageCost*quantity)-localDelivery-extraFee;
+      const profitRate=actualPrice>0?profit/actualPrice*100:0;
+      if(linkId||productName||actualPrice||shared.remark)result.push({
+        linkId,type,date,location,transactionId:txnId,productOrder:i+1,
+        productId,productName,quantity,averageCost,minimumPrice,actualPrice,
+        commissionRate,commissionAmount,localDelivery,extraFee,profit,profitRate,remark:shared.remark
+      });
+    });
+  });
+  return result;
+}
+
+async function saveProductLinksV206(type){
+  const items=collectProductLinksV206(type);
+  if(!items.length){alert("请至少输入一张销售卡；如果这次没有销售卡，可以保持收起，不需要保存。");return null}
+  const first=items[0];if(!first.date||!first.location){alert(type==="live"?"请先选择日期和主播":"请先选择 Fair 日期和地点");return null}
+  for(const x of items){
+    if(!x.productName){alert("每一个产品都需要填写产品名称。");return null}
+    if(!Number.isFinite(Number(x.quantity))||Number(x.quantity)<=0){alert("每一个产品数量必须大于 0。");return null}
+  }
+
+  // Every transaction card may contain multiple products; each card's product prices form that card total.
+  const cards=salesCardWrappersV239(type);
+  for(const card of cards){
+    const products=salesCardProductsV239(card);
+    const saleTotal=products.reduce((s,x)=>s+toAmount(x.querySelector(".product-link-price")?.value||0),0);
+    if(saleTotal<=0&&products.some(x=>String(x.querySelector(".product-link-name")?.value||"").trim())){
+      if(!confirm("这张销售卡售价合计为 RM0.00，确定仍然保存？"))return null;
+    }
+  }
+
+  const official=dedupeRows(rows).filter(r=>r.type===type&&r.date===first.date&&(type==="live"?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(first.location):normalizeFairLocationKey(r.location)===normalizeFairLocationKey(first.location))).reduce((m,r)=>Math.max(m,Number(r.amount||0)),0);
+  const batchTotal=items.reduce((s,x)=>s+Number(x.actualPrice||0),0);
+  if(official>0&&batchTotal>official+0.005){alert(`所有销售卡售价合计 RM${formatAmount(batchTotal)} 已超过当天营业额 RM${formatAmount(official)}。`);return null}
+  try{
+    setSync("销售卡同步中...");
+    const result=await saveSalesProductLinksV206(items);
+    renderProductLinksEditorV206(type,result?.links||[]);
+    setSync("销售卡已保存",true);
+    alert("销售卡保存成功。");
+    if(result?.warning)alert(result.warning);
+    return result;
+  }catch(e){alert("销售卡保存失败："+(e.message||e));setSync("销售卡同步失败",false,true);return null}
+}
+
+function clearUnsavedSalesCardEditorsV224(){
+  ["live","fair"].forEach(type=>{
+    const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");if(!wrap)return;
+    salesCardWrappersV239(type).forEach(card=>{
+      const hasSaved=salesCardProductsV239(card).some(x=>x.dataset.saved==="1"&&String(x.dataset.linkId||""));
+      if(!hasSaved)card.remove();
+    });
+    salesCardWrappersV239(type).forEach(clearSalesCardTransactionDirtyV239);
+    if(!salesCardWrappersV239(type).length)addProductLinkItemV209(type);
+    if(type==="fair")syncFairProductDatesV203();
+  });
+}
+window.clearUnsavedSalesCardEditorsV224=clearUnsavedSalesCardEditorsV224;
+
+
+/* ================= V23.9 same-day linked bonsai profit summary ================= */
 const productProfitSummaryOpenV216={live:false,fair:false};
 function productProfitSummaryPanelV216(type){return document.getElementById(productLinkPreV208(type)+"ProductProfitSummary")}
 function productProfitSelectedDateV216(type){
@@ -2838,7 +3212,7 @@ async function toggleProductProfitSummaryV216(type,button){
   const date=productProfitSelectedDateV216(type);if(!date){alert("请先选择日期");return}
   if(productProfitSummaryOpenV216[type]&&!panel.classList.contains("hidden")){productProfitSummaryOpenV216[type]=false;panel.classList.add("hidden");panel.innerHTML="";if(button)button.textContent="📊 当天利润";return}
   try{
-    // V23.8: opening Daily Profit closes Sales Cards first, then paints local cache immediately.
+    // V23.9: opening Daily Profit closes Sales Cards first, then paints local cache immediately.
     const pre=productLinkPreV208(type),box=document.getElementById(pre+"ProductLinkBox"),body=document.getElementById(pre+"ProductLinkBody");
     if(body)body.classList.add("hidden");
     if(box)box.classList.add("product-link-collapsed");
@@ -3018,12 +3392,12 @@ async function toggleMonthGrandHistoryV223(){
 window.toggleMonthGrandHistoryV223=toggleMonthGrandHistoryV223;
 
 
-/* ================= V23.8 expandable yearly monthly breakdown ================= */
+/* ================= V23.9 expandable yearly monthly breakdown ================= */
 const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 
 function yearBreakdownRowsV224(kind){
-  // V23.8: Balakong / Belimbing / Fair / Live show months inside the selected
+  // V23.9: Balakong / Belimbing / Fair / Live show months inside the selected
   // year. The final Grand Total is a higher-level view and must show YEAR totals.
   if(kind==="total"){
     const byYear=new Map();
@@ -3121,7 +3495,7 @@ function renderTable(){
   document.getElementById("recordTable").innerHTML=s.map(r=>{const rate=r.type==="live"?getLiveHostRate(r.location,r.date):r.type==="fair"?getFairCommissionRate(totalBy("fair","","month"))*100:0;const commission=(r.type==="live"||r.type==="fair")?Number(r.amount||0)*rate/100:0;return `<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":r.type==="live"?"Live":"每日"}</td><td>${r.type==="live"?"Live":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td><td>${rate?Number(rate.toFixed(2))+"%":"-"}</td><td>${rate?money(commission):"-"}</td></tr>`}).join("")||'<tr><td colspan="7" style="text-align:center;">这个月份还没有记录</td></tr>';
 }
 function renderAll(){
-  // V23.8: one complete render path. This replaces the older partial duplicate
+  // V23.9: one complete render path. This replaces the older partial duplicate
   // so Fair daily/monthly totals, Home totals and Report always refresh together.
   rows=dedupeRows(rows);
   renderDashboard();
@@ -3163,7 +3537,7 @@ function buildMonthlySummary(){
   });
   return [...map.values()].map(item=>({...item,total:item.balakong+item.belimbing+item.fair+item.live})).sort((a,b)=>b.month.localeCompare(a.month));
 }
-// V23.8: expandable daily total list. It uses cached rows immediately and only
+// V23.9: expandable daily total list. It uses cached rows immediately and only
 // reads the selected historical month from cloud when the user asks for it.
 function buildDailyTotals(month){
   const totals=new Map();
@@ -3196,7 +3570,7 @@ async function loadDailyTotalsMonth(month){
   const status=document.getElementById("dailyTotalsStatus");
   renderDailyTotals();
 
-  // V23.8: current month already follows the normal Home sync flow.
+  // V23.9: current month already follows the normal Home sync flow.
   // Do not make a second cloud request just because the daily summary is opened.
   // This keeps startup / Home sync speed unchanged.
   const currentMonth=selectedMonth();
@@ -3271,7 +3645,7 @@ async function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V23.8: show cache immediately and complete historical months in background.
+  // V23.9: show cache immediately and complete historical months in background.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 
@@ -3404,7 +3778,7 @@ async function saveFairCommissionSettings(){
       fairRevision:nextFairCommissionRevision(previous.fairRevision)
     });
 
-    // V23.8: save locally immediately. Do not make the user wait for Apps Script.
+    // V23.9: save locally immediately. Do not make the user wait for Apps Script.
     applyCommissionSettings(settings);
     setSavedCommissionSnapshots(settings,{fair:true,live:false});
     updateFairCommissionDraftState();
@@ -3464,7 +3838,7 @@ async function saveLiveCommissionSettings(){
     const live=readLiveCommissionInputs();
     const candidate=normalizeCommissionSettings({...previous,...live});
     const comparable=x=>JSON.stringify({liveHostRates:x.liveHostRates||{},liveHosts:x.liveHosts||{},inactiveLiveHosts:x.inactiveLiveHosts||{},liveRateSchedules:x.liveRateSchedules||[]});
-    // V23.8: deleting the last special commission rule leaves candidate and
+    // V23.9: deleting the last special commission rule leaves candidate and
     // previous structurally identical because the delete was already applied
     // locally.  A dirty draft must still be written to cloud so [] overwrites
     // the old month snapshot instead of letting the deleted rule return.
@@ -3585,7 +3959,7 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V23.8 Reliable Backup / Restore ================= */
+/* ================= V23.9 Reliable Backup / Restore ================= */
 const BACKUP_RESTORE_STATE_KEY_V234="lover_backup_restore_status_v234";
 let backupRestoreOperationRunningV234=false;
 
@@ -3617,7 +3991,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"2380",
+    version:"2390",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
