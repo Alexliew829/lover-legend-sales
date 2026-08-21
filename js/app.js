@@ -35,7 +35,7 @@ function showPage(name,el){
   if(el)el.classList.add("active");
   try{localStorage.setItem(LAST_PAGE_KEY_V238,name)}catch(e){}
 
-  // V24.1: every time Live is opened, start from today's date.
+  // V24.2: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -47,7 +47,7 @@ function showPage(name,el){
   if(name==="report")renderTable();
   if(name==="fair"&&typeof refreshFairInputsFromRows==="function")refreshFairInputsFromRows(false);
 
-  // V24.1: page switching never waits for or triggers cloud sync.
+  // V24.2: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");return [r.type,r.date,r.company,location].join("|")}
@@ -57,7 +57,7 @@ function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&
 function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c);document.getElementById("dailySales").value=formatAmount(a);document.getElementById("salesDateResult").textContent=`${companyNames[c]}｜${d}｜${money(a)}`;renderSalesMonthlyList()}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
 
-// V24.1: Top 5 business performance. Uses rows already loaded in memory only;
+// V24.2: Top 5 business performance. Uses rows already loaded in memory only;
 // opening/closing Top 5 never triggers an extra cloud request.
 function weekdayZh(displayDate){
   const iso=displayToISO(displayDate);
@@ -244,7 +244,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V24.1: historical record is lazy. Top 5 opens instantly from local rows;
+    // V24.2: historical record is lazy. Top 5 opens instantly from local rows;
     // one shared history request runs only after the user explicitly expands Top 5.
     setTimeout(()=>{ ensureHistoricalHighs(); },0);
   }
@@ -518,7 +518,7 @@ function applyCloudCommissionSettings(settings){
   const incomingLiveRevision=Number(incoming.liveRevision||0);
   const localLiveRevision=Number(local.liveRevision||0);
 
-  // V24.1: Fair and Live each have their own revision.
+  // V24.2: Fair and Live each have their own revision.
   // A stale device/cloud response can never overwrite a newer saved setting.
   const keepLocalFair=incomingFairRevision<localFairRevision;
   const keepLocalLive=liveCommissionDraftDirty||incomingLiveRevision<localLiveRevision;
@@ -655,7 +655,7 @@ function getCommissionSettingsForMonth(month){
   const snapshot=(systemState.commissionSnapshots||{})[target];
   if(!snapshot)return current;
 
-  // V24.1: historical Fair rates come from that month's snapshot, while the
+  // V24.2: historical Fair rates come from that month's snapshot, while the
   // Live schedule is selected by the actual Live record date. This prevents
   // Home's history month selector from blocking the current month's More setup.
   return normalizeCommissionSettings({
@@ -794,7 +794,7 @@ async function removeLiveHost(hostKey){
     if(message){message.textContent="✅ 主播已设为离职／停用";message.classList.remove("hidden");}
     setSync("已同步",true);
   }catch(error){
-    // V24.1: timeout must not undo the user's local action.
+    // V24.2: timeout must not undo the user's local action.
     console.warn("Inactive host cloud sync delayed",error);
     liveCommissionDraftDirty=true;
     queueLiveCommissionRetry(nextSettings,commissionConfigMonth());
@@ -1047,7 +1047,7 @@ async function saveDailySales(){
   renderAll();
   showTempMsg("saveMsg");
 
-  // V24.1: normal Save uses exactly one cloud write.
+  // V24.2: normal Save uses exactly one cloud write.
   // This prevents the immediate keepalive request from racing the normal save,
   // which could turn a real change such as RM9,999 -> RM0 into a later 0 -> 0
   // comparison and suppress the modification notification.
@@ -1209,7 +1209,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     setSync("已储存，正在后台同步...");
     const result=await saveFairBatchToSheet(loc,records);
 
-    // V24.1: local Fair values are direct replacements, never additions. The server
+    // V24.2: local Fair values are direct replacements, never additions. The server
     // also removes duplicate Sheet rows whose location differs only by spaces/case.
     // The response confirms the authoritative overwrite and clears pending rows.
     records.forEach(i=>clearPendingRow({
@@ -1227,7 +1227,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"2410"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"2420"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1245,7 +1245,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"2410"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"2420"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1405,7 +1405,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V24.1: paint Home immediately, restore local cache, then perform only a
+// V24.2: paint Home immediately, restore local cache, then perform only a
 // lightweight Revision check. Full month data is downloaded only when the
 // cloud Revision proves that another device changed data.
 attachMoneyInputs();
@@ -1479,7 +1479,7 @@ async function startInitialSalesDataLoad() {
   return startupSalesSyncPromise;
 }
 
-// V24.1: start cached Home immediately, then warm the current year's historical
+// V24.2: start cached Home immediately, then warm the current year's historical
 // months in the background so Monthly Summary is complete on first open.
 startInitialSalesDataLoad().finally(()=>{
   const startupYear=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
@@ -1508,7 +1508,7 @@ function getSavedLiveHosts(){
 function collectLiveHosts(){
   const merged=[];
   const cloudHosts=Object.values((getCommissionSettings().liveHosts)||{});
-  // V24.1: active host list is independent from historical Live records.
+  // V24.2: active host list is independent from historical Live records.
   // Deleted hosts stay in old reports but do not return to current host options.
   [...cloudHosts,...getSavedLiveHosts()]
     .filter(Boolean)
@@ -1589,7 +1589,7 @@ async function ensureDateControlMonthLoaded(id){
 }
 
 
-/* ================= V24.1 on-demand 修改 / 销售记录 ================= */
+/* ================= V24.2 on-demand 修改 / 销售记录 ================= */
 const salesChangeLogOpenV200={daily:false,fair:false,live:false};
 
 function changeLogPanelIdV200(type){
@@ -1621,7 +1621,7 @@ function renderChangeLogTimelineV200(type,date,items){
     group.items.push(item);
   });
 
-  // V24.1 display rule:
+  // V24.2 display rule:
   // 1) any real audit row must be shown, including a single first sale (0 -> amount).
   // 2) later changes keep the first/original amount in the full timeline.
   // 3) downward correction is attached to the amount BEFORE that correction, so every row explains what happened next.
@@ -1950,7 +1950,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V24.1: do not restore the previously saved date.
+  // V24.2: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -2010,7 +2010,7 @@ function reactivateLiveHostIfNeeded(name){
 }
 
 
-/* ================= V24.1 Import Cost System product search ================= */
+/* ================= V24.2 Import Cost System product search ================= */
 // Search/mapping behavior mirrors Lover Legend Cost and Pricing Calculator V8.2.
 const IMPORT_SYSTEM_CLOUD_URL_V214="https://script.google.com/macros/s/AKfycbxWKdEC7vy_7pZ2_CPie-9L5DeIofPggZlLuwB7gW-31HqWXEOxshtCR-HB-m5qLYS6/exec";
 let importProductsV214=[];
@@ -2035,7 +2035,7 @@ function unorderedImportProductMatchV214(sourceValue,queryValue){
   const query=normalizeImportProductSearchTextV214(queryValue);
   if(!query)return true;
   if(isExactProductCodeQueryV214(query)){
-    // V24.1: code search supports case-insensitive prefix/partial entry.
+    // V24.2: code search supports case-insensitive prefix/partial entry.
     const codes=extractImportProductCodesV214(sourceValue);
     return codes.some(code=>code===query||code.startsWith(query));
   }
@@ -2290,7 +2290,7 @@ function updateProductLinkMinimumWarningV214(item){
   if(priceInput)priceInput.classList.toggle("below-minimum-price",low);
 }
 function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
-  // V24.1: iPhone/iOS safe search state.
+  // V24.2: iPhone/iOS safe search state.
   // The dropdown remains open through async Import loading, keyboard candidate changes,
   // transient blur/focus changes and background sales-card loading.
   let searchOpen=false;
@@ -2365,7 +2365,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
 
         row.append(line1,line2);
 
-        // V24.1: distinguish an intentional tap from list scrolling on iPhone/iOS.
+        // V24.2: distinguish an intentional tap from list scrolling on iPhone/iOS.
         let touchStartX=0,touchStartY=0,touchMoved=false,touchHandled=false;
         const chooseRecord=e=>{
           if(e){
@@ -2455,7 +2455,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
 }
 
 
-/* ================= V24.1 Sales Card unsaved-change protection ================= */
+/* ================= V24.2 Sales Card unsaved-change protection ================= */
 function markSalesCardDirtyV238(item){
   if(!item)return;
   item.dataset.dirty="1";
@@ -2482,7 +2482,7 @@ function confirmDiscardSalesCardChangesV238(type){
   return ok;
 }
 
-/* ================= V24.1 optional bonsai product association ================= */
+/* ================= V24.2 optional bonsai product association ================= */
 
 let productLinkItemSeqV206=0;
 function productLinkContextV206(type){
@@ -2506,13 +2506,13 @@ function toggleProductLinkBoxV206(type){
   body.classList.toggle("hidden",!opening);box.classList.toggle("product-link-collapsed",!opening);
   const btn=box.querySelector(".product-link-toggle");if(btn)btn.setAttribute("aria-expanded",opening?"true":"false");
   if(opening){
-    // V24.1: Sales Cards and Daily Profit are mutually exclusive.
+    // V24.2: Sales Cards and Daily Profit are mutually exclusive.
     const profitPanel=productProfitSummaryPanelV216(type);
     if(profitPanel){profitPanel.classList.add("hidden");profitPanel.innerHTML=""}
     productProfitSummaryOpenV216[type]=false;
     const profitBtn=document.querySelector(`#${pre}ProductLinkBox .product-profit-toggle-btn`);
     if(profitBtn){profitBtn.textContent="📊 当天利润";profitBtn.disabled=false}
-    // V24.1: saved cards first. Do not flash a fake 0.00 card while cloud data loads.
+    // V24.2: saved cards first. Do not flash a fake 0.00 card while cloud data loads.
     if(type==="fair")syncFairProductDatesV203();
     Promise.resolve(loadProductLinksIntoEditorV206(type)).catch(()=>{});
   }
@@ -2635,14 +2635,14 @@ function buildProductLinkItemV209(type,id,data={}){
 }
 function addProductLinkItemV209(type,data={}){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
-  if(!wrap){console.error("V24.1 product item container missing",type);return false}
+  if(!wrap){console.error("V24.2 product item container missing",type);return false}
   const id=++productLinkItemSeqV206;
   const item=buildProductLinkItemV209(type,id,data);
   wrap.appendChild(item);
   return true;
 }
 function addProductLinkItemV206(type,data={}){return addProductLinkItemV209(type,data)}
-// Explicit globals keep both legacy and V24.1 button bindings reliable.
+// Explicit globals keep both legacy and V24.2 button bindings reliable.
 window.addProductLinkItemV206=addProductLinkItemV206;
 window.addProductLinkItemV209=addProductLinkItemV209;
 window.toggleProductLinkBoxV206=toggleProductLinkBoxV206;
@@ -2726,7 +2726,7 @@ async function loadProductLinksIntoEditorV206(type){
 
   const cached=(typeof getCachedSalesProductLinksV216==="function")?getCachedSalesProductLinksV216(type,date,location):null;
 
-  // V24.1: memory/local persistent cache renders first, cloud verifies silently.
+  // V24.2: memory/local persistent cache renders first, cloud verifies silently.
   if(Array.isArray(cached)){
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
   }else{
@@ -2780,7 +2780,7 @@ async function saveProductLinksV206(type){
 }
 
 
-/* ================= V24.1 multi-product Sales Card ================= */
+/* ================= V24.2 multi-product Sales Card ================= */
 let salesCardSeqV239=0;
 
 function salesCardTxnIdV239(data={}){
@@ -3051,7 +3051,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
 
 function addProductLinkItemV209(type,data={}){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
-  if(!wrap){console.error("V24.1 sales card container missing",type);return false}
+  if(!wrap){console.error("V24.2 sales card container missing",type);return false}
   const card=buildSalesCardTransactionV239(type,[data||{}]);
   wrap.appendChild(card);
   return true;
@@ -3154,7 +3154,7 @@ window.clearUnsavedSalesCardEditorsV224=clearUnsavedSalesCardEditorsV224;
 
 
 
-/* ================= V24.1 Sales Card unit-price + stable optimistic UI ================= */
+/* ================= V24.2 Sales Card unit-price + stable optimistic UI ================= */
 const LIVE_OPTIMISTIC_LOCKS_V240=new Map();
 
 function liveOptimisticKeyV240(date,host){
@@ -3451,7 +3451,7 @@ async function saveProductLinksV206(type){
   const batchTotal=items.reduce((s,x)=>s+Number(x.actualPrice||0),0);
   if(official>0&&batchTotal>official+0.005){alert(`所有销售卡售价总数 RM${formatAmount(batchTotal)} 已超过当天营业额 RM${formatAmount(official)}。`);return null}
 
-  // V24.1 optimistic local cache: keep the current UI stable; do not redraw from an older async response.
+  // V24.2 optimistic local cache: keep the current UI stable; do not redraw from an older async response.
   if(typeof setCachedSalesProductLinksV216==="function")setCachedSalesProductLinksV216(type,first.date,first.location,items);
   if(typeof setSalesCardPersistentCacheV232==="function")setSalesCardPersistentCacheV232(type,first.date,first.location,items);
   if(typeof mergeDailyProfitContextCacheV237==="function")mergeDailyProfitContextCacheV237(type,first.date,first.location,items);
@@ -3506,7 +3506,7 @@ async function saveLiveSales(){
   }
 }
 
-/* ================= V24.1 same-day linked bonsai profit summary ================= */
+/* ================= V24.2 same-day linked bonsai profit summary ================= */
 const productProfitSummaryOpenV216={live:false,fair:false};
 function productProfitSummaryPanelV216(type){return document.getElementById(productLinkPreV208(type)+"ProductProfitSummary")}
 function productProfitSelectedDateV216(type){
@@ -3565,7 +3565,7 @@ async function toggleProductProfitSummaryV216(type,button){
   const date=productProfitSelectedDateV216(type);if(!date){alert("请先选择日期");return}
   if(productProfitSummaryOpenV216[type]&&!panel.classList.contains("hidden")){productProfitSummaryOpenV216[type]=false;panel.classList.add("hidden");panel.innerHTML="";if(button)button.textContent="📊 当天利润";return}
   try{
-    // V24.1: opening Daily Profit closes Sales Cards first, then paints local cache immediately.
+    // V24.2: opening Daily Profit closes Sales Cards first, then paints local cache immediately.
     const pre=productLinkPreV208(type),box=document.getElementById(pre+"ProductLinkBox"),body=document.getElementById(pre+"ProductLinkBody");
     if(body)body.classList.add("hidden");
     if(box)box.classList.add("product-link-collapsed");
@@ -3603,43 +3603,83 @@ async function toggleProductProfitSummaryV216(type,button){
 function xlsxVisualWidthV216(value){
   let width=0;for(const ch of String(value??""))width+=/[\u2E80-\u9FFF\uF900-\uFAFF]/.test(ch)?2:1;return width;
 }
-function buildProductProfitXlsxV216(type,list,date,salesMap){
-  const groups=productProfitGroupLinksV216(type,date,list);salesMap.forEach((rec,key)=>{if(!groups.has(key))groups.set(key,{name:rec.name,links:[]})});
-  const ordered=Array.from(groups.values()).sort((a,b)=>String(a.name).localeCompare(String(b.name),"zh-Hans-CN",{numeric:true,sensitivity:"base"}));
-  const table=[["日期",date],[]];let dayProfit=0,daySales=0;
-  ordered.forEach(group=>{
-    const s=productProfitGroupStatsV216(group,salesMap,type);dayProfit+=s.totalProfit;daySales+=s.sales;
-    table.push([type==="live"?"主播":"地点",group.name]);table.push(["产品名","成本","售价","利润","利润率","备注"]);
-    group.links.forEach(x=>table.push([String(x.productName||""),Number(x.averageCost||0)*Math.max(1,Number(x.quantity||1)),Number(x.actualPrice||0),Number(x.profit||0),Number(x.profitRate||0)/100,String(x.remark||"")]));
-    table.push(["总利润",s.totalProfit]);table.push(["销售额",s.sales]);table.push(["整体利润率",s.overallRate/100]);table.push([]);
+function excelDateSerialV242(date){
+  const m=String(date||"").match(/^(\d{2})-(\d{2})-(\d{4})$/);if(!m)return null;
+  return Date.UTC(Number(m[3]),Number(m[2])-1,Number(m[1]))/86400000+25569;
+}
+function buildProductProfitXlsxV216(type,list,dates){
+  const table=[];
+  let grandProfit=0,grandSales=0;
+  dates.forEach((date,dateIndex)=>{
+    const salesMap=productProfitSalesByGroupV216(type,date);
+    const groups=productProfitGroupLinksV216(type,date,list);
+    salesMap.forEach((rec,key)=>{if(!groups.has(key))groups.set(key,{name:rec.name,links:[]})});
+    const ordered=Array.from(groups.values()).sort((a,b)=>String(a.name).localeCompare(String(b.name),"zh-Hans-CN",{numeric:true,sensitivity:"base"}));
+    let dayProfit=0,daySales=0;
+    if(dateIndex)table.push([]);
+    table.push([{v:date,kind:"date"}]);
+    ordered.forEach(group=>{
+      const st=productProfitGroupStatsV216(group,salesMap,type);dayProfit+=st.totalProfit;daySales+=st.sales;
+      table.push([type==="live"?"主播":"地点",group.name]);
+      table.push(["产品名","数量","单棵成本","单棵售价","总数","利润","利润率","备注"]);
+      group.links.forEach(x=>{
+        const qty=Math.max(1,Number(x.quantity||1));
+        const total=Number(x.actualPrice||0);
+        const unit=(x.unitPrice!==undefined&&x.unitPrice!==null&&x.unitPrice!=="")?Number(x.unitPrice||0):(qty?total/qty:total);
+        table.push([
+          String(x.productName||""),qty,Number(x.averageCost||0),unit,total,
+          Number(x.profit||0),Number(x.profitRate||0)/100,String(x.remark||"")
+        ]);
+      });
+      table.push(["总利润",st.totalProfit]);table.push(["销售额",st.sales]);table.push(["整体利润率",st.overallRate/100]);table.push([]);
+    });
+    const dayRate=daySales>0?dayProfit/daySales:0;
+    table.push(["当天总利润",dayProfit]);table.push(["当天销售额",daySales]);table.push(["当天整体利润率",dayRate]);
+    grandProfit+=dayProfit;grandSales+=daySales;
   });
-  const dayRate=daySales>0?dayProfit/daySales*100:0;table.push(["当天总利润",dayProfit]);table.push(["当天销售额",daySales]);table.push(["当天整体利润率",dayRate/100]);
-  const colCount=6,widths=Array.from({length:colCount},(_,c)=>{let max=c===0?34:(c===5?28:12);table.forEach(row=>max=Math.max(max,xlsxVisualWidthV216(row[c])+3));return Math.min(60,max)});
+  if(dates.length>1){table.push([]);table.push(["全部总利润",grandProfit]);table.push(["全部销售额",grandSales]);table.push(["全部整体利润率",grandSales>0?grandProfit/grandSales:0]);}
+  const colCount=8;
+  const widths=Array.from({length:colCount},(_,c)=>{let max=c===0?30:(c===7?28:12);table.forEach(row=>{const cell=row[c];const v=cell&&typeof cell==="object"?cell.v:cell;max=Math.max(max,xlsxVisualWidthV216(v)+3)});return Math.min(70,max)});
   const cols=widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("");
-  const rowsXml=table.map((row,ri)=>`<row r="${ri+1}">${Array.from({length:colCount},(_,ci)=>{const v=row[ci],ref=xlsxColNameV196(ci)+(ri+1);if(v===undefined||v===null||v==="")return"";const header=row[0]==="产品名";if(header)return`<c r="${ref}" t="inlineStr" s="1"><is><t>${xlsxXmlEscapeV196(v)}</t></is></c>`;const label=String(row[0]||""),productRow=row.length>=6&&typeof row[1]==="number"&&!["总利润","销售额"].includes(label);if(productRow&&(ci===1||ci===2||ci===3))return`<c r="${ref}" s="2"><v>${Number(v).toFixed(2)}</v></c>`;if(productRow&&ci===4)return`<c r="${ref}" s="4"><v>${Number(v).toFixed(6)}</v></c>`;if(["总利润","销售额","当天总利润","当天销售额"].includes(label)&&ci===1)return`<c r="${ref}" s="2"><v>${Number(v).toFixed(2)}</v></c>`;if(["整体利润率","当天整体利润率"].includes(label)&&ci===1)return`<c r="${ref}" s="4"><v>${Number(v).toFixed(6)}</v></c>`;return`<c r="${ref}" t="inlineStr"><is><t>${xlsxXmlEscapeV196(v)}</t></is></c>`}).join("")}</row>`).join("");
+  const moneyLabels=new Set(["总利润","销售额","当天总利润","当天销售额","全部总利润","全部销售额"]);
+  const pctLabels=new Set(["整体利润率","当天整体利润率","全部整体利润率"]);
+  const rowsXml=table.map((row,ri)=>`<row r="${ri+1}">${Array.from({length:colCount},(_,ci)=>{
+    const cell=row[ci],ref=xlsxColNameV196(ci)+(ri+1);if(cell===undefined||cell===null||cell==="")return"";
+    if(cell&&typeof cell==="object"&&cell.kind==="date"){const serial=excelDateSerialV242(cell.v);return serial===null?`<c r="${ref}" t="inlineStr"><is><t>${xlsxXmlEscapeV196(cell.v)}</t></is></c>`:`<c r="${ref}" s="5"><v>${serial}</v></c>`}
+    const v=cell,label=String(row[0]&&typeof row[0]==="object"?row[0].v:row[0]||"");
+    if(label==="产品名")return`<c r="${ref}" t="inlineStr" s="1"><is><t>${xlsxXmlEscapeV196(v)}</t></is></c>`;
+    const productRow=row.length>=8&&typeof row[1]==="number";
+    if(productRow&&ci===1)return`<c r="${ref}" s="3"><v>${Number(v)}</v></c>`;
+    if(productRow&&[2,3,4,5].includes(ci))return`<c r="${ref}" s="2"><v>${Number(v).toFixed(2)}</v></c>`;
+    if(productRow&&ci===6)return`<c r="${ref}" s="4"><v>${Number(v).toFixed(6)}</v></c>`;
+    if(moneyLabels.has(label)&&ci===1)return`<c r="${ref}" s="2"><v>${Number(v).toFixed(2)}</v></c>`;
+    if(pctLabels.has(label)&&ci===1)return`<c r="${ref}" s="4"><v>${Number(v).toFixed(6)}</v></c>`;
+    return`<c r="${ref}" t="inlineStr"><is><t>${xlsxXmlEscapeV196(v)}</t></is></c>`
+  }).join("")}</row>`).join("");
   const sheetXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>${cols}</cols><sheetData>${rowsXml}</sheetData></worksheet>`;
-  const styles=`<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="2" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="10" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>`;
+  const styles=`<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="dd-mm-yyyy"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="1" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="10" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>`;
   return[{name:"[Content_Types].xml",data:`<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},{name:"_rels/.rels",data:`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},{name:"xl/workbook.xml",data:`<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Profit" sheetId="1" r:id="rId1"/></sheets></workbook>`},{name:"xl/_rels/workbook.xml.rels",data:`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},{name:"xl/styles.xml",data:styles},{name:"xl/worksheets/sheet1.xml",data:sheetXml}];
 }
+let productProfitExportBusyV242=false;
 async function exportProductProfitExcelV216(type){
+  if(productProfitExportBusyV242)return;
   const choice=prompt("选择导出范围：\n1 = 按日期\n2 = 整个月\n3 = 全部数据","1");if(!choice)return;
-  let mode=choice==="1"?"date":choice==="2"?"month":choice==="3"?"all":"";if(!mode){alert("请输入 1、2 或 3。");return}
+  const mode=choice==="1"?"date":choice==="2"?"month":choice==="3"?"all":"";if(!mode){alert("请输入 1、2 或 3。");return}
   let target="";
   if(mode==="date"){target=prompt("日期 DD-MM-YYYY：",productProfitSelectedDateV216(type))||"";if(!/^\d{2}-\d{2}-\d{4}$/.test(target)){alert("日期格式错误");return}}
   if(mode==="month"){const d=productProfitSelectedDateV216(type);target=prompt("月份 MM-YYYY：",d?d.slice(3):"")||"";if(!/^\d{2}-\d{4}$/.test(target)){alert("月份格式错误");return}}
+  productProfitExportBusyV242=true;
   try{
     const all=await loadAllSalesProductLinksV203({force:true,maxAgeMs:0});
     const filtered=all.filter(x=>String(x.type||"")===type&&(mode==="all"||mode==="date"&&String(x.date||"")===target||mode==="month"&&String(x.date||"").slice(3)===target));
-    if(!filtered.length){alert("所选范围没有关联盆栽利润资料。");return}
-    const dates=[...new Set(filtered.map(x=>String(x.date||"")))].sort();
-    for(const date of dates){
-      const list=filtered.filter(x=>String(x.date||"")===date);
-      const files=buildProductProfitXlsxV216(type,list,date,productProfitSalesByGroupV216(type,date));
-      const blob=new Blob([zipStoreV196(files)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),u=URL.createObjectURL(blob),a=document.createElement("a");
-      a.href=u;a.download=`Lover_${type==="live"?"Live":"Fair"}_Profit_${date}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);
-      await new Promise(r=>setTimeout(r,180));
-    }
+    if(!filtered.length){alert("所选范围没有销售卡利润资料。");return}
+    const dates=[...new Set(filtered.map(x=>String(x.date||"")))].filter(Boolean).sort((a,b)=>{const pa=a.split("-").reverse().join(""),pb=b.split("-").reverse().join("");return pa.localeCompare(pb)});
+    const files=buildProductProfitXlsxV216(type,filtered,dates);
+    const blob=new Blob([zipStoreV196(files)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),u=URL.createObjectURL(blob),a=document.createElement("a");
+    const suffix=mode==="date"?target:mode==="month"?target:"All";
+    a.href=u;a.download=`Lover_${type==="live"?"Live":"Fair"}_Profit_${suffix}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);
   }catch(e){alert("导出失败："+(e.message||e))}
+  finally{productProfitExportBusyV242=false}
 }
 window.toggleProductProfitSummaryV216=toggleProductProfitSummaryV216;
 window.exportProductProfitExcelV216=exportProductProfitExcelV216;
@@ -3745,12 +3785,12 @@ async function toggleMonthGrandHistoryV223(){
 window.toggleMonthGrandHistoryV223=toggleMonthGrandHistoryV223;
 
 
-/* ================= V24.1 expandable yearly monthly breakdown ================= */
+/* ================= V24.2 expandable yearly monthly breakdown ================= */
 const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 
 function yearBreakdownRowsV224(kind){
-  // V24.1: Balakong / Belimbing / Fair / Live show months inside the selected
+  // V24.2: Balakong / Belimbing / Fair / Live show months inside the selected
   // year. The final Grand Total is a higher-level view and must show YEAR totals.
   if(kind==="total"){
     const byYear=new Map();
@@ -3848,7 +3888,7 @@ function renderTable(){
   document.getElementById("recordTable").innerHTML=s.map(r=>{const rate=r.type==="live"?getLiveHostRate(r.location,r.date):r.type==="fair"?getFairCommissionRate(totalBy("fair","","month"))*100:0;const commission=(r.type==="live"||r.type==="fair")?Number(r.amount||0)*rate/100:0;return `<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":r.type==="live"?"Live":"每日"}</td><td>${r.type==="live"?"Live":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td><td>${rate?Number(rate.toFixed(2))+"%":"-"}</td><td>${rate?money(commission):"-"}</td></tr>`}).join("")||'<tr><td colspan="7" style="text-align:center;">这个月份还没有记录</td></tr>';
 }
 function renderAll(){
-  // V24.1: one complete render path. This replaces the older partial duplicate
+  // V24.2: one complete render path. This replaces the older partial duplicate
   // so Fair daily/monthly totals, Home totals and Report always refresh together.
   rows=dedupeRows(rows);
   renderDashboard();
@@ -3890,7 +3930,7 @@ function buildMonthlySummary(){
   });
   return [...map.values()].map(item=>({...item,total:item.balakong+item.belimbing+item.fair+item.live})).sort((a,b)=>b.month.localeCompare(a.month));
 }
-// V24.1: expandable daily total list. It uses cached rows immediately and only
+// V24.2: expandable daily total list. It uses cached rows immediately and only
 // reads the selected historical month from cloud when the user asks for it.
 function buildDailyTotals(month){
   const totals=new Map();
@@ -3923,7 +3963,7 @@ async function loadDailyTotalsMonth(month){
   const status=document.getElementById("dailyTotalsStatus");
   renderDailyTotals();
 
-  // V24.1: current month already follows the normal Home sync flow.
+  // V24.2: current month already follows the normal Home sync flow.
   // Do not make a second cloud request just because the daily summary is opened.
   // This keeps startup / Home sync speed unchanged.
   const currentMonth=selectedMonth();
@@ -3998,7 +4038,7 @@ async function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V24.1: show cache immediately and complete historical months in background.
+  // V24.2: show cache immediately and complete historical months in background.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 
@@ -4131,7 +4171,7 @@ async function saveFairCommissionSettings(){
       fairRevision:nextFairCommissionRevision(previous.fairRevision)
     });
 
-    // V24.1: save locally immediately. Do not make the user wait for Apps Script.
+    // V24.2: save locally immediately. Do not make the user wait for Apps Script.
     applyCommissionSettings(settings);
     setSavedCommissionSnapshots(settings,{fair:true,live:false});
     updateFairCommissionDraftState();
@@ -4191,7 +4231,7 @@ async function saveLiveCommissionSettings(){
     const live=readLiveCommissionInputs();
     const candidate=normalizeCommissionSettings({...previous,...live});
     const comparable=x=>JSON.stringify({liveHostRates:x.liveHostRates||{},liveHosts:x.liveHosts||{},inactiveLiveHosts:x.inactiveLiveHosts||{},liveRateSchedules:x.liveRateSchedules||[]});
-    // V24.1: deleting the last special commission rule leaves candidate and
+    // V24.2: deleting the last special commission rule leaves candidate and
     // previous structurally identical because the delete was already applied
     // locally.  A dirty draft must still be written to cloud so [] overwrites
     // the old month snapshot instead of letting the deleted rule return.
@@ -4312,7 +4352,7 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V24.1 Reliable Backup / Restore ================= */
+/* ================= V24.2 Reliable Backup / Restore ================= */
 const BACKUP_RESTORE_STATE_KEY_V234="lover_backup_restore_status_v234";
 let backupRestoreOperationRunningV234=false;
 
@@ -4344,7 +4384,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"2410",
+    version:"2420",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -4522,7 +4562,7 @@ setTimeout(async()=>{
 
 let lastObservedSystemMonth=monthISO();setInterval(()=>{const nowMonth=monthISO();if(nowMonth!==lastObservedSystemMonth){lastObservedSystemMonth=nowMonth;systemState.currentMonth=nowMonth;document.getElementById("monthPicker").value=nowMonth;document.getElementById("yearPicker").value=nowMonth.slice(0,4);renderAll();updateReadOnlyMode();loadFromSheet({force:true})}},60000);
 
-/* ================= V24.1 Sales Card transaction integrity / instant cache ================= */
+/* ================= V24.2 Sales Card transaction integrity / instant cache ================= */
 function salesCardHasUserDataV241(card){
   if(!card)return false;
   if(card.dataset.dirty==="1")return true;
