@@ -52,7 +52,7 @@
       loadYear: false,
       silent: false,
       statusText: manual ? "正在刷新云端资料..." : "正在检查云端更新...",
-      refreshFairInputs: manual
+      refreshFairInputs: false
     }).catch(err => {
       console.warn("Cloud refresh failed:", reason, err);
       return { ok:false, error:err };
@@ -261,7 +261,7 @@
       const result = await refreshCloudData("pull-down", true);
 
       if (result && result.ok) {
-        if (typeof window.clearUnsavedSalesCardEditorsV221 === "function") window.clearUnsavedSalesCardEditorsV221();
+        if (typeof window.clearUnsavedSalesCardEditorsV224 === "function") window.clearUnsavedSalesCardEditorsV224();
         indicator.textContent = "刷新完成";
       } else {
         indicator.textContent = "刷新失败，请稍后重试";
