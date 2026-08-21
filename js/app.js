@@ -26,7 +26,7 @@ function showPage(name,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
 
-  // V23.3: every time Live is opened, start from today's date.
+  // V23.4: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -38,7 +38,7 @@ function showPage(name,el){
   if(name==="report")renderTable();
   if(name==="fair"&&typeof refreshFairInputsFromRows==="function")refreshFairInputsFromRows(false);
 
-  // V23.3: page switching never waits for or triggers cloud sync.
+  // V23.4: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");return [r.type,r.date,r.company,location].join("|")}
@@ -48,7 +48,7 @@ function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&
 function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c);document.getElementById("dailySales").value=formatAmount(a);document.getElementById("salesDateResult").textContent=`${companyNames[c]}｜${d}｜${money(a)}`;renderSalesMonthlyList()}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
 
-// V23.3: Top 5 business performance. Uses rows already loaded in memory only;
+// V23.4: Top 5 business performance. Uses rows already loaded in memory only;
 // opening/closing Top 5 never triggers an extra cloud request.
 function weekdayZh(displayDate){
   const iso=displayToISO(displayDate);
@@ -235,7 +235,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V23.3: historical record is lazy. Top 5 opens instantly from local rows;
+    // V23.4: historical record is lazy. Top 5 opens instantly from local rows;
     // one shared history request runs only after the user explicitly expands Top 5.
     setTimeout(()=>{ ensureHistoricalHighs(); },0);
   }
@@ -509,7 +509,7 @@ function applyCloudCommissionSettings(settings){
   const incomingLiveRevision=Number(incoming.liveRevision||0);
   const localLiveRevision=Number(local.liveRevision||0);
 
-  // V23.3: Fair and Live each have their own revision.
+  // V23.4: Fair and Live each have their own revision.
   // A stale device/cloud response can never overwrite a newer saved setting.
   const keepLocalFair=incomingFairRevision<localFairRevision;
   const keepLocalLive=liveCommissionDraftDirty||incomingLiveRevision<localLiveRevision;
@@ -646,7 +646,7 @@ function getCommissionSettingsForMonth(month){
   const snapshot=(systemState.commissionSnapshots||{})[target];
   if(!snapshot)return current;
 
-  // V23.3: historical Fair rates come from that month's snapshot, while the
+  // V23.4: historical Fair rates come from that month's snapshot, while the
   // Live schedule is selected by the actual Live record date. This prevents
   // Home's history month selector from blocking the current month's More setup.
   return normalizeCommissionSettings({
@@ -785,7 +785,7 @@ async function removeLiveHost(hostKey){
     if(message){message.textContent="✅ 主播已设为离职／停用";message.classList.remove("hidden");}
     setSync("已同步",true);
   }catch(error){
-    // V23.3: timeout must not undo the user's local action.
+    // V23.4: timeout must not undo the user's local action.
     console.warn("Inactive host cloud sync delayed",error);
     liveCommissionDraftDirty=true;
     queueLiveCommissionRetry(nextSettings,commissionConfigMonth());
@@ -1038,7 +1038,7 @@ async function saveDailySales(){
   renderAll();
   showTempMsg("saveMsg");
 
-  // V23.3: normal Save uses exactly one cloud write.
+  // V23.4: normal Save uses exactly one cloud write.
   // This prevents the immediate keepalive request from racing the normal save,
   // which could turn a real change such as RM9,999 -> RM0 into a later 0 -> 0
   // comparison and suppress the modification notification.
@@ -1200,7 +1200,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     setSync("已储存，正在后台同步...");
     const result=await saveFairBatchToSheet(loc,records);
 
-    // V23.3: local Fair values are direct replacements, never additions. The server
+    // V23.4: local Fair values are direct replacements, never additions. The server
     // also removes duplicate Sheet rows whose location differs only by spaces/case.
     // The response confirms the authoritative overwrite and clears pending rows.
     records.forEach(i=>clearPendingRow({
@@ -1218,7 +1218,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${companyNames[r.company]||r.company}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"2330"};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"2340"};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1236,7 +1236,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"2330"}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"2340"}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1396,7 +1396,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V23.3: paint Home immediately, restore local cache, then perform only a
+// V23.4: paint Home immediately, restore local cache, then perform only a
 // lightweight Revision check. Full month data is downloaded only when the
 // cloud Revision proves that another device changed data.
 attachMoneyInputs();
@@ -1461,7 +1461,7 @@ async function startInitialSalesDataLoad() {
   return startupSalesSyncPromise;
 }
 
-// V23.3: start cached Home immediately, then warm the current year's historical
+// V23.4: start cached Home immediately, then warm the current year's historical
 // months in the background so Monthly Summary is complete on first open.
 startInitialSalesDataLoad().finally(()=>{
   const startupYear=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
@@ -1490,7 +1490,7 @@ function getSavedLiveHosts(){
 function collectLiveHosts(){
   const merged=[];
   const cloudHosts=Object.values((getCommissionSettings().liveHosts)||{});
-  // V23.3: active host list is independent from historical Live records.
+  // V23.4: active host list is independent from historical Live records.
   // Deleted hosts stay in old reports but do not return to current host options.
   [...cloudHosts,...getSavedLiveHosts()]
     .filter(Boolean)
@@ -1571,7 +1571,7 @@ async function ensureDateControlMonthLoaded(id){
 }
 
 
-/* ================= V23.3 on-demand 新增 / 修改记录 ================= */
+/* ================= V23.4 on-demand 新增 / 修改记录 ================= */
 const salesChangeLogOpenV200={daily:false,fair:false,live:false};
 
 function changeLogPanelIdV200(type){
@@ -1603,7 +1603,7 @@ function renderChangeLogTimelineV200(type,date,items){
     group.items.push(item);
   });
 
-  // V23.3 display rule:
+  // V23.4 display rule:
   // 1) any real audit row must be shown, including a single first sale (0 -> amount).
   // 2) later changes keep the first/original amount in the full timeline.
   // 3) downward correction is attached to the amount BEFORE that correction, so every row explains what happened next.
@@ -1926,7 +1926,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V23.3: do not restore the previously saved date.
+  // V23.4: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -1986,7 +1986,7 @@ function reactivateLiveHostIfNeeded(name){
 }
 
 
-/* ================= V23.3 Import Cost System product search ================= */
+/* ================= V23.4 Import Cost System product search ================= */
 // Search/mapping behavior mirrors Lover Legend Cost and Pricing Calculator V8.2.
 const IMPORT_SYSTEM_CLOUD_URL_V214="https://script.google.com/macros/s/AKfycbxWKdEC7vy_7pZ2_CPie-9L5DeIofPggZlLuwB7gW-31HqWXEOxshtCR-HB-m5qLYS6/exec";
 let importProductsV214=[];
@@ -2011,7 +2011,7 @@ function unorderedImportProductMatchV214(sourceValue,queryValue){
   const query=normalizeImportProductSearchTextV214(queryValue);
   if(!query)return true;
   if(isExactProductCodeQueryV214(query)){
-    // V23.3: code search supports case-insensitive prefix/partial entry.
+    // V23.4: code search supports case-insensitive prefix/partial entry.
     const codes=extractImportProductCodesV214(sourceValue);
     return codes.some(code=>code===query||code.startsWith(query));
   }
@@ -2265,7 +2265,7 @@ function updateProductLinkMinimumWarningV214(item){
   if(priceInput)priceInput.classList.toggle("below-minimum-price",low);
 }
 function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
-  // V23.3: iPhone/iOS safe search state.
+  // V23.4: iPhone/iOS safe search state.
   // The dropdown remains open through async Import loading, keyboard candidate changes,
   // transient blur/focus changes and background sales-card loading.
   let searchOpen=false;
@@ -2340,7 +2340,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
 
         row.append(line1,line2);
 
-        // V23.3: distinguish an intentional tap from list scrolling on iPhone/iOS.
+        // V23.4: distinguish an intentional tap from list scrolling on iPhone/iOS.
         let touchStartX=0,touchStartY=0,touchMoved=false,touchHandled=false;
         const chooseRecord=e=>{
           if(e){
@@ -2429,7 +2429,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
   },false);
 }
 
-/* ================= V23.3 optional bonsai product association ================= */
+/* ================= V23.4 optional bonsai product association ================= */
 
 let productLinkItemSeqV206=0;
 function productLinkContextV206(type){
@@ -2452,13 +2452,13 @@ function toggleProductLinkBoxV206(type){
   body.classList.toggle("hidden",!opening);box.classList.toggle("product-link-collapsed",!opening);
   const btn=box.querySelector(".product-link-toggle");if(btn)btn.setAttribute("aria-expanded",opening?"true":"false");
   if(opening){
-    // V23.3: Sales Cards and Daily Profit are mutually exclusive.
+    // V23.4: Sales Cards and Daily Profit are mutually exclusive.
     const profitPanel=productProfitSummaryPanelV216(type);
     if(profitPanel){profitPanel.classList.add("hidden");profitPanel.innerHTML=""}
     productProfitSummaryOpenV216[type]=false;
     const profitBtn=document.querySelector(`#${pre}ProductLinkBox .product-profit-toggle-btn`);
     if(profitBtn){profitBtn.textContent="📊 当天利润";profitBtn.disabled=false}
-    // V23.3: saved cards first. Do not flash a fake 0.00 card while cloud data loads.
+    // V23.4: saved cards first. Do not flash a fake 0.00 card while cloud data loads.
     if(type==="fair")syncFairProductDatesV203();
     Promise.resolve(loadProductLinksIntoEditorV206(type)).catch(()=>{});
   }
@@ -2579,14 +2579,14 @@ function buildProductLinkItemV209(type,id,data={}){
 }
 function addProductLinkItemV209(type,data={}){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
-  if(!wrap){console.error("V23.3 product item container missing",type);return false}
+  if(!wrap){console.error("V23.4 product item container missing",type);return false}
   const id=++productLinkItemSeqV206;
   const item=buildProductLinkItemV209(type,id,data);
   wrap.appendChild(item);
   return true;
 }
 function addProductLinkItemV206(type,data={}){return addProductLinkItemV209(type,data)}
-// Explicit globals keep both legacy and V23.3 button bindings reliable.
+// Explicit globals keep both legacy and V23.4 button bindings reliable.
 window.addProductLinkItemV206=addProductLinkItemV206;
 window.addProductLinkItemV209=addProductLinkItemV209;
 window.toggleProductLinkBoxV206=toggleProductLinkBoxV206;
@@ -2670,7 +2670,7 @@ async function loadProductLinksIntoEditorV206(type){
 
   const cached=(typeof getCachedSalesProductLinksV216==="function")?getCachedSalesProductLinksV216(type,date,location):null;
 
-  // V23.3: memory/local persistent cache renders first, cloud verifies silently.
+  // V23.4: memory/local persistent cache renders first, cloud verifies silently.
   if(Array.isArray(cached)){
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
   }else{
@@ -2715,7 +2715,7 @@ async function saveProductLinksV206(type){
   catch(e){alert("盆栽资料保存失败："+(e.message||e));setSync("盆栽资料同步失败",false,true);return null}
 }
 
-/* ================= V23.3 same-day linked bonsai profit summary ================= */
+/* ================= V23.4 same-day linked bonsai profit summary ================= */
 const productProfitSummaryOpenV216={live:false,fair:false};
 function productProfitSummaryPanelV216(type){return document.getElementById(productLinkPreV208(type)+"ProductProfitSummary")}
 function productProfitSelectedDateV216(type){
@@ -2773,7 +2773,7 @@ async function toggleProductProfitSummaryV216(type,button){
   const date=productProfitSelectedDateV216(type);if(!date){alert("请先选择日期");return}
   if(productProfitSummaryOpenV216[type]&&!panel.classList.contains("hidden")){productProfitSummaryOpenV216[type]=false;panel.classList.add("hidden");panel.innerHTML="";if(button)button.textContent="📊 当天利润";return}
   try{
-    // V23.3: opening Daily Profit closes Sales Cards first.
+    // V23.4: opening Daily Profit closes Sales Cards first.
     const pre=productLinkPreV208(type),box=document.getElementById(pre+"ProductLinkBox"),body=document.getElementById(pre+"ProductLinkBody");
     if(body)body.classList.add("hidden");
     if(box)box.classList.add("product-link-collapsed");
@@ -2930,12 +2930,12 @@ async function toggleMonthGrandHistoryV223(){
 window.toggleMonthGrandHistoryV223=toggleMonthGrandHistoryV223;
 
 
-/* ================= V23.3 expandable yearly monthly breakdown ================= */
+/* ================= V23.4 expandable yearly monthly breakdown ================= */
 const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 
 function yearBreakdownRowsV224(kind){
-  // V23.3: Balakong / Belimbing / Fair / Live show months inside the selected
+  // V23.4: Balakong / Belimbing / Fair / Live show months inside the selected
   // year. The final Grand Total is a higher-level view and must show YEAR totals.
   if(kind==="total"){
     const byYear=new Map();
@@ -3033,7 +3033,7 @@ function renderTable(){
   document.getElementById("recordTable").innerHTML=s.map(r=>{const rate=r.type==="live"?getLiveHostRate(r.location,r.date):r.type==="fair"?getFairCommissionRate(totalBy("fair","","month"))*100:0;const commission=(r.type==="live"||r.type==="fair")?Number(r.amount||0)*rate/100:0;return `<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":r.type==="live"?"Live":"每日"}</td><td>${r.type==="live"?"Live":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td><td>${rate?Number(rate.toFixed(2))+"%":"-"}</td><td>${rate?money(commission):"-"}</td></tr>`}).join("")||'<tr><td colspan="7" style="text-align:center;">这个月份还没有记录</td></tr>';
 }
 function renderAll(){
-  // V23.3: one complete render path. This replaces the older partial duplicate
+  // V23.4: one complete render path. This replaces the older partial duplicate
   // so Fair daily/monthly totals, Home totals and Report always refresh together.
   rows=dedupeRows(rows);
   renderDashboard();
@@ -3075,7 +3075,7 @@ function buildMonthlySummary(){
   });
   return [...map.values()].map(item=>({...item,total:item.balakong+item.belimbing+item.fair+item.live})).sort((a,b)=>b.month.localeCompare(a.month));
 }
-// V23.3: expandable daily total list. It uses cached rows immediately and only
+// V23.4: expandable daily total list. It uses cached rows immediately and only
 // reads the selected historical month from cloud when the user asks for it.
 function buildDailyTotals(month){
   const totals=new Map();
@@ -3108,7 +3108,7 @@ async function loadDailyTotalsMonth(month){
   const status=document.getElementById("dailyTotalsStatus");
   renderDailyTotals();
 
-  // V23.3: current month already follows the normal Home sync flow.
+  // V23.4: current month already follows the normal Home sync flow.
   // Do not make a second cloud request just because the daily summary is opened.
   // This keeps startup / Home sync speed unchanged.
   const currentMonth=selectedMonth();
@@ -3183,7 +3183,7 @@ async function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V23.3: show cache immediately and complete historical months in background.
+  // V23.4: show cache immediately and complete historical months in background.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 
@@ -3264,7 +3264,7 @@ restoreLastLiveSession();
   if(el)el.addEventListener("input",markFairCommissionDraftDirty);
 });
 window.addEventListener("beforeunload",event=>{
-  if(!(fairCommissionDraftDirty||liveCommissionDraftDirty))return;
+  if(!(fairCommissionDraftDirty||liveCommissionDraftDirty||backupRestoreOperationRunningV234))return;
   event.preventDefault();
   event.returnValue="";
 });
@@ -3315,7 +3315,7 @@ async function saveFairCommissionSettings(){
       fairRevision:nextFairCommissionRevision(previous.fairRevision)
     });
 
-    // V23.3: save locally immediately. Do not make the user wait for Apps Script.
+    // V23.4: save locally immediately. Do not make the user wait for Apps Script.
     applyCommissionSettings(settings);
     setSavedCommissionSnapshots(settings,{fair:true,live:false});
     updateFairCommissionDraftState();
@@ -3375,7 +3375,7 @@ async function saveLiveCommissionSettings(){
     const live=readLiveCommissionInputs();
     const candidate=normalizeCommissionSettings({...previous,...live});
     const comparable=x=>JSON.stringify({liveHostRates:x.liveHostRates||{},liveHosts:x.liveHosts||{},inactiveLiveHosts:x.inactiveLiveHosts||{},liveRateSchedules:x.liveRateSchedules||[]});
-    // V23.3: deleting the last special commission rule leaves candidate and
+    // V23.4: deleting the last special commission rule leaves candidate and
     // previous structurally identical because the delete was already applied
     // locally.  A dirty draft must still be written to cloud so [] overwrites
     // the old month snapshot instead of letting the deleted rule return.
@@ -3496,11 +3496,39 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V23.3 Backup / Restore ================= */
+/* ================= V23.4 Reliable Backup / Restore ================= */
+const BACKUP_RESTORE_STATE_KEY_V234="lover_backup_restore_status_v234";
+let backupRestoreOperationRunningV234=false;
+
+function getBackupRestoreStateV234(){
+  try{return JSON.parse(localStorage.getItem(BACKUP_RESTORE_STATE_KEY_V234)||"null")}catch(e){return null}
+}
+function setBackupRestoreStateV234(state){
+  const value={...(state||{}),updatedAt:new Date().toISOString()};
+  localStorage.setItem(BACKUP_RESTORE_STATE_KEY_V234,JSON.stringify(value));
+  renderBackupRestoreStatusV234(value);
+  return value;
+}
+function clearBackupRestoreStateV234(){
+  localStorage.removeItem(BACKUP_RESTORE_STATE_KEY_V234);
+  renderBackupRestoreStatusV234(null);
+}
+function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
+  const box=document.getElementById("backupRestoreStatusV234");
+  if(!box)return;
+  if(!state){box.className="backup-restore-status-v234 hidden";box.innerHTML="";return}
+  const type=state.type==="restore"?"Restore":"Backup";
+  const status=state.status||"running";
+  const title=status==="running"?`⚠ ${type} 进行中 — 请勿关闭或刷新页面`:status==="success"?`✅ ${type} 成功`:`❌ ${type} 失败`;
+  const detail=String(state.message||"");
+  const time=state.updatedAt?new Date(state.updatedAt).toLocaleString():"";
+  box.className=`backup-restore-status-v234 ${status}`;
+  box.innerHTML=`<div class="br-title">${title}</div><div class="br-detail">${escapeChangeLogHtmlV200(detail)}</div><div class="br-time">${escapeChangeLogHtmlV200(time)}</div>`;
+}
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"2330",
+    version:"2340",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -3513,62 +3541,142 @@ function getBackupPayload(){
   };
 }
 async function backupAllData(){
+  if(backupRestoreOperationRunningV234){alert("Backup / Restore 正在进行中，请等待完成。");return}
+  backupRestoreOperationRunningV234=true;
+  setBackupRestoreStateV234({type:"backup",status:"running",message:"正在读取完整营业资料及销售卡，请勿关闭或刷新页面。"});
+  setSync("Backup 进行中，请勿关闭页面...");
   try{
-    setSync("正在建立完整 Backup...");
     const payload=getBackupPayload();
-    payload.productLinks=await loadAllSalesProductLinksV203({force:true,maxAgeMs:0});
+    // Prefer a recent complete cache; first Backup without cache still reads cloud truth.
+    setBackupRestoreStateV234({type:"backup",status:"running",message:"正在读取销售卡资料..."});
+    payload.productLinks=await loadAllSalesProductLinksV203({force:false,maxAgeMs:120000});
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true};
+    setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    downloadFile(`Lover_Legend_Sales_V23_3_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
-    setSync("完整 Backup 已建立",true);
+    downloadFile(`Lover_Legend_Sales_V23_4_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+    setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔。`});
+    setSync("Backup 已完成",true);
+    alert(`Backup 成功。\n\n营业记录：${payload.rows.length} 笔\n销售卡：${payload.productLinks.length} 笔\n\nBackup 文件已经生成。`);
   }catch(e){
     console.error("Backup failed",e);
+    setBackupRestoreStateV234({type:"backup",status:"failed",message:e&&e.message?e.message:String(e)});
     setSync("Backup 失败",false,true);
-    alert("Backup 失败：无法取得完整资料，因此不会产生不完整的备份文件。\n\n"+(e&&e.message?e.message:e));
+    alert("Backup 失败：\n\n"+(e&&e.message?e.message:e));
+  }finally{
+    backupRestoreOperationRunningV234=false;
   }
 }
+async function finishRestoreClientV234(payload){
+  localStorage.setItem("lover_fair_locations",JSON.stringify(payload.fairLocations||[]));
+  if(payload.liveHosts)localStorage.setItem("lover_live_hosts",JSON.stringify(payload.liveHosts));
+  fairCommissionDraftDirty=false;
+  liveCommissionDraftDirty=false;
+  localStorage.setItem("lover_commission_settings_cache",JSON.stringify(payload.commissionSettings));
+  applyCommissionSettings(payload.commissionSettings);
+  setSavedCommissionSnapshots(payload.commissionSettings);
+  await loadFromSheet({force:true});
+  loadCommissionSettingsForm();
+  renderLiveHostCommissionSettings();
+  document.getElementById("monthPicker").value=monthISO();
+  document.getElementById("yearPicker").value=monthISO().slice(0,4);
+  renderAll();updateReadOnlyMode();
+}
 async function restoreBackupFile(file){
+  if(backupRestoreOperationRunningV234){alert("Backup / Restore 正在进行中，请等待完成。");return}
   let payload;
   try{payload=JSON.parse(await file.text())}catch(e){alert("Backup 文件无法读取或不是有效 JSON。");return}
   if(!payload||!Array.isArray(payload.rows)||!payload.commissionSettings){alert("这不是有效的 Lover Legend Sales Backup。");return}
   payload.closedMonths=sanitizeClosedMonthsClientV197(payload.closedMonths,payload.currentMonth||monthISO());
-  const ok=confirm(`准备 Restore 完整备份。\n\n备份版本：${payload.version||"未知"}\n备份时间：${payload.createdAt||"未知"}\n营业记录：${payload.rows.length} 笔\n销售卡：${Array.isArray(payload.productLinks)?payload.productLinks.length:0} 笔\n\n恢复将覆盖 Google Sheet 目前所有月份营业资料、Fair、Live、Commission、销售卡与结算状态。\n此操作无法自动撤销。\n\n确定继续？`);
+  const ok=confirm(`准备 Restore 完整备份。\n\n备份版本：${payload.version||"未知"}\n备份时间：${payload.createdAt||"未知"}\n营业记录：${payload.rows.length} 笔\n销售卡：${Array.isArray(payload.productLinks)?payload.productLinks.length:0} 笔\n\nRestore 进行中会显示状态，请勿关闭或刷新页面。\n恢复将覆盖 Google Sheet 现有营业资料与销售卡。\n\n确定继续？`);
   if(!ok)return;
 
+  backupRestoreOperationRunningV234=true;
+  const current=getCommissionSettings();
+  payload={...payload};
+  payload.commissionSettings=normalizeCommissionSettings({
+    ...payload.commissionSettings,
+    fairRevision:nextFairCommissionRevision(Math.max(Number(current.fairRevision||0),Number(payload.commissionSettings.fairRevision||0))),
+    liveRevision:nextLiveCommissionRevision(Math.max(Number(current.liveRevision||0),Number(payload.commissionSettings.liveRevision||0)))
+  });
   try{
-    setSync("正在恢复 Backup...");
-    const current=getCommissionSettings();
-    payload={...payload};
-    payload.commissionSettings=normalizeCommissionSettings({
-      ...payload.commissionSettings,
-      fairRevision:nextFairCommissionRevision(Math.max(Number(current.fairRevision||0),Number(payload.commissionSettings.fairRevision||0))),
-      liveRevision:nextLiveCommissionRevision(Math.max(Number(current.liveRevision||0),Number(payload.commissionSettings.liveRevision||0)))
+    setBackupRestoreStateV234({type:"restore",status:"running",message:"Restore 正在准备，请勿关闭或刷新页面。"});
+    setSync("Restore 进行中，请勿关闭页面...");
+    const result=await restoreBackupToSheet(payload,info=>{
+      const jobId=String(info.jobId||"");
+      setBackupRestoreStateV234({
+        type:"restore",status:"running",jobId,
+        restoreId:info.restoreId||"",
+        message:info.message||"Restore 进行中..."
+      });
     });
-
-    await restoreBackupToSheet(payload);
-    localStorage.setItem("lover_fair_locations",JSON.stringify(payload.fairLocations||[]));
-    if(payload.liveHosts)localStorage.setItem("lover_live_hosts",JSON.stringify(payload.liveHosts));
-
-    // Restore is authoritative: clear local draft state/cache before reading cloud truth.
-    fairCommissionDraftDirty=false;
-    liveCommissionDraftDirty=false;
-    localStorage.setItem("lover_commission_settings_cache",JSON.stringify(payload.commissionSettings));
-    applyCommissionSettings(payload.commissionSettings);
-    setSavedCommissionSnapshots(payload.commissionSettings);
-
-    await loadFromSheet({force:true});
-    loadCommissionSettingsForm();
-    renderLiveHostCommissionSettings();
-    document.getElementById("monthPicker").value=monthISO();
-    document.getElementById("yearPicker").value=monthISO().slice(0,4);
-    renderAll();
-    updateReadOnlyMode();
-    setSync("Backup 已恢复",true);
-    alert("Restore 已完成。Google Sheet、本机 Home 与 More 佣金设置已统一重新载入。");
+    await finishRestoreClientV234(payload);
+    setBackupRestoreStateV234({type:"restore",status:"success",jobId:result.jobId||"",message:`Restore 完成并已验证。营业记录 ${payload.rows.length} 笔，销售卡 ${Array.isArray(payload.productLinks)?payload.productLinks.length:0} 笔。`});
+    setSync("Restore 已完成",true);
+    alert("Restore 成功。\n\nGoogle Sheet、销售卡及系统设置已经恢复并重新载入。");
   }catch(e){
-    alert("Restore 失败："+e.message);
-    setSync("Restore 失败",false,true);
+    const state=getBackupRestoreStateV234()||{};
+    // A transient frontend timeout does not overwrite an active server job as failed.
+    let serverState=null;
+    if(state.jobId){
+      try{serverState=await getRestoreJobStatusV234(state.jobId)}catch(_){}
+    }
+    if(serverState&&serverState.ok&&serverState.state==="running"){
+      setBackupRestoreStateV234({type:"restore",status:"running",jobId:state.jobId,message:serverState.message||"Restore 后端仍在进行中。重新打开系统会继续显示状态。"});
+      alert("Restore 前端连接暂时中断，但后端仍在进行中。\n\n请不要重复 Restore。重新打开系统后会继续显示 Restore 状态。");
+    }else{
+      const msg=(serverState&&serverState.error)||e.message||String(e);
+      setBackupRestoreStateV234({type:"restore",status:"failed",jobId:state.jobId||"",message:msg});
+      setSync("Restore 失败",false,true);
+      alert("Restore 失败：\n\n"+msg);
+    }
+  }finally{
+    backupRestoreOperationRunningV234=false;
   }
 }
-const restoreInput=document.getElementById("restoreFile");if(restoreInput)restoreInput.addEventListener("change",async e=>{const file=e.target.files&&e.target.files[0];e.target.value="";if(file)await restoreBackupFile(file)});
+async function resumeRestoreStatusV234(){
+  const state=getBackupRestoreStateV234();
+  renderBackupRestoreStatusV234(state);
+  if(!state||state.type!=="restore"||state.status!=="running"||!state.jobId)return;
+  try{
+    const status=await getRestoreJobStatusV234(state.jobId);
+    if(!status||!status.ok)return;
+    if(status.state==="success"){
+      setBackupRestoreStateV234({type:"restore",status:"success",jobId:state.jobId,message:status.message||"Restore 已完成。请刷新资料确认。"});
+      alert("上一次 Restore 已成功完成。");
+      return;
+    }
+    if(status.state==="failed"){
+      setBackupRestoreStateV234({type:"restore",status:"failed",jobId:state.jobId,message:status.error||status.message||"Restore 失败"});
+      alert("上一次 Restore 失败："+(status.error||status.message||"未知错误"));
+      return;
+    }
+    // Persisted running job: continue one small step at a time in background.
+    backupRestoreOperationRunningV234=true;
+    setBackupRestoreStateV234({type:"restore",status:"running",jobId:state.jobId,message:status.message||"Restore 仍在进行中..."});
+    for(let i=0;i<200;i++){
+      let st=await getRestoreJobStatusV234(state.jobId);
+      if(st.state==="success"){
+        setBackupRestoreStateV234({type:"restore",status:"success",jobId:state.jobId,message:st.message||"Restore 已完成。"});
+        alert("Restore 已成功完成。");
+        break;
+      }
+      if(st.state==="failed"){
+        setBackupRestoreStateV234({type:"restore",status:"failed",jobId:state.jobId,message:st.error||st.message||"Restore 失败"});
+        alert("Restore 失败："+(st.error||st.message||"未知错误"));
+        break;
+      }
+      setBackupRestoreStateV234({type:"restore",status:"running",jobId:state.jobId,message:st.message||"Restore 进行中..."});
+      try{await continueRestoreJobV234(state.jobId)}catch(_){}
+      await new Promise(r=>setTimeout(r,1200));
+    }
+  }catch(e){
+    console.warn("Restore resume status failed",e);
+  }finally{
+    backupRestoreOperationRunningV234=false;
+  }
+}
+const restoreInput=document.getElementById("restoreFile");
+if(restoreInput)restoreInput.addEventListener("change",async e=>{const file=e.target.files&&e.target.files[0];e.target.value="";if(file)await restoreBackupFile(file)});
+setTimeout(()=>{renderBackupRestoreStatusV234();resumeRestoreStatusV234()},800);
+
 let lastObservedSystemMonth=monthISO();setInterval(()=>{const nowMonth=monthISO();if(nowMonth!==lastObservedSystemMonth){lastObservedSystemMonth=nowMonth;systemState.currentMonth=nowMonth;document.getElementById("monthPicker").value=nowMonth;document.getElementById("yearPicker").value=nowMonth.slice(0,4);renderAll();updateReadOnlyMode();loadFromSheet({force:true})}},60000);
