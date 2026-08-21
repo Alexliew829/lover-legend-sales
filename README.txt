@@ -1,16 +1,15 @@
-Lover Legend Sales System V22.7 PERFECT STABLE
+Lover Legend Sales System V22.8 PERFECT STABLE
 
-V22.7 修复：
-- 修复 iPhone / iOS 产品搜索列表无法点击选择产品的问题。
-- 移除会阻断触摸选择的 touchstart / pointerdown preventDefault。
-- 保留 V22.6“搜索结果不自动收起”的修复。
-- 产品可通过 click / touchend 正常选择。
-- 选择产品后继续自动映射产品名称、平均成本、最低售价、Import Product ID / Batch 等现有资料，然后关闭列表。
-- Live / Fair 共用相同修复。
-- 保留 V22.6 其他稳定逻辑。
+V22.8 更新：
+- 销售卡“搜索或输入产品”输入框右侧新增固定 X 按钮。
+- 点击 X 只收起 Import System 产品搜索结果，不选择产品、不清空已输入关键字。
+- 保留 V22.7 iPhone / iOS 产品选择修复。
+- 产品列表仍然只有选择产品或点击搜索区域外时才会关闭。
+- Live / Fair 两边同步更新。
+- 保留原有 Import System 预加载、缓存、平均成本/最低售价/Batch 映射及其他稳定逻辑。
 
-Apps Script / Code.gs：业务逻辑不需要更新；本包内版本标记已同步为 V22.7 / 2270。
+Apps Script / Code.gs：业务逻辑不需要更新；本包内版本标记已同步为 V22.8 / 2280。
 appsscript.json：不需要更新。
 Import Cost System：不需要更新。
 
-版本：V22.7 / 2270 / ?v=22.7
+版本：V22.8 / 2280 / ?v=22.8
