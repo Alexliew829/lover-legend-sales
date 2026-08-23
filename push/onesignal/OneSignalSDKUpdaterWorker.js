@@ -1,2 +1,2 @@
-// V27.4 - OneSignal updater worker.
+// V27.5 - OneSignal updater worker.
 importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDKUpdaterWorker.js");
