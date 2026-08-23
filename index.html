@@ -359,7 +359,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V27.3</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V27.4</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -633,7 +633,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
           <button type="button" class="secondary-btn product-link-add-btn" onclick="addProductLinkItemV209('fair')">＋ 新增销售卡</button>
           <button type="button" class="secondary-btn product-link-save-btn" onclick="saveProductLinksV206('fair')">💾 保存全部销售卡资料</button>
           <div id="fairProductLinkMsg" class="save-msg hidden">✅ 销售卡资料已保存</div>
-          <p class="note">可连续新增多棵盆栽；数量默认 1。当天关联盆栽实际售价合计可少过或等于 Fair 营业额，但不能超过。销售卡张数不限；所有销售卡售价总数可以低于或等于当天营业额，但不能超过。V27.3 Sales System 不直接扣库存；库存变动由 Import Cost System 确认处理。平均成本仍可手动修改。</p>
+          <p class="note">可连续新增多棵盆栽；数量默认 1。当天关联盆栽实际售价合计可少过或等于 Fair 营业额，但不能超过。销售卡张数不限；所有销售卡售价总数可以低于或等于当天营业额，但不能超过。V27.4 Sales System 不直接扣库存；库存变动由 Import Cost System 确认处理。平均成本仍可手动修改。</p>
         </div>
       </div>
     </div>
@@ -699,7 +699,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
         <button type="button" class="secondary-btn product-link-add-btn" onclick="addProductLinkItemV209('live')">＋ 新增销售卡</button>
         <button type="button" class="secondary-btn product-link-save-btn" onclick="saveProductLinksV206('live')">💾 保存全部销售卡资料</button>
         <div id="liveProductLinkMsg" class="save-msg hidden">✅ 销售卡资料已保存</div>
-        <p class="note">可连续新增多棵盆栽；数量默认 1。Live 木架等级默认 C80，可改为 自取0 / A20 / B50 / C80 / D120 / E150；售价与数量不会自动决定运费；附加费用 花盆/苔藓默认 0。当天关联盆栽售价合计不能超过 Live 营业额；销售卡张数不限；所有销售卡售价总数可以低于或等于当天营业额，但不能超过。V27.3 Sales System 不直接扣库存；库存变动由 Import Cost System 确认处理。平均成本仍可手动修改。</p>
+        <p class="note">可连续新增多棵盆栽；数量默认 1。Live 木架等级默认 C80，可改为 自取0 / A20 / B50 / C80 / D120 / E150；售价与数量不会自动决定运费；附加费用 花盆/苔藓默认 0。当天关联盆栽售价合计不能超过 Live 营业额；销售卡张数不限；所有销售卡售价总数可以低于或等于当天营业额，但不能超过。V27.4 Sales System 不直接扣库存；库存变动由 Import Cost System 确认处理。平均成本仍可手动修改。</p>
       </div>
     </div>
     <p class="note">主播名字忽略大小写及空格；选择旧日期会自动带出该主播当天销售额。</p>
@@ -759,7 +759,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     <button id="restoreAllBtn" class="gray" onclick="document.getElementById('restoreFile').click()">♻️ Restore 恢复备份</button>
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
     <div id="backupRestoreStatusV234" class="backup-restore-status-v234 hidden"></div>
-    <p class="note">V27.3：月底结算只关账、不删除全年资料；年底结算才允许在强确认后清除当年资料。Backup/Restore 已覆盖关联盆栽、成本、利润、最低售价和备注。进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
+    <p class="note">V27.4：月底结算只关账、不删除全年资料；年底结算才允许在强确认后清除当年资料。Backup/Restore 已覆盖关联盆栽、成本、利润、最低售价和备注。进入 Live 页面时日期自动回到今天；手机在页面顶部垂直下拉并松开即可刷新，左右拉动不会触发。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致；修改佣金后其他已开启装置会自动同步，无需手动 Refresh；Report 会按所选月份读取历史资料；月份选择可读取并编辑历史资料；月底结算只记录结算状态，不会锁定资料。发现手误后可修正并保存，Google Sheet 会立即更新。系统日期进入新月份后才自动切换。</p>
   </div>
 
   
@@ -776,7 +776,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V27.3 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V27.4 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -896,7 +896,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
       });
     return appLoadPromise;
   };
-  // V27.3: critical CSS is loaded synchronously; no splash/loading overlay is used.
+  // V27.4: critical CSS is loaded synchronously; no splash/loading overlay is used.
   window.startLoverSalesApp();
 })();
 </script>
