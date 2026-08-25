@@ -2284,7 +2284,7 @@ button:disabled{cursor:wait;opacity:.68}
 @media(max-width:390px){.year-profit-head-v286,.year-profit-row-v286{grid-template-columns:54px minmax(76px,1.35fr) minmax(76px,1.35fr) 44px;gap:2px}.year-profit-row-v286,.year-profit-row-v286 b{font-size:10px;letter-spacing:-.3px}}
 
 
-/* V29.0 Home annual summary: keep both columns inside the main frame. */
+/* V29.1 Home annual summary: keep both columns inside the main frame. */
 #page-home .year-summary-frame .dash{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 #page-home .year-summary-frame .box{min-width:0;overflow:hidden}
 #page-home .year-summary-frame .box.total{grid-column:1 / -1}
@@ -2296,36 +2296,48 @@ button:disabled{cursor:wait;opacity:.68}
 #page-home .year-summary-frame .year-profit-head-v286 span,#page-home .year-summary-frame .year-profit-row-v286 span,#page-home .year-summary-frame .year-profit-row-v286 b{min-width:0;overflow:hidden;text-overflow:clip}
 @media(max-width:430px){#page-home .year-summary-frame .dash{gap:8px}#page-home .year-summary-frame .box{padding:12px}#page-home .year-summary-frame .amount{font-size:clamp(22px,6.2vw,28px)}}
 
-/* ================= V29.0 display stability fixes ================= */
+/* ================= V29.1 scoped display fixes ================= */
+/* Keep the normal application frame. Do not use global page scaling/zoom fixes. */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 body{overflow-x:hidden;}
-.app{box-sizing:border-box;width:100%;max-width:560px;min-width:0;}
-.page,.page.active{box-sizing:border-box;width:100%;max-width:100%;min-width:0;}
-#page-live,#page-live .card,#liveMonthlyList{box-sizing:border-box;width:100%;max-width:100%;min-width:0;}
-#page-live .live-record-row{box-sizing:border-box;width:100%;max-width:100%;min-width:0;}
-#page-live .live-record-row>*{min-width:0;}
+.app{width:100%;max-width:560px;margin:0 auto;padding:12px;box-sizing:border-box;}
+#page-sales,#page-fair,#page-live{width:100%;max-width:560px;margin-left:auto;margin-right:auto;box-sizing:border-box;}
+#page-sales .card,#page-fair .card,#page-live .card{max-width:100%;box-sizing:border-box;}
 
-/* Annual cards stay two-column when collapsed. Once opened, the card gets the
-   full row so 日期 / 营业额 / 利润 / 利润率 (including the % sign) never clips. */
-#page-home .year-summary-frame .box.year-breakdown-expanded-v290{grid-column:1 / -1;overflow:visible;}
-#page-home .year-summary-frame .box.year-breakdown-expanded-v290 .month-grand-history{overflow-x:visible;}
+/* Home annual cards: expanded cards use the full row, but only the table is adjusted. */
+#page-home .year-summary-frame .box.year-breakdown-expanded-v290{grid-column:1 / -1;overflow:hidden;}
+#page-home .year-summary-frame .box.year-breakdown-expanded-v290 .month-grand-history{overflow:hidden;}
 #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286,
 #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286{
-  grid-template-columns:minmax(62px,.8fr) minmax(96px,1.25fr) minmax(96px,1.25fr) minmax(70px,.8fr);
-  gap:8px;
+  grid-template-columns:minmax(58px,.78fr) minmax(92px,1.35fr) minmax(68px,.9fr) minmax(64px,.82fr);
+  gap:6px;
 }
 #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286 span,
 #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286 span,
 #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286 b{
-  overflow:visible;text-overflow:clip;white-space:nowrap;
+  min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;
 }
+
+/* Phone: larger readable type, less wasted space for date/profit, reserve room for 100.00%. */
 @media(max-width:430px){
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290{padding-left:12px;padding-right:12px;}
   #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286,
   #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286{
-    grid-template-columns:54px minmax(78px,1.25fr) minmax(72px,1.15fr) 54px;
+    grid-template-columns:64px minmax(88px,1.45fr) minmax(58px,.82fr) minmax(62px,.9fr);
+    gap:4px;
+  }
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286{font-size:12px;letter-spacing:-.1px;}
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286,
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286 b{font-size:13px;letter-spacing:-.15px;}
+}
+@media(max-width:390px){
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286,
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286{
+    grid-template-columns:60px minmax(82px,1.4fr) minmax(54px,.8fr) minmax(58px,.9fr);
     gap:3px;
   }
-  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286{font-size:10px;}
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286{font-size:11px;}
   #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286,
-  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286 b{font-size:10px;letter-spacing:-.2px;}
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286 b{font-size:12px;}
 }
+
