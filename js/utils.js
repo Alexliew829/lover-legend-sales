@@ -384,3 +384,17 @@ function bindDateControl(id,onChange){
 
   bindSingleClickDatePicker(id);
 }
+
+// V28.5 global button protection
+(function(){
+  document.addEventListener("click",function(e){
+    const b=e.target.closest("button");
+    if(!b || b.dataset.loading==="true") return;
+    if(b.dataset.busyLock==="true"){
+      b.dataset.loading="true";
+      const old=b.innerHTML;
+      b.innerHTML=b.dataset.loadingText||"处理中…";
+      setTimeout(()=>{b.dataset.loading="";b.innerHTML=old},3000);
+    }
+  },true);
+})();
