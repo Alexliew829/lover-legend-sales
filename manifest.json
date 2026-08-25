@@ -1,6 +1,6 @@
 {
-  "name": "Lover Legend Sales System V28.9",
-  "short_name": "Lover Sales V28.9",
+  "name": "Lover Legend Sales System V29.0",
+  "short_name": "Lover Sales V29.0",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f3f6f1",
@@ -19,5 +19,5 @@
     }
   ],
   "version": "2850",
-  "description": "Lover Legend Sales System V28.9"
+  "description": "Lover Legend Sales System V29.0"
 }
