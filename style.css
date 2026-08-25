@@ -25,7 +25,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .done,.save-msg{background:#e6f7ea;color:#0b6b2b;border:1px solid #9ad6a8;border-radius:12px;padding:10px;margin-top:10px;font-weight:900;text-align:center}.done{margin-bottom:10px;text-align:left}
 .hidden{display:none}.page{display:none}.page.active{display:block}
 .bottom-nav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #ddd;display:grid;grid-template-columns:repeat(6,1fr);z-index:100;padding:5px 4px 8px;max-width:560px;margin:0 auto;box-shadow:0 -2px 10px rgba(0,0,0,.08)}
-/* V29.0: iPhone/Safari can occasionally report an abnormally large safe-area inset after refresh/restore. Keep the nav physically anchored to the viewport bottom and clamp only the inner bottom spacing. */
+/* V28.7: iPhone/Safari can occasionally report an abnormally large safe-area inset after refresh/restore. Keep the nav physically anchored to the viewport bottom and clamp only the inner bottom spacing. */
 @supports (padding-bottom:env(safe-area-inset-bottom)){.bottom-nav{padding-bottom:clamp(8px,env(safe-area-inset-bottom),20px)}}
 .nav-item{text-align:center;font-size:12px;font-weight:900;color:#555;padding:7px 2px;border-radius:10px;cursor:pointer}.nav-item.active{background:#e6f1e8;color:#0b6b2b}.nav-item span{display:block;font-size:22px}
 .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ddd;padding:6px;text-align:right}th:first-child,td:first-child,th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4){text-align:left}th{background:#eee}
@@ -719,7 +719,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* V29.0 当月营业额总数 */
+/* V28.7 当月营业额总数 */
 .daily-summary-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .daily-summary-title-row h2{margin:0;color:#9b1c1c}
 .daily-totals-btn{width:auto;margin:0;padding:10px 13px;border:0;border-radius:10px;background:#9b1c1c;color:#fff;font-weight:800;white-space:nowrap}
@@ -743,7 +743,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .daily-total-empty{padding:18px;text-align:center;color:#777}
 @media(max-width:430px){.daily-summary-title-row{gap:8px}.daily-totals-btn{padding:9px 10px;font-size:14px}.daily-totals-title-line{gap:10px}.daily-totals-month-grand-total{font-size:18px}.daily-totals-toolbar{align-items:stretch;flex-direction:column;gap:6px}.daily-totals-toolbar input{width:100%}}
 
-/* V29.0 monthly summary total row: every month total is green */
+/* V28.7 monthly summary total row: every month total is green */
 .monthly-summary-grid .monthly-total-cell{
   font-weight:900;
   color:#08752f;
@@ -751,7 +751,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   background:#f2faf4;
 }
 
-/* V29.0 month titles: same deep red; current month differs by background only */
+/* V28.7 month titles: same deep red; current month differs by background only */
 .monthly-summary-grid .monthly-month-head,
 .monthly-summary-grid .monthly-month-head.active{
   color:#b00000 !important;
@@ -761,7 +761,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* V29.0 Top 3 business performance */
+/* V28.7 Top 3 business performance */
 .top3-toggle-btn{
   width:100%;
   margin:12px 0 0;
@@ -789,7 +789,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* V29.0: keep Balakong / Belimbing cards clean; Top 3 controls live on their own row */
+/* V28.7: keep Balakong / Belimbing cards clean; Top 3 controls live on their own row */
 .company-top3-row{
   grid-column:1/-1;
   display:grid;
@@ -828,7 +828,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* V29.0 Top 5 compact layout
+/* V28.7 Top 5 compact layout
    Designed for single-day amounts up to RM999,999.99 without breaking mobile width. */
 .top3-row{
   display:grid;
@@ -891,7 +891,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* V29.0 historical record: lazy-loaded only after Top 5 is expanded */
+/* V28.7 historical record: lazy-loaded only after Top 5 is expanded */
 .history-record-host{border-bottom:1px solid #eadede}
 .history-record{
   display:grid;
@@ -922,7 +922,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   .history-record strong{font-size:12px}
 }
 
-/* V29.0: historical record amount stands out in green; record gap is a separate action cue. */
+/* V28.7: historical record amount stands out in green; record gap is a separate action cue. */
 .history-record-gap{
   padding:7px 10px 8px;
   background:#fffaf0;
@@ -935,10 +935,10 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .history-record-achieved{color:#087a36;background:#eef9f1}
 @media(max-width:430px){.history-record-gap{padding:6px 8px 7px;font-size:11.5px}.history-record-gap strong{font-size:12px}}
 
-/* V29.0: five-character historical-high label stays on one line on mobile. */
+/* V28.7: five-character historical-high label stays on one line on mobile. */
 .history-record-label{white-space:nowrap}
 
-/* V29.0 OneSignal notification setup */
+/* V28.7 OneSignal notification setup */
 .notification-settings-card{border:2px solid #9ac7a8}
 .notification-settings-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .notification-settings-head h2{margin:0 0 4px;color:#08752f}.notification-settings-head .note{margin:0}
@@ -960,7 +960,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   border:1px solid #c8dff2;font-size:12px
 }
 
-/* V29.0 push-device registration verification */
+/* V28.7 push-device registration verification */
 .notification-registered.ok{background:#eef9f1;color:#08752f;border-color:#b9dfc5}
 .notification-registered.warn{background:#fff8e8;color:#8a5a00;border-color:#efd28c}
 .notification-reregister-btn{
@@ -968,7 +968,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   background:#fff;color:#24527a;font-size:12px;font-weight:800
 }
 
-/* V29.0 subscription cleanup feedback */
+/* V28.7 subscription cleanup feedback */
 .notification-registered.cleaned{background:#eef9f1;color:#08752f;border-color:#b9dfc5}
 
 #page-home .company-month-daily-row{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -979,7 +979,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 #page-home .company-daily-list b{color:#c62828}
 
 
-/* V29.0 - full Subscription ID diagnostic */
+/* V28.7 - full Subscription ID diagnostic */
 .notification-subscription-id{
   overflow-wrap:anywhere;
   word-break:break-all;
@@ -1002,7 +1002,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .notification-copy-id-btn:active{transform:scale(.99)}
 
 
-/* V29.0 - on-demand Sales / Fair / Live change timeline. Audit UI only; it does not participate in calculations. */
+/* V28.7 - on-demand Sales / Fair / Live change timeline. Audit UI only; it does not participate in calculations. */
 .record-title-row{
   display:flex;
   align-items:center;
@@ -1071,7 +1071,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .change-log-value{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap;text-align:right;}
 .change-log-cumulative{font-weight:900;color:#222;font-variant-numeric:tabular-nums;}
 .change-log-delta{font-weight:900;font-variant-numeric:tabular-nums;}
-/* V29.0: additions are red for instant visibility; corrections are blue. */
+/* V28.7: additions are red for instant visibility; corrections are blue. */
 .change-log-delta.positive{color:#c00000;}
 .change-log-delta.negative{color:#1769aa;}
 .change-log-origin .change-log-cumulative{color:#555;}
@@ -1093,7 +1093,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* V29.0 optional bonsai product association. Isolated from sales totals and normal sync. */
+/* V28.7 optional bonsai product association. Isolated from sales totals and normal sync. */
 .product-link-box{margin-top:14px;padding:12px;border:1px solid #d7e2d6;border-radius:12px;background:#f8fbf8}
 .product-link-title{font-weight:800;color:#245b2d;margin-bottom:8px}
 .product-link-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -1101,7 +1101,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .product-link-save-btn{width:100%;margin-top:10px}
 @media(max-width:520px){.product-link-grid{grid-template-columns:1fr 1fr;gap:8px}.product-link-box{padding:10px}}
 
-/* V29.0: optional bonsai association stays collapsed until explicitly opened. */
+/* V28.7: optional bonsai association stays collapsed until explicitly opened. */
 .product-link-box{padding:0;overflow:hidden}
 .product-link-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border:0;background:#f8fbf8;color:#245b2d;font-weight:800;text-align:left;cursor:pointer}
 .product-link-toggle:hover{background:#f1f7f1}
@@ -1112,29 +1112,29 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .qty-input-no-spinner::-webkit-outer-spin-button,.qty-input-no-spinner::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 @media(max-width:520px){.product-link-body{padding:0 10px 10px}.product-link-toggle{padding:10px}}
 
-/* V29.0 multi-bonsai association */
+/* V28.7 multi-bonsai association */
 .product-link-items{display:flex;flex-direction:column;gap:10px;margin-top:8px}
 .product-link-item{padding:10px;border:1px solid #d7e2d6;border-radius:10px;background:#fff}
 .product-link-item-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .product-link-remove-btn{border:1px solid #e3bcbc;background:#fff7f7;color:#9d1f1f;border-radius:8px;padding:5px 9px;font-weight:700;cursor:pointer}
 .product-link-add-btn{width:100%;margin-top:10px}
 
-/* V29.0 saved product-link state */
+/* V28.7 saved product-link state */
 .product-link-saved-tag{font-size:12px;font-weight:700;opacity:.75}
 
-/* V29.0 product-link profit calculation */
+/* V28.7 product-link profit calculation */
 .product-link-commission-hint{display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:12px;color:#667}
 .product-link-commission-amount{color:#245b2d}
 .product-link-profit-grid input[readonly]{background:#f4f7f4;font-weight:800;color:#245b2d}
 .product-link-profit-rate{font-weight:800;color:#245b2d}
 
-/* V29.0 linked-product financial field consistency */
+/* V28.7 linked-product financial field consistency */
 .product-link-commission-rate{color:#b40000!important;font-size:24px!important;font-weight:800!important}
 .product-link-commission-rate::-webkit-outer-spin-button,.product-link-commission-rate::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .product-link-commission-rate{-moz-appearance:textfield}
 .bonsai-sale-amount{color:#b40000!important}
 
-/* V29.0 Import product name search */
+/* V28.7 Import product name search */
 .product-link-search-wrap{position:relative}
 .product-link-search-results{position:absolute;left:0;right:0;top:100%;z-index:90;max-height:320px;overflow:auto;background:#fff;border:1px solid #d8d8d8;border-radius:10px;box-shadow:0 8px 22px rgba(0,0,0,.14);margin-top:4px}
 .product-link-search-option{display:block;width:100%;text-align:left;background:#fff;border:0;border-bottom:1px solid #eee;padding:11px 12px;cursor:pointer}
@@ -1143,7 +1143,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .product-link-search-name{font-size:15px;font-weight:700;color:#222;line-height:1.35}
 .product-link-search-meta{font-size:12px;color:#777;margin-top:3px}
 
-/* V29.0 Import search and minimum-price warning */
+/* V28.7 Import search and minimum-price warning */
 .product-link-search-results{max-height:360px}
 .product-link-search-option{padding:10px 12px}
 .product-link-search-line1{font-size:14px;font-weight:700;color:#222;line-height:1.45}
@@ -1153,7 +1153,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .product-link-minimum-warning{margin-top:4px;color:#c00000;font-weight:800;font-size:13px;line-height:1.3}
 .product-link-price.below-minimum-price{color:#c00000!important;font-weight:800!important}
 
-/* V29.0 linked-bonsai profit summary */
+/* V28.7 linked-bonsai profit summary */
 .product-link-title-row{display:flex;align-items:stretch;background:#f8fbf8}
 .product-link-title-row .product-link-toggle{flex:1;width:auto}
 .product-profit-toggle-btn{border:0;border-left:1px solid #d7e2d6;background:#f8fbf8;color:#245b2d;font-weight:800;padding:8px 10px;white-space:nowrap;cursor:pointer}
@@ -1176,7 +1176,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   .product-profit-summary-head{align-items:flex-start;flex-direction:column}
 }
 
-/* V29.0 mobile-first linked product / profit UI */
+/* V28.7 mobile-first linked product / profit UI */
 .product-link-title-row{display:grid!important;grid-template-columns:1fr 1fr;gap:0;align-items:stretch}
 .product-link-title-row .product-link-toggle,.product-link-title-row .product-profit-toggle-btn{width:100%!important;min-width:0!important;white-space:nowrap!important;font-size:15px!important;padding:10px 7px!important;display:flex;align-items:center;justify-content:center;gap:4px}
 .product-link-title-row .product-link-toggle span:first-child{white-space:nowrap!important}
@@ -1193,7 +1193,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .product-profit-mobile-grid b{white-space:nowrap}
 @media(max-width:600px){.product-profit-table-wrap{display:none!important}.product-profit-mobile-list{display:block!important}.product-profit-summary-head{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important}.product-profit-export-btn{font-size:12px!important;padding:7px 9px!important}}
 
-/* V29.0 profit list readability */
+/* V28.7 profit list readability */
 .product-profit-table{font-size:13px!important}
 .product-profit-table th,.product-profit-table td{font-size:13px!important}
 .product-profit-mobile-name{font-size:15px!important}
@@ -1205,7 +1205,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   .product-profit-mobile-grid b{font-size:14px!important}
 }
 
-/* V29.0 monthly turnover history */
+/* V28.7 monthly turnover history */
 .month-grand-toggle{cursor:pointer}
 .month-grand-history{margin-top:12px;padding-top:10px;border-top:1px solid #e2c56c;text-align:left}
 .month-grand-history-list>div{display:flex;justify-content:space-between;gap:18px;padding:8px 2px;border-bottom:1px dashed #ddd;font-size:16px}
@@ -1213,7 +1213,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .month-grand-history-total{margin-top:5px;border-bottom:0!important;font-weight:900;color:#b00000}
 .month-grand-history-total b{font-size:19px}
 
-/* V29.0 product search close button */
+/* V28.7 product search close button */
 .product-link-search-input-row{
   display:grid;
   grid-template-columns:minmax(0,1fr) 58px;
@@ -1250,7 +1250,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* V29.0 Reliable Backup / Restore status */
+/* V28.7 Reliable Backup / Restore status */
 .backup-restore-status-v234{margin:12px 0;padding:14px;border:2px solid #d2d2d2;border-radius:14px;background:#fff;font-weight:700;line-height:1.55}
 .backup-restore-status-v234.running{border-color:#d99b00;background:#fff8df;color:#704900}
 .backup-restore-status-v234.success{border-color:#2f8f4e;background:#effaf2;color:#17662f}
@@ -1259,7 +1259,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .backup-restore-status-v234 .br-detail{font-size:14px;font-weight:700}
 .backup-restore-status-v234 .br-time{font-size:12px;opacity:.75;margin-top:5px}
 
-/* ================= V29.0 multi-product Sales Card ================= */
+/* ================= V28.7 multi-product Sales Card ================= */
 .sales-card-transaction-v239{
   border:1px solid #d7dfd5;border-radius:16px;background:#fff;padding:12px;margin:10px 0 16px;
 }
@@ -1313,7 +1313,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   .sales-card-summary-v239 b{font-size:15px}
 }
 
-/* ================= V29.0 unit price / total / editable delivery ================= */
+/* ================= V28.7 unit price / total / editable delivery ================= */
 .product-subitem-grid-v240{display:grid;grid-template-columns:.52fr 1fr 1fr 1fr;gap:7px;align-items:end}
 .product-subitem-grid-v240 label{font-size:13px;margin:7px 0 4px}
 .product-subitem-grid-v240 input{padding:9px 8px;font-size:17px}
@@ -1334,12 +1334,12 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   .product-subitem-result-v240{padding:7px 3px;gap:3px}
   .product-delivery-inline-v240 input{width:72px;font-size:14px}
 }
-/* V29.0 clearer one-customer / one-sale boundary */
+/* V28.7 clearer one-customer / one-sale boundary */
 .sales-card-transaction-v239{border:3px solid #4f8f61;box-shadow:0 2px 9px rgba(30,95,50,.12);padding:12px}
 .sales-card-transaction-v239 .product-link-subitem-v239{border-color:#cfd8cf}
 .product-profit-qty-v241{font-size:.72em;color:#17662f;font-weight:900;white-space:nowrap}
 
-/* ================= V29.0 sales card / profit UX ================= */
+/* ================= V28.7 sales card / profit UX ================= */
 .sales-card-transaction-v239{
   border:2px solid #2f6f44 !important;
   box-shadow:0 0 0 1px rgba(47,111,68,.10);
@@ -1361,7 +1361,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* ================= V29.0 sales-card widths + profit rollup ================= */
+/* ================= V28.7 sales-card widths + profit rollup ================= */
 .product-subitem-grid-v240{grid-template-columns:minmax(52px,.48fr) minmax(108px,1.05fr) minmax(116px,1.12fr) minmax(142px,1.32fr)!important}
 .product-subitem-grid-v240>div{min-width:0}
 .product-subitem-grid-v240 input,.product-item-total-box-v240{box-sizing:border-box;width:100%;min-width:0}
@@ -1378,7 +1378,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
  .product-profit-rollup-v246 span{grid-column:1/-1}.product-profit-rollup-v246 b{text-align:left}
 }
 
-/* ================= V29.0 input widths + profit rollup alignment ================= */
+/* ================= V28.7 input widths + profit rollup alignment ================= */
 .product-subitem-grid-v240{
   display:grid !important;
   grid-template-columns:48px minmax(88px,.95fr) minmax(110px,1.15fr) minmax(136px,1.35fr) !important;
@@ -1448,7 +1448,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* ================= V29.0 polish ================= */
+/* ================= V28.7 polish ================= */
 .product-profit-rollup-v247{
   align-items:center !important;
 }
@@ -1461,7 +1461,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   box-shadow:none !important;
 }
 
-/* ================= V29.0 inventory reminder + final sales-card polish ================= */
+/* ================= V28.7 inventory reminder + final sales-card polish ================= */
 .product-subitem-grid-v240{
   grid-template-columns:44px minmax(108px,1.08fr) minmax(108px,1.08fr) minmax(126px,1.22fr) !important;
 }
@@ -1521,7 +1521,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   .product-delivery-inline-v240 input{font-size:16px !important}
 }
 
-/* ================= V29.0 cross-date inventory reminders ================= */
+/* ================= V28.7 cross-date inventory reminders ================= */
 .inventory-global-v250{
   margin:8px 0 14px;padding:10px;border:2px solid #e1a323;border-radius:12px;background:#fff9e8;
 }
@@ -1549,7 +1549,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   .inventory-global-actions-v250 button{width:100%;min-width:0}
 }
 
-/* ================= V29.0 mobile sales-card width polish ================= */
+/* ================= V28.7 mobile sales-card width polish ================= */
 @media(max-width:600px){
   .sales-card-transaction-v239{
     overflow:hidden !important;
@@ -1706,7 +1706,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* ================= V29.0 final mobile card polish ================= */
+/* ================= V28.7 final mobile card polish ================= */
 
 /* X is a clear-selection control, visually contained inside the row. */
 .product-link-search-input-row{
@@ -1880,18 +1880,18 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* ================= V29.0 single-tap delete product ================= */
+/* ================= V28.7 single-tap delete product ================= */
 .product-subitem-remove-v239{
   touch-action:manipulation !important;
   -webkit-tap-highlight-color:transparent;
   user-select:none;
 }
 
-/* ================= V29.0 per-product inventory confirmation ================= */
+/* ================= V28.7 per-product inventory confirmation ================= */
 .inventory-product-copy-v262{display:block;width:100%;padding:0;border:0;background:transparent;text-align:left;color:#222;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:normal;word-break:break-word}
 .inventory-product-copy-v262:active{opacity:.65}
 
-/* V29.0 — one independent inventory action per product/linkId */
+/* V28.7 — one independent inventory action per product/linkId */
 .inventory-product-row-v263{
   display:grid;
   grid-template-columns:minmax(0,1fr) auto auto;
@@ -1915,7 +1915,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* ================= V29.0 compact inventory reminder ================= */
+/* ================= V28.7 compact inventory reminder ================= */
 .inventory-global-v250{margin:8px 0 10px;padding:0;border:0;background:transparent}
 .inventory-global-v250.hidden{display:none!important}
 .inventory-summary-v264{
@@ -1939,8 +1939,8 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* ================= V29.0 iPhone Sales Card Import Search visibility fix ================= */
-/* The V29.0 mobile layout can clip the absolute-positioned search dropdown.
+/* ================= V28.7 iPhone Sales Card Import Search visibility fix ================= */
+/* The V28.7 mobile layout can clip the absolute-positioned search dropdown.
    Keep the input row clipped, but let the result list escape the card containers. */
 @media (max-width: 600px) {
   .sales-card-transaction-v239,
@@ -1961,7 +1961,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 
 .live-crate-wrap-v269{color:#17662f;font-weight:800}.live-crate-v269{color:#17662f;font-weight:800;border:0;background:transparent}
 
-/* ================= V29.0 ================= */
+/* ================= V28.7 ================= */
 .sales-action-locked-v270{opacity:.42!important;cursor:default!important;pointer-events:none!important;filter:grayscale(.65)}
 .sales-action-box-locked-v270 .product-link-head{opacity:.72}
 .product-subitem-result-v240.live-crate-result-v270{grid-template-columns:1.18fr .94fr .94fr!important}
@@ -1969,7 +1969,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .product-subitem-grid-v240 input,.product-item-total-box-v240{box-sizing:border-box!important;height:46px!important;min-height:46px!important;border-radius:12px!important}
 .product-item-total-box-v240{display:flex!important;align-items:center!important;padding:8px 6px!important}
 
-/* ================= V29.0 UI consistency / Live crate+shipping ================= */
+/* ================= V28.7 UI consistency / Live crate+shipping ================= */
 .product-subitem-result-v240.live-crate-result-v270{
   grid-template-columns:1.12fr .88fr .88fr .88fr !important;
 }
@@ -1989,7 +1989,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* ================= V29.0 per-product extra fee ================= */
+/* ================= V28.7 per-product extra fee ================= */
 .product-extra-inline-v278{
   display:flex;
   flex-direction:column;
@@ -2033,7 +2033,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   .product-extra-inline-v278 input{font-size:14px;padding:3px 1px}
 }
 
-/* ================= V29.0 Live cost-control visual alignment ================= */
+/* ================= V28.7 Live cost-control visual alignment ================= */
 .product-subitem-result-v240.live-crate-result-v270{align-items:stretch!important}
 .product-subitem-result-v240.live-crate-result-v270 .product-result-cell-v252{
   display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;min-width:0!important
@@ -2071,7 +2071,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* ================= V29.0 mobile sales-card layout ================= */
+/* ================= V28.7 mobile sales-card layout ================= */
 /* 产品卡：木架等级 / 运费 / 附加费用同一行；利润 / 利润率下一行 */
 .product-subitem-result-v240.live-crate-result-v270{
   display:grid !important;
@@ -2142,7 +2142,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* ================= V29.0 Fair mobile date width fix ================= */
+/* ================= V28.7 Fair mobile date width fix ================= */
 /* Keep Start/End on one row while guaranteeing the full DD-MM-YYYY text is visible. */
 @media(max-width:600px){
   #fairDateRange{
@@ -2168,7 +2168,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   }
 }
 
-/* ================= V29.0 Fair mobile date width fix ================= */
+/* ================= V28.7 Fair mobile date width fix ================= */
 @media(max-width:600px){
   #fairDateRange{
     display:grid !important;
@@ -2257,7 +2257,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 }
 
 
-/* ================= V29.0 universal button feedback ================= */
+/* ================= V28.7 universal button feedback ================= */
 button,.btn,[role="button"]{transition:transform .08s ease,filter .08s ease,opacity .08s ease}
 button:active,.btn:active,[role="button"]:active{transform:translateY(2px) scale(.985);filter:brightness(.96)}
 button:disabled{cursor:wait;opacity:.68}
@@ -2272,7 +2272,7 @@ button:disabled{cursor:wait;opacity:.68}
 @media(max-width:640px){.profit-rollup-metrics-v285{grid-template-columns:1fr 1fr 1fr}.profit-rollup-metrics-v285 b,.profit-rollup-total-v285 b{font-size:14px}.profit-rollup-total-v285{grid-template-columns:1fr 1fr 1fr}.profit-rollup-total-v285 strong{grid-column:1/-1}}
 
 
-/* V29.0 Home yearly turnover / profit comparison */
+/* V28.7 Home yearly turnover / profit comparison */
 .year-profit-row-v286,.year-profit-total-v286{align-items:flex-start!important;gap:10px}
 .year-profit-row-v286>div,.year-profit-total-v286>div{display:grid;grid-template-columns:1fr;justify-items:end;gap:3px;text-align:right}
 .year-profit-row-v286 b,.year-profit-total-v286 b{font-size:.95em}
