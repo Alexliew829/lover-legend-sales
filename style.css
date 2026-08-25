@@ -995,7 +995,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   border:1px solid #b8c7d4;
   border-radius:10px;
   background:#fff;
-  color:#28606f;
+  color:#28506f;
   font-weight:800;
   cursor:pointer;
 }
@@ -2272,10 +2272,13 @@ button:disabled{cursor:wait;opacity:.68}
 @media(max-width:640px){.profit-rollup-metrics-v285{grid-template-columns:1fr 1fr 1fr}.profit-rollup-metrics-v285 b,.profit-rollup-total-v285 b{font-size:14px}.profit-rollup-total-v285{grid-template-columns:1fr 1fr 1fr}.profit-rollup-total-v285 strong{grid-column:1/-1}}
 
 
-/* V28.6 yearly profit short form — ONLY Home > 本年度累计 */
-.year-short-list-v286 .year-short-row-v286{display:grid!important;grid-template-columns:minmax(62px,.9fr) minmax(88px,1.2fr) minmax(72px,1fr) minmax(58px,.75fr);gap:8px!important;align-items:center;padding:9px 2px!important;font-size:14px!important}
-.year-short-row-v286 span,.year-short-row-v286 b{white-space:nowrap;min-width:0}
-.year-short-row-v286 b{text-align:right;font-size:14px!important}
-.year-profit-v286{color:#087c35}
-.year-short-list-v286 .month-grand-history-total{font-weight:900}
-@media(max-width:600px){.year-short-list-v286 .year-short-row-v286{grid-template-columns:minmax(58px,.9fr) minmax(82px,1.2fr) minmax(68px,1fr) minmax(54px,.75fr);gap:5px!important;font-size:12px!important}.year-short-row-v286 b{font-size:12px!important}}
+/* V28.6 annual turnover / profit compact table. Header is fixed once; rows contain numbers only. */
+.year-profit-table-v286{width:100%;min-width:0;margin-top:2px;font-variant-numeric:tabular-nums}
+.year-profit-head-v286,.year-profit-row-v286{display:grid;grid-template-columns:minmax(58px,.8fr) minmax(82px,1.35fr) minmax(82px,1.35fr) minmax(48px,.7fr);gap:6px;align-items:center}
+.year-profit-head-v286{padding:6px 2px 7px;border-bottom:1px solid #d8d8d8;font-size:12px;font-weight:800;text-align:right;white-space:nowrap}
+.year-profit-head-v286 span:first-child{text-align:left}
+.year-profit-row-v286{padding:9px 2px;border-bottom:1px dashed #ddd;font-size:13px;white-space:nowrap}
+.year-profit-row-v286 span:first-child{text-align:left}.year-profit-row-v286 b{text-align:right;font-size:13px;white-space:nowrap}
+.year-profit-total-v286{margin-top:3px;border-bottom:0;color:#b00000;font-weight:900}
+@media(max-width:640px){.year-profit-head-v286,.year-profit-row-v286{grid-template-columns:58px minmax(80px,1.35fr) minmax(80px,1.35fr) 48px;gap:4px}.year-profit-head-v286{font-size:10px}.year-profit-row-v286,.year-profit-row-v286 b{font-size:clamp(9px,2.65vw,12px);letter-spacing:-.15px}}
+@media(max-width:390px){.year-profit-head-v286,.year-profit-row-v286{grid-template-columns:54px minmax(76px,1.35fr) minmax(76px,1.35fr) 44px;gap:2px}.year-profit-row-v286,.year-profit-row-v286 b{font-size:10px;letter-spacing:-.3px}}

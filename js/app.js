@@ -4091,13 +4091,28 @@ async function toggleMonthGrandHistoryV223(){
 window.toggleMonthGrandHistoryV223=toggleMonthGrandHistoryV223;
 
 
-/* ================= V28.6 expandable yearly monthly breakdown ================= */
+/* ================= V28.6 expandable yearly monthly breakdown + profit ================= */
 const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
+let yearBreakdownLinksV286=[];
 
+function yearBreakdownProfitV286(kind,key){
+  const isYear=kind==="total";
+  return (yearBreakdownLinksV286||[]).reduce((sum,x)=>{
+    const date=String(x.date||"");
+    const iso=/^\d{4}-\d{2}-\d{2}$/.test(date)?date:displayToISO(date);
+    if(!iso)return sum;
+    const rowKey=isYear?iso.slice(0,4):iso.slice(0,7);
+    if(rowKey!==key)return sum;
+    const type=String(x.type||"");
+    if(kind==="balakong")return sum; // Sales Cards belong to Belimbing; Balakong has no card-profit history.
+    if(kind==="belimbing"&&type!=="daily")return sum;
+    if(kind==="fair"&&type!=="fair")return sum;
+    if(kind==="live"&&type!=="live")return sum;
+    return sum+Number(x.profit||0);
+  },0);
+}
 function yearBreakdownRowsV224(kind){
-  // V28.6: Balakong / Belimbing / Fair / Live show months inside the selected
-  // year. The final Grand Total is a higher-level view and must show YEAR totals.
   if(kind==="total"){
     const byYear=new Map();
     buildMonthlySummary().forEach(item=>{
@@ -4105,77 +4120,36 @@ function yearBreakdownRowsV224(kind){
       if(!/^\d{4}$/.test(year))return;
       byYear.set(year,(byYear.get(year)||0)+Number(item.total||0));
     });
-    return [...byYear.entries()]
-      .map(([year,amount])=>({month:year,year,amount:Number(amount||0)}))
-      .filter(item=>Math.abs(item.amount)>0.000001)
-      .sort((a,b)=>String(a.year).localeCompare(String(b.year)));
+    return [...byYear.entries()].map(([year,amount])=>({month:year,year,amount:Number(amount||0),profit:yearBreakdownProfitV286("total",year)}))
+      .filter(item=>Math.abs(item.amount)>0.000001).sort((a,b)=>String(a.year).localeCompare(String(b.year)));
   }
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
-  return buildMonthlySummary()
-    .filter(item=>!year||String(item.month||"").slice(0,4)===year)
-    .map(item=>({month:item.month,amount:Number(item[kind]||0)}))
-    .filter(item=>Math.abs(item.amount)>0.000001)
-    .sort((a,b)=>String(a.month).localeCompare(String(b.month)));
+  return buildMonthlySummary().filter(item=>!year||String(item.month||"").slice(0,4)===year)
+    .map(item=>({month:item.month,amount:Number(item[kind]||0),profit:yearBreakdownProfitV286(kind,String(item.month||""))}))
+    .filter(item=>Math.abs(item.amount)>0.000001).sort((a,b)=>String(a.month).localeCompare(String(b.month)));
+}
+function yearBreakdownTableV286(list,kind){
+  const grandSales=list.reduce((s,x)=>s+Number(x.amount||0),0),grandProfit=list.reduce((s,x)=>s+Number(x.profit||0),0),grandRate=grandSales>0?grandProfit/grandSales*100:0;
+  const rowsHtml=list.map(x=>{const sales=Number(x.amount||0),profit=Number(x.profit||0),rate=sales>0?profit/sales*100:0;const label=kind==="total"?String(x.year||x.month):String(x.month).slice(5,7)+"-"+String(x.month).slice(0,4);return `<div class="year-profit-row-v286"><span>${label}</span><b>${money(sales)}</b><b>${money(profit)}</b><b>${rate.toFixed(2)}%</b></div>`}).join("");
+  return `<div class="year-profit-table-v286"><div class="year-profit-head-v286"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${rowsHtml}<div class="year-profit-row-v286 year-profit-total-v286"><span>总数</span><b>${money(grandSales)}</b><b>${money(grandProfit)}</b><b>${grandRate.toFixed(2)}%</b></div></div>`;
 }
 function renderYearBreakdownV224(kind){
-  const panel=document.getElementById("yearBreakdown-"+kind);
-  const arrow=document.getElementById("yearBreakdownArrow-"+kind);
-  if(!panel)return;
-  if(!yearBreakdownOpenV224[kind]){
-    panel.classList.add("hidden"); panel.innerHTML="";
-    if(arrow)arrow.textContent="▼";
-    return;
-  }
-  const list=yearBreakdownRowsV224(kind);
-  const grand=list.reduce((s,x)=>s+Number(x.amount||0),0);
-  panel.classList.remove("hidden");
-  if(arrow)arrow.textContent="▲";
-  if(yearBreakdownLoadingV224[kind]&&!list.length){
-    panel.innerHTML='<div class="sub">正在读取月份营业额...</div>';
-    return;
-  }
-  // V28.6: ONLY the yearly breakdown shows profit. Keep the monthly Home section unchanged.
-  // Compact format: 06-2026  S13,406.00  P0.00  0.00% (no RM).
-  const links=(typeof allSalesProductLinksCacheV216!=="undefined"&&Array.isArray(allSalesProductLinksCacheV216.links))?allSalesProductLinksCacheV216.links:[];
-  const profitFor=(x)=>{
-    const ym=kind==="total"?String(x.year||x.month):String(x.month||"");
-    return links.reduce((sum,l)=>{
-      const d=String(l.date||"");
-      const m=d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-      if(!m)return sum;
-      const linkYm=m[3]+"-"+m[2];
-      if(kind==="total"){if(m[3]!==ym)return sum;}else if(linkYm!==ym)return sum;
-      const t=String(l.type||"");
-      if(kind==="balakong"&&!(t==="daily"&&String(l.company||"").toLowerCase()==="balakong"))return sum;
-      if(kind==="belimbing"&&!(t==="daily"&&String(l.company||"").toLowerCase()!=="balakong"))return sum;
-      if(kind==="fair"&&t!=="fair")return sum;
-      if(kind==="live"&&t!=="live")return sum;
-      return sum+Number(l.profit||0);
-    },0);
-  };
-  const rowHtml=x=>{const sales=Number(x.amount||0),profit=profitFor(x),rate=sales>0?profit/sales*100:0,label=kind==="total"?String(x.year||x.month):String(x.month).slice(5,7)+"-"+String(x.month).slice(0,4);return `<div class="year-short-row-v286"><span>${label}</span><b>S${money(sales)}</b><b class="year-profit-v286">P${money(profit)}</b><b>${rate.toFixed(2)}%</b></div>`};
-  const grandProfit=list.reduce((s,x)=>s+profitFor(x),0),grandRate=grand>0?grandProfit/grand*100:0;
-  panel.innerHTML=list.length
-    ?`<div class="month-grand-history-list year-short-list-v286">${list.map(rowHtml).join("")}<div class="month-grand-history-total year-short-row-v286"><span>总数</span><b>S${money(grand)}</b><b class="year-profit-v286">P${money(grandProfit)}</b><b>${grandRate.toFixed(2)}%</b></div></div>`
-    :'<div class="sub">还没有月份营业额记录</div>';
+  const panel=document.getElementById("yearBreakdown-"+kind),arrow=document.getElementById("yearBreakdownArrow-"+kind);if(!panel)return;
+  if(!yearBreakdownOpenV224[kind]){panel.classList.add("hidden");panel.innerHTML="";if(arrow)arrow.textContent="▼";return;}
+  const list=yearBreakdownRowsV224(kind);panel.classList.remove("hidden");if(arrow)arrow.textContent="▲";
+  if(yearBreakdownLoadingV224[kind]&&!list.length){panel.innerHTML='<div class="sub">正在读取年度资料...</div>';return;}
+  panel.innerHTML=list.length?yearBreakdownTableV286(list,kind):'<div class="sub">还没有月份营业额记录</div>';
 }
-function renderAllYearBreakdownsV224(){
-  Object.keys(yearBreakdownOpenV224).forEach(renderYearBreakdownV224);
-}
+function renderAllYearBreakdownsV224(){Object.keys(yearBreakdownOpenV224).forEach(renderYearBreakdownV224);}
 async function toggleYearBreakdownV224(kind){
-  if(!(kind in yearBreakdownOpenV224))return;
-  yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];
-  renderYearBreakdownV224(kind);
-  if(!yearBreakdownOpenV224[kind])return;
-  const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
-  if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year)){
-    yearBreakdownLoadingV224[kind]=true; renderYearBreakdownV224(kind);
-    try{
-      await Promise.all([loadYearInBackground(year), (typeof loadAllSalesProductLinksV203==="function"?loadAllSalesProductLinksV203({force:false,maxAgeMs:120000}):Promise.resolve([]))]);
-    }
-    catch(e){ console.warn("Year breakdown load skipped:",kind,e); }
-    finally{ yearBreakdownLoadingV224[kind]=false; renderYearBreakdownV224(kind); }
-  }
+  if(!(kind in yearBreakdownOpenV224))return;yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
+  const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");yearBreakdownLoadingV224[kind]=true;renderYearBreakdownV224(kind);
+  try{
+    const tasks=[];
+    if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))tasks.push(loadYearInBackground(year));
+    if(typeof loadAllSalesProductLinksV203==="function")tasks.push(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000}).then(x=>{yearBreakdownLinksV286=Array.isArray(x)?x:[]}));
+    await Promise.all(tasks);
+  }catch(e){console.warn("Year breakdown load skipped:",kind,e)}finally{yearBreakdownLoadingV224[kind]=false;renderYearBreakdownV224(kind)}
 }
 window.toggleYearBreakdownV224=toggleYearBreakdownV224;
 
