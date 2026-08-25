@@ -2284,7 +2284,7 @@ button:disabled{cursor:wait;opacity:.68}
 @media(max-width:390px){.year-profit-head-v286,.year-profit-row-v286{grid-template-columns:54px minmax(76px,1.35fr) minmax(76px,1.35fr) 44px;gap:2px}.year-profit-row-v286,.year-profit-row-v286 b{font-size:10px;letter-spacing:-.3px}}
 
 
-/* V29.4 Home annual summary: keep both columns inside the main frame. */
+/* V29.5 Home annual summary: keep both columns inside the main frame. */
 #page-home .year-summary-frame .dash{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 #page-home .year-summary-frame .box{min-width:0;overflow:hidden}
 #page-home .year-summary-frame .box.total{grid-column:1 / -1}
@@ -2296,7 +2296,7 @@ button:disabled{cursor:wait;opacity:.68}
 #page-home .year-summary-frame .year-profit-head-v286 span,#page-home .year-summary-frame .year-profit-row-v286 span,#page-home .year-summary-frame .year-profit-row-v286 b{min-width:0;overflow:hidden;text-overflow:clip}
 @media(max-width:430px){#page-home .year-summary-frame .dash{gap:8px}#page-home .year-summary-frame .box{padding:12px}#page-home .year-summary-frame .amount{font-size:clamp(22px,6.2vw,28px)}}
 
-/* ================= V29.4 scoped display fixes ================= */
+/* ================= V29.5 scoped display fixes ================= */
 /* Keep the normal application frame. Do not use global page scaling/zoom fixes. */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 body{overflow-x:hidden;}
@@ -2342,7 +2342,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V29.4 scoped layout fixes ================= */
+/* ================= V29.5 scoped layout fixes ================= */
 /* Report + More: keep desktop content inside the same application frame as other pages. */
 #page-report,#page-more{
   width:100%;
@@ -2398,7 +2398,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V29.4 phone Home annual table refinement ================= */
+/* ================= V29.5 phone Home annual table refinement ================= */
 /* Date needs only 12-2026 space. Give more room to readable numbers. */
 @media(max-width:430px){
   #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286,
@@ -2423,7 +2423,7 @@ body{overflow-x:hidden;}
   }
 }
 
-/* ================= V29.4 Fair / Live monthly profit summary ================= */
+/* ================= V29.5 Fair / Live monthly profit summary ================= */
 .month-profit-row-v294{display:grid;grid-template-columns:minmax(88px,.9fr) minmax(90px,1fr) minmax(82px,.9fr) minmax(72px,.75fr);gap:10px;align-items:center;padding:7px 0}
 .month-profit-row-v294+.month-profit-row-v294{border-top:1px dashed #e5e5e5}
 .month-profit-row-v294>span:not(:first-child),.month-profit-row-v294>strong{text-align:right}
@@ -2439,4 +2439,40 @@ body{overflow-x:hidden;}
   .month-profit-head-v294{font-size:12px}
   .live-profit-row-v294 small{font-size:9px}
   .profit-grand-v294{grid-template-columns:1fr 1fr 1fr;gap:8px}.profit-grand-v294>strong{grid-column:1/-1}.profit-grand-v294 b{font-size:14px}
+}
+
+/* ================= V29.5 Home monthly total turnover + profit table ================= */
+#page-home .month-grand-profit-table-v295{width:100%;min-width:0;font-variant-numeric:tabular-nums}
+#page-home .month-grand-profit-head-v295,
+#page-home .month-grand-profit-row-v295{display:grid;grid-template-columns:minmax(62px,.8fr) minmax(100px,1.45fr) minmax(78px,.95fr) minmax(70px,.85fr);gap:6px;align-items:center;min-width:0}
+#page-home .month-grand-profit-head-v295{padding:7px 2px;border-bottom:1px solid #d8d8d8;font-size:13px;font-weight:900;white-space:nowrap;text-align:right}
+#page-home .month-grand-profit-head-v295 span:first-child{text-align:left}
+#page-home .month-grand-profit-row-v295{padding:10px 2px;border-bottom:1px dashed #ddd;font-size:14px;white-space:nowrap}
+#page-home .month-grand-profit-row-v295 span:first-child{text-align:left}
+#page-home .month-grand-profit-row-v295 b{text-align:right;font-size:14px;white-space:nowrap;min-width:0}
+#page-home .month-grand-profit-total-v295{margin-top:4px;border-bottom:0;color:#b00000;font-weight:900}
+#page-home .month-grand-profit-total-v295 b{font-weight:900}
+
+/* Phone: date only needs space for 12-2026. Use the saved width for larger readable figures. */
+@media(max-width:430px){
+  #page-home .month-grand-toggle{padding-left:12px;padding-right:12px;overflow:hidden}
+  #page-home .month-grand-toggle .month-grand-history{max-width:100%;overflow:hidden}
+  #page-home .month-grand-profit-head-v295,
+  #page-home .month-grand-profit-row-v295{
+    grid-template-columns:57px minmax(112px,1.7fr) minmax(62px,.78fr) minmax(74px,.95fr);
+    gap:3px;
+  }
+  #page-home .month-grand-profit-head-v295{font-size:14px;letter-spacing:-.15px}
+  #page-home .month-grand-profit-row-v295,
+  #page-home .month-grand-profit-row-v295 b{font-size:15.5px;line-height:1.28;letter-spacing:-.22px}
+}
+@media(max-width:390px){
+  #page-home .month-grand-profit-head-v295,
+  #page-home .month-grand-profit-row-v295{
+    grid-template-columns:55px minmax(105px,1.62fr) minmax(58px,.74fr) minmax(70px,.92fr);
+    gap:2px;
+  }
+  #page-home .month-grand-profit-head-v295{font-size:13.5px}
+  #page-home .month-grand-profit-row-v295,
+  #page-home .month-grand-profit-row-v295 b{font-size:15px;letter-spacing:-.28px}
 }
