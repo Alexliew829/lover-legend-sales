@@ -995,7 +995,7 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   border:1px solid #b8c7d4;
   border-radius:10px;
   background:#fff;
-  color:#28506f;
+  color:#28606f;
   font-weight:800;
   cursor:pointer;
 }
@@ -2272,17 +2272,10 @@ button:disabled{cursor:wait;opacity:.68}
 @media(max-width:640px){.profit-rollup-metrics-v285{grid-template-columns:1fr 1fr 1fr}.profit-rollup-metrics-v285 b,.profit-rollup-total-v285 b{font-size:14px}.profit-rollup-total-v285{grid-template-columns:1fr 1fr 1fr}.profit-rollup-total-v285 strong{grid-column:1/-1}}
 
 
-/* V28.6 Home: profit appears ONLY inside 本年度累计 expanded breakdowns. */
-.year-profit-list-v286{margin-top:12px;padding-top:8px;border-top:1px solid #e2c56c;text-align:left}
-.year-profit-row-v286{padding:10px 2px;border-bottom:1px dashed #ddd}
-.year-profit-month-v286{font-weight:800;margin-bottom:7px}
-.year-profit-metrics-v286{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;font-size:14px}
-.year-profit-metrics-v286 span{display:flex;flex-direction:column;gap:2px;min-width:0}
-.year-profit-metrics-v286 b{font-size:15px;white-space:nowrap}
-.year-profit-metrics-v286 span:nth-child(2) b{color:#087a31}
-.year-profit-total-v286{margin-top:5px;border-bottom:0;color:#b00000;font-weight:900}
-@media(max-width:700px){
-  .year-profit-metrics-v286{grid-template-columns:1fr;gap:5px}
-  .year-profit-metrics-v286 span{display:grid;grid-template-columns:58px 1fr;align-items:center}
-  .year-profit-metrics-v286 b{text-align:right;font-size:16px}
-}
+/* V28.6 yearly profit short form — ONLY Home > 本年度累计 */
+.year-short-list-v286 .year-short-row-v286{display:grid!important;grid-template-columns:minmax(62px,.9fr) minmax(88px,1.2fr) minmax(72px,1fr) minmax(58px,.75fr);gap:8px!important;align-items:center;padding:9px 2px!important;font-size:14px!important}
+.year-short-row-v286 span,.year-short-row-v286 b{white-space:nowrap;min-width:0}
+.year-short-row-v286 b{text-align:right;font-size:14px!important}
+.year-profit-v286{color:#087c35}
+.year-short-list-v286 .month-grand-history-total{font-weight:900}
+@media(max-width:600px){.year-short-list-v286 .year-short-row-v286{grid-template-columns:minmax(58px,.9fr) minmax(82px,1.2fr) minmax(68px,1fr) minmax(54px,.75fr);gap:5px!important;font-size:12px!important}.year-short-row-v286 b{font-size:12px!important}}
