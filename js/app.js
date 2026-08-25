@@ -21,7 +21,7 @@ const LAST_PAGE_KEY_V238="lover_last_active_page_v238";
 function showPage(name,el){
   const current=document.querySelector(".page.active");
   const currentName=String(current?.id||"").replace(/^page-/,"");
-  // V29.4: page "sales" uses the sales-card type "daily".
+  // V28.6: page "sales" uses the sales-card type "daily".
   // Without this mapping, Sales/Belimbing dirty cards were not seen by bottom navigation.
   const currentSalesCardType=currentName==="sales"?"daily":currentName;
 
@@ -43,7 +43,7 @@ function showPage(name,el){
   if(el)el.classList.add("active");
   try{localStorage.setItem(LAST_PAGE_KEY_V238,name)}catch(e){}
 
-  // V29.4: every time Live is opened, start from today's date.
+  // V28.6: every time Live is opened, start from today's date.
   // A previous date is loaded only when the user deliberately selects it.
   if(name==="live"&&document.getElementById("liveDate")){
     setDateControl("liveDate",todayISO());
@@ -55,7 +55,7 @@ function showPage(name,el){
   if(name==="report")renderTable();
   if(name==="fair"&&typeof refreshFairInputsFromRows==="function")refreshFairInputsFromRows(false);
 
-  // V29.4: page switching never waits for or triggers cloud sync.
+  // V28.6: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
 function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");const company=r.type==="fair"?"fair":r.company;return [r.type,r.date,company,location].join("|")}
@@ -65,7 +65,7 @@ function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&
 function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c);document.getElementById("dailySales").value=formatAmount(a);document.getElementById("salesDateResult").textContent=`${companyNames[c]}｜${d}｜${money(a)}`;renderSalesMonthlyList();if(typeof refreshSalesActionLocksV270==="function")refreshSalesActionLocksV270();if(c==="belimbing"&&typeof loadProductLinksIntoEditorV206==="function")Promise.resolve(loadProductLinksIntoEditorV206("daily")).catch(()=>{});}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
 
-// V29.4: Top 5 business performance. Uses rows already loaded in memory only;
+// V28.6: Top 5 business performance. Uses rows already loaded in memory only;
 // opening/closing Top 5 never triggers an extra cloud request.
 function weekdayZh(displayDate){
   const iso=displayToISO(displayDate);
@@ -252,7 +252,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V29.4: historical record is lazy. Top 5 opens instantly from local rows;
+    // V28.6: historical record is lazy. Top 5 opens instantly from local rows;
     // one shared history request runs only after the user explicitly expands Top 5.
     setTimeout(()=>{ ensureHistoricalHighs(); },0);
   }
@@ -307,7 +307,7 @@ function renderTodayCompanyStatus(){
   const done=document.getElementById("todayDone");
   if(!warning||!done)return;
 
-  // V29.4: status colour represents actual business amount, not merely
+  // V28.6: status colour represents actual business amount, not merely
   // whether a row exists. A saved RM0.00 record is still a confirmed record,
   // but it must remain red.
   const statusLine=(label,recorded,amount)=>{
@@ -531,7 +531,7 @@ function applyCloudCommissionSettings(settings){
   const incomingLiveRevision=Number(incoming.liveRevision||0);
   const localLiveRevision=Number(local.liveRevision||0);
 
-  // V29.4: Fair and Live each have their own revision.
+  // V28.6: Fair and Live each have their own revision.
   // A stale device/cloud response can never overwrite a newer saved setting.
   const keepLocalFair=incomingFairRevision<localFairRevision;
   const keepLocalLive=liveCommissionDraftDirty||incomingLiveRevision<localLiveRevision;
@@ -668,7 +668,7 @@ function getCommissionSettingsForMonth(month){
   const snapshot=(systemState.commissionSnapshots||{})[target];
   if(!snapshot)return current;
 
-  // V29.4: historical Fair rates come from that month's snapshot, while the
+  // V28.6: historical Fair rates come from that month's snapshot, while the
   // Live schedule is selected by the actual Live record date. This prevents
   // Home's history month selector from blocking the current month's More setup.
   return normalizeCommissionSettings({
@@ -807,7 +807,7 @@ async function removeLiveHost(hostKey){
     if(message){message.textContent="✅ 主播已设为离职／停用";message.classList.remove("hidden");}
     setSync("已同步",true);
   }catch(error){
-    // V29.4: timeout must not undo the user's local action.
+    // V28.6: timeout must not undo the user's local action.
     console.warn("Inactive host cloud sync delayed",error);
     liveCommissionDraftDirty=true;
     queueLiveCommissionRetry(nextSettings,commissionConfigMonth());
@@ -1064,7 +1064,7 @@ async function saveDailySales(){
   renderAll();
   showTempMsg("saveMsg");
 
-  // V29.4: normal Save uses exactly one cloud write.
+  // V28.6: normal Save uses exactly one cloud write.
   // This prevents the immediate keepalive request from racing the normal save,
   // which could turn a real change such as RM9,999 -> RM0 into a later 0 -> 0
   // comparison and suppress the modification notification.
@@ -1229,7 +1229,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     await refreshFairSessionsV281();
     const result=await saveFairBatchToSheet(loc,records);
 
-    // V29.4: local Fair values are direct replacements, never additions. The server
+    // V28.6: local Fair values are direct replacements, never additions. The server
     // also removes duplicate Sheet rows whose location differs only by spaces/case.
     // The response confirms the authoritative overwrite and clears pending rows.
     records.forEach(i=>clearPendingRow({
@@ -1425,7 +1425,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   syncFairInputs();
 });
 
-// V29.4: paint Home immediately, restore local cache, then perform only a
+// V28.6: paint Home immediately, restore local cache, then perform only a
 // lightweight Revision check. Full month data is downloaded only when the
 // cloud Revision proves that another device changed data.
 attachMoneyInputs();
@@ -1499,7 +1499,7 @@ async function startInitialSalesDataLoad() {
   return startupSalesSyncPromise;
 }
 
-// V29.4: start cached Home immediately, then warm the current year's historical
+// V28.6: start cached Home immediately, then warm the current year's historical
 // months in the background so Monthly Summary is complete on first open.
 startInitialSalesDataLoad().finally(()=>{
   const startupYear=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
@@ -1528,7 +1528,7 @@ function getSavedLiveHosts(){
 function collectLiveHosts(){
   const merged=[];
   const cloudHosts=Object.values((getCommissionSettings().liveHosts)||{});
-  // V29.4: active host list is independent from historical Live records.
+  // V28.6: active host list is independent from historical Live records.
   // Deleted hosts stay in old reports but do not return to current host options.
   [...cloudHosts,...getSavedLiveHosts()]
     .filter(Boolean)
@@ -1610,7 +1610,7 @@ async function ensureDateControlMonthLoaded(id){
 }
 
 
-/* ================= V29.4 on-demand 修改 / 销售记录 ================= */
+/* ================= V28.6 on-demand 修改 / 销售记录 ================= */
 const salesChangeLogOpenV200={daily:false,fair:false,live:false};
 
 function changeLogPanelIdV200(type){
@@ -1642,7 +1642,7 @@ function renderChangeLogTimelineV200(type,date,items){
     group.items.push(item);
   });
 
-  // V29.4 display rule:
+  // V28.6 display rule:
   // 1) any real audit row must be shown, including a single first sale (0 -> amount).
   // 2) later changes keep the first/original amount in the full timeline.
   // 3) downward correction is attached to the amount BEFORE that correction, so every row explains what happened next.
@@ -1972,7 +1972,7 @@ function restoreLastLiveSession(){
     const saved=JSON.parse(localStorage.getItem(LIVE_LAST_SESSION_KEY)||"null");
     if(saved&&saved.host)hostEl.value=canonicalLiveHost(saved.host);
   }catch(e){}
-  // V29.4: do not restore the previously saved date.
+  // V28.6: do not restore the previously saved date.
   setDateControl("liveDate",todayISO());
   updateLiveInputFromSelectedDate();
 }
@@ -2032,7 +2032,7 @@ function reactivateLiveHostIfNeeded(name){
 }
 
 
-/* ================= V29.4 Import Cost System product search ================= */
+/* ================= V28.6 Import Cost System product search ================= */
 // Search/mapping behavior mirrors Lover Legend Cost and Pricing Calculator V8.2.
 const IMPORT_SYSTEM_CLOUD_URL_V214="https://script.google.com/macros/s/AKfycbxWKdEC7vy_7pZ2_CPie-9L5DeIofPggZlLuwB7gW-31HqWXEOxshtCR-HB-m5qLYS6/exec";
 let importProductsV214=[];
@@ -2057,7 +2057,7 @@ function unorderedImportProductMatchV214(sourceValue,queryValue){
   const query=normalizeImportProductSearchTextV214(queryValue);
   if(!query)return true;
   if(isExactProductCodeQueryV214(query)){
-    // V29.4: code search supports case-insensitive prefix/partial entry.
+    // V28.6: code search supports case-insensitive prefix/partial entry.
     const codes=extractImportProductCodesV214(sourceValue);
     return codes.some(code=>code===query||code.startsWith(query));
   }
@@ -2355,7 +2355,7 @@ function updateProductLinkMinimumWarningV214(item){
   if(priceInput)priceInput.classList.toggle("below-minimum-price",low);
 }
 function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
-  // V29.4: iPhone/iOS safe search state.
+  // V28.6: iPhone/iOS safe search state.
   // The dropdown remains open through async Import loading, keyboard candidate changes,
   // transient blur/focus changes and background sales-card loading.
   let searchOpen=false;
@@ -2430,7 +2430,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
 
         row.append(line1,line2);
 
-        // V29.4: distinguish an intentional tap from list scrolling on iPhone/iOS.
+        // V28.6: distinguish an intentional tap from list scrolling on iPhone/iOS.
         let touchStartX=0,touchStartY=0,touchMoved=false,touchHandled=false;
         const chooseRecord=e=>{
           if(e){
@@ -2506,7 +2506,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
       e.preventDefault();
       e.stopPropagation();
 
-      // V29.4: X means CLEAR CURRENT PRODUCT SELECTION.
+      // V28.6: X means CLEAR CURRENT PRODUCT SELECTION.
       // Never focus the input again here, otherwise focus() reopens the search list.
       ++renderSeq;
       close();
@@ -2552,7 +2552,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
 }
 
 
-/* ================= V29.4 Sales Card unsaved-change protection ================= */
+/* ================= V28.6 Sales Card unsaved-change protection ================= */
 function markSalesCardDirtyV238(item){
   if(!item)return;
   item.dataset.dirty="1";
@@ -2564,7 +2564,7 @@ function hasUnsavedSalesCardChangesV238(type){
   if(!["daily","live","fair"].includes(String(type||"")))return false;
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
   if(!wrap)return false;
-  // V29.4: use the same transaction-level dirty signal that Live already maintains.
+  // V28.6: use the same transaction-level dirty signal that Live already maintains.
   // This is essential for Sales/Belimbing shared fields and newly edited cards.
   if([...wrap.querySelectorAll(".sales-card-transaction-v239")].some(card=>card.dataset.dirty==="1"))return true;
   return [...wrap.querySelectorAll(".product-link-item")].some(item=>item.dataset.dirty==="1");
@@ -2583,7 +2583,7 @@ function confirmDiscardSalesCardChangesV238(type){
   return ok;
 }
 
-/* ================= V29.4 optional bonsai product association ================= */
+/* ================= V28.6 optional bonsai product association ================= */
 
 let productLinkItemSeqV206=0;
 function productLinkContextV206(type){
@@ -2610,13 +2610,13 @@ function toggleProductLinkBoxV206(type){
   body.classList.toggle("hidden",!opening);box.classList.toggle("product-link-collapsed",!opening);
   const btn=box.querySelector(".product-link-toggle");if(btn)btn.setAttribute("aria-expanded",opening?"true":"false");
   if(opening){
-    // V29.4: Sales Cards and Daily Profit are mutually exclusive.
+    // V28.6: Sales Cards and Daily Profit are mutually exclusive.
     const profitPanel=productProfitSummaryPanelV216(type);
     if(profitPanel){profitPanel.classList.add("hidden");profitPanel.innerHTML=""}
     productProfitSummaryOpenV216[type]=false;
     const profitBtn=document.querySelector(`#${pre}ProductLinkBox .product-profit-toggle-btn`);
     if(profitBtn){profitBtn.textContent="📊 当天利润";profitBtn.disabled=false}
-    // V29.4: saved cards first. Do not flash a fake 0.00 card while cloud data loads.
+    // V28.6: saved cards first. Do not flash a fake 0.00 card while cloud data loads.
     if(type==="fair")syncFairProductDatesV203(true);
     Promise.resolve(loadProductLinksIntoEditorV206(type)).catch(()=>{});
   }
@@ -2740,14 +2740,14 @@ function buildProductLinkItemV209(type,id,data={}){
 }
 function addProductLinkItemV209(type,data={}){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
-  if(!wrap){console.error("V29.4 product item container missing",type);return false}
+  if(!wrap){console.error("V28.6 product item container missing",type);return false}
   const id=++productLinkItemSeqV206;
   const item=buildProductLinkItemV209(type,id,data);
   wrap.appendChild(item);
   return true;
 }
 function addProductLinkItemV206(type,data={}){return addProductLinkItemV209(type,data)}
-// Explicit globals keep both legacy and V29.4 button bindings reliable.
+// Explicit globals keep both legacy and V28.6 button bindings reliable.
 window.addProductLinkItemV206=addProductLinkItemV206;
 window.addProductLinkItemV209=addProductLinkItemV209;
 window.toggleProductLinkBoxV206=toggleProductLinkBoxV206;
@@ -2863,7 +2863,7 @@ async function loadProductLinksIntoEditorV206(type){
 
   const contextKey=salesCardContextKeyV245(type,date,location);
 
-  // V29.4:
+  // V28.6:
   // 1) Exact context cache exists -> paint immediately, even after reopening/browser restart.
   // 2) No cache on this device -> show loading and read Google Sheet; never assume blank.
   // 3) Cloud always verifies in background and only repaints if data changed.
@@ -2924,7 +2924,7 @@ async function saveProductLinksV206(type){
     renderProductLinksEditorV206(type,result?.links||[]);
     setSync("销售卡已保存",true);
     alert("销售卡保存成功。\n\n如有库存变动，请到 Import Cost System 处理。");
-    if(typeof scheduleInventoryPendingBackgroundV293==="function")scheduleInventoryPendingBackgroundV293(2200,true);
+    if(typeof refreshInventoryPendingV250==="function")refreshInventoryPendingV250(true);
     if(result?.warning)alert(result.warning);
     return result;
   }
@@ -2932,7 +2932,7 @@ async function saveProductLinksV206(type){
 }
 
 
-/* ================= V29.4 multi-product Sales Card ================= */
+/* ================= V28.6 multi-product Sales Card ================= */
 let salesCardSeqV239=0;
 
 function salesCardTxnIdV239(data={}){
@@ -3037,7 +3037,7 @@ function recalcSalesCardTransactionV239(card){
 }
 
 
-// V29.4 Live 木架等级
+// V28.6 Live 木架等级
 const LIVE_CRATE_V269=[["0","自取0"],["20","A20"],["50","B50"],["80","C80"],["120","D120"],["150","E150"]];
 function createLiveCrateV269(){
  const s=document.createElement("select");
@@ -3107,7 +3107,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
   item.querySelector(".live-crate-v269")?.addEventListener("change",onEdit);
   [c,p].forEach(el=>el.addEventListener("blur",()=>{
     el.value=formatAmount(toAmount(el.value||0));
-    // V29.4: blur fires before the Save button click. Re-mark the card dirty here so
+    // V28.6: blur fires before the Save button click. Re-mark the card dirty here so
     // a late initialization/render timer can never erase the user's first price edit.
     markSalesCardDirtyV238(item);
     markSalesCardTransactionDirtyV239(card);
@@ -3145,7 +3145,7 @@ function bindSingleTapDeleteProductV254(button,handler){
   if(!button||typeof handler!=="function")return;
   let skipNextClick=false;
 
-  // V29.4: for touch/pen, pointerup is the one and only real activation.
+  // V28.6: for touch/pen, pointerup is the one and only real activation.
   // The synthetic click generated later by the browser is always swallowed once,
   // regardless of how long an alert/confirm dialog stayed open.
   button.addEventListener("pointerup",e=>{
@@ -3186,7 +3186,7 @@ async function removeProductFromTransactionV239(type,card,item){
   const linkId=String(item.dataset.linkId||"");
   const isSaved=!!(linkId&&item.dataset.saved==="1");
 
-  // V29.4:
+  // V28.6:
   // Removing a product from a saved sales card is an EDIT, not an immediate backend delete.
   // We only remove it from the editor and mark the whole card dirty.
   // On the FIRST press of "Save", the backend compares the original active Link IDs
@@ -3215,7 +3215,7 @@ async function deleteSalesCardTransactionV239(type,txnId){
     if(saved.length)await deleteSalesTransactionV256(txnId);
     card.remove();
     if(!salesCardWrappersV239(type).length)addProductLinkItemV209(type);
-    // V29.4: refresh profit view from active backend links after card deletion.
+    // V28.6: refresh profit view from active backend links after card deletion.
     try{
       const date=productProfitSelectedDateV216(type);
       const fresh=await loadAllSalesProductLinksV203({force:true});
@@ -3235,16 +3235,14 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   card.dataset.transactionId=txnId;
   card.dataset.type=type;
   card.dataset.dirty="0";
-  card.dataset.cardStatus=String(seed.cardStatus||"").toUpperCase()||(list.some(x=>x.linkId)?"CONFIRMED":"DRAFT");
-  card.dataset.manualCorrectionStatus=String(seed.manualCorrectionStatus||"");
   card.dataset.deliveryManual="0";
 
   const header=document.createElement("div");header.className="sales-card-header-v239";
-  const title=document.createElement("b");title.textContent=list.some(x=>x.linkId)?(String(card.dataset.cardStatus)==="DRAFT"?"草稿销售卡":"已确认销售卡"):"新销售卡";
+  const title=document.createElement("b");title.textContent=list.some(x=>x.linkId)?"已保存销售卡":"新销售卡";
   const total=document.createElement("b");total.className="sales-card-price-total-v239";total.textContent="RM0.00";
   header.append(title,total);card.appendChild(header);
 
-  // V29.4: Sales only reminds. Inventory confirmation is handled in Import Cost System.
+  // V28.6: Sales only reminds. Inventory confirmation is handled in Import Cost System.
   const inventoryBox=document.createElement("div");inventoryBox.className="sales-card-inventory-v249";inventoryBox.hidden=true;
   const renderInventoryStatus=()=>{inventoryBox.hidden=true;inventoryBox.innerHTML="";};
   card.appendChild(inventoryBox);
@@ -3272,7 +3270,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const commissionHint=document.createElement("div");commissionHint.className="sales-card-commission-hint-v239";commissionHint.innerHTML='佣金一次计算：<b class="sales-card-commission-amount-v239">RM0.00</b>';card.appendChild(commissionHint);
 
   const summary=document.createElement("div");summary.className="sales-card-summary-v239";
-  summary.innerHTML='<div><span>盆栽成本</span><b class="sales-card-cost-total-v239">RM0.00</b></div><div><span>总利润</span><b class="sales-card-profit-total-v239">RM0.00</b></div><div><span>整体利润率</span><b class="sales-card-profit-rate-v239">0.00%</b></div>';
+  summary.innerHTML='<div><span>总成本</span><b class="sales-card-cost-total-v239">RM0.00</b></div><div><span>总利润</span><b class="sales-card-profit-total-v239">RM0.00</b></div><div><span>整体利润率</span><b class="sales-card-profit-rate-v239">0.00%</b></div>';
   card.appendChild(summary);
 
   const warn=document.createElement("div");warn.className="sales-card-total-warning-v239";warn.hidden=true;card.appendChild(warn);
@@ -3296,7 +3294,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const savedDelivery=list.reduce((s,x)=>s+Number(x.localDelivery||0),0);
   card.dataset.deliveryManual=(list.some(x=>x.linkId)&&Math.abs(savedDelivery-autoSum)>0.01)?"1":"0";
   setTimeout(()=>{
-    // V29.4: initialization may finish after a very fast first edit.
+    // V28.6: initialization may finish after a very fast first edit.
     // Only clear the initial state when no user edit has marked the card dirty.
     if(card.dataset.dirty!=="1"&&card.dataset.productRemovedV259!=="1")clearSalesCardTransactionDirtyV239(card);
     recalcSalesCardTransactionV239(card);
@@ -3306,7 +3304,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
 
 function addProductLinkItemV209(type,data={}){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
-  if(!wrap){console.error("V29.4 sales card container missing",type);return false}
+  if(!wrap){console.error("V28.6 sales card container missing",type);return false}
   const card=buildSalesCardTransactionV239(type,[data||{}]);
   wrap.appendChild(card);
   return true;
@@ -3353,7 +3351,7 @@ function collectProductLinksV206(type){
       if(linkId||productName||actualPrice||shared.remark)result.push({
         linkId,type,date,location,transactionId:txnId,productOrder:i+1,
         productId,productName,quantity,averageCost,minimumPrice,actualPrice,
-        commissionRate,commissionAmount,localDelivery,extraFee,profit,profitRate,remark:shared.remark,importSyncStatus:String(item.dataset.inventoryStatus||card.dataset.inventoryStatus||"PENDING_IMPORT_LINK"),cardStatus:String(card.dataset.cardStatus||"DRAFT").toUpperCase(),saveMode:String(card.dataset.cardStatus||"DRAFT").toUpperCase()==="CONFIRMED"?"EDIT":"DRAFT"
+        commissionRate,commissionAmount,localDelivery,extraFee,profit,profitRate,remark:shared.remark,importSyncStatus:String(item.dataset.inventoryStatus||card.dataset.inventoryStatus||"PENDING_IMPORT_LINK")
       });
     });
   });
@@ -3413,7 +3411,7 @@ window.clearUnsavedSalesCardEditorsV224=clearUnsavedSalesCardEditorsV224;
 
 
 
-/* ================= V29.4 Sales Card unit-price + stable optimistic UI ================= */
+/* ================= V28.6 Sales Card unit-price + stable optimistic UI ================= */
 const LIVE_OPTIMISTIC_LOCKS_V240=new Map();
 
 function liveOptimisticKeyV240(date,host){
@@ -3657,12 +3655,10 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   card.dataset.transactionId=txnId;
   card.dataset.type=type;
   card.dataset.dirty="0";
-  card.dataset.cardStatus=String(seed.cardStatus||"").toUpperCase()||(list.some(x=>x.linkId)?"CONFIRMED":"DRAFT");
-  card.dataset.manualCorrectionStatus=String(seed.manualCorrectionStatus||"");
   card.dataset.inventoryStatus=list.some(x=>String(x.productId||"")&&String(x.importSyncStatus||"")!=="INVENTORY_CONFIRMED")?"PENDING_IMPORT_LINK":(list.some(x=>String(x.productId||""))?"INVENTORY_CONFIRMED":"");
 
   const header=document.createElement("div");header.className="sales-card-header-v239";
-  const title=document.createElement("b");title.textContent=list.some(x=>x.linkId)?(String(card.dataset.cardStatus)==="DRAFT"?"草稿销售卡":"已确认销售卡"):"新销售卡";
+  const title=document.createElement("b");title.textContent=list.some(x=>x.linkId)?"已保存销售卡":"新销售卡";
   const total=document.createElement("b");total.className="sales-card-price-total-v239";total.textContent="RM0.00";
   header.append(title,total);card.appendChild(header);
 
@@ -3690,7 +3686,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   saleSummary.innerHTML='<span>售价总数</span><b class="sales-card-price-summary-v240">RM0.00</b>';card.appendChild(saleSummary);
 
   const summary=document.createElement("div");summary.className="sales-card-summary-v239";
-  summary.innerHTML='<div><span>盆栽成本</span><b class="sales-card-cost-total-v239">RM0.00</b></div><div><span>总利润</span><b class="sales-card-profit-total-v239">RM0.00</b></div><div><span>整体利润率</span><b class="sales-card-profit-rate-v239">0.00%</b></div>';
+  summary.innerHTML='<div><span>总成本</span><b class="sales-card-cost-total-v239">RM0.00</b></div><div><span>总利润</span><b class="sales-card-profit-total-v239">RM0.00</b></div><div><span>整体利润率</span><b class="sales-card-profit-rate-v239">0.00%</b></div>';
   card.appendChild(summary);
 
   const warn=document.createElement("div");warn.className="sales-card-total-warning-v239";warn.hidden=true;card.appendChild(warn);
@@ -3755,7 +3751,7 @@ async function saveProductLinksV206(type){
   const batchTotal=items.reduce((s,x)=>s+Number(x.actualPrice||0),0);
   if(official>0&&batchTotal>official+0.005){alert(`所有销售卡售价总数 RM${formatAmount(batchTotal)} 已超过当天营业额 RM${formatAmount(official)}。`);return null}
 
-  // V29.4 optimistic local cache: keep the current UI stable; do not redraw from an older async response.
+  // V28.6 optimistic local cache: keep the current UI stable; do not redraw from an older async response.
   if(typeof setCachedSalesProductLinksV216==="function")setCachedSalesProductLinksV216(type,first.date,first.location,items);
   if(typeof setSalesCardPersistentCacheV232==="function")setSalesCardPersistentCacheV232(type,first.date,first.location,items);
   if(typeof mergeDailyProfitContextCacheV237==="function")mergeDailyProfitContextCacheV237(type,first.date,first.location,items);
@@ -3815,7 +3811,7 @@ async function saveLiveSales(){
   }
 }
 
-/* ================= V29.4 same-day linked bonsai profit summary ================= */
+/* ================= V28.6 same-day linked bonsai profit summary ================= */
 const productProfitSummaryOpenV216={live:false,fair:false};
 function productProfitSummaryPanelV216(type){return document.getElementById(productLinkPreV208(type)+"ProductProfitSummary")}
 function productProfitSelectedDateV216(type){
@@ -3875,7 +3871,7 @@ async function toggleProductProfitSummaryV216(type,button){
   const date=productProfitSelectedDateV216(type);if(!date){alert("请先选择日期");return}
   if(productProfitSummaryOpenV216[type]&&!panel.classList.contains("hidden")){productProfitSummaryOpenV216[type]=false;panel.classList.add("hidden");panel.innerHTML="";if(button)button.textContent="📊 当天利润";return}
   try{
-    // V29.4: opening Daily Profit closes Sales Cards first, then paints local cache immediately.
+    // V28.6: opening Daily Profit closes Sales Cards first, then paints local cache immediately.
     const pre=productLinkPreV208(type),box=document.getElementById(pre+"ProductLinkBox"),body=document.getElementById(pre+"ProductLinkBody");
     if(body)body.classList.add("hidden");
     if(box)box.classList.add("product-link-collapsed");
@@ -4095,13 +4091,28 @@ async function toggleMonthGrandHistoryV223(){
 window.toggleMonthGrandHistoryV223=toggleMonthGrandHistoryV223;
 
 
-/* ================= V29.4 expandable yearly monthly breakdown ================= */
+/* ================= V28.6 expandable yearly monthly breakdown + profit ================= */
 const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
+let yearBreakdownLinksV286=[];
 
+function yearBreakdownProfitV286(kind,key){
+  const isYear=kind==="total";
+  return (yearBreakdownLinksV286||[]).reduce((sum,x)=>{
+    const date=String(x.date||"");
+    const iso=/^\d{4}-\d{2}-\d{2}$/.test(date)?date:displayToISO(date);
+    if(!iso)return sum;
+    const rowKey=isYear?iso.slice(0,4):iso.slice(0,7);
+    if(rowKey!==key)return sum;
+    const type=String(x.type||"");
+    if(kind==="balakong")return sum; // Sales Cards belong to Belimbing; Balakong has no card-profit history.
+    if(kind==="belimbing"&&type!=="daily")return sum;
+    if(kind==="fair"&&type!=="fair")return sum;
+    if(kind==="live"&&type!=="live")return sum;
+    return sum+Number(x.profit||0);
+  },0);
+}
 function yearBreakdownRowsV224(kind){
-  // V29.4: Balakong / Belimbing / Fair / Live show months inside the selected
-  // year. The final Grand Total is a higher-level view and must show YEAR totals.
   if(kind==="total"){
     const byYear=new Map();
     buildMonthlySummary().forEach(item=>{
@@ -4109,54 +4120,36 @@ function yearBreakdownRowsV224(kind){
       if(!/^\d{4}$/.test(year))return;
       byYear.set(year,(byYear.get(year)||0)+Number(item.total||0));
     });
-    return [...byYear.entries()]
-      .map(([year,amount])=>({month:year,year,amount:Number(amount||0)}))
-      .filter(item=>Math.abs(item.amount)>0.000001)
-      .sort((a,b)=>String(a.year).localeCompare(String(b.year)));
+    return [...byYear.entries()].map(([year,amount])=>({month:year,year,amount:Number(amount||0),profit:yearBreakdownProfitV286("total",year)}))
+      .filter(item=>Math.abs(item.amount)>0.000001).sort((a,b)=>String(a.year).localeCompare(String(b.year)));
   }
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
-  return buildMonthlySummary()
-    .filter(item=>!year||String(item.month||"").slice(0,4)===year)
-    .map(item=>({month:item.month,amount:Number(item[kind]||0)}))
-    .filter(item=>Math.abs(item.amount)>0.000001)
-    .sort((a,b)=>String(a.month).localeCompare(String(b.month)));
+  return buildMonthlySummary().filter(item=>!year||String(item.month||"").slice(0,4)===year)
+    .map(item=>({month:item.month,amount:Number(item[kind]||0),profit:yearBreakdownProfitV286(kind,String(item.month||""))}))
+    .filter(item=>Math.abs(item.amount)>0.000001).sort((a,b)=>String(a.month).localeCompare(String(b.month)));
+}
+function yearBreakdownTableV286(list,kind){
+  const grandSales=list.reduce((s,x)=>s+Number(x.amount||0),0),grandProfit=list.reduce((s,x)=>s+Number(x.profit||0),0),grandRate=grandSales>0?grandProfit/grandSales*100:0;
+  const rowsHtml=list.map(x=>{const sales=Number(x.amount||0),profit=Number(x.profit||0),rate=sales>0?profit/sales*100:0;const label=kind==="total"?String(x.year||x.month):String(x.month).slice(5,7)+"-"+String(x.month).slice(0,4);return `<div class="year-profit-row-v286"><span>${label}</span><b>${money(sales)}</b><b>${money(profit)}</b><b>${rate.toFixed(2)}%</b></div>`}).join("");
+  return `<div class="year-profit-table-v286"><div class="year-profit-head-v286"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${rowsHtml}<div class="year-profit-row-v286 year-profit-total-v286"><span>总数</span><b>${money(grandSales)}</b><b>${money(grandProfit)}</b><b>${grandRate.toFixed(2)}%</b></div></div>`;
 }
 function renderYearBreakdownV224(kind){
-  const panel=document.getElementById("yearBreakdown-"+kind);
-  const arrow=document.getElementById("yearBreakdownArrow-"+kind);
-  if(!panel)return;
-  if(!yearBreakdownOpenV224[kind]){
-    panel.classList.add("hidden"); panel.innerHTML="";
-    if(arrow)arrow.textContent="▼";
-    return;
-  }
-  const list=yearBreakdownRowsV224(kind);
-  const grand=list.reduce((s,x)=>s+Number(x.amount||0),0);
-  panel.classList.remove("hidden");
-  if(arrow)arrow.textContent="▲";
-  if(yearBreakdownLoadingV224[kind]&&!list.length){
-    panel.innerHTML='<div class="sub">正在读取月份营业额...</div>';
-    return;
-  }
-  panel.innerHTML=list.length
-    ?`<div class="month-grand-history-list">${list.map(x=>`<div><span>${kind==="total"?String(x.year||x.month):String(x.month).slice(5,7)+"-"+String(x.month).slice(0,4)}</span><b>RM${money(x.amount)}</b></div>`).join("")}<div class="month-grand-history-total"><span>总数</span><b>RM${money(grand)}</b></div></div>`
-    :'<div class="sub">还没有月份营业额记录</div>';
+  const panel=document.getElementById("yearBreakdown-"+kind),arrow=document.getElementById("yearBreakdownArrow-"+kind);if(!panel)return;
+  if(!yearBreakdownOpenV224[kind]){panel.classList.add("hidden");panel.innerHTML="";if(arrow)arrow.textContent="▼";return;}
+  const list=yearBreakdownRowsV224(kind);panel.classList.remove("hidden");if(arrow)arrow.textContent="▲";
+  if(yearBreakdownLoadingV224[kind]&&!list.length){panel.innerHTML='<div class="sub">正在读取年度资料...</div>';return;}
+  panel.innerHTML=list.length?yearBreakdownTableV286(list,kind):'<div class="sub">还没有月份营业额记录</div>';
 }
-function renderAllYearBreakdownsV224(){
-  Object.keys(yearBreakdownOpenV224).forEach(renderYearBreakdownV224);
-}
+function renderAllYearBreakdownsV224(){Object.keys(yearBreakdownOpenV224).forEach(renderYearBreakdownV224);}
 async function toggleYearBreakdownV224(kind){
-  if(!(kind in yearBreakdownOpenV224))return;
-  yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];
-  renderYearBreakdownV224(kind);
-  if(!yearBreakdownOpenV224[kind])return;
-  const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
-  if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year)){
-    yearBreakdownLoadingV224[kind]=true; renderYearBreakdownV224(kind);
-    try{ await loadYearInBackground(year); }
-    catch(e){ console.warn("Year breakdown load skipped:",kind,e); }
-    finally{ yearBreakdownLoadingV224[kind]=false; renderYearBreakdownV224(kind); }
-  }
+  if(!(kind in yearBreakdownOpenV224))return;yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
+  const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");yearBreakdownLoadingV224[kind]=true;renderYearBreakdownV224(kind);
+  try{
+    const tasks=[];
+    if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))tasks.push(loadYearInBackground(year));
+    if(typeof loadAllSalesProductLinksV203==="function")tasks.push(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000}).then(x=>{yearBreakdownLinksV286=Array.isArray(x)?x:[]}));
+    await Promise.all(tasks);
+  }catch(e){console.warn("Year breakdown load skipped:",kind,e)}finally{yearBreakdownLoadingV224[kind]=false;renderYearBreakdownV224(kind)}
 }
 window.toggleYearBreakdownV224=toggleYearBreakdownV224;
 
@@ -4198,7 +4191,7 @@ function renderTable(){
   document.getElementById("recordTable").innerHTML=s.map(r=>{const rate=r.type==="live"?getLiveHostRate(r.location,r.date):r.type==="fair"?getFairCommissionRate(totalBy("fair","","month"))*100:0;const commission=(r.type==="live"||r.type==="fair")?Number(r.amount||0)*rate/100:0;return `<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":r.type==="live"?"Live":"每日"}</td><td>${r.type==="live"?"Live":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td><td>${rate?Number(rate.toFixed(2))+"%":"-"}</td><td>${rate?money(commission):"-"}</td></tr>`}).join("")||'<tr><td colspan="7" style="text-align:center;">这个月份还没有记录</td></tr>';
 }
 function renderAll(){
-  // V29.4: one complete render path. This replaces the older partial duplicate
+  // V28.6: one complete render path. This replaces the older partial duplicate
   // so Fair daily/monthly totals, Home totals and Report always refresh together.
   rows=dedupeRows(rows);
   renderDashboard();
@@ -4240,7 +4233,7 @@ function buildMonthlySummary(){
   });
   return [...map.values()].map(item=>({...item,total:item.balakong+item.belimbing+item.fair+item.live})).sort((a,b)=>b.month.localeCompare(a.month));
 }
-// V29.4: expandable daily total list. It uses cached rows immediately and only
+// V28.6: expandable daily total list. It uses cached rows immediately and only
 // reads the selected historical month from cloud when the user asks for it.
 function buildDailyTotals(month){
   const totals=new Map();
@@ -4273,7 +4266,7 @@ async function loadDailyTotalsMonth(month){
   const status=document.getElementById("dailyTotalsStatus");
   renderDailyTotals();
 
-  // V29.4: current month already follows the normal Home sync flow.
+  // V28.6: current month already follows the normal Home sync flow.
   // Do not make a second cloud request just because the daily summary is opened.
   // This keeps startup / Home sync speed unchanged.
   const currentMonth=selectedMonth();
@@ -4348,7 +4341,7 @@ async function toggleMonthlySummary(force){
   if(btn)btn.classList.toggle("active",show);
   if(!show)return;
 
-  // V29.4: show cache immediately and complete historical months in background.
+  // V28.6: show cache immediately and complete historical months in background.
   renderMonthlySummary();
   setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),50);
 
@@ -4403,7 +4396,7 @@ function exportCSV(scope="month"){
 bindDateControl("liveScheduleStart");
 bindDateControl("liveScheduleEnd");
 
-/* ================= V29.4 pre-change sales-card context guard ================= */
+/* ================= V28.6 pre-change sales-card context guard ================= */
 function salesCardGuardTypeV273(el){
   const id=String(el?.id||"");
   if(id==="saleDate"||id==="company")return "daily";
@@ -4526,7 +4519,7 @@ async function saveFairCommissionSettings(){
       fairRevision:nextFairCommissionRevision(previous.fairRevision)
     });
 
-    // V29.4: save locally immediately. Do not make the user wait for Apps Script.
+    // V28.6: save locally immediately. Do not make the user wait for Apps Script.
     applyCommissionSettings(settings);
     setSavedCommissionSnapshots(settings,{fair:true,live:false});
     updateFairCommissionDraftState();
@@ -4586,7 +4579,7 @@ async function saveLiveCommissionSettings(){
     const live=readLiveCommissionInputs();
     const candidate=normalizeCommissionSettings({...previous,...live});
     const comparable=x=>JSON.stringify({liveHostRates:x.liveHostRates||{},liveHosts:x.liveHosts||{},inactiveLiveHosts:x.inactiveLiveHosts||{},liveRateSchedules:x.liveRateSchedules||[]});
-    // V29.4: deleting the last special commission rule leaves candidate and
+    // V28.6: deleting the last special commission rule leaves candidate and
     // previous structurally identical because the delete was already applied
     // locally.  A dirty draft must still be written to cloud so [] overwrites
     // the old month snapshot instead of letting the deleted rule return.
@@ -4707,7 +4700,7 @@ async function resetFairCommissionSettings(){
 
 
 
-/* ================= V29.4 Reliable Backup / Restore ================= */
+/* ================= V28.6 Reliable Backup / Restore ================= */
 const BACKUP_RESTORE_STATE_KEY_V234="lover_backup_restore_status_v234";
 let backupRestoreOperationRunningV234=false;
 
@@ -4918,7 +4911,7 @@ setTimeout(async()=>{
 
 let lastObservedSystemMonth=monthISO();setInterval(()=>{const nowMonth=monthISO();if(nowMonth!==lastObservedSystemMonth){lastObservedSystemMonth=nowMonth;systemState.currentMonth=nowMonth;document.getElementById("monthPicker").value=nowMonth;document.getElementById("yearPicker").value=nowMonth.slice(0,4);renderAll();updateReadOnlyMode();loadFromSheet({force:true})}},60000);
 
-/* ================= V29.4 Sales Card transaction integrity / instant cache ================= */
+/* ================= V28.6 Sales Card transaction integrity / instant cache ================= */
 function salesCardHasUserDataV241(card){
   if(!card)return false;
   if(card.dataset.dirty==="1")return true;
@@ -4946,7 +4939,6 @@ const _deleteSalesCardTransactionV240=deleteSalesCardTransactionV239;
 deleteSalesCardTransactionV239=async function(type,txnId){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
   const card=[...(wrap?.querySelectorAll('.sales-card-transaction-v239')||[])].find(x=>x.dataset.transactionId===txnId);if(!card)return;
-  if(String(card.dataset.cardStatus||"DRAFT").toUpperCase()==="CONFIRMED"){alert("这张销售卡已经确认，不能删除。\n\n如果顾客换产品、改数量或补差价，请直接修改销售卡并保存修改。");return;}
   if(!salesCardIsSavedV241(card)){
     if(salesCardHasUserDataV241(card)&&!confirm('这张销售卡尚未保存，确定删除？\n\n确认后，刚才输入的资料不会保存。'))return;
     card.remove();setSync('未保存销售卡已删除',true);return;
@@ -4956,7 +4948,7 @@ deleteSalesCardTransactionV239=async function(type,txnId){
 window.deleteSalesCardTransactionV239=deleteSalesCardTransactionV239;
 
 function renumberSavedSalesCardsV241(type){
-  let n=0;salesCardWrappersV239(type).forEach(card=>{const title=card.querySelector('.sales-card-header-v239 b:first-child');if(!title)return;if(salesCardIsSavedV241(card)){n++;title.textContent=(String(card.dataset.cardStatus||'CONFIRMED').toUpperCase()==='DRAFT'?'草稿销售卡 ':'已确认销售卡 ')+n}else title.textContent='新销售卡';const del=card.querySelector('.product-link-remove-bottom');if(del){const lock=String(card.dataset.cardStatus||'DRAFT').toUpperCase()==='CONFIRMED';del.disabled=lock;del.title=lock?'已确认销售卡不能删除':''}});
+  let n=0;salesCardWrappersV239(type).forEach(card=>{const title=card.querySelector('.sales-card-header-v239 b:first-child');if(!title)return;if(salesCardIsSavedV241(card)){n++;title.textContent='已保存销售卡 '+n}else title.textContent='新销售卡';});
 }
 const _renderProductLinksEditorV240=renderProductLinksEditorV206;
 renderProductLinksEditorV206=function(type,links){_renderProductLinksEditorV240(type,links);renumberSavedSalesCardsV241(type)};
@@ -4965,20 +4957,24 @@ const _buildSalesCardTransactionV240=buildSalesCardTransactionV239;
 buildSalesCardTransactionV239=function(type,dataList=[]){const card=_buildSalesCardTransactionV240(type,dataList);setTimeout(()=>renumberSavedSalesCardsV241(type),0);return card};
 
 const _saveProductLinksV240=saveProductLinksV206;
-saveProductLinksV206=async function(type){
-  const cards=salesCardWrappersV239(type),dirty=cards.filter(c=>c.dataset.dirty==='1'||c.dataset.productRemovedV259==='1'||!salesCardIsSavedV241(c));
-  if(!dirty.length){alert('销售卡没有需要保存的修改。');return null;}
+saveProductLinksV206=async function(type,saveMode='confirm',button=null){
+  saveMode=saveMode==='draft'?'draft':'confirm';
+  if(button?.dataset?.busyV285==='1')return null;
+  const originalButtonText=button?.textContent||'';
+  if(button){button.dataset.busyV285='1';button.disabled=true;button.textContent=saveMode==='draft'?'保存中…':'确认中…';}
+  const cards=salesCardWrappersV239(type),dirty=cards.filter(c=>c.dataset.dirty==='1'||c.dataset.productRemovedV259==='1'||!salesCardIsSavedV241(c)||(saveMode==='confirm'&&String(c.dataset.inventoryStatus||'').startsWith('DRAFT')));
+  if(!dirty.length){alert('销售卡没有需要保存的修改。');if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}return null;}
   /* Keep only changed transactions in the request; server treats existing other cards as context. */
   const all=collectProductLinksV206(type),dirtyIds=new Set(dirty.map(c=>String(c.dataset.transactionId||''))),items=all.filter(x=>dirtyIds.has(String(x.transactionId||'')));
-  if(!items.length){alert('请填写销售卡产品资料。');return null;}
+  if(!items.length){alert('请填写销售卡产品资料。');if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}return null;}
   const first=items[0],official=salesCardsOfficialAmountV241(type),allTotal=all.reduce((s,x)=>s+Number(x.actualPrice||0),0);
-  if(official>0&&allTotal>official+0.005){alert(`所有销售卡售价总数 RM${formatAmount(allTotal)} 已超过当天营业额 RM${formatAmount(official)}。`);return null;}
+  if(official>0&&allTotal>official+0.005){alert(`所有销售卡售价总数 RM${formatAmount(allTotal)} 已超过当天营业额 RM${formatAmount(official)}。`);if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}return null;}
   for(const x of items){
-    if(!x.productName){alert('每一个产品都需要填写产品名称。');return null}
-    if(!Number.isFinite(Number(x.quantity))||Number(x.quantity)<=0){alert(`产品${Number(x.productOrder||0)||""} 数量必须大于 0。`);return null}
+    if(!x.productName){alert('每一个产品都需要填写产品名称。');if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}return null}
+    if(!Number.isFinite(Number(x.quantity))||Number(x.quantity)<=0){alert(`产品${Number(x.productOrder||0)||""} 数量必须大于 0。`);if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}return null}
     if(!Number.isFinite(Number(x.unitPrice))||Number(x.unitPrice)<=0){
       alert(`产品${Number(x.productOrder||0)||""} 售价必须大于 RM0.00，无法保存销售卡。`);
-      return null;
+      if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}return null;
     }
   }
   /* Optimistic merge before network: prevents old cached cards/records flashing back. */
@@ -4988,26 +4984,22 @@ saveProductLinksV206=async function(type){
   if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,merged);
   if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,ctx.date,ctx.location,merged);
   try{
-    setSync('销售卡同步中...');const result=await window.saveSalesProductLinksApiV241(items);const saved=Array.isArray(result?.links)?result.links:items;
+    setSync('销售卡同步中...');const result=await window.saveSalesProductLinksApiV241(items,saveMode);const saved=Array.isArray(result?.links)?result.links:items;
     const final=[...merged.filter(x=>!dirtyIds.has(String(x.transactionId||''))),...saved];
     if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,final);
     if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,final);
-    const byTxn=new Map();saved.forEach(x=>{const tx=String(x.transactionId||'');if(tx&&!byTxn.has(tx))byTxn.set(tx,x)});
-    dirty.forEach(card=>{clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0'});const m=byTxn.get(String(card.dataset.transactionId||''));if(m){card.dataset.cardStatus=String(m.cardStatus||card.dataset.cardStatus||'DRAFT').toUpperCase();card.dataset.manualCorrectionStatus=String(m.manualCorrectionStatus||'')}});
-    renumberSavedSalesCardsV241(type);setSync('销售卡已保存',true);if(Number(result?.manualCorrectionCount||0)>0)alert('销售卡修改已保存。\n\n产品或数量与上一次已处理库存的记录不同。顶部会持续提醒，直到 Import System 手动处理完成。');else if(dirty.some(c=>String(c.dataset.cardStatus||'DRAFT').toUpperCase()==='CONFIRMED'))alert('销售卡修改已保存。\n\n如果目前产品/数量已经恢复到上一次处理库存的状态，就不会再次提醒扣库存。');else alert('草稿已保存。\n\n草稿不会通知 Import System，也不会影响库存。');if(typeof refreshInventoryPendingV250==='function')setTimeout(()=>refreshInventoryPendingV250(true),80);if(result?.warning)alert(result.warning);return result;
-  }catch(e){setSync('销售卡同步失败',false,true);alert('销售卡保存失败：'+(e.message||e));return null}
+    const savedByLink=new Map(saved.map(x=>[String(x.linkId||''),x]));
+    dirty.forEach(card=>{clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;let cardStatus='';card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';const rec=savedByLink.get(String(i.dataset.linkId||''));if(rec){i.dataset.inventoryStatus=String(rec.importSyncStatus||'');cardStatus=cardStatus||i.dataset.inventoryStatus;}});if(cardStatus)card.dataset.inventoryStatus=cardStatus;});
+    renumberSavedSalesCardsV241(type);setSync(saveMode==='draft'?'草稿已保存':'销售已确认',true);alert(saveMode==='draft'?'销售卡草稿保存成功。\n\n草稿不会产生新的库存提醒。':'销售确认成功。\n\n如有库存变动，请到 Import Cost System 处理。');if(result?.warning)alert(result.warning);return result;
+  }catch(e){setSync('销售卡同步失败',false,true);alert('销售卡保存失败：'+(e.message||e));return null}finally{if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}}
 };
-
-async function confirmSalesCardsV290(type){const cards=salesCardWrappersV239(type),dirty=cards.filter(c=>c.dataset.dirty==='1'||c.dataset.productRemovedV259==='1'||!salesCardIsSavedV241(c));if(dirty.length){alert('请先点击「保存草稿 / 修改」，确认资料已经保存后，再确认销售。');return null}const drafts=cards.filter(c=>salesCardIsSavedV241(c)&&String(c.dataset.cardStatus||'DRAFT').toUpperCase()==='DRAFT');if(!drafts.length){alert('目前没有等待确认的草稿销售卡。');return null}const total=drafts.reduce((s,c)=>s+salesCardProductsV239(c).reduce((a,x)=>a+toAmount(x.querySelector('.product-link-price')?.value||0),0),0);if(!confirm(`确认 ${drafts.length} 张销售卡正式成交？\n\n销售卡合计：RM${formatAmount(total)}\n\n确认后整张销售卡不能删除，并会产生 Import System 库存待处理提醒。`))return null;try{setSync('正在确认销售...');const r=await window.confirmSalesTransactionsV290(drafts.map(c=>String(c.dataset.transactionId||'')));drafts.forEach(c=>c.dataset.cardStatus='CONFIRMED');renumberSavedSalesCardsV241(type);setSync('销售已确认',true);if(typeof refreshInventoryPendingV250==='function')await refreshInventoryPendingV250(true);alert('销售已确认。\n\nImport System 会持续提醒库存待处理，直到库存处理完成。');return r}catch(e){setSync('确认销售失败',false,true);alert('确认销售失败：'+(e.message||e));return null}}
-window.confirmSalesCardsV290=confirmSalesCardsV290;
-
 
 function productProfitNameV241(x){const q=Math.max(1,Number(x.quantity||1));return escapeChangeLogHtmlV200(String(x.productName||''))+(q>1?` <small class="product-profit-qty-v241">×${q}</small>`:'')}
 productProfitDesktopRowsV216=function(list){return list.map(x=>`<tr><td>${productProfitNameV241(x)}</td><td>${formatAmount(Number(x.averageCost||0)*Math.max(1,Number(x.quantity||1)))}</td><td>${formatAmount(Number(x.actualPrice||0))}</td><td>${formatAmount(Number(x.profit||0))}</td><td>${Number(x.profitRate||0).toFixed(2)}%</td></tr>`).join('')};
 productProfitMobileCardsV216=function(list){return list.map(x=>`<div class="product-profit-mobile-card"><div class="product-profit-mobile-name">${productProfitNameV241(x)}</div><div class="product-profit-mobile-grid"><div><span>成本</span><b>${formatAmount(Number(x.averageCost||0)*Math.max(1,Number(x.quantity||1)))}</b></div><div><span>售价</span><b>${formatAmount(Number(x.actualPrice||0))}</b></div><div><span>利润</span><b>${formatAmount(Number(x.profit||0))}</b></div><div><span>利润率</span><b>${Number(x.profitRate||0).toFixed(2)}%</b></div></div></div>`).join('')};
 
 
-/* ================= V29.4 Live optimistic revision guard ================= */
+/* ================= V28.6 Live optimistic revision guard ================= */
 const LIVE_SAVE_REV_V243=new Map();
 function liveSaveRevKeyV243(date,host){return String(date||"")+"|"+normalizeLiveHostKey(String(host||""))}
 function nextLiveSaveRevV243(date,host){
@@ -5027,7 +5019,7 @@ async function refreshOpenSalesChangeLogAfterSaveV243(type,date){
     if(panel&&salesChangeLogOpenV200[type]&&String(panel.dataset.logDate||"")===date){
       renderChangeLogTimelineV200(type,date,Array.isArray(data?.logs)?data.logs:[]);
     }
-  }catch(e){console.warn("V29.4 修改/销售记录后台刷新失败",e)}
+  }catch(e){console.warn("V28.6 修改/销售记录后台刷新失败",e)}
 }
 
 saveLiveSales=async function(){
@@ -5041,7 +5033,7 @@ saveLiveSales=async function(){
   if(!host){alert("请输入主播名字");return}
   if(!d){alert("请选择日期");return}
 
-  // V29.4 preflight: do not even mutate local turnover when saved cards exceed the new amount.
+  // V28.6 preflight: do not even mutate local turnover when saved cards exceed the new amount.
   try{
     const activeLinks=await loadSalesProductLinksV206("live",d,host,{force:true});
     const cardAmount=(Array.isArray(activeLinks)?activeLinks:[]).reduce((s,x)=>s+Math.max(0,Number(x.actualPrice||0)),0);
@@ -5063,7 +5055,7 @@ saveLiveSales=async function(){
   const now=new Date().toISOString();
   const localRow={type:"live",date:d,company:"live",location:host,amount,updatedAt:now,clientUpdatedAt:now};
 
-  // Critical V29.4 guard: any cloud request started before this local mutation
+  // Critical V28.6 guard: any cloud request started before this local mutation
   // is not allowed to overwrite this newer value.
   if(typeof markLocalRowMutation==="function")markLocalRowMutation(localRow,Date.now()+1);
   if(amount<=0)rows=rows.filter(r=>rowKey(r)!==rowKey(localRow)); else upsertLocalRow(localRow);
@@ -5106,7 +5098,7 @@ window.saveLiveSales=saveLiveSales;
 
 
 
-/* ================= V29.4 Profit list copy + compact totals ================= */
+/* ================= V28.6 Profit list copy + compact totals ================= */
 async function copyProfitProductNameV244(el){
   if(!el)return;
   const raw=String(el.dataset.copyName||"").trim();
@@ -5160,7 +5152,7 @@ productProfitMobileCardsV216=function(list){
 
 
 
-/* ================= V29.4 profit layout + weighted average margin ================= */
+/* ================= V28.6 profit layout + weighted average margin ================= */
 function productProfitWeightedAverageRateV246(list){
   let weighted=0,qtyTotal=0;
   (list||[]).forEach(x=>{const q=Math.max(1,Number(x.quantity||1));weighted+=Number(x.profitRate||0)*q;qtyTotal+=q});
@@ -5191,7 +5183,7 @@ renderProductProfitSummaryV216=function(type,allLinks){
 };
 
 
-/* ================= V29.4 cross-date inventory reminders =================
+/* ================= V28.6 cross-date inventory reminders =================
    One independent inventory reminder per product/linkId.
    Compatible with both per-product API rows and older aggregated products[] payloads. */
 let inventoryPendingCacheV250=[];
@@ -5216,8 +5208,6 @@ function normalizePendingInventoryItemsV263(list){
       updatedAt:String(parent?.updatedAt||"")
     };
 
-    const taskType=String(parent?.taskType||parent?.inventoryTaskType||"").toUpperCase();
-    if(taskType==="MANUAL_CORRECTION"||String(parent?.importSyncStatus||"").toUpperCase()==="MANUAL_CORRECTION_PENDING"){out.push({...parent,...base,taskType:"MANUAL_CORRECTION",inventoryTaskType:"MANUAL_CORRECTION"});return;}
     if(String(parent?.linkId||"").trim() || String(parent?.productName||"").trim()){
       out.push({
         ...parent,...base,
@@ -5248,7 +5238,7 @@ function normalizePendingInventoryItemsV263(list){
       [item.transactionId,item.productId||item.productName,item.productOrder||index].join("|");
     if(seen.has(key))return false;
     seen.add(key);
-    return String(item.taskType||item.inventoryTaskType||"").toUpperCase()==="MANUAL_CORRECTION" || !!String(item.productName||"").trim();
+    return !!String(item.productName||"").trim();
   });
 }
 
@@ -5268,7 +5258,7 @@ window.copyInventoryProductNameV262=copyInventoryProductNameV262;
 const IMPORT_COST_SYSTEM_URL_V266="https://alexliew829.github.io/lover-legend-import-system/";
 
 function openImportCostSystemV266(target={}){
-  // V29.4: Sales must stay open; Import always opens in a separate tab/window.
+  // V28.6: Sales must stay open; Import always opens in a separate tab/window.
   // Pass the clicked transaction so Import can put that Sales card first.
   const saleId=String(target?.saleId||target?.transactionId||"").trim();
   const linkId=String(target?.linkId||"").trim();
@@ -5323,11 +5313,10 @@ function renderInventoryPendingGlobalV250(){
         date:String(first.date||""),
         location:String(first.location||"")
       };
-      const manual=String(first.taskType||first.inventoryTaskType||"").toUpperCase()==="MANUAL_CORRECTION";
       return `<button type="button" class="inventory-summary-v264${stale?" stale-v250":""}" onclick='openImportCostSystemV266(${JSON.stringify(targetPayload)})'>
-        <div class="inventory-summary-title-v264">${manual?"⚠️ 有 1 项库存差异待处理":`⚠️ 有 ${itemCount} 项库存变动`}</div>
+        <div class="inventory-summary-title-v264">⚠️ 有 ${itemCount} 项库存变动</div>
         <div class="inventory-summary-meta-v264">${escapeChangeLogHtmlV200(first.date)} · ${String(first.type||"").toLowerCase()==="daily"?"Sales · Belimbing":String(first.type||"").toLowerCase()==="live"?"Live · "+escapeChangeLogHtmlV200(first.location):"Fair · "+escapeChangeLogHtmlV200(first.location)}</div>
-        <div class="inventory-summary-action-v264">${manual?"请到 Import Cost System 手动处理库存":"请到 Import Cost System 处理"} <span aria-hidden="true">›</span></div>
+        <div class="inventory-summary-action-v264">请到 Import Cost System 处理 <span aria-hidden="true">›</span></div>
       </button>`;
     }).join("");
   });
@@ -5354,7 +5343,7 @@ async function refreshInventoryPendingV250(force=false){
 window.refreshInventoryPendingV250=refreshInventoryPendingV250;
 
 
-// V29.4: Sales-side inventory confirmation removed. Import is the only inventory authority.
+// V28.6: Sales-side inventory confirmation removed. Import is the only inventory authority.
 
 async function openPendingInventorySalesCardV250(raw){
   const item=typeof raw==="string"?JSON.parse(raw):raw;if(!item)return;
@@ -5395,39 +5384,20 @@ async function openPendingInventorySalesCardV250(raw){
 }
 window.openPendingInventorySalesCardV250=openPendingInventorySalesCardV250;
 
-// V29.4: inventory reminder is low-priority background work.
-// Page entry and initial cloud sync NEVER wait for this request.
-let inventoryPendingBackgroundTimerV293=null;
-function scheduleInventoryPendingBackgroundV293(delayMs=4000,force=true){
-  clearTimeout(inventoryPendingBackgroundTimerV293);
-  inventoryPendingBackgroundTimerV293=setTimeout(()=>{
-    Promise.resolve()
-      .then(()=>refreshInventoryPendingV250(force))
-      .catch(error=>console.warn("后台库存提醒读取失败",error));
-  },Math.max(800,Number(delayMs)||4000));
-}
-window.scheduleInventoryPendingBackgroundV293=scheduleInventoryPendingBackgroundV293;
-
+// Always refresh global pending status when Live / Fair page opens.
 const _showPageV249=showPage;
 showPage=function(name,el){
   const result=_showPageV249(name,el);
   if(result===false)return false;
-  if(name==="sales"||name==="live"||name==="fair"){
-    // Use cache immediately; refresh from cloud later without touching main sync status.
-    renderInventoryPendingGlobalV250();
-    scheduleInventoryPendingBackgroundV293(3000,false);
-  }
+  if(name==="sales"||name==="live"||name==="fair")setTimeout(()=>refreshInventoryPendingV250(true),50);
   return result;
 };
 window.showPage=showPage;
 
-// Start reminder only AFTER the main startup sync has settled, then give Apps Script
-// another quiet window so reminder traffic cannot compete with Home synchronization.
-Promise.resolve(startInitialSalesDataLoad()).finally(()=>{
-  scheduleInventoryPendingBackgroundV293(4500,true);
-});
+// Cross-day reminder also initializes shortly after startup.
+setTimeout(()=>refreshInventoryPendingV250(true),1200);
 
-// V29.4: after the user processes inventory in the separate Import tab/app,
+// V28.6: after the user processes inventory in the separate Import tab/app,
 // returning to Sales should refresh the compact reminder automatically.
 let inventoryPendingResumeTimerV265=null;
 let inventoryPendingLastResumeAtV265=0;
@@ -5436,10 +5406,10 @@ function scheduleInventoryPendingResumeRefreshV265(){
   clearTimeout(inventoryPendingResumeTimerV265);
   inventoryPendingResumeTimerV265=setTimeout(()=>{
     const now=Date.now();
-    if(now-inventoryPendingLastResumeAtV265<5000)return;
+    if(now-inventoryPendingLastResumeAtV265<1200)return;
     inventoryPendingLastResumeAtV265=now;
-    scheduleInventoryPendingBackgroundV293(1800,true);
-  },1200);
+    refreshInventoryPendingV250(true);
+  },500);
 }
 document.addEventListener("visibilitychange",()=>{
   if(!document.hidden)scheduleInventoryPendingResumeRefreshV265();
@@ -5448,7 +5418,7 @@ window.addEventListener("focus",scheduleInventoryPendingResumeRefreshV265);
 window.addEventListener("pageshow",scheduleInventoryPendingResumeRefreshV265);
 
 
-/* ================= V29.4 RM0 防误触：Sales / Fair / Live ================= */
+/* ================= V28.6 RM0 防误触：Sales / Fair / Live ================= */
 function selectedActionAmountV270(type){
   if(type==="daily"){
     if(String(document.getElementById("company")?.value||"")!=="belimbing")return 0;
@@ -5499,3 +5469,36 @@ function refreshSalesActionLocksV270(){
 setTimeout(refreshSalesActionLocksV270,0);
 const _renderAllV270=renderAll;
 renderAll=function(){const r=_renderAllV270.apply(this,arguments);setTimeout(refreshSalesActionLocksV270,0);return r};
+
+
+/* ================= V28.6 Sales / Fair / Live 营业利润汇总 ================= */
+const profitRollupOpenV285={daily:false,fair:false,live:false};
+function profitRollupPanelV285(type){return document.getElementById(type+'ProfitRollupV285')}
+function displayDateFromIsoV285(iso){const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}-${m[2]}-${m[1]}`:String(iso||'')}
+function dateKeyV285(display){const m=String(display||'').match(/^(\d{2})-(\d{2})-(\d{4})$/);return m?`${m[3]}${m[2]}${m[1]}`:''}
+function selectedMonthDisplayV285(){const v=document.getElementById('monthPicker')?.value||monthISO();return String(v||'').slice(5,7)+'-'+String(v||'').slice(0,4)}
+function rowTurnoverV285(type,name,start,end){
+  const sk=dateKeyV285(start),ek=dateKeyV285(end);let total=0;
+  dedupeRows(rows).forEach(r=>{if(r.type!==type)return;const dk=dateKeyV285(r.date);if(!dk||dk<sk||dk>ek)return;
+    if(type==='daily'){if(r.company!=='belimbing')return;}else if(type==='live'){if(normalizeLiveHostKey(r.location)!==normalizeLiveHostKey(name))return;}else if(normalizeFairLocationKey(r.location)!==normalizeFairLocationKey(name))return;
+    total+=Number(r.amount||0);
+  });return total;
+}
+function linksProfitV285(links,type,name,start,end){const sk=dateKeyV285(start),ek=dateKeyV285(end);return (links||[]).reduce((sum,x)=>{if(String(x.type||'')!==type)return sum;const dk=dateKeyV285(x.date);if(!dk||dk<sk||dk>ek)return sum;if(type==='daily')return sum+Number(x.profit||0);if(type==='live'&&normalizeLiveHostKey(x.location)!==normalizeLiveHostKey(name))return sum;if(type==='fair'&&normalizeFairLocationKey(x.location)!==normalizeFairLocationKey(name))return sum;return sum+Number(x.profit||0)},0)}
+function profitRollupCardV285(title,start,end,sales,profit){const rate=sales>0?profit/sales*100:0;return `<div class="profit-rollup-card-v285"><div class="profit-rollup-title-v285">${escapeChangeLogHtmlV200(title)}</div><div class="profit-rollup-date-v285">${start}${end&&end!==start?' ～ '+end:''}</div><div class="profit-rollup-metrics-v285"><div><span>营业</span><b>RM${formatAmount(sales)}</b></div><div><span>利润</span><b>RM${formatAmount(profit)}</b></div><div><span>利润率</span><b>${rate.toFixed(2)}%</b></div></div></div>`}
+async function renderProfitRollupV285(type){
+  const panel=profitRollupPanelV285(type);if(!panel)return;panel.innerHTML='<div class="product-link-loading-v231">正在计算营业 / 利润…</div>';
+  const month=selectedMonthDisplayV285(),links=await loadAllSalesProductLinksV203({force:true,maxAgeMs:0});let cards=[];
+  if(type==='fair'){
+    const sessions=(Array.isArray(fairSessionsCloudV281)?fairSessionsCloudV281:[]).filter(x=>x&&x.location&&x.start&&x.end&&String((/^\d{4}-/.test(String(x.start))?isoToDisplay(x.start):x.start)).slice(3)===month);
+    const seen=new Set();sessions.sort((a,b)=>dateKeyV285(/^\d{4}-/.test(String(a.start))?isoToDisplay(a.start):a.start).localeCompare(dateKeyV285(/^\d{4}-/.test(String(b.start))?isoToDisplay(b.start):b.start))).forEach(x=>{const start=/^\d{4}-/.test(String(x.start))?isoToDisplay(x.start):x.start,end=/^\d{4}-/.test(String(x.end))?isoToDisplay(x.end):x.end,key=[normalizeFairLocationKey(x.location),start,end].join('|');if(seen.has(key))return;seen.add(key);const sales=rowTurnoverV285('fair',x.location,start,end),profit=linksProfitV285(links,'fair',x.location,start,end);cards.push({title:x.location,start,end,sales,profit})});
+  }else if(type==='live'){
+    const monthRows=dedupeRows(rows).filter(r=>r.type==='live'&&String(r.date||'').slice(3)===month),names=[...new Set(monthRows.map(r=>canonicalLiveHost(r.location)).filter(Boolean))].sort();const start='01-'+month;let lastDay=31;const [mm,yy]=month.split('-').map(Number);lastDay=new Date(yy,mm,0).getDate();const end=String(lastDay).padStart(2,'0')+'-'+month;names.forEach(name=>cards.push({title:name,start,end,sales:rowTurnoverV285('live',name,start,end),profit:linksProfitV285(links,'live',name,start,end)}));
+  }else{
+    const start='01-'+month,[mm,yy]=month.split('-').map(Number),end=String(new Date(yy,mm,0).getDate()).padStart(2,'0')+'-'+month;cards=[{title:'Belimbing',start,end,sales:rowTurnoverV285('daily','Belimbing',start,end),profit:linksProfitV285(links,'daily','Belimbing',start,end)}];
+  }
+  const totalSales=cards.reduce((s,x)=>s+x.sales,0),totalProfit=cards.reduce((s,x)=>s+x.profit,0),totalRate=totalSales>0?totalProfit/totalSales*100:0;
+  const label=type==='fair'?'Fair':type==='live'?'Live':'Sales';panel.innerHTML=`<div class="profit-rollup-head-v285"><b>${label} · ${month}</b></div>${cards.length?cards.map(x=>profitRollupCardV285(x.title,x.start,x.end,x.sales,x.profit)).join(''):'<div class="product-profit-empty">这个月份没有资料</div>'}<div class="profit-rollup-total-v285"><strong>${label} 总计</strong><div><span>营业</span><b>RM${formatAmount(totalSales)}</b></div><div><span>利润</span><b>RM${formatAmount(totalProfit)}</b></div><div><span>整体利润率</span><b>${totalRate.toFixed(2)}%</b></div></div>`;
+}
+async function toggleProfitRollupV285(type,button){const panel=profitRollupPanelV285(type);if(!panel)return;if(profitRollupOpenV285[type]&&!panel.classList.contains('hidden')){profitRollupOpenV285[type]=false;panel.classList.add('hidden');if(button)button.textContent=`📊 ${type==='fair'?'Fair':type==='live'?'Live':'Sales'} 营业 / 利润汇总`;return}if(button){button.disabled=true;button.textContent='读取中…'}try{if(type==='fair')await refreshFairSessionsV281({applyLatest:false});await renderProfitRollupV285(type);panel.classList.remove('hidden');profitRollupOpenV285[type]=true;if(button)button.textContent='📊 收起营业 / 利润汇总'}catch(e){alert('读取营业 / 利润汇总失败：'+(e.message||e))}finally{if(button)button.disabled=false}}
+window.toggleProfitRollupV285=toggleProfitRollupV285;
