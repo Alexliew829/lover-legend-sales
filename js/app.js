@@ -1246,7 +1246,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     saveFairSession();
     await refreshFairSessionsV281();
     const result=await saveFairBatchToSheet(loc,records);
-    // V31.1: only a successfully saved Fair becomes a reusable history location.
+    // V31.3: only a successfully saved Fair becomes a reusable history location.
     saveFairLocation(loc);
 
     // V29.9: local Fair values are direct replacements, never additions. The server
@@ -1444,7 +1444,7 @@ document.getElementById("fairLocation").addEventListener("input",()=>{
 document.getElementById("fairLocation").addEventListener("blur",()=>{
   const input=document.getElementById("fairLocation");
   input.value=canonicalLocation(input.value);
-  // V31.1: typing/blurring alone must not create history. A location is added
+  // V31.3: typing/blurring alone must not create history. A location is added
   // only after Fair is successfully saved to cloud.
   saveFairSession();
   syncFairInputs();
@@ -4054,7 +4054,7 @@ async function saveLiveSales(){
 let monthGrandHistoryOpenV223=false;
 let monthGrandHistoryLoadingV223=false;
 
-/* ================= V31.1 Home turnover-only history =================
+/* ================= V31.3 Home turnover-only history =================
    Home monthly/yearly dropdowns deliberately do NOT read Sales_Product_Links,
    aggregate Profit, calculate profit rate, or render profit fields.
    Sales/Fair/Live page profit logic remains unchanged.
@@ -4096,13 +4096,13 @@ async function toggleMonthGrandHistoryV223(){
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
   monthGrandHistoryLoadingV223=true;renderMonthGrandHistoryV223();
   try{
-    // V31.1: only turnover rows are needed. Never load Sales_Product_Links here.
+    // V31.3: only turnover rows are needed. Never load Sales_Product_Links here.
     if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
   }catch(e){console.warn("Month turnover history load skipped:",e)}finally{monthGrandHistoryLoadingV223=false;renderMonthGrandHistoryV223()}
 }
 window.toggleMonthGrandHistoryV223=toggleMonthGrandHistoryV223;
 
-/* ================= V31.1 expandable yearly turnover-only breakdown ================= */
+/* ================= V31.3 expandable yearly turnover-only breakdown ================= */
 const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 
@@ -4139,7 +4139,7 @@ async function toggleYearBreakdownV224(kind){
   yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");yearBreakdownLoadingV224[kind]=true;renderYearBreakdownV224(kind);
   try{
-    // V31.1: no Home profit read/rollup/render; only load turnover history.
+    // V31.3: no Home profit read/rollup/render; only load turnover history.
     if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
   }catch(e){console.warn("Year turnover breakdown load skipped:",kind,e)}finally{yearBreakdownLoadingV224[kind]=false;renderYearBreakdownV224(kind)}
 }
@@ -4977,16 +4977,98 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,merged);
   if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,merged);
   if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,ctx.date,ctx.location,merged);
-  try{
-    setSync('销售卡同步中...');const result=await window.saveSalesProductLinksApiV241(items,saveMode);const saved=Array.isArray(result?.links)?result.links:items;
+  const finalizeSalesCardSaveV313=(result,verifiedAfterTimeout=false)=>{
+    const saved=Array.isArray(result?.links)?result.links:items;
     const final=[...merged.filter(x=>!dirtyIds.has(String(x.transactionId||''))),...saved];
     if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,final);
     if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,final);
     const savedByLink=new Map(saved.map(x=>[String(x.linkId||''),x]));
     dirty.forEach(card=>{clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;let cardStatus='';card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';const rec=savedByLink.get(String(i.dataset.linkId||''));if(rec){i.dataset.inventoryStatus=String(rec.importSyncStatus||'');cardStatus=cardStatus||i.dataset.inventoryStatus;}});if(cardStatus)card.dataset.inventoryStatus=cardStatus;});
-    renumberSavedSalesCardsV241(type);setSync(saveMode==='draft'?'草稿已保存':'销售已确认',true);alert(saveMode==='draft'?'销售卡草稿保存成功。\n\n草稿不会产生新的库存提醒。':'销售确认成功。\n\n如有库存变动，请到 Import Cost System 处理。');if(result?.warning)alert(result.warning);return result;
-  }catch(e){setSync('销售卡同步失败',false,true);alert('销售卡保存失败：'+(e.message||e));return null}finally{if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}}
+    renumberSavedSalesCardsV241(type);
+    setSync(saveMode==='draft'?'草稿已保存':'销售已确认',true);
+    const extra=verifiedAfterTimeout?'\n\n刚才连接超时，但系统已重新核对云端，确认资料已经保存。':'';
+    alert((saveMode==='draft'?'销售卡草稿保存成功。\n\n草稿不会产生新的库存提醒。':'销售确认成功。\n\n如有库存变动，请到 Import Cost System 处理。')+extra);
+    if(result?.warning)alert(result.warning);
+    return result;
+  };
+  try{
+    setSync('销售卡同步中...');
+    const result=await window.saveSalesProductLinksApiV241(items,saveMode);
+    return finalizeSalesCardSaveV313(result,false);
+  }catch(e){
+    // V31.3: JSONP may time out after Apps Script has already committed the edit.
+    // Re-read the same date/location and verify the stable transaction/link IDs
+    // before telling the user the save failed. This keeps repeated draft saves
+    // idempotent and prevents accidental duplicate cards after a timeout.
+    try{
+      setSync('连接稍慢，正在核对销售卡...');
+      const verified=await verifySalesCardSaveAfterTimeoutV313(type,ctx.date,ctx.location,items,saveMode);
+      if(verified?.ok){
+        return finalizeSalesCardSaveV313({ok:true,links:verified.links||items,warning:''},true);
+      }
+    }catch(verifyErr){
+      console.warn('V31.3 销售卡超时后核对失败',verifyErr);
+    }
+    setSync('销售卡同步失败',false,true);
+    alert('销售卡保存失败：'+(e.message||e)+'\n\n系统未能确认云端已经保存。请保留当前页面后再重试，避免重复建立销售卡。');
+    return null;
+  }finally{if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}}
 };
+
+function salesCardComparableV313(x){
+  return [
+    String(x.transactionId||''),String(x.linkId||''),String(x.productId||''),String(x.productName||'').trim(),
+    Number(x.quantity||0).toFixed(6),Number(x.unitPrice||0).toFixed(6),Number(x.actualPrice||0).toFixed(6),
+    Number(x.localDelivery||0).toFixed(6),Number(x.extraFee||0).toFixed(6),String(x.remark||'').trim()
+  ].join('|');
+}
+async function verifySalesCardSaveAfterTimeoutV313(type,date,location,items,saveMode){
+  const expected=Array.isArray(items)?items:[];
+  if(!expected.length)return{ok:false,links:[]};
+  let cloud=[];
+  let lastErr=null;
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      cloud=await loadSalesProductLinksV206(type,date,location,{force:true,maxAgeMs:0});
+      break;
+    }catch(err){
+      lastErr=err;
+      if(attempt===0)await new Promise(r=>setTimeout(r,900));
+    }
+  }
+  if(!Array.isArray(cloud))throw lastErr||new Error('无法读取云端销售卡');
+  const byTxn=new Map();
+  cloud.forEach(x=>{
+    const key=String(x.transactionId||'').trim();
+    if(!key)return;
+    if(!byTxn.has(key))byTxn.set(key,[]);
+    byTxn.get(key).push(x);
+  });
+  const verifiedLinks=[];
+  const expectedByTxn=new Map();
+  expected.forEach(x=>{
+    const key=String(x.transactionId||'').trim();
+    if(!key)return;
+    if(!expectedByTxn.has(key))expectedByTxn.set(key,[]);
+    expectedByTxn.get(key).push(x);
+  });
+  for(const [txn,expRows] of expectedByTxn.entries()){
+    const got=byTxn.get(txn)||[];
+    if(got.length!==expRows.length)return{ok:false,links:cloud};
+    const expSorted=expRows.map(salesCardComparableV313).sort();
+    const gotSorted=got.map(salesCardComparableV313).sort();
+    if(expSorted.join('\n')!==gotSorted.join('\n'))return{ok:false,links:cloud};
+    if(saveMode==='draft'){
+      const valid=got.every(x=>['DRAFT','DRAFT_INVENTORY_CHANGED','INVENTORY_CONFIRMED'].includes(String(x.importSyncStatus||'')));
+      if(!valid)return{ok:false,links:cloud};
+    }else{
+      const valid=got.every(x=>['PENDING_IMPORT_LINK','INVENTORY_CONFIRMED'].includes(String(x.importSyncStatus||'')));
+      if(!valid)return{ok:false,links:cloud};
+    }
+    verifiedLinks.push(...got);
+  }
+  return{ok:verifiedLinks.length===expected.length,links:verifiedLinks};
+}
 
 function productProfitNameV241(x){const q=Math.max(1,Number(x.quantity||1));return escapeChangeLogHtmlV200(String(x.productName||''))+(q>1?` <small class="product-profit-qty-v241">×${q}</small>`:'')}
 productProfitDesktopRowsV216=function(list){return list.map(x=>`<tr><td>${productProfitNameV241(x)}</td><td>${formatAmount(Number(x.averageCost||0)*Math.max(1,Number(x.quantity||1)))}</td><td>${formatAmount(Number(x.actualPrice||0))}</td><td>${formatAmount(Number(x.profit||0))}</td><td>${Number(x.profitRate||0).toFixed(2)}%</td></tr>`).join('')};
@@ -5037,10 +5119,10 @@ saveLiveSales=async function(){
       return;
     }
   }catch(e){
-    // V31.1: a cloud preflight timeout must not lock turnover editing.
+    // V31.3: a cloud preflight timeout must not lock turnover editing.
     // The authoritative saveLive() server guard still rejects any amount below
     // active saved cards. With no saved card, the user may edit turnover freely.
-    console.warn("V31.1 销售卡预检暂时失败，继续交由云端保存时核对",e);
+    console.warn("V31.3 销售卡预检暂时失败，继续交由云端保存时核对",e);
   }
 
   const restored=reactivateLiveHostIfNeeded(host);
@@ -5407,7 +5489,7 @@ function scheduleInventoryPendingResumeRefreshV265(){
     refreshInventoryPendingV250(true);
   },500);
 }
-// V31.1: cloud resume synchronization is centralized in update.js.
+// V31.3: cloud resume synchronization is centralized in update.js.
 // Refresh Import reminders once only after that resume cycle completes, instead
 // of competing with it through visibilitychange + focus + pageshow.
 window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);
@@ -5582,7 +5664,7 @@ renderLiveMonthlyList=function(){
   }).catch(e=>console.warn('V29.9 Live 利润读取失败',e));
 };
 
-/* ================= V31.1 on-demand Profit Query =================
+/* ================= V31.3 on-demand Profit Query =================
    Deliberately isolated from Home startup/sync. Sales_Product_Links is read only
    after the user presses 查询利润.
 */
