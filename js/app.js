@@ -1,9 +1,26 @@
 let fairSessionsCloudV281=[];
 let fairSessionDraftDirtyV282=false;
-function getSavedFairLocations(){try{return JSON.parse(localStorage.getItem("lover_fair_locations")||"[]")}catch(e){return[]}}
-function saveFairLocation(location){const loc=canonicalLocation(location);if(!loc)return;const list=getSavedFairLocations();if(!list.some(x=>canonicalLocation(x)===loc))list.push(loc);list.sort();localStorage.setItem("lover_fair_locations",JSON.stringify(list));renderFairLocationOptions()}
-function collectFairLocations(){const fromRows=[...new Set(rows.filter(r=>r.type==="fair").map(r=>canonicalLocation(r.location)).filter(Boolean))],fromStorage=[],fromSessions=(Array.isArray(fairSessionsCloudV281)?fairSessionsCloudV281:[]).map(x=>canonicalLocation(x.location)).filter(Boolean),merged=[];[...fromRows,...fromSessions,...fromStorage].forEach(x=>{const loc=canonicalLocation(x);if(loc&&!merged.some(y=>canonicalLocation(y)===loc))merged.push(loc)});merged.sort();localStorage.setItem("lover_fair_locations",JSON.stringify(merged));return merged}
-function renderFairLocationOptions(){const el=document.getElementById("fairLocationListOptions");if(el)el.innerHTML=collectFairLocations().map(loc=>`<option value="${loc}"></option>`).join("")}
+function getSavedFairLocations(){try{const list=JSON.parse(localStorage.getItem("lover_fair_locations")||"[]");return Array.isArray(list)?list.map(x=>canonicalLocation(x)).filter(Boolean):[]}catch(e){return[]}}
+function saveFairLocation(location){const loc=canonicalLocation(location);if(!loc)return;const list=getSavedFairLocations();if(!list.some(x=>normalizeFairLocationKey(x)===normalizeFairLocationKey(loc)))list.push(loc);list.sort((a,b)=>a.localeCompare(b));localStorage.setItem("lover_fair_locations",JSON.stringify(list));renderFairLocationOptions()}
+function deleteFairLocationHistoryV309(location){const key=normalizeFairLocationKey(location);const list=getSavedFairLocations().filter(x=>normalizeFairLocationKey(x)!==key);localStorage.setItem("lover_fair_locations",JSON.stringify(list));renderFairLocationOptions()}
+function collectFairLocations(){return getSavedFairLocations()}
+function renderFairLocationHistoryV309(){
+  const panel=document.getElementById("fairLocationHistoryV309");
+  if(!panel)return;
+  const list=collectFairLocations();
+  panel.innerHTML="";
+  if(!list.length){panel.classList.add("hidden");return;}
+  const title=document.createElement("div");title.className="fair-location-history-title-v309";title.textContent="历史地点";panel.appendChild(title);
+  list.forEach(loc=>{
+    const row=document.createElement("div");row.className="fair-location-history-row-v309";
+    const choose=document.createElement("button");choose.type="button";choose.className="fair-location-history-choose-v309";choose.textContent=loc;
+    choose.addEventListener("click",()=>{const input=document.getElementById("fairLocation");if(input){input.value=loc;fairSessionDraftDirtyV282=true;updateFairPageMode();syncFairInputs();syncFairProductDatesV203(true);input.focus();}panel.classList.add("hidden")});
+    const del=document.createElement("button");del.type="button";del.className="fair-location-history-delete-v309";del.setAttribute("aria-label",`删除 ${loc}`);del.textContent="×";
+    del.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();deleteFairLocationHistoryV309(loc)});
+    row.append(choose,del);panel.appendChild(row);
+  });
+}
+function renderFairLocationOptions(){const el=document.getElementById("fairLocationListOptions");if(el){el.innerHTML="";collectFairLocations().forEach(loc=>{const option=document.createElement("option");option.value=loc;el.appendChild(option)})}renderFairLocationHistoryV309()}
 function latestFairSessionV281(){const list=(Array.isArray(fairSessionsCloudV281)?fairSessionsCloudV281:[]).filter(x=>x&&x.location&&x.start&&x.end);return [...list].sort((a,b)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")))[0]||null}
 function applyFairSessionV281(s,{force=false}={}){if(!s)return false;const l=document.getElementById("fairLocation"),a=document.getElementById("fairStart"),b=document.getElementById("fairEnd");if(!l||!a||!b)return false;if(!force&&fairSessionDraftDirtyV282)return false;l.value=canonicalLocation(s.location);setDateControl("fairStart",s.start);setDateControl("fairEnd",s.end);localStorage.setItem("lover_last_fair_session",JSON.stringify({location:canonicalLocation(s.location),start:s.start,end:s.end,updatedAt:s.updatedAt||""}));fairSessionDraftDirtyV282=false;updateFairPageMode();syncFairInputs();renderFairLocationOptions();return true}
 async function refreshFairSessionsV281({applyLatest=false,forceApply=false}={}){try{const r=await loadFairSessionsFromSheetV281();fairSessionsCloudV281=Array.isArray(r?.sessions)?r.sessions:[];renderFairLocationOptions();if(applyLatest)applyFairSessionV281(latestFairSessionV281(),{force:forceApply});return fairSessionsCloudV281}catch(e){console.warn("Fair Session cloud sync failed",e);return fairSessionsCloudV281}}
@@ -1226,10 +1243,11 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value;
     await saveFairSessionToSheetV281(loc,start,end);
     fairSessionDraftDirtyV282=false;
-    saveFairLocation(loc);
     saveFairSession();
     await refreshFairSessionsV281();
     const result=await saveFairBatchToSheet(loc,records);
+    // V31.1: only a successfully saved Fair becomes a reusable history location.
+    saveFairLocation(loc);
 
     // V29.9: local Fair values are direct replacements, never additions. The server
     // also removes duplicate Sheet rows whose location differs only by spaces/case.
@@ -1414,6 +1432,10 @@ bindDateControl("dashboardDate",async()=>{
 document.getElementById("yearPicker").addEventListener("change",renderAll);
 document.getElementById("company").addEventListener("change",updateDailyInputFromSelectedDate);
 
+document.getElementById("fairLocation").addEventListener("focus",()=>{
+  renderFairLocationHistoryV309();
+  document.getElementById("fairLocationHistoryV309")?.classList.remove("hidden");
+});
 document.getElementById("fairLocation").addEventListener("input",()=>{
   syncFairInputs();
   syncFairProductDatesV203(true);
@@ -1422,9 +1444,11 @@ document.getElementById("fairLocation").addEventListener("input",()=>{
 document.getElementById("fairLocation").addEventListener("blur",()=>{
   const input=document.getElementById("fairLocation");
   input.value=canonicalLocation(input.value);
-  saveFairLocation(input.value);
+  // V31.1: typing/blurring alone must not create history. A location is added
+  // only after Fair is successfully saved to cloud.
   saveFairSession();
   syncFairInputs();
+  setTimeout(()=>document.getElementById("fairLocationHistoryV309")?.classList.add("hidden"),180);
 });
 
 // V29.9: paint Home immediately, restore local cache, then perform only a
@@ -4030,7 +4054,7 @@ async function saveLiveSales(){
 let monthGrandHistoryOpenV223=false;
 let monthGrandHistoryLoadingV223=false;
 
-/* ================= V30.8 Home turnover-only history =================
+/* ================= V31.1 Home turnover-only history =================
    Home monthly/yearly dropdowns deliberately do NOT read Sales_Product_Links,
    aggregate Profit, calculate profit rate, or render profit fields.
    Sales/Fair/Live page profit logic remains unchanged.
@@ -4072,13 +4096,13 @@ async function toggleMonthGrandHistoryV223(){
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
   monthGrandHistoryLoadingV223=true;renderMonthGrandHistoryV223();
   try{
-    // V30.8: only turnover rows are needed. Never load Sales_Product_Links here.
+    // V31.1: only turnover rows are needed. Never load Sales_Product_Links here.
     if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
   }catch(e){console.warn("Month turnover history load skipped:",e)}finally{monthGrandHistoryLoadingV223=false;renderMonthGrandHistoryV223()}
 }
 window.toggleMonthGrandHistoryV223=toggleMonthGrandHistoryV223;
 
-/* ================= V30.8 expandable yearly turnover-only breakdown ================= */
+/* ================= V31.1 expandable yearly turnover-only breakdown ================= */
 const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 
@@ -4115,7 +4139,7 @@ async function toggleYearBreakdownV224(kind){
   yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");yearBreakdownLoadingV224[kind]=true;renderYearBreakdownV224(kind);
   try{
-    // V30.8: no Home profit read/rollup/render; only load turnover history.
+    // V31.1: no Home profit read/rollup/render; only load turnover history.
     if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
   }catch(e){console.warn("Year turnover breakdown load skipped:",kind,e)}finally{yearBreakdownLoadingV224[kind]=false;renderYearBreakdownV224(kind)}
 }
@@ -5013,8 +5037,10 @@ saveLiveSales=async function(){
       return;
     }
   }catch(e){
-    alert("无法核对当天销售卡，已停止修改营业额。\n\n"+(e.message||e));
-    return;
+    // V31.1: a cloud preflight timeout must not lock turnover editing.
+    // The authoritative saveLive() server guard still rejects any amount below
+    // active saved cards. With no saved card, the user may edit turnover freely.
+    console.warn("V31.1 销售卡预检暂时失败，继续交由云端保存时核对",e);
   }
 
   const restored=reactivateLiveHostIfNeeded(host);
@@ -5381,7 +5407,7 @@ function scheduleInventoryPendingResumeRefreshV265(){
     refreshInventoryPendingV250(true);
   },500);
 }
-// V30.8: cloud resume synchronization is centralized in update.js.
+// V31.1: cloud resume synchronization is centralized in update.js.
 // Refresh Import reminders once only after that resume cycle completes, instead
 // of competing with it through visibilitychange + focus + pageshow.
 window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);
@@ -5555,3 +5581,41 @@ renderLiveMonthlyList=function(){
     container.insertAdjacentHTML('beforeend',`<div class="profit-grand-v294"><strong>Live 全部主播总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>${money(totalProfit)}</b></div><div><span>整体利润率</span><b>${marginTextV294(totalProfit,total)}</b></div></div>`);
   }).catch(e=>console.warn('V29.9 Live 利润读取失败',e));
 };
+
+/* ================= V31.1 on-demand Profit Query =================
+   Deliberately isolated from Home startup/sync. Sales_Product_Links is read only
+   after the user presses 查询利润.
+*/
+function initProfitQueryV310(){
+  const mode=document.getElementById("profitQueryModeV310"),month=document.getElementById("profitQueryMonthV310"),year=document.getElementById("profitQueryYearV310");
+  if(!mode)return;
+  if(month&&!month.value)month.value=document.getElementById("monthPicker")?.value||monthISO();
+  if(year&&!year.value)year.value=document.getElementById("yearPicker")?.value||selectedYear();
+  const swap=()=>{document.getElementById("profitQueryMonthWrapV310")?.classList.toggle("hidden",mode.value!=="month");document.getElementById("profitQueryYearWrapV310")?.classList.toggle("hidden",mode.value!=="year")};
+  mode.onchange=swap;swap();
+}
+function profitQueryRowMonthV310(row){const iso=displayToISO(String(row?.date||""));return /^\d{4}-\d{2}-\d{2}$/.test(iso)?iso.slice(0,7):""}
+function profitQuerySalesForPeriodV310(mode,target){
+  return dedupeRows(rows).filter(r=>{const m=profitQueryRowMonthV310(r);return mode==="month"?m===target:m.slice(0,4)===target}).reduce((s,r)=>s+Number(r.amount||0),0);
+}
+function profitQueryLinksForPeriodV310(links,mode,target){return (Array.isArray(links)?links:[]).filter(x=>{const m=profitQueryRowMonthV310(x);return mode==="month"?m===target:m.slice(0,4)===target})}
+function profitQueryBucketsV310(links,mode,target){
+  const map=new Map();
+  profitQueryLinksForPeriodV310(links,mode,target).forEach(x=>{const m=profitQueryRowMonthV310(x);if(!m)return;const key=mode==="month"?displayToISO(String(x.date||"")):m;map.set(key,(map.get(key)||0)+Number(x.profit||0))});
+  const salesMap=new Map();dedupeRows(rows).forEach(r=>{const m=profitQueryRowMonthV310(r);if(!m)return;const inPeriod=mode==="month"?m===target:m.slice(0,4)===target;if(!inPeriod)return;const key=mode==="month"?displayToISO(String(r.date||"")):m;salesMap.set(key,(salesMap.get(key)||0)+Number(r.amount||0))});
+  const keys=[...new Set([...map.keys(),...salesMap.keys()])].sort();return keys.map(key=>{const sales=Number(salesMap.get(key)||0),profit=Number(map.get(key)||0);return{key,sales,profit,rate:sales>0?profit/sales*100:0}})
+}
+function renderProfitQueryV310(mode,target,links){
+  const el=document.getElementById("profitQueryResultV310");if(!el)return;
+  const buckets=profitQueryBucketsV310(links,mode,target),sales=profitQuerySalesForPeriodV310(mode,target),profit=profitQueryLinksForPeriodV310(links,mode,target).reduce((s,x)=>s+Number(x.profit||0),0),rate=sales>0?profit/sales*100:0;
+  const body=buckets.map(x=>`<tr><td>${mode==="month"?isoToDisplay(x.key).slice(0,5):x.key.slice(5,7)+"-"+x.key.slice(0,4)}</td><td>${money(x.sales)}</td><td>${money(x.profit)}</td><td>${x.rate.toFixed(2)}%</td></tr>`).join("");
+  el.innerHTML=`<div class="profit-query-summary-v310"><div class="profit-query-kpi-v310"><span>营业额</span><b>RM${money(sales)}</b></div><div class="profit-query-kpi-v310"><span>利润</span><b>RM${money(profit)}</b></div><div class="profit-query-kpi-v310"><span>利润率</span><b>${rate.toFixed(2)}%</b></div></div><div class="table-wrap"><table class="profit-query-table-v310"><thead><tr><th>日期</th><th>营业额</th><th>利润</th><th>利润率</th></tr></thead><tbody>${body||'<tr><td colspan="4">没有利润资料</td></tr>'}</tbody><tfoot><tr><td>总数</td><td>${money(sales)}</td><td>${money(profit)}</td><td>${rate.toFixed(2)}%</td></tr></tfoot></table></div>`;el.classList.remove("hidden");
+}
+async function runProfitQueryV310(){
+  initProfitQueryV310();const mode=document.getElementById("profitQueryModeV310")?.value||"month",target=mode==="month"?document.getElementById("profitQueryMonthV310")?.value:String(document.getElementById("profitQueryYearV310")?.value||"").trim(),status=document.getElementById("profitQueryStatusV310"),result=document.getElementById("profitQueryResultV310");
+  if(mode==="month"&&!/^\d{4}-\d{2}$/.test(target)){alert("请选择月份");return}if(mode==="year"&&!/^\d{4}$/.test(target)){alert("请输入年度");return}
+  if(status)status.textContent="正在按需读取利润资料…";if(result)result.classList.add("hidden");
+  try{if(mode==="year"&&typeof loadYearInBackground==="function")await loadYearInBackground(target);else if(mode==="month"&&target!==selectedMonth()&&typeof loadMonthCloudShared==="function"&&typeof mergeCloudMonthRows==="function"){const cloud=await loadMonthCloudShared(target);mergeCloudMonthRows(target,cloud)}const links=await loadAllSalesProductLinksV203({force:true,maxAgeMs:0});renderProfitQueryV310(mode,target,links);if(status)status.textContent="查询完成 · 利润资料只在本次主动查询时读取"}catch(e){if(status)status.textContent="查询失败："+(e.message||e);console.error(e)}
+}
+window.runProfitQueryV310=runProfitQueryV310;
+setTimeout(initProfitQueryV310,0);

@@ -2553,7 +2553,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V30.8 Fair / Live four-column summary layout ================= */
+/* ================= V31.1 Fair / Live four-column summary layout ================= */
 .profit-grand-v294{
   grid-template-columns:minmax(142px,1.45fr) minmax(88px,.9fr) minmax(72px,.76fr) minmax(92px,.9fr);
   gap:6px;padding:12px 12px;white-space:nowrap;overflow:hidden;
@@ -2579,7 +2579,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V30.8 Home turnover-only dropdowns ================= */
+/* ================= V31.1 Home turnover-only dropdowns ================= */
 .turnover-only-table-v307{width:100%;margin-top:10px;border-top:1px solid rgba(160,120,0,.35)}
 .turnover-only-head-v307,.turnover-only-row-v307{display:grid;grid-template-columns:minmax(78px,.8fr) minmax(110px,1.2fr);align-items:center;gap:8px;padding:9px 2px;border-bottom:1px dashed #ddd}
 .turnover-only-head-v307{font-weight:800;color:#333}
@@ -2590,3 +2590,24 @@ body{overflow-x:hidden;}
   .turnover-only-head-v307,.turnover-only-row-v307{grid-template-columns:82px minmax(0,1fr);gap:5px;padding:9px 0;font-size:16px}
   .turnover-only-row-v307 b{font-size:17px}
 }
+
+
+/* ================= V31.1 Fair location history ================= */
+.fair-location-history-v309{margin-top:8px;border:1px solid #d8ddd8;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 8px 22px rgba(0,0,0,.08)}
+.fair-location-history-title-v309{padding:9px 12px 6px;font-weight:800;color:#555;font-size:.9rem;background:#f7f8f7}
+.fair-location-history-row-v309{display:grid;grid-template-columns:minmax(0,1fr) 48px;align-items:stretch;border-top:1px solid #ecefec}
+.fair-location-history-choose-v309,.fair-location-history-delete-v309{border:0;background:#fff;font:inherit;min-height:46px}
+.fair-location-history-choose-v309{text-align:left;padding:9px 12px;font-weight:750;color:#176f39;white-space:normal;overflow-wrap:anywhere}
+.fair-location-history-delete-v309{font-size:1.65rem;font-weight:700;color:#b31515;border-left:1px solid #ecefec}
+.fair-location-history-choose-v309:active,.fair-location-history-delete-v309:active{background:#f1f6f2}
+@media(max-width:600px){.fair-location-history-v309{margin-top:6px}.fair-location-history-choose-v309{font-size:1rem}.fair-location-history-delete-v309{font-size:1.55rem}}
+
+/* ================= V31.1 on-demand profit query ================= */
+.profit-query-card-v310{margin-top:14px;padding:14px;border:1px solid #e2b348;border-radius:16px;background:#fffaf0}
+.profit-query-head-v310 h3{margin:0 0 4px;color:#7b5100}.profit-query-head-v310 .note{margin:0 0 12px}
+.profit-query-controls-v310{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
+.profit-query-controls-v310 label{display:grid;gap:5px;font-weight:800}.profit-query-controls-v310 input,.profit-query-controls-v310 select{width:100%;min-height:44px;border:1px solid #ccc;border-radius:10px;padding:8px 10px;background:#fff;font:inherit}
+.profit-query-btn-v310{min-height:44px;margin:0}.profit-query-status-v310{margin-top:10px;font-weight:800;color:#805500}
+.profit-query-result-v310{margin-top:12px}.profit-query-summary-v310{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.profit-query-kpi-v310{padding:11px;border:1px solid #ead7ad;border-radius:12px;background:#fff}.profit-query-kpi-v310 span{display:block;color:#666;font-size:.85rem}.profit-query-kpi-v310 b{display:block;margin-top:4px;color:#b40000;font-size:1.15rem}
+.profit-query-table-v310{width:100%;border-collapse:collapse;background:#fff}.profit-query-table-v310 th,.profit-query-table-v310 td{padding:9px 7px;border-bottom:1px dashed #ddd;text-align:right;white-space:nowrap}.profit-query-table-v310 th:first-child,.profit-query-table-v310 td:first-child{text-align:left}.profit-query-table-v310 tfoot{font-weight:900;color:#b40000}
+@media(max-width:600px){.profit-query-controls-v310{grid-template-columns:1fr 1fr}.profit-query-btn-v310{grid-column:1/-1}.profit-query-summary-v310{grid-template-columns:1fr 1fr 1fr;gap:5px}.profit-query-kpi-v310{padding:8px 5px}.profit-query-kpi-v310 span{font-size:.72rem}.profit-query-kpi-v310 b{font-size:.95rem}.profit-query-table-v310 th,.profit-query-table-v310 td{padding:8px 4px;font-size:.86rem}}
