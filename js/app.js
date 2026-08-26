@@ -1246,7 +1246,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     saveFairSession();
     await refreshFairSessionsV281();
     const result=await saveFairBatchToSheet(loc,records);
-    // V31.3: only a successfully saved Fair becomes a reusable history location.
+    // V31.4: only a successfully saved Fair becomes a reusable history location.
     saveFairLocation(loc);
 
     // V29.9: local Fair values are direct replacements, never additions. The server
@@ -1444,7 +1444,7 @@ document.getElementById("fairLocation").addEventListener("input",()=>{
 document.getElementById("fairLocation").addEventListener("blur",()=>{
   const input=document.getElementById("fairLocation");
   input.value=canonicalLocation(input.value);
-  // V31.3: typing/blurring alone must not create history. A location is added
+  // V31.4: typing/blurring alone must not create history. A location is added
   // only after Fair is successfully saved to cloud.
   saveFairSession();
   syncFairInputs();
@@ -4054,7 +4054,7 @@ async function saveLiveSales(){
 let monthGrandHistoryOpenV223=false;
 let monthGrandHistoryLoadingV223=false;
 
-/* ================= V31.3 Home turnover-only history =================
+/* ================= V31.4 Home turnover-only history =================
    Home monthly/yearly dropdowns deliberately do NOT read Sales_Product_Links,
    aggregate Profit, calculate profit rate, or render profit fields.
    Sales/Fair/Live page profit logic remains unchanged.
@@ -4096,13 +4096,13 @@ async function toggleMonthGrandHistoryV223(){
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
   monthGrandHistoryLoadingV223=true;renderMonthGrandHistoryV223();
   try{
-    // V31.3: only turnover rows are needed. Never load Sales_Product_Links here.
+    // V31.4: only turnover rows are needed. Never load Sales_Product_Links here.
     if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
   }catch(e){console.warn("Month turnover history load skipped:",e)}finally{monthGrandHistoryLoadingV223=false;renderMonthGrandHistoryV223()}
 }
 window.toggleMonthGrandHistoryV223=toggleMonthGrandHistoryV223;
 
-/* ================= V31.3 expandable yearly turnover-only breakdown ================= */
+/* ================= V31.4 expandable yearly turnover-only breakdown ================= */
 const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 
@@ -4139,7 +4139,7 @@ async function toggleYearBreakdownV224(kind){
   yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");yearBreakdownLoadingV224[kind]=true;renderYearBreakdownV224(kind);
   try{
-    // V31.3: no Home profit read/rollup/render; only load turnover history.
+    // V31.4: no Home profit read/rollup/render; only load turnover history.
     if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
   }catch(e){console.warn("Year turnover breakdown load skipped:",kind,e)}finally{yearBreakdownLoadingV224[kind]=false;renderYearBreakdownV224(kind)}
 }
@@ -4951,124 +4951,159 @@ const _buildSalesCardTransactionV240=buildSalesCardTransactionV239;
 buildSalesCardTransactionV239=function(type,dataList=[]){const card=_buildSalesCardTransactionV240(type,dataList);setTimeout(()=>renumberSavedSalesCardsV241(type),0);return card};
 
 const _saveProductLinksV240=saveProductLinksV206;
+
+/* ================= V31.4 instant draft save + durable cloud retry =================
+   Draft edits must never hold the user on “保存中…”.  The latest draft is written
+   to persistent local cache first, the UI is released immediately, and the cloud
+   write runs in the background.  Confirmation still waits for cloud so Import/FIFO
+   never sees an older draft. */
+const SALES_DRAFT_PENDING_KEY_V314='lover_sales_draft_pending_v314';
+const SALES_DRAFT_INFLIGHT_V314=new Map();
+let SALES_DRAFT_RETRY_TIMER_V314=null;
+function readSalesDraftPendingV314(){try{const x=JSON.parse(localStorage.getItem(SALES_DRAFT_PENDING_KEY_V314)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}}
+function writeSalesDraftPendingV314(obj){try{localStorage.setItem(SALES_DRAFT_PENDING_KEY_V314,JSON.stringify(obj||{}));return true}catch(_){return false}}
+function salesDraftPendingKeyV314(type,date,location){return [String(type||''),String(date||''),String(location||'').trim().toLowerCase()].join('|')}
+function queueSalesDraftV314(type,date,location,items){
+  const all=readSalesDraftPendingV314(),key=salesDraftPendingKeyV314(type,date,location),token=Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
+  all[key]={type,date,location,items:Array.isArray(items)?items:[],token,savedAt:Date.now()};
+  if(!writeSalesDraftPendingV314(all))throw new Error('无法写入本机草稿安全记录');
+  const verify=readSalesDraftPendingV314()[key];
+  if(!verify||verify.token!==token)throw new Error('本机草稿安全记录验证失败');
+  return {key,token};
+}
+function removeSalesDraftPendingV314(key,token=''){
+  const all=readSalesDraftPendingV314(),cur=all[key];
+  if(!cur)return;
+  if(token&&String(cur.token||'')!==String(token||''))return;
+  delete all[key];writeSalesDraftPendingV314(all);
+}
+function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
+  const local=items.map(x=>({...x,importSyncStatus:'DRAFT'}));
+  const old=(typeof getSalesCardPersistentCacheV232==='function'?getSalesCardPersistentCacheV232(type,ctx.date,ctx.location):[])||[];
+  const merged=[...old.filter(x=>!dirtyIds.has(String(x.transactionId||''))),...local];
+  if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,merged);
+  if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,merged);
+  if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,ctx.date,ctx.location,merged);
+  const byLink=new Map(local.map(x=>[String(x.linkId||''),x]));
+  dirty.forEach(card=>{
+    clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;card.dataset.inventoryStatus='DRAFT';
+    card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';i.dataset.inventoryStatus='DRAFT';});
+    const tag=card.querySelector('.sales-card-header-v239 b:first-child');if(tag)tag.textContent='已保存销售卡';
+  });
+  renumberSavedSalesCardsV241(type);
+  return merged;
+}
+async function syncQueuedSalesDraftV314(key,expectedToken=''){
+  if(SALES_DRAFT_INFLIGHT_V314.has(key))return SALES_DRAFT_INFLIGHT_V314.get(key);
+  const all=readSalesDraftPendingV314(),entry=all[key];
+  if(!entry)return {ok:true,skipped:true};
+  if(expectedToken&&String(entry.token||'')!==String(expectedToken))return {ok:true,stale:true};
+  const p=(async()=>{
+    try{
+      const result=await window.saveSalesProductLinksApiV241(entry.items,'draft');
+      const latest=readSalesDraftPendingV314()[key];
+      if(latest&&String(latest.token||'')===String(entry.token||'')){
+        removeSalesDraftPendingV314(key,entry.token);
+        const saved=Array.isArray(result?.links)&&result.links.length?result.links:entry.items;
+        if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(entry.type,entry.date,entry.location,saved);
+        if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(entry.type,entry.date,entry.location,saved);
+        if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(entry.type,entry.date,entry.location,saved);
+        setSync('草稿已保存 · 云端已同步',true);
+      }
+      return result;
+    }catch(err){
+      setSync('草稿已安全保存 · 云端待同步',false,true);
+      scheduleSalesDraftRetryV314(5000);
+      throw err;
+    }finally{SALES_DRAFT_INFLIGHT_V314.delete(key)}
+  })();
+  SALES_DRAFT_INFLIGHT_V314.set(key,p);return p;
+}
+function scheduleSalesDraftRetryV314(delay=5000){
+  clearTimeout(SALES_DRAFT_RETRY_TIMER_V314);
+  SALES_DRAFT_RETRY_TIMER_V314=setTimeout(()=>retryAllSalesDraftsV314(),delay);
+}
+async function retryAllSalesDraftsV314(){
+  if(typeof navigator!=='undefined'&&!navigator.onLine)return scheduleSalesDraftRetryV314(15000);
+  const keys=Object.keys(readSalesDraftPendingV314());
+  for(const key of keys){try{await syncQueuedSalesDraftV314(key)}catch(_){}}
+}
+async function flushSalesDraftBeforeConfirmV314(type,date,location){
+  const key=salesDraftPendingKeyV314(type,date,location);
+  const inflight=SALES_DRAFT_INFLIGHT_V314.get(key);if(inflight){try{await inflight}catch(_){}}
+  const current=readSalesDraftPendingV314()[key];
+  if(current){const result=await window.saveSalesProductLinksApiV241(current.items,'draft');removeSalesDraftPendingV314(key,current.token);return result}
+  return null;
+}
+window.addEventListener('online',()=>scheduleSalesDraftRetryV314(100));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleSalesDraftRetryV314(250)});
+setTimeout(()=>scheduleSalesDraftRetryV314(1200),0);
+
 saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   saveMode=saveMode==='draft'?'draft':'confirm';
   if(button?.dataset?.busyV285==='1')return null;
   const originalButtonText=button?.textContent||'';
   if(button){button.dataset.busyV285='1';button.disabled=true;button.textContent=saveMode==='draft'?'保存中…':'确认中…';}
+  const releaseButton=()=>{if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}};
   const cards=salesCardWrappersV239(type),dirty=cards.filter(c=>c.dataset.dirty==='1'||c.dataset.productRemovedV259==='1'||!salesCardIsSavedV241(c)||(saveMode==='confirm'&&String(c.dataset.inventoryStatus||'').startsWith('DRAFT')));
-  if(!dirty.length){alert('销售卡没有需要保存的修改。');if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}return null;}
-  /* Keep only changed transactions in the request; server treats existing other cards as context. */
+  if(!dirty.length){alert('销售卡没有需要保存的修改。');releaseButton();return null;}
   const all=collectProductLinksV206(type),dirtyIds=new Set(dirty.map(c=>String(c.dataset.transactionId||''))),items=all.filter(x=>dirtyIds.has(String(x.transactionId||'')));
-  if(!items.length){alert('请填写销售卡产品资料。');if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}return null;}
-  const first=items[0],official=salesCardsOfficialAmountV241(type),allTotal=all.reduce((s,x)=>s+Number(x.actualPrice||0),0);
-  if(official>0&&allTotal>official+0.005){alert(`所有销售卡售价总数 RM${formatAmount(allTotal)} 已超过当天营业额 RM${formatAmount(official)}。`);if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}return null;}
+  if(!items.length){alert('请填写销售卡产品资料。');releaseButton();return null;}
+  const official=salesCardsOfficialAmountV241(type),allTotal=all.reduce((s,x)=>s+Number(x.actualPrice||0),0);
+  if(official>0&&allTotal>official+0.005){alert(`所有销售卡售价总数 RM${formatAmount(allTotal)} 已超过当天营业额 RM${formatAmount(official)}。`);releaseButton();return null;}
   for(const x of items){
-    if(!x.productName){alert('每一个产品都需要填写产品名称。');if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}return null}
-    if(!Number.isFinite(Number(x.quantity))||Number(x.quantity)<=0){alert(`产品${Number(x.productOrder||0)||""} 数量必须大于 0。`);if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}return null}
-    if(!Number.isFinite(Number(x.unitPrice))||Number(x.unitPrice)<=0){
-      alert(`产品${Number(x.productOrder||0)||""} 售价必须大于 RM0.00，无法保存销售卡。`);
-      if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}return null;
+    if(!x.productName){alert('每一个产品都需要填写产品名称。');releaseButton();return null}
+    if(!Number.isFinite(Number(x.quantity))||Number(x.quantity)<=0){alert(`产品${Number(x.productOrder||0)||''} 数量必须大于 0。`);releaseButton();return null}
+    if(!Number.isFinite(Number(x.unitPrice))||Number(x.unitPrice)<=0){alert(`产品${Number(x.productOrder||0)||''} 售价必须大于 RM0.00，无法保存销售卡。`);releaseButton();return null}
+  }
+  const ctx=productLinkContextV206(type);
+
+  if(saveMode==='draft'){
+    try{
+      // V31.4: local durable save is the user-facing completion point.
+      const queued=queueSalesDraftV314(type,ctx.date,ctx.location,items);
+      markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds);
+      setSync('草稿已安全保存 · 可以离开',true);
+      releaseButton();
+      alert('销售卡草稿已保存。\n\n可以继续操作或离开；云端会在后台同步。');
+      // Fire-and-forget: never hold “保存中…” on a repeat draft save.
+      setTimeout(()=>syncQueuedSalesDraftV314(queued.key,queued.token).catch(()=>{}),0);
+      return {ok:true,local:true,pendingCloud:true,links:items};
+    }catch(e){
+      releaseButton();setSync('本机草稿保存失败',false,true);alert('草稿未能安全保存：'+(e.message||e));return null;
     }
   }
-  /* Optimistic merge before network: prevents old cached cards/records flashing back. */
-  const ctx=productLinkContextV206(type),old=(typeof getSalesCardPersistentCacheV232==='function'?getSalesCardPersistentCacheV232(type,ctx.date,ctx.location):[])||[];
-  const merged=[...old.filter(x=>!dirtyIds.has(String(x.transactionId||''))),...items];
-  if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,merged);
-  if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,merged);
-  if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,ctx.date,ctx.location,merged);
-  const finalizeSalesCardSaveV313=(result,verifiedAfterTimeout=false)=>{
-    const saved=Array.isArray(result?.links)?result.links:items;
-    const final=[...merged.filter(x=>!dirtyIds.has(String(x.transactionId||''))),...saved];
+
+  try{
+    // Confirmation is different: wait for any earlier draft write, then confirm
+    // the latest values so Import/FIFO can never receive an older card version.
+    await flushSalesDraftBeforeConfirmV314(type,ctx.date,ctx.location);
+    setSync('销售确认同步中...');
+    const result=await window.saveSalesProductLinksApiV241(items,'confirm');
+    const saved=Array.isArray(result?.links)&&result.links.length?result.links:items;
+    const old=(typeof getSalesCardPersistentCacheV232==='function'?getSalesCardPersistentCacheV232(type,ctx.date,ctx.location):[])||[];
+    const final=[...old.filter(x=>!dirtyIds.has(String(x.transactionId||''))),...saved];
     if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,final);
     if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,final);
     const savedByLink=new Map(saved.map(x=>[String(x.linkId||''),x]));
     dirty.forEach(card=>{clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;let cardStatus='';card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';const rec=savedByLink.get(String(i.dataset.linkId||''));if(rec){i.dataset.inventoryStatus=String(rec.importSyncStatus||'');cardStatus=cardStatus||i.dataset.inventoryStatus;}});if(cardStatus)card.dataset.inventoryStatus=cardStatus;});
-    renumberSavedSalesCardsV241(type);
-    setSync(saveMode==='draft'?'草稿已保存':'销售已确认',true);
-    const extra=verifiedAfterTimeout?'\n\n刚才连接超时，但系统已重新核对云端，确认资料已经保存。':'';
-    alert((saveMode==='draft'?'销售卡草稿保存成功。\n\n草稿不会产生新的库存提醒。':'销售确认成功。\n\n如有库存变动，请到 Import Cost System 处理。')+extra);
-    if(result?.warning)alert(result.warning);
-    return result;
-  };
-  try{
-    setSync('销售卡同步中...');
-    const result=await window.saveSalesProductLinksApiV241(items,saveMode);
-    return finalizeSalesCardSaveV313(result,false);
-  }catch(e){
-    // V31.3: JSONP may time out after Apps Script has already committed the edit.
-    // Re-read the same date/location and verify the stable transaction/link IDs
-    // before telling the user the save failed. This keeps repeated draft saves
-    // idempotent and prevents accidental duplicate cards after a timeout.
-    try{
-      setSync('连接稍慢，正在核对销售卡...');
-      const verified=await verifySalesCardSaveAfterTimeoutV313(type,ctx.date,ctx.location,items,saveMode);
-      if(verified?.ok){
-        return finalizeSalesCardSaveV313({ok:true,links:verified.links||items,warning:''},true);
-      }
-    }catch(verifyErr){
-      console.warn('V31.3 销售卡超时后核对失败',verifyErr);
-    }
-    setSync('销售卡同步失败',false,true);
-    alert('销售卡保存失败：'+(e.message||e)+'\n\n系统未能确认云端已经保存。请保留当前页面后再重试，避免重复建立销售卡。');
-    return null;
-  }finally{if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}}
+    renumberSavedSalesCardsV241(type);setSync('销售已确认',true);alert('销售确认成功。\n\n如有库存变动，请到 Import Cost System 处理。');if(result?.warning)alert(result.warning);return result;
+  }catch(e){setSync('销售确认失败',false,true);alert('销售确认失败：'+(e.message||e)+'\n\n草稿仍保留，请稍后重试确认销售。');return null}
+  finally{releaseButton()}
 };
 
-function salesCardComparableV313(x){
-  return [
-    String(x.transactionId||''),String(x.linkId||''),String(x.productId||''),String(x.productName||'').trim(),
-    Number(x.quantity||0).toFixed(6),Number(x.unitPrice||0).toFixed(6),Number(x.actualPrice||0).toFixed(6),
-    Number(x.localDelivery||0).toFixed(6),Number(x.extraFee||0).toFixed(6),String(x.remark||'').trim()
-  ].join('|');
-}
-async function verifySalesCardSaveAfterTimeoutV313(type,date,location,items,saveMode){
-  const expected=Array.isArray(items)?items:[];
-  if(!expected.length)return{ok:false,links:[]};
-  let cloud=[];
-  let lastErr=null;
-  for(let attempt=0;attempt<2;attempt++){
-    try{
-      cloud=await loadSalesProductLinksV206(type,date,location,{force:true,maxAgeMs:0});
-      break;
-    }catch(err){
-      lastErr=err;
-      if(attempt===0)await new Promise(r=>setTimeout(r,900));
-    }
-  }
-  if(!Array.isArray(cloud))throw lastErr||new Error('无法读取云端销售卡');
-  const byTxn=new Map();
-  cloud.forEach(x=>{
-    const key=String(x.transactionId||'').trim();
-    if(!key)return;
-    if(!byTxn.has(key))byTxn.set(key,[]);
-    byTxn.get(key).push(x);
-  });
-  const verifiedLinks=[];
-  const expectedByTxn=new Map();
-  expected.forEach(x=>{
-    const key=String(x.transactionId||'').trim();
-    if(!key)return;
-    if(!expectedByTxn.has(key))expectedByTxn.set(key,[]);
-    expectedByTxn.get(key).push(x);
-  });
-  for(const [txn,expRows] of expectedByTxn.entries()){
-    const got=byTxn.get(txn)||[];
-    if(got.length!==expRows.length)return{ok:false,links:cloud};
-    const expSorted=expRows.map(salesCardComparableV313).sort();
-    const gotSorted=got.map(salesCardComparableV313).sort();
-    if(expSorted.join('\n')!==gotSorted.join('\n'))return{ok:false,links:cloud};
-    if(saveMode==='draft'){
-      const valid=got.every(x=>['DRAFT','DRAFT_INVENTORY_CHANGED','INVENTORY_CONFIRMED'].includes(String(x.importSyncStatus||'')));
-      if(!valid)return{ok:false,links:cloud};
-    }else{
-      const valid=got.every(x=>['PENDING_IMPORT_LINK','INVENTORY_CONFIRMED'].includes(String(x.importSyncStatus||'')));
-      if(!valid)return{ok:false,links:cloud};
-    }
-    verifiedLinks.push(...got);
-  }
-  return{ok:verifiedLinks.length===expected.length,links:verifiedLinks};
-}
+// V31.4: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
+const _deleteSalesCardTransactionV313=deleteSalesCardTransactionV239;
+deleteSalesCardTransactionV239=async function(type,txnId){
+  const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
+  const card=[...(wrap?.querySelectorAll('.sales-card-transaction-v239')||[])].find(x=>x.dataset.transactionId===txnId);if(!card)return;
+  const savedItems=[...card.querySelectorAll('.product-link-item')].filter(i=>i.dataset.saved==='1'&&String(i.dataset.linkId||''));
+  const statuses=savedItems.map(i=>String(i.dataset.inventoryStatus||'').trim()).filter(Boolean);
+  const confirmed=statuses.some(s=>!['DRAFT','DRAFT_INVENTORY_CHANGED'].includes(s));
+  if(confirmed){alert('这张销售卡已经确认销售，不能删除。');return;}
+  return _deleteSalesCardTransactionV313(type,txnId);
+};
+window.deleteSalesCardTransactionV239=deleteSalesCardTransactionV239;
 
 function productProfitNameV241(x){const q=Math.max(1,Number(x.quantity||1));return escapeChangeLogHtmlV200(String(x.productName||''))+(q>1?` <small class="product-profit-qty-v241">×${q}</small>`:'')}
 productProfitDesktopRowsV216=function(list){return list.map(x=>`<tr><td>${productProfitNameV241(x)}</td><td>${formatAmount(Number(x.averageCost||0)*Math.max(1,Number(x.quantity||1)))}</td><td>${formatAmount(Number(x.actualPrice||0))}</td><td>${formatAmount(Number(x.profit||0))}</td><td>${Number(x.profitRate||0).toFixed(2)}%</td></tr>`).join('')};
@@ -5119,10 +5154,10 @@ saveLiveSales=async function(){
       return;
     }
   }catch(e){
-    // V31.3: a cloud preflight timeout must not lock turnover editing.
+    // V31.4: a cloud preflight timeout must not lock turnover editing.
     // The authoritative saveLive() server guard still rejects any amount below
     // active saved cards. With no saved card, the user may edit turnover freely.
-    console.warn("V31.3 销售卡预检暂时失败，继续交由云端保存时核对",e);
+    console.warn("V31.4 销售卡预检暂时失败，继续交由云端保存时核对",e);
   }
 
   const restored=reactivateLiveHostIfNeeded(host);
@@ -5489,7 +5524,7 @@ function scheduleInventoryPendingResumeRefreshV265(){
     refreshInventoryPendingV250(true);
   },500);
 }
-// V31.3: cloud resume synchronization is centralized in update.js.
+// V31.4: cloud resume synchronization is centralized in update.js.
 // Refresh Import reminders once only after that resume cycle completes, instead
 // of competing with it through visibilitychange + focus + pageshow.
 window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);
@@ -5664,7 +5699,7 @@ renderLiveMonthlyList=function(){
   }).catch(e=>console.warn('V29.9 Live 利润读取失败',e));
 };
 
-/* ================= V31.3 on-demand Profit Query =================
+/* ================= V31.4 on-demand Profit Query =================
    Deliberately isolated from Home startup/sync. Sales_Product_Links is read only
    after the user presses 查询利润.
 */

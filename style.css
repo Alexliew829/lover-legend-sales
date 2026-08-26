@@ -2553,7 +2553,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V31.3 Fair / Live four-column summary layout ================= */
+/* ================= V31.4 Fair / Live four-column summary layout ================= */
 .profit-grand-v294{
   grid-template-columns:minmax(142px,1.45fr) minmax(88px,.9fr) minmax(72px,.76fr) minmax(92px,.9fr);
   gap:6px;padding:12px 12px;white-space:nowrap;overflow:hidden;
@@ -2579,7 +2579,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V31.3 Home turnover-only dropdowns ================= */
+/* ================= V31.4 Home turnover-only dropdowns ================= */
 .turnover-only-table-v307{width:100%;margin-top:10px;border-top:1px solid rgba(160,120,0,.35)}
 .turnover-only-head-v307,.turnover-only-row-v307{display:grid;grid-template-columns:minmax(78px,.8fr) minmax(110px,1.2fr);align-items:center;gap:8px;padding:9px 2px;border-bottom:1px dashed #ddd}
 .turnover-only-head-v307{font-weight:800;color:#333}
@@ -2592,7 +2592,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V31.3 Fair location history ================= */
+/* ================= V31.4 Fair location history ================= */
 .fair-location-history-v309{margin-top:8px;border:1px solid #d8ddd8;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 8px 22px rgba(0,0,0,.08)}
 .fair-location-history-title-v309{padding:9px 12px 6px;font-weight:800;color:#555;font-size:.9rem;background:#f7f8f7}
 .fair-location-history-row-v309{display:grid;grid-template-columns:minmax(0,1fr) 48px;align-items:stretch;border-top:1px solid #ecefec}
@@ -2602,7 +2602,7 @@ body{overflow-x:hidden;}
 .fair-location-history-choose-v309:active,.fair-location-history-delete-v309:active{background:#f1f6f2}
 @media(max-width:600px){.fair-location-history-v309{margin-top:6px}.fair-location-history-choose-v309{font-size:1rem}.fair-location-history-delete-v309{font-size:1.55rem}}
 
-/* ================= V31.3 on-demand profit query ================= */
+/* ================= V31.4 on-demand profit query ================= */
 .profit-query-card-v310{margin-top:14px;padding:14px;border:1px solid #e2b348;border-radius:16px;background:#fffaf0}
 .profit-query-head-v310 h3{margin:0 0 4px;color:#7b5100}.profit-query-head-v310 .note{margin:0 0 12px}
 .profit-query-controls-v310{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
