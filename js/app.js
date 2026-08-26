@@ -1035,6 +1035,37 @@ function renderDashboard(){const bt=totalBy("daily","balakong","today"),blt=tota
 function sortReportRows(list){const rank=r=>r.type==="daily"&&r.company==="balakong"?0:r.type==="daily"&&r.company==="belimbing"?1:2;return [...list].sort((a,b)=>rank(a)-rank(b)||canonicalLocation(a.location).localeCompare(canonicalLocation(b.location))||displayToISO(a.date).localeCompare(displayToISO(b.date)))}
 function renderTable(){const s=sortReportRows(dedupeRows(rows).filter(r=>sameMonth(r.date)&&Number(r.amount)>0));document.getElementById("recordTable").innerHTML=s.map(r=>`<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":"每日"}</td><td>${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td></tr>`).join("")||'<tr><td colspan="5" style="text-align:center;">这个月份还没有记录</td></tr>'}
 function renderAll(){rows=dedupeRows(rows);renderDashboard();renderBusinessTop3();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions();updateFairPageMode();renderFairMonthlyList();renderFairDailySummary();renderFairPageTop3();renderLiveDailySummary();renderLiveMonthlyList();renderLivePageTop3()}
+// V30.5: keep the save button's critical path tiny. Once pendingRows has
+// survived a localStorage read-back, yield to the browser immediately so the
+// green safe-to-leave state can paint before expensive dashboard rendering,
+// profit summaries, Top 5 work, or full local cache serialization.
+function schedulePostLocalSaveUiV305(tempMsgId="") {
+  const renderLater = () => {
+    try { renderAll(); } catch (e) { console.warn("Deferred post-save render failed", e); }
+    try { if (tempMsgId) showTempMsg(tempMsgId); } catch (_) {}
+  };
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(() => setTimeout(renderLater, 0));
+  } else {
+    setTimeout(renderLater, 0);
+  }
+
+  const cacheLater = () => {
+    try { if (typeof saveLocalDataCache === "function") saveLocalDataCache(); } catch (_) {}
+  };
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(cacheLater, { timeout: 1500 });
+  } else {
+    setTimeout(cacheLater, 250);
+  }
+}
+
+function schedulePostLocalSaveCloudV305(task) {
+  setTimeout(() => {
+    Promise.resolve().then(task).catch(() => {});
+  }, 0);
+}
+
 async function saveDailySales(){
   if(!ensureWritableSelection())return;
   const d=isoToDisplay(document.getElementById("saleDate").value);
@@ -1062,9 +1093,11 @@ async function saveDailySales(){
 
   upsertLocalRow(localRow);
   addPendingRow(localRow);
+  // V30.5: durable pending first, status second. Nothing expensive may run
+  // before this point. This is what makes Save feel immediate on mobile.
+  setDurableSaveStatus(localRow);
   document.getElementById("dailySales").value=formatAmount(a);
-  renderAll();
-  showTempMsg("saveMsg");
+  schedulePostLocalSaveUiV305("saveMsg");
 
   // V29.9: normal Save uses exactly one cloud write.
   // This prevents the immediate keepalive request from racing the normal save,
@@ -1072,15 +1105,11 @@ async function saveDailySales(){
   // comparison and suppress the modification notification.
   // The pagehide/visibility keepalive fallback remains in sheet.js for pending
   // rows only when the page is actually being closed or backgrounded.
-  if(typeof saveLocalDataCache==="function")saveLocalDataCache();
-  setDurableSaveStatus(localRow);
-
-  Promise.resolve().then(async()=>{
+  schedulePostLocalSaveCloudV305(async()=>{
     try{
       const saved=await saveDailyToSheet(d,c,a,localRow.clientUpdatedAt);
       if(saved)upsertLocalRow(saved);
       clearPendingRow(localRow);
-      renderAll();
       if(typeof saveLocalDataCache==="function")saveLocalDataCache();
       setSync("已同步",true);
     }catch(e){
@@ -1217,16 +1246,12 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     if(typeof markLocalRowMutation==="function")markLocalRowMutation(row);
   });
 
-  renderAll();
-  if(typeof saveLocalDataCache==="function")saveLocalDataCache();
-  showTempMsg("fairSaveMsg");
-
-  // V30.4: every Fair pending row must survive a localStorage read-back before
-  // the UI says it is safe to leave. Cloud confirmation continues in background.
+  // V30.5: verify persistent pending rows before any full render/cache work.
   const fairDurable = records.every(i => verifyPendingRowPersisted({type:"fair",date:i.date,company:"fair",location:loc}));
   if(fairDurable) setSync("已安全保存 · 可以离开", true);
   else setSync("本机保存未确认 · 请暂时不要离开", false, true);
-  Promise.resolve().then(async()=>{
+  schedulePostLocalSaveUiV305("fairSaveMsg");
+  schedulePostLocalSaveCloudV305(async()=>{
     try{
       const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value;
       await saveFairSessionToSheetV281(loc,start,end);
@@ -1439,7 +1464,7 @@ setTimeout(()=>{
   }catch(e){}
 },0);
 
-// V30.4 FAST STARTUP:
+// V30.5 FAST STARTUP:
 // 1) Render the last safe local snapshot immediately so Sales/Fair/Live inputs are usable.
 // 2) Perform one combined month/revision cloud request in the background.
 // 3) Do not pre-load the full year during startup; historical months load only when needed.
@@ -3982,19 +4007,16 @@ async function saveLiveSales(){
   if(amount<=0)rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));
   else upsertLocalRow(localRow);
   addPendingRow(localRow);
-  renderAll();
-  showTempMsg("liveSaveMsg");
-  if(typeof saveLocalDataCache==="function")saveLocalDataCache();
-  // V30.4: confirm the pending row can be read back from persistent storage
-  // before telling the user it is safe to leave.
+  // V30.5: persistent pending confirmation is the only work allowed before
+  // showing the user that it is safe to leave.
   setDurableSaveStatus(localRow);
-  Promise.resolve().then(async()=>{
+  schedulePostLocalSaveUiV305("liveSaveMsg");
+  schedulePostLocalSaveCloudV305(async()=>{
     try{
       const saved=await saveLiveToSheet(d,host,amount,now);
       if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);
       else rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));
       clearPendingRow(localRow);
-      renderAll();
       if(typeof saveLocalDataCache==="function")saveLocalDataCache();
       setSync("已同步",true);
     }catch(e){
