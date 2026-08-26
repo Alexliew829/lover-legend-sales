@@ -570,7 +570,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V31.5: foreground priority sync checks ONLY turnover and sales-card revisions.
+      // V31.7: foreground priority sync checks ONLY turnover and sales-card revisions.
       // Profit/Top5/Report/old-month changes never delay normal Sales/Fair/Live work.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {

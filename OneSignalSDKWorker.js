@@ -1,2 +1,2 @@
-// V31.7 - OneSignal Web Push worker. Keep this path stable.
+// V31.7 - Legacy OneSignal worker path retained for existing subscriptions.
 importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");

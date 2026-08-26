@@ -1246,7 +1246,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     saveFairSession();
     await refreshFairSessionsV281();
     const result=await saveFairBatchToSheet(loc,records);
-    // V31.5: only a successfully saved Fair becomes a reusable history location.
+    // V31.7: only a successfully saved Fair becomes a reusable history location.
     saveFairLocation(loc);
 
     // V29.9: local Fair values are direct replacements, never additions. The server
@@ -1444,7 +1444,7 @@ document.getElementById("fairLocation").addEventListener("input",()=>{
 document.getElementById("fairLocation").addEventListener("blur",()=>{
   const input=document.getElementById("fairLocation");
   input.value=canonicalLocation(input.value);
-  // V31.5: typing/blurring alone must not create history. A location is added
+  // V31.7: typing/blurring alone must not create history. A location is added
   // only after Fair is successfully saved to cloud.
   saveFairSession();
   syncFairInputs();
@@ -3661,7 +3661,15 @@ function buildProductSubItemV239(type,card,data={},order=1){
 
   const onCoreEdit=()=>{markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)};
   [name,q,c,p].forEach(el=>el.addEventListener("input",onCoreEdit));
-  [name,q].forEach(el=>el.addEventListener("input",()=>{if(String(name.dataset.productId||"")){card.dataset.inventoryStatus="PENDING_IMPORT_LINK";item.dataset.inventoryStatus="PENDING_IMPORT_LINK";if(card._renderInventoryStatusV249)card._renderInventoryStatusV249()}}));
+  [name,q].forEach(el=>el.addEventListener("input",()=>{
+    // V31.7: editing is not confirmation. Keep a saved draft as DRAFT until
+    // “确认销售” succeeds; the server is authoritative for the final status.
+    if(String(card.dataset.inventoryStatus||"").startsWith("DRAFT")){
+      card.dataset.inventoryStatus="DRAFT_INVENTORY_CHANGED";
+      item.dataset.inventoryStatus="DRAFT_INVENTORY_CHANGED";
+    }
+    if(card._renderSalesStateV317)card._renderSalesStateV317();
+  }));
   [c,p].forEach(el=>el.addEventListener("blur",()=>{el.value=formatAmount(toAmount(el.value||0));recalcSalesCardTransactionV239(card)}));
   p.addEventListener("input",()=>updateProductLinkMinimumWarningV214(item));
   shipInput.addEventListener("input",()=>{shipInput.dataset.manual="1";markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);syncCardDeliveryTotalFromProductsV240(card);recalcSalesCardTransactionV239(card)});
@@ -3681,12 +3689,35 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   card.dataset.transactionId=txnId;
   card.dataset.type=type;
   card.dataset.dirty="0";
-  card.dataset.inventoryStatus=list.some(x=>String(x.productId||"")&&String(x.importSyncStatus||"")!=="INVENTORY_CONFIRMED")?"PENDING_IMPORT_LINK":(list.some(x=>String(x.productId||""))?"INVENTORY_CONFIRMED":"");
+  const savedStatusesV317=list.filter(x=>String(x.linkId||"")||String(x.productId||"")).map(x=>String(x.importSyncStatus||"").trim()).filter(Boolean);
+  const hasDraftV317=savedStatusesV317.some(s=>s==="DRAFT"||s==="DRAFT_INVENTORY_CHANGED");
+  const hasPendingV317=savedStatusesV317.some(s=>s==="PENDING_IMPORT_LINK");
+  const hasConfirmedV317=savedStatusesV317.length>0&&savedStatusesV317.every(s=>s==="INVENTORY_CONFIRMED");
+  card.dataset.inventoryStatus=hasDraftV317?"DRAFT":hasPendingV317?"PENDING_IMPORT_LINK":hasConfirmedV317?"INVENTORY_CONFIRMED":"";
 
   const header=document.createElement("div");header.className="sales-card-header-v239";
   const title=document.createElement("b");title.textContent=list.some(x=>x.linkId)?"已保存销售卡":"新销售卡";
   const total=document.createElement("b");total.className="sales-card-price-total-v239";total.textContent="RM0.00";
   header.append(title,total);card.appendChild(header);
+
+  // V31.7: make the sales-card state explicit on Sales / Fair / Live.
+  // Draft is local/saved but NOT a confirmed sale and must never reach Import.
+  const stateBoxV317=document.createElement("div");
+  stateBoxV317.className="sales-card-state-v317";
+  stateBoxV317.hidden=true;
+  const renderStateV317=()=>{
+    const savedItems=[...card.querySelectorAll(".product-link-item")].filter(i=>i.dataset.saved==="1"&&String(i.dataset.linkId||""));
+    if(!savedItems.length){stateBoxV317.hidden=true;stateBoxV317.textContent="";return;}
+    const sts=savedItems.map(i=>String(i.dataset.inventoryStatus||card.dataset.inventoryStatus||"").trim()).filter(Boolean);
+    const draft=sts.some(st=>st==="DRAFT"||st==="DRAFT_INVENTORY_CHANGED")||String(card.dataset.inventoryStatus||"").startsWith("DRAFT");
+    const pending=!draft&&(sts.some(st=>st==="PENDING_IMPORT_LINK")||String(card.dataset.inventoryStatus||"")==="PENDING_IMPORT_LINK");
+    const done=!draft&&!pending&&sts.length>0&&sts.every(st=>st==="INVENTORY_CONFIRMED");
+    stateBoxV317.hidden=false;
+    stateBoxV317.className="sales-card-state-v317 "+(draft?"is-draft":pending?"is-pending":done?"is-done":"is-draft");
+    stateBoxV317.textContent=draft?"🟡 草稿已保存 · 尚未确认销售":pending?"🟢 已确认销售 · 等待 Import 处理库存":done?"✅ 已确认销售 · Import 已处理库存":"🟡 草稿已保存 · 尚未确认销售";
+  };
+  card.appendChild(stateBoxV317);
+  card._renderSalesStateV317=renderStateV317;
 
   const products=document.createElement("div");products.className="sales-card-products-v239";card.appendChild(products);
   list.sort((a,b)=>Number(a.productOrder||0)-Number(b.productOrder||0)).forEach((x,i)=>products.appendChild(buildProductSubItemV239(type,card,x,i+1)));
@@ -3733,7 +3764,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   delivery.inp.addEventListener("blur",()=>{delivery.inp.value=formatAmount(toAmount(delivery.inp.value||0));});
   commission.inp.addEventListener("blur",()=>{commission.inp.value=(Math.max(0,Number(commission.inp.value)||0)).toFixed(2);recalcSalesCardTransactionV239(card)});
 
-  setTimeout(()=>{clearSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)},0);
+  setTimeout(()=>{clearSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card);if(card._renderSalesStateV317)card._renderSalesStateV317()},0);
   return card;
 }
 
@@ -4053,12 +4084,22 @@ async function saveLiveSales(){
 }
 let monthGrandHistoryOpenV223=false;
 let monthGrandHistoryLoadingV223=false;
+let monthGrandProfitLinksV295=[];
 
-/* ================= V31.5 Home turnover-only history =================
-   Home monthly/yearly dropdowns deliberately do NOT read Sales_Product_Links,
-   aggregate Profit, calculate profit rate, or render profit fields.
-   Sales/Fair/Live page profit logic remains unchanged.
-*/
+function monthGrandProfitV295(month){
+  return (monthGrandProfitLinksV295||[]).reduce((sum,x)=>{
+    if(["deleted","cancelled"].includes(String(x.status||"active").toLowerCase()))return sum;
+    const date=String(x.date||"");
+    const iso=/^\d{4}-\d{2}-\d{2}$/.test(date)?date:displayToISO(date);
+    if(!iso||iso.slice(0,7)!==month)return sum;
+    const type=String(x.type||"").toLowerCase();
+    // Profit source exists for Belimbing Sales Cards, Fair and Live.
+    if(!["daily","fair","live"].includes(type))return sum;
+    const profit=Number(x.profit);
+    return sum+(Number.isFinite(profit)?profit:0);
+  },0);
+}
+
 function monthGrandHistoryRowsV223(){
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
   return buildMonthlySummary()
@@ -4068,44 +4109,86 @@ function monthGrandHistoryRowsV223(){
     .map(item=>({
       key:item.month,
       label:String(item.month||"").slice(5,7)+"-"+String(item.month||"").slice(0,4),
-      amount:Number(item.total||0)
+      amount:Number(item.total||0),
+      profit:monthGrandProfitV295(String(item.month||""))
     }));
-}
-
-function turnoverOnlyTableV307(list,labelFor){
-  const grandSales=list.reduce((sum,item)=>sum+Number(item.amount||0),0);
-  const rowsHtml=list.map(x=>`<div class="turnover-only-row-v307"><span>${labelFor(x)}</span><b>${money(x.amount)}</b></div>`).join("");
-  return `<div class="turnover-only-table-v307"><div class="turnover-only-head-v307"><span>日期</span><span>营业额</span></div>${rowsHtml}<div class="turnover-only-row-v307 turnover-only-total-v307"><span>总数</span><b>${money(grandSales)}</b></div></div>`;
 }
 
 function renderMonthGrandHistoryV223(){
   const panel=document.getElementById("monthGrandHistory");
   const arrow=document.getElementById("monthGrandHistoryArrow");
   if(!panel)return;
-  if(!monthGrandHistoryOpenV223){panel.classList.add("hidden");panel.innerHTML="";if(arrow)arrow.textContent="▼";return;}
+
+  if(!monthGrandHistoryOpenV223){
+    panel.classList.add("hidden");
+    panel.innerHTML="";
+    if(arrow)arrow.textContent="▼";
+    return;
+  }
+
   const list=monthGrandHistoryRowsV223();
-  panel.classList.remove("hidden");if(arrow)arrow.textContent="▲";
-  if(monthGrandHistoryLoadingV223&&!list.length){panel.innerHTML='<div class="sub">正在读取月份营业额...</div>';return;}
-  panel.innerHTML=list.length?turnoverOnlyTableV307(list,x=>x.label):'<div class="sub">还没有月份营业额记录</div>';
+  const grandSales=list.reduce((sum,item)=>sum+Number(item.amount||0),0);
+  const grandProfit=list.reduce((sum,item)=>sum+Number(item.profit||0),0);
+  const grandRate=grandSales>0?grandProfit/grandSales*100:0;
+  panel.classList.remove("hidden");
+  if(arrow)arrow.textContent="▲";
+
+  if(monthGrandHistoryLoadingV223&&!list.length){
+    panel.innerHTML='<div class="sub">正在读取月份营业额和利润...</div>';
+    return;
+  }
+
+  panel.innerHTML=list.length
+    ?`<div class="month-grand-profit-table-v295"><div class="month-grand-profit-head-v295"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${list.map(x=>{const rate=Number(x.amount||0)>0?Number(x.profit||0)/Number(x.amount||0)*100:0;return `<div class="month-grand-profit-row-v295"><span>${x.label}</span><b>${money(x.amount)}</b><b>${money(x.profit)}</b><b>${rate.toFixed(2)}%</b></div>`}).join("")}<div class="month-grand-profit-row-v295 month-grand-profit-total-v295"><span>总数</span><b>${money(grandSales)}</b><b>${money(grandProfit)}</b><b>${grandRate.toFixed(2)}%</b></div></div>`
+    :'<div class="sub">还没有月份营业额记录</div>';
 }
 
 async function toggleMonthGrandHistoryV223(){
   monthGrandHistoryOpenV223=!monthGrandHistoryOpenV223;
   renderMonthGrandHistoryV223();
   if(!monthGrandHistoryOpenV223)return;
+
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
-  monthGrandHistoryLoadingV223=true;renderMonthGrandHistoryV223();
+  monthGrandHistoryLoadingV223=true;
+  renderMonthGrandHistoryV223();
   try{
-    // V31.5: only turnover rows are needed. Never load Sales_Product_Links here.
-    if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
-  }catch(e){console.warn("Month turnover history load skipped:",e)}finally{monthGrandHistoryLoadingV223=false;renderMonthGrandHistoryV223()}
+    const tasks=[];
+    if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))tasks.push(loadYearInBackground(year));
+    if(typeof loadAllSalesProductLinksV203==="function")tasks.push(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000}).then(x=>{monthGrandProfitLinksV295=Array.isArray(x)?x:[]}));
+    await Promise.all(tasks);
+  }catch(e){
+    console.warn("Month turnover/profit history load skipped:",e);
+  }finally{
+    monthGrandHistoryLoadingV223=false;
+    renderMonthGrandHistoryV223();
+  }
 }
 window.toggleMonthGrandHistoryV223=toggleMonthGrandHistoryV223;
 
-/* ================= V31.5 expandable yearly turnover-only breakdown ================= */
+
+/* ================= V29.9 expandable yearly monthly breakdown + profit ================= */
 const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
+let yearBreakdownLinksV286=[];
 
+function yearBreakdownProfitV286(kind,key){
+  const isYear=kind==="total";
+  return (yearBreakdownLinksV286||[]).reduce((sum,x)=>{
+    if(["deleted","cancelled"].includes(String(x.status||"active").toLowerCase()))return sum;
+    const date=String(x.date||"");
+    const iso=/^\d{4}-\d{2}-\d{2}$/.test(date)?date:displayToISO(date);
+    if(!iso)return sum;
+    const rowKey=isYear?iso.slice(0,4):iso.slice(0,7);
+    if(rowKey!==key)return sum;
+    const type=String(x.type||"").toLowerCase();
+    if(kind==="balakong")return sum; // Sales Cards are Belimbing; Balakong has no sales-card profit source.
+    if(kind==="belimbing"&&type!=="daily")return sum;
+    if(kind==="fair"&&type!=="fair")return sum;
+    if(kind==="live"&&type!=="live")return sum;
+    const profit=Number(x.profit);
+    return sum+(Number.isFinite(profit)?profit:0);
+  },0);
+}
 function yearBreakdownRowsV224(kind){
   if(kind==="total"){
     const byYear=new Map();
@@ -4114,34 +4197,38 @@ function yearBreakdownRowsV224(kind){
       if(!/^\d{4}$/.test(year))return;
       byYear.set(year,(byYear.get(year)||0)+Number(item.total||0));
     });
-    return [...byYear.entries()].map(([year,amount])=>({month:year,year,amount:Number(amount||0)}))
+    return [...byYear.entries()].map(([year,amount])=>({month:year,year,amount:Number(amount||0),profit:yearBreakdownProfitV286("total",year)}))
       .filter(item=>Math.abs(item.amount)>0.000001).sort((a,b)=>String(a.year).localeCompare(String(b.year)));
   }
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
   return buildMonthlySummary().filter(item=>!year||String(item.month||"").slice(0,4)===year)
-    .map(item=>({month:item.month,amount:Number(item[kind]||0)}))
+    .map(item=>({month:item.month,amount:Number(item[kind]||0),profit:yearBreakdownProfitV286(kind,String(item.month||""))}))
     .filter(item=>Math.abs(item.amount)>0.000001).sort((a,b)=>String(a.month).localeCompare(String(b.month)));
 }
 function yearBreakdownTableV286(list,kind){
-  return turnoverOnlyTableV307(list,x=>kind==="total"?String(x.year||x.month):String(x.month).slice(5,7)+"-"+String(x.month).slice(0,4));
+  const grandSales=list.reduce((s,x)=>s+Number(x.amount||0),0),grandProfit=list.reduce((s,x)=>s+Number(x.profit||0),0),grandRate=grandSales>0?grandProfit/grandSales*100:0;
+  const rowsHtml=list.map(x=>{const sales=Number(x.amount||0),profit=Number(x.profit||0),rate=sales>0?profit/sales*100:0;const label=kind==="total"?String(x.year||x.month):String(x.month).slice(5,7)+"-"+String(x.month).slice(0,4);return `<div class="year-profit-row-v286"><span>${label}</span><b>${money(sales)}</b><b>${money(profit)}</b><b>${rate.toFixed(2)}%</b></div>`}).join("");
+  return `<div class="year-profit-table-v286"><div class="year-profit-head-v286"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${rowsHtml}<div class="year-profit-row-v286 year-profit-total-v286"><span>总数</span><b>${money(grandSales)}</b><b>${money(grandProfit)}</b><b>${grandRate.toFixed(2)}%</b></div></div>`;
 }
 function renderYearBreakdownV224(kind){
   const panel=document.getElementById("yearBreakdown-"+kind),arrow=document.getElementById("yearBreakdownArrow-"+kind);if(!panel)return;
-  const box=panel.closest(".box");if(box)box.classList.toggle("year-breakdown-expanded-v290",!!yearBreakdownOpenV224[kind]);
+  const box=panel.closest(".box");
+  if(box)box.classList.toggle("year-breakdown-expanded-v290",!!yearBreakdownOpenV224[kind]);
   if(!yearBreakdownOpenV224[kind]){panel.classList.add("hidden");panel.innerHTML="";if(arrow)arrow.textContent="▼";return;}
   const list=yearBreakdownRowsV224(kind);panel.classList.remove("hidden");if(arrow)arrow.textContent="▲";
-  if(yearBreakdownLoadingV224[kind]&&!list.length){panel.innerHTML='<div class="sub">正在读取年度营业额...</div>';return;}
+  if(yearBreakdownLoadingV224[kind]&&!list.length){panel.innerHTML='<div class="sub">正在读取年度资料...</div>';return;}
   panel.innerHTML=list.length?yearBreakdownTableV286(list,kind):'<div class="sub">还没有月份营业额记录</div>';
 }
 function renderAllYearBreakdownsV224(){Object.keys(yearBreakdownOpenV224).forEach(renderYearBreakdownV224);}
 async function toggleYearBreakdownV224(kind){
-  if(!(kind in yearBreakdownOpenV224))return;
-  yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
+  if(!(kind in yearBreakdownOpenV224))return;yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");yearBreakdownLoadingV224[kind]=true;renderYearBreakdownV224(kind);
   try{
-    // V31.5: no Home profit read/rollup/render; only load turnover history.
-    if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
-  }catch(e){console.warn("Year turnover breakdown load skipped:",kind,e)}finally{yearBreakdownLoadingV224[kind]=false;renderYearBreakdownV224(kind)}
+    const tasks=[];
+    if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))tasks.push(loadYearInBackground(year));
+    if(typeof loadAllSalesProductLinksV203==="function")tasks.push(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000}).then(x=>{yearBreakdownLinksV286=Array.isArray(x)?x:[]}));
+    await Promise.all(tasks);
+  }catch(e){console.warn("Year breakdown load skipped:",kind,e)}finally{yearBreakdownLoadingV224[kind]=false;renderYearBreakdownV224(kind)}
 }
 window.toggleYearBreakdownV224=toggleYearBreakdownV224;
 
@@ -4952,7 +5039,7 @@ buildSalesCardTransactionV239=function(type,dataList=[]){const card=_buildSalesC
 
 const _saveProductLinksV240=saveProductLinksV206;
 
-/* ================= V31.5 instant draft save + durable cloud retry =================
+/* ================= V31.7 instant draft save + durable cloud retry =================
    Draft edits must never hold the user on “保存中…”.  The latest draft is written
    to persistent local cache first, the UI is released immediately, and the cloud
    write runs in the background.  Confirmation still waits for cloud so Import/FIFO
@@ -4989,6 +5076,7 @@ function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
     clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;card.dataset.inventoryStatus='DRAFT';
     card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';i.dataset.inventoryStatus='DRAFT';});
     const tag=card.querySelector('.sales-card-header-v239 b:first-child');if(tag)tag.textContent='已保存销售卡';
+    if(card._renderSalesStateV317)card._renderSalesStateV317();
   });
   renumberSavedSalesCardsV241(type);
   return merged;
@@ -5060,7 +5148,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
 
   if(saveMode==='draft'){
     try{
-      // V31.5: local durable save is the user-facing completion point.
+      // V31.7: local durable save is the user-facing completion point.
       const queued=queueSalesDraftV314(type,ctx.date,ctx.location,items);
       markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds);
       setSync('草稿已安全保存 · 可以离开',true);
@@ -5086,13 +5174,13 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
     if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,final);
     if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,final);
     const savedByLink=new Map(saved.map(x=>[String(x.linkId||''),x]));
-    dirty.forEach(card=>{clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;let cardStatus='';card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';const rec=savedByLink.get(String(i.dataset.linkId||''));if(rec){i.dataset.inventoryStatus=String(rec.importSyncStatus||'');cardStatus=cardStatus||i.dataset.inventoryStatus;}});if(cardStatus)card.dataset.inventoryStatus=cardStatus;});
+    dirty.forEach(card=>{clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;let cardStatus='';card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';const rec=savedByLink.get(String(i.dataset.linkId||''));if(rec){i.dataset.inventoryStatus=String(rec.importSyncStatus||'');cardStatus=cardStatus||i.dataset.inventoryStatus;}});if(cardStatus)card.dataset.inventoryStatus=cardStatus;if(card._renderSalesStateV317)card._renderSalesStateV317();});
     renumberSavedSalesCardsV241(type);setSync('销售已确认',true);alert('销售确认成功。\n\n如有库存变动，请到 Import Cost System 处理。');if(result?.warning)alert(result.warning);return result;
   }catch(e){setSync('销售确认失败',false,true);alert('销售确认失败：'+(e.message||e)+'\n\n草稿仍保留，请稍后重试确认销售。');return null}
   finally{releaseButton()}
 };
 
-// V31.5: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
+// V31.7: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
 const _deleteSalesCardTransactionV313=deleteSalesCardTransactionV239;
 deleteSalesCardTransactionV239=async function(type,txnId){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
@@ -5154,10 +5242,10 @@ saveLiveSales=async function(){
       return;
     }
   }catch(e){
-    // V31.5: a cloud preflight timeout must not lock turnover editing.
+    // V31.7: a cloud preflight timeout must not lock turnover editing.
     // The authoritative saveLive() server guard still rejects any amount below
     // active saved cards. With no saved card, the user may edit turnover freely.
-    console.warn("V31.5 销售卡预检暂时失败，继续交由云端保存时核对",e);
+    console.warn("V31.7 销售卡预检暂时失败，继续交由云端保存时核对",e);
   }
 
   const restored=reactivateLiveHostIfNeeded(host);
@@ -5524,7 +5612,7 @@ function scheduleInventoryPendingResumeRefreshV265(){
     refreshInventoryPendingV250(true);
   },500);
 }
-// V31.5: cloud resume synchronization is centralized in update.js.
+// V31.7: cloud resume synchronization is centralized in update.js.
 // Refresh Import reminders once only after that resume cycle completes, instead
 // of competing with it through visibilitychange + focus + pageshow.
 window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);
@@ -5699,40 +5787,4 @@ renderLiveMonthlyList=function(){
   }).catch(e=>console.warn('V29.9 Live 利润读取失败',e));
 };
 
-/* ================= V31.5 on-demand Profit Query =================
-   Deliberately isolated from Home startup/sync. Sales_Product_Links is read only
-   after the user presses 查询利润.
-*/
-function initProfitQueryV310(){
-  const mode=document.getElementById("profitQueryModeV310"),month=document.getElementById("profitQueryMonthV310"),year=document.getElementById("profitQueryYearV310");
-  if(!mode)return;
-  if(month&&!month.value)month.value=document.getElementById("monthPicker")?.value||monthISO();
-  if(year&&!year.value)year.value=document.getElementById("yearPicker")?.value||selectedYear();
-  const swap=()=>{document.getElementById("profitQueryMonthWrapV310")?.classList.toggle("hidden",mode.value!=="month");document.getElementById("profitQueryYearWrapV310")?.classList.toggle("hidden",mode.value!=="year")};
-  mode.onchange=swap;swap();
-}
-function profitQueryRowMonthV310(row){const iso=displayToISO(String(row?.date||""));return /^\d{4}-\d{2}-\d{2}$/.test(iso)?iso.slice(0,7):""}
-function profitQuerySalesForPeriodV310(mode,target){
-  return dedupeRows(rows).filter(r=>{const m=profitQueryRowMonthV310(r);return mode==="month"?m===target:m.slice(0,4)===target}).reduce((s,r)=>s+Number(r.amount||0),0);
-}
-function profitQueryLinksForPeriodV310(links,mode,target){return (Array.isArray(links)?links:[]).filter(x=>{const m=profitQueryRowMonthV310(x);return mode==="month"?m===target:m.slice(0,4)===target})}
-function profitQueryBucketsV310(links,mode,target){
-  const map=new Map();
-  profitQueryLinksForPeriodV310(links,mode,target).forEach(x=>{const m=profitQueryRowMonthV310(x);if(!m)return;const key=mode==="month"?displayToISO(String(x.date||"")):m;map.set(key,(map.get(key)||0)+Number(x.profit||0))});
-  const salesMap=new Map();dedupeRows(rows).forEach(r=>{const m=profitQueryRowMonthV310(r);if(!m)return;const inPeriod=mode==="month"?m===target:m.slice(0,4)===target;if(!inPeriod)return;const key=mode==="month"?displayToISO(String(r.date||"")):m;salesMap.set(key,(salesMap.get(key)||0)+Number(r.amount||0))});
-  const keys=[...new Set([...map.keys(),...salesMap.keys()])].sort();return keys.map(key=>{const sales=Number(salesMap.get(key)||0),profit=Number(map.get(key)||0);return{key,sales,profit,rate:sales>0?profit/sales*100:0}})
-}
-function renderProfitQueryV310(mode,target,links){
-  const el=document.getElementById("profitQueryResultV310");if(!el)return;
-  const buckets=profitQueryBucketsV310(links,mode,target),sales=profitQuerySalesForPeriodV310(mode,target),profit=profitQueryLinksForPeriodV310(links,mode,target).reduce((s,x)=>s+Number(x.profit||0),0),rate=sales>0?profit/sales*100:0;
-  const body=buckets.map(x=>`<tr><td>${mode==="month"?isoToDisplay(x.key).slice(0,5):x.key.slice(5,7)+"-"+x.key.slice(0,4)}</td><td>${money(x.sales)}</td><td>${money(x.profit)}</td><td>${x.rate.toFixed(2)}%</td></tr>`).join("");
-  el.innerHTML=`<div class="profit-query-summary-v310"><div class="profit-query-kpi-v310"><span>营业额</span><b>RM${money(sales)}</b></div><div class="profit-query-kpi-v310"><span>利润</span><b>RM${money(profit)}</b></div><div class="profit-query-kpi-v310"><span>利润率</span><b>${rate.toFixed(2)}%</b></div></div><div class="table-wrap"><table class="profit-query-table-v310"><thead><tr><th>日期</th><th>营业额</th><th>利润</th><th>利润率</th></tr></thead><tbody>${body||'<tr><td colspan="4">没有利润资料</td></tr>'}</tbody><tfoot><tr><td>总数</td><td>${money(sales)}</td><td>${money(profit)}</td><td>${rate.toFixed(2)}%</td></tr></tfoot></table></div>`;el.classList.remove("hidden");
-}
-async function runProfitQueryV310(){
-  initProfitQueryV310();const mode=document.getElementById("profitQueryModeV310")?.value||"month",target=mode==="month"?document.getElementById("profitQueryMonthV310")?.value:String(document.getElementById("profitQueryYearV310")?.value||"").trim(),status=document.getElementById("profitQueryStatusV310"),result=document.getElementById("profitQueryResultV310");
-  if(mode==="month"&&!/^\d{4}-\d{2}$/.test(target)){alert("请选择月份");return}if(mode==="year"&&!/^\d{4}$/.test(target)){alert("请输入年度");return}
-  if(status)status.textContent="正在按需读取利润资料…";if(result)result.classList.add("hidden");
-  try{if(mode==="year"&&typeof loadYearInBackground==="function")await loadYearInBackground(target);else if(mode==="month"&&target!==selectedMonth()&&typeof loadMonthCloudShared==="function"&&typeof mergeCloudMonthRows==="function"){const cloud=await loadMonthCloudShared(target);mergeCloudMonthRows(target,cloud)}const links=await loadAllSalesProductLinksV203({force:true,maxAgeMs:0});renderProfitQueryV310(mode,target,links);if(status)status.textContent="查询完成 · 利润资料只在本次主动查询时读取"}catch(e){if(status)status.textContent="查询失败："+(e.message||e);console.error(e)}
-}
-window.runProfitQueryV310=runProfitQueryV310;
-setTimeout(initProfitQueryV310,0);
+

@@ -163,7 +163,7 @@
     const running = activeLoadPromise() || refreshPromise || resumePromise;
     if (running) return running;
 
-    // V31.5: if the page was synced very recently, returning from another app
+    // V31.7: if the page was synced very recently, returning from another app
     // must not turn the status yellow or start another Apps Script request.
     if (now - lastCloudRefresh < RESUME_RECENT_SYNC_MS) {
       dispatchResumeReady({ reason, skipped:true, recent:true });
