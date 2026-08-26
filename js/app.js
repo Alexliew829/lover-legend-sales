@@ -4029,22 +4029,12 @@ async function saveLiveSales(){
 }
 let monthGrandHistoryOpenV223=false;
 let monthGrandHistoryLoadingV223=false;
-let monthGrandProfitLinksV295=[];
 
-function monthGrandProfitV295(month){
-  return (monthGrandProfitLinksV295||[]).reduce((sum,x)=>{
-    if(["deleted","cancelled"].includes(String(x.status||"active").toLowerCase()))return sum;
-    const date=String(x.date||"");
-    const iso=/^\d{4}-\d{2}-\d{2}$/.test(date)?date:displayToISO(date);
-    if(!iso||iso.slice(0,7)!==month)return sum;
-    const type=String(x.type||"").toLowerCase();
-    // Profit source exists for Belimbing Sales Cards, Fair and Live.
-    if(!["daily","fair","live"].includes(type))return sum;
-    const profit=Number(x.profit);
-    return sum+(Number.isFinite(profit)?profit:0);
-  },0);
-}
-
+/* ================= V30.7 Home turnover-only history =================
+   Home monthly/yearly dropdowns deliberately do NOT read Sales_Product_Links,
+   aggregate Profit, calculate profit rate, or render profit fields.
+   Sales/Fair/Live page profit logic remains unchanged.
+*/
 function monthGrandHistoryRowsV223(){
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
   return buildMonthlySummary()
@@ -4054,86 +4044,44 @@ function monthGrandHistoryRowsV223(){
     .map(item=>({
       key:item.month,
       label:String(item.month||"").slice(5,7)+"-"+String(item.month||"").slice(0,4),
-      amount:Number(item.total||0),
-      profit:monthGrandProfitV295(String(item.month||""))
+      amount:Number(item.total||0)
     }));
+}
+
+function turnoverOnlyTableV307(list,labelFor){
+  const grandSales=list.reduce((sum,item)=>sum+Number(item.amount||0),0);
+  const rowsHtml=list.map(x=>`<div class="turnover-only-row-v307"><span>${labelFor(x)}</span><b>${money(x.amount)}</b></div>`).join("");
+  return `<div class="turnover-only-table-v307"><div class="turnover-only-head-v307"><span>日期</span><span>营业额</span></div>${rowsHtml}<div class="turnover-only-row-v307 turnover-only-total-v307"><span>总数</span><b>${money(grandSales)}</b></div></div>`;
 }
 
 function renderMonthGrandHistoryV223(){
   const panel=document.getElementById("monthGrandHistory");
   const arrow=document.getElementById("monthGrandHistoryArrow");
   if(!panel)return;
-
-  if(!monthGrandHistoryOpenV223){
-    panel.classList.add("hidden");
-    panel.innerHTML="";
-    if(arrow)arrow.textContent="▼";
-    return;
-  }
-
+  if(!monthGrandHistoryOpenV223){panel.classList.add("hidden");panel.innerHTML="";if(arrow)arrow.textContent="▼";return;}
   const list=monthGrandHistoryRowsV223();
-  const grandSales=list.reduce((sum,item)=>sum+Number(item.amount||0),0);
-  const grandProfit=list.reduce((sum,item)=>sum+Number(item.profit||0),0);
-  const grandRate=grandSales>0?grandProfit/grandSales*100:0;
-  panel.classList.remove("hidden");
-  if(arrow)arrow.textContent="▲";
-
-  if(monthGrandHistoryLoadingV223&&!list.length){
-    panel.innerHTML='<div class="sub">正在读取月份营业额和利润...</div>';
-    return;
-  }
-
-  panel.innerHTML=list.length
-    ?`<div class="month-grand-profit-table-v295"><div class="month-grand-profit-head-v295"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${list.map(x=>{const rate=Number(x.amount||0)>0?Number(x.profit||0)/Number(x.amount||0)*100:0;return `<div class="month-grand-profit-row-v295"><span>${x.label}</span><b>${money(x.amount)}</b><b>${money(x.profit)}</b><b>${rate.toFixed(2)}%</b></div>`}).join("")}<div class="month-grand-profit-row-v295 month-grand-profit-total-v295"><span>总数</span><b>${money(grandSales)}</b><b>${money(grandProfit)}</b><b>${grandRate.toFixed(2)}%</b></div></div>`
-    :'<div class="sub">还没有月份营业额记录</div>';
+  panel.classList.remove("hidden");if(arrow)arrow.textContent="▲";
+  if(monthGrandHistoryLoadingV223&&!list.length){panel.innerHTML='<div class="sub">正在读取月份营业额...</div>';return;}
+  panel.innerHTML=list.length?turnoverOnlyTableV307(list,x=>x.label):'<div class="sub">还没有月份营业额记录</div>';
 }
 
 async function toggleMonthGrandHistoryV223(){
   monthGrandHistoryOpenV223=!monthGrandHistoryOpenV223;
   renderMonthGrandHistoryV223();
   if(!monthGrandHistoryOpenV223)return;
-
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
-  monthGrandHistoryLoadingV223=true;
-  renderMonthGrandHistoryV223();
+  monthGrandHistoryLoadingV223=true;renderMonthGrandHistoryV223();
   try{
-    const tasks=[];
-    if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))tasks.push(loadYearInBackground(year));
-    if(typeof loadAllSalesProductLinksV203==="function")tasks.push(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000}).then(x=>{monthGrandProfitLinksV295=Array.isArray(x)?x:[]}));
-    await Promise.all(tasks);
-  }catch(e){
-    console.warn("Month turnover/profit history load skipped:",e);
-  }finally{
-    monthGrandHistoryLoadingV223=false;
-    renderMonthGrandHistoryV223();
-  }
+    // V30.7: only turnover rows are needed. Never load Sales_Product_Links here.
+    if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
+  }catch(e){console.warn("Month turnover history load skipped:",e)}finally{monthGrandHistoryLoadingV223=false;renderMonthGrandHistoryV223()}
 }
 window.toggleMonthGrandHistoryV223=toggleMonthGrandHistoryV223;
 
-
-/* ================= V29.9 expandable yearly monthly breakdown + profit ================= */
+/* ================= V30.7 expandable yearly turnover-only breakdown ================= */
 const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
-let yearBreakdownLinksV286=[];
 
-function yearBreakdownProfitV286(kind,key){
-  const isYear=kind==="total";
-  return (yearBreakdownLinksV286||[]).reduce((sum,x)=>{
-    if(["deleted","cancelled"].includes(String(x.status||"active").toLowerCase()))return sum;
-    const date=String(x.date||"");
-    const iso=/^\d{4}-\d{2}-\d{2}$/.test(date)?date:displayToISO(date);
-    if(!iso)return sum;
-    const rowKey=isYear?iso.slice(0,4):iso.slice(0,7);
-    if(rowKey!==key)return sum;
-    const type=String(x.type||"").toLowerCase();
-    if(kind==="balakong")return sum; // Sales Cards are Belimbing; Balakong has no sales-card profit source.
-    if(kind==="belimbing"&&type!=="daily")return sum;
-    if(kind==="fair"&&type!=="fair")return sum;
-    if(kind==="live"&&type!=="live")return sum;
-    const profit=Number(x.profit);
-    return sum+(Number.isFinite(profit)?profit:0);
-  },0);
-}
 function yearBreakdownRowsV224(kind){
   if(kind==="total"){
     const byYear=new Map();
@@ -4142,38 +4090,34 @@ function yearBreakdownRowsV224(kind){
       if(!/^\d{4}$/.test(year))return;
       byYear.set(year,(byYear.get(year)||0)+Number(item.total||0));
     });
-    return [...byYear.entries()].map(([year,amount])=>({month:year,year,amount:Number(amount||0),profit:yearBreakdownProfitV286("total",year)}))
+    return [...byYear.entries()].map(([year,amount])=>({month:year,year,amount:Number(amount||0)}))
       .filter(item=>Math.abs(item.amount)>0.000001).sort((a,b)=>String(a.year).localeCompare(String(b.year)));
   }
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
   return buildMonthlySummary().filter(item=>!year||String(item.month||"").slice(0,4)===year)
-    .map(item=>({month:item.month,amount:Number(item[kind]||0),profit:yearBreakdownProfitV286(kind,String(item.month||""))}))
+    .map(item=>({month:item.month,amount:Number(item[kind]||0)}))
     .filter(item=>Math.abs(item.amount)>0.000001).sort((a,b)=>String(a.month).localeCompare(String(b.month)));
 }
 function yearBreakdownTableV286(list,kind){
-  const grandSales=list.reduce((s,x)=>s+Number(x.amount||0),0),grandProfit=list.reduce((s,x)=>s+Number(x.profit||0),0),grandRate=grandSales>0?grandProfit/grandSales*100:0;
-  const rowsHtml=list.map(x=>{const sales=Number(x.amount||0),profit=Number(x.profit||0),rate=sales>0?profit/sales*100:0;const label=kind==="total"?String(x.year||x.month):String(x.month).slice(5,7)+"-"+String(x.month).slice(0,4);return `<div class="year-profit-row-v286"><span>${label}</span><b>${money(sales)}</b><b>${money(profit)}</b><b>${rate.toFixed(2)}%</b></div>`}).join("");
-  return `<div class="year-profit-table-v286"><div class="year-profit-head-v286"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${rowsHtml}<div class="year-profit-row-v286 year-profit-total-v286"><span>总数</span><b>${money(grandSales)}</b><b>${money(grandProfit)}</b><b>${grandRate.toFixed(2)}%</b></div></div>`;
+  return turnoverOnlyTableV307(list,x=>kind==="total"?String(x.year||x.month):String(x.month).slice(5,7)+"-"+String(x.month).slice(0,4));
 }
 function renderYearBreakdownV224(kind){
   const panel=document.getElementById("yearBreakdown-"+kind),arrow=document.getElementById("yearBreakdownArrow-"+kind);if(!panel)return;
-  const box=panel.closest(".box");
-  if(box)box.classList.toggle("year-breakdown-expanded-v290",!!yearBreakdownOpenV224[kind]);
+  const box=panel.closest(".box");if(box)box.classList.toggle("year-breakdown-expanded-v290",!!yearBreakdownOpenV224[kind]);
   if(!yearBreakdownOpenV224[kind]){panel.classList.add("hidden");panel.innerHTML="";if(arrow)arrow.textContent="▼";return;}
   const list=yearBreakdownRowsV224(kind);panel.classList.remove("hidden");if(arrow)arrow.textContent="▲";
-  if(yearBreakdownLoadingV224[kind]&&!list.length){panel.innerHTML='<div class="sub">正在读取年度资料...</div>';return;}
+  if(yearBreakdownLoadingV224[kind]&&!list.length){panel.innerHTML='<div class="sub">正在读取年度营业额...</div>';return;}
   panel.innerHTML=list.length?yearBreakdownTableV286(list,kind):'<div class="sub">还没有月份营业额记录</div>';
 }
 function renderAllYearBreakdownsV224(){Object.keys(yearBreakdownOpenV224).forEach(renderYearBreakdownV224);}
 async function toggleYearBreakdownV224(kind){
-  if(!(kind in yearBreakdownOpenV224))return;yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
+  if(!(kind in yearBreakdownOpenV224))return;
+  yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");yearBreakdownLoadingV224[kind]=true;renderYearBreakdownV224(kind);
   try{
-    const tasks=[];
-    if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))tasks.push(loadYearInBackground(year));
-    if(typeof loadAllSalesProductLinksV203==="function")tasks.push(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000}).then(x=>{yearBreakdownLinksV286=Array.isArray(x)?x:[]}));
-    await Promise.all(tasks);
-  }catch(e){console.warn("Year breakdown load skipped:",kind,e)}finally{yearBreakdownLoadingV224[kind]=false;renderYearBreakdownV224(kind)}
+    // V30.7: no Home profit read/rollup/render; only load turnover history.
+    if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
+  }catch(e){console.warn("Year turnover breakdown load skipped:",kind,e)}finally{yearBreakdownLoadingV224[kind]=false;renderYearBreakdownV224(kind)}
 }
 window.toggleYearBreakdownV224=toggleYearBreakdownV224;
 

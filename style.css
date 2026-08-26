@@ -2553,7 +2553,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V30.0 Fair / Live four-column summary layout ================= */
+/* ================= V30.7 Fair / Live four-column summary layout ================= */
 .profit-grand-v294{
   grid-template-columns:minmax(142px,1.45fr) minmax(88px,.9fr) minmax(72px,.76fr) minmax(92px,.9fr);
   gap:6px;padding:12px 12px;white-space:nowrap;overflow:hidden;
@@ -2576,4 +2576,17 @@ body{overflow-x:hidden;}
   .profit-grand-v294>strong{font-size:13.5px;letter-spacing:-.5px}
   .profit-grand-v294 span{font-size:10.8px;letter-spacing:-.35px}
   .profit-grand-v294 b{font-size:13.5px;letter-spacing:-.45px}
+}
+
+
+/* ================= V30.7 Home turnover-only dropdowns ================= */
+.turnover-only-table-v307{width:100%;margin-top:10px;border-top:1px solid rgba(160,120,0,.35)}
+.turnover-only-head-v307,.turnover-only-row-v307{display:grid;grid-template-columns:minmax(78px,.8fr) minmax(110px,1.2fr);align-items:center;gap:8px;padding:9px 2px;border-bottom:1px dashed #ddd}
+.turnover-only-head-v307{font-weight:800;color:#333}
+.turnover-only-head-v307 span:last-child,.turnover-only-row-v307 b{text-align:right}
+.turnover-only-row-v307 b{font-variant-numeric:tabular-nums}
+.turnover-only-total-v307{font-weight:900;color:#b40000;border-bottom:0;padding-top:11px}
+@media(max-width:600px){
+  .turnover-only-head-v307,.turnover-only-row-v307{grid-template-columns:82px minmax(0,1fr);gap:5px;padding:9px 0;font-size:16px}
+  .turnover-only-row-v307 b{font-size:17px}
 }
