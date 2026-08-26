@@ -1442,73 +1442,46 @@ setTimeout(()=>{
   }catch(e){}
 },0);
 
+// V30.1 FAST STARTUP:
+// 1) Render the last safe local snapshot immediately so Sales/Fair/Live inputs are usable.
+// 2) Perform one combined month/revision cloud request in the background.
+// 3) Do not pre-load the full year during startup; historical months load only when needed.
 let startupCacheLoaded = false;
 let startupSalesSyncPromise = null;
 
-function waitForFirstHomePaint() {
-  return new Promise(resolve => {
-    requestAnimationFrame(() => requestAnimationFrame(resolve));
-  });
+try {
+  startupCacheLoaded = typeof loadLocalDataCache === "function" && loadLocalDataCache();
+} catch (error) {
+  startupCacheLoaded = false;
+  console.warn("Local cache startup failed", error);
 }
 
 async function startInitialSalesDataLoad() {
   if (startupSalesSyncPromise) return startupSalesSyncPromise;
 
-  let startupStatusTimer = setTimeout(() => {
-    if (typeof markCloudCheckPending === "function") {
-      markCloudCheckPending("正在快速确认云端...");
-    }
-  }, 2200);
+  if (typeof markCloudCheckPending === "function") {
+    markCloudCheckPending(startupCacheLoaded ? "后台同步中" : "正在读取云端资料");
+  }
 
-  startupSalesSyncPromise = (async () => {
-    await waitForFirstHomePaint();
-
-    try {
-      startupCacheLoaded = typeof loadLocalDataCacheAsync === "function"
-        ? await loadLocalDataCacheAsync()
-        : (typeof loadLocalDataCache === "function" && loadLocalDataCache());
-    } catch (error) {
-      startupCacheLoaded = false;
-      console.warn("Local cache startup failed", error);
-    }
-
-    if (typeof markCloudCheckPending === "function") {
-      markCloudCheckPending(startupCacheLoaded
-        ? "正在快速确认云端..."
-        : "正在读取云端资料");
-    }
-
-    // This forced read is deliberately inside finally-style startup flow:
-    // local cache failure can never prevent cloud synchronization.
-    const result = await loadFromSheet({
-      background: true,
-      force: false,
-      loadYear: false,
-      suppressStartStatus: true,
-      revisionTimeoutMs: 2500,
-      timeoutMs: 10000
-    });
-
+  startupSalesSyncPromise = loadFromSheet({
+    background: true,
+    force: false,
+    loadYear: false,
+    suppressStartStatus: true,
+    fastStartup: true,
+    timeoutMs: 10000
+  }).then(result => {
     try { syncFairInputs(); } catch (error) {}
     return result;
-  })().catch(error => {
+  }).catch(error => {
     console.warn("Initial sales data load failed", error);
     return { ok:false, error };
-  }).finally(() => {
-    clearTimeout(startupStatusTimer);
   });
 
   return startupSalesSyncPromise;
 }
 
-// V29.9: start cached Home immediately, then warm the current year's historical
-// months in the background so Monthly Summary is complete on first open.
-startInitialSalesDataLoad().finally(()=>{
-  const startupYear=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
-  if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(startupYear)){
-    loadYearInBackground(startupYear).catch(()=>{});
-  }
-});
+startInitialSalesDataLoad();
 
 
 /* ===== V7.3 Live Module ===== */
