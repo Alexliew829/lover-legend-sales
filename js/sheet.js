@@ -536,8 +536,8 @@ async function loadFromSheet(options = {}) {
   const statusText = String(options.statusText || "").trim();
   const now = Date.now();
   if (cloudLoadPromise) return cloudLoadPromise;
-  if (!force && now - lastCloudLoadAt < CLOUD_LOAD_COOLDOWN_MS) {
-    return initialCloudSyncPromise || Promise.resolve({ ok:true, skipped:true });
+  if (!force && options.bypassCooldown !== true && now - lastCloudLoadAt < CLOUD_LOAD_COOLDOWN_MS) {
+    return initialCloudSyncPromise || Promise.resolve({ ok:true, skipped:true, cooldown:true });
   }
   lastCloudLoadAt = now;
 
@@ -573,7 +573,7 @@ async function loadFromSheet(options = {}) {
               return { ok:true, month, revisionOnly:true, dataRevision:cloudRevision };
             }
           } else {
-            setSync("本机资料已显示 · 云端暂未确认", false, true);
+            setSync("云端确认稍慢 · 可继续使用", false, false);
             completedSuccessfully = true;
             return { ok:true, month, revisionUnconfirmed:true };
           }
@@ -581,7 +581,7 @@ async function loadFromSheet(options = {}) {
           // V29.9: when local data exists, a slow/failed revision check must not
           // trigger the expensive full-month download. Keep the visible local
           // data and let the next foreground/interval/manual check try again.
-          setSync("本机资料已显示 · 云端暂未确认", false, true);
+          setSync("云端确认稍慢 · 可继续使用", false, false);
           completedSuccessfully = true;
           return {
             ok: true,

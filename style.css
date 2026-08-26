@@ -2553,7 +2553,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V30.7 Fair / Live four-column summary layout ================= */
+/* ================= V30.8 Fair / Live four-column summary layout ================= */
 .profit-grand-v294{
   grid-template-columns:minmax(142px,1.45fr) minmax(88px,.9fr) minmax(72px,.76fr) minmax(92px,.9fr);
   gap:6px;padding:12px 12px;white-space:nowrap;overflow:hidden;
@@ -2579,7 +2579,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V30.7 Home turnover-only dropdowns ================= */
+/* ================= V30.8 Home turnover-only dropdowns ================= */
 .turnover-only-table-v307{width:100%;margin-top:10px;border-top:1px solid rgba(160,120,0,.35)}
 .turnover-only-head-v307,.turnover-only-row-v307{display:grid;grid-template-columns:minmax(78px,.8fr) minmax(110px,1.2fr);align-items:center;gap:8px;padding:9px 2px;border-bottom:1px dashed #ddd}
 .turnover-only-head-v307{font-weight:800;color:#333}

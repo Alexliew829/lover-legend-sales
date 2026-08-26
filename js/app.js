@@ -4030,7 +4030,7 @@ async function saveLiveSales(){
 let monthGrandHistoryOpenV223=false;
 let monthGrandHistoryLoadingV223=false;
 
-/* ================= V30.7 Home turnover-only history =================
+/* ================= V30.8 Home turnover-only history =================
    Home monthly/yearly dropdowns deliberately do NOT read Sales_Product_Links,
    aggregate Profit, calculate profit rate, or render profit fields.
    Sales/Fair/Live page profit logic remains unchanged.
@@ -4072,13 +4072,13 @@ async function toggleMonthGrandHistoryV223(){
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
   monthGrandHistoryLoadingV223=true;renderMonthGrandHistoryV223();
   try{
-    // V30.7: only turnover rows are needed. Never load Sales_Product_Links here.
+    // V30.8: only turnover rows are needed. Never load Sales_Product_Links here.
     if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
   }catch(e){console.warn("Month turnover history load skipped:",e)}finally{monthGrandHistoryLoadingV223=false;renderMonthGrandHistoryV223()}
 }
 window.toggleMonthGrandHistoryV223=toggleMonthGrandHistoryV223;
 
-/* ================= V30.7 expandable yearly turnover-only breakdown ================= */
+/* ================= V30.8 expandable yearly turnover-only breakdown ================= */
 const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 
@@ -4115,7 +4115,7 @@ async function toggleYearBreakdownV224(kind){
   yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");yearBreakdownLoadingV224[kind]=true;renderYearBreakdownV224(kind);
   try{
-    // V30.7: no Home profit read/rollup/render; only load turnover history.
+    // V30.8: no Home profit read/rollup/render; only load turnover history.
     if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
   }catch(e){console.warn("Year turnover breakdown load skipped:",kind,e)}finally{yearBreakdownLoadingV224[kind]=false;renderYearBreakdownV224(kind)}
 }
@@ -5381,11 +5381,10 @@ function scheduleInventoryPendingResumeRefreshV265(){
     refreshInventoryPendingV250(true);
   },500);
 }
-document.addEventListener("visibilitychange",()=>{
-  if(!document.hidden)scheduleInventoryPendingResumeRefreshV265();
-});
-window.addEventListener("focus",scheduleInventoryPendingResumeRefreshV265);
-window.addEventListener("pageshow",scheduleInventoryPendingResumeRefreshV265);
+// V30.8: cloud resume synchronization is centralized in update.js.
+// Refresh Import reminders once only after that resume cycle completes, instead
+// of competing with it through visibilitychange + focus + pageshow.
+window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);
 
 
 /* ================= V29.9 RM0 防误触：Sales / Fair / Live ================= */

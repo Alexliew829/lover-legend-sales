@@ -48,11 +48,16 @@
     lastCloudRefresh = now;
     refreshPromise = loadFromSheet({
       force: manual || force === true,
+      bypassCooldown: reason.includes("reopen") || reason.includes("resume"),
       skipLocalCache: true,
       loadYear: false,
       silent: false,
+      revisionTimeoutMs: reason.includes("reopen") || reason.includes("resume") ? 3500 : undefined,
       statusText: manual ? "正在刷新云端资料..." : "正在检查云端更新...",
       refreshFairInputs: false
+    }).then(result => {
+      if (result && result.cooldown && typeof setSync === "function") setSync("已同步", true);
+      return result;
     }).catch(err => {
       console.warn("Cloud refresh failed:", reason, err);
       return { ok:false, error:err };
@@ -139,6 +144,14 @@
 
   window.addEventListener("load", scheduleServiceWorkerCheckAfterStartup, { once:true });
 
+  const RESUME_DEBOUNCE_MS = 320;
+  const RESUME_RECENT_SYNC_MS = 30000;
+  let resumeTimer = null;
+
+  function dispatchResumeReady(detail = {}) {
+    try { window.dispatchEvent(new CustomEvent("lover-sales-resume-ready", { detail })); } catch (e) {}
+  }
+
   function refreshAfterReopen(reason = "resume") {
     if (!initialSyncReady) {
       return typeof waitForInitialCloudSync === "function"
@@ -149,19 +162,47 @@
     const now = Date.now();
     const running = activeLoadPromise() || refreshPromise || resumePromise;
     if (running) return running;
+
+    // V30.8: if the page was synced very recently, returning from another app
+    // must not turn the status yellow or start another Apps Script request.
+    if (now - lastCloudRefresh < RESUME_RECENT_SYNC_MS) {
+      dispatchResumeReady({ reason, skipped:true, recent:true });
+      return Promise.resolve({ ok:true, skipped:true, recent:true });
+    }
     if (now - lastResumeAt < 1200) return Promise.resolve({ ok:true, skipped:true });
     lastResumeAt = now;
 
     if (typeof markCloudCheckPending === "function") {
       markCloudCheckPending("正在快速确认云端...");
-    } else if (typeof setSync === "function") {
-      setSync("正在快速确认云端...");
     }
 
-    resumePromise = refreshCloudData(reason, false).finally(() => {
+    resumePromise = refreshCloudData(reason, false).then(result => {
+      if (result && result.ok && !result.revisionUnconfirmed) lastCloudRefresh = Date.now();
+      if (result && result.revisionUnconfirmed) {
+        // One quiet retry after mobile wake-up. Do not stack focus/pageshow requests.
+        setTimeout(() => {
+          if (document.visibilityState === "visible" && !activeLoadPromise() && !refreshPromise && !resumePromise) {
+            refreshCloudData("resume-retry", false).then(retry => {
+              if (retry && retry.ok && !retry.revisionUnconfirmed) lastCloudRefresh = Date.now();
+              dispatchResumeReady({ reason:"resume-retry", result:retry });
+            });
+          }
+        }, 2200);
+      }
+      dispatchResumeReady({ reason, result });
+      return result;
+    }).finally(() => {
       resumePromise = null;
     });
     return resumePromise;
+  }
+
+  function scheduleResume(reason) {
+    clearTimeout(resumeTimer);
+    resumeTimer = setTimeout(() => {
+      resumeTimer = null;
+      refreshAfterReopen(reason);
+    }, RESUME_DEBOUNCE_MS);
   }
 
   document.addEventListener("visibilitychange", () => {
@@ -171,21 +212,19 @@
     }
     if (hiddenAt && Date.now() - hiddenAt >= 300) {
       hiddenAt = 0;
-      refreshAfterReopen("visibility-reopen");
+      scheduleResume("visibility-reopen");
     }
   });
 
   window.addEventListener("focus", () => {
     if (hiddenAt && Date.now() - hiddenAt >= 300) {
       hiddenAt = 0;
-      refreshAfterReopen("focus-reopen");
+      scheduleResume("focus-reopen");
     }
   });
-  window.addEventListener("pagehide", () => {
-    hiddenAt = Date.now();
-  });
+  window.addEventListener("pagehide", () => { hiddenAt = Date.now(); });
   window.addEventListener("pageshow", event => {
-    if (event.persisted) refreshAfterReopen("pageshow-cache");
+    if (event.persisted) scheduleResume("pageshow-cache");
   });
   window.addEventListener("online", () => refreshCloudData("online", false));
 
