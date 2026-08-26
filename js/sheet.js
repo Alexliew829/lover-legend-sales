@@ -107,7 +107,7 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-// V30.1: one round-trip replaces revisionCheck + optional loadMonth.
+// V30.3: one round-trip replaces revisionCheck + optional loadMonth.
 // When the revision is unchanged the server returns only a tiny response; when
 // changed it returns the current month in the same request.
 async function loadMonthIfChangedCloudShared(month, knownRevision = 0, timeoutMs = 10000) {
@@ -116,7 +116,7 @@ async function loadMonthIfChangedCloudShared(month, knownRevision = 0, timeoutMs
   if (cloudLoadPromisesByMonth.has(requestKey)) return cloudLoadPromisesByMonth.get(requestKey);
 
   const request = jsonp(
-    { action: "loadMonthIfChangedV301", month: key, knownRevision: Number(knownRevision || 0) },
+    { action: "loadMonthIfChangedV302", month: key, knownRevision: Number(knownRevision || 0) },
     { timeoutMs: Number(timeoutMs || 10000) }
   ).finally(() => {
     if (cloudLoadPromisesByMonth.get(requestKey) === request) cloudLoadPromisesByMonth.delete(requestKey);
@@ -266,6 +266,28 @@ function loadPendingRows() {
 
 function savePendingRows() {
   localStorage.setItem("lover_pending_rows", JSON.stringify(pendingRows));
+}
+
+// V30.3: a green "safe to leave" state is only allowed after the pending
+// queue has been written to persistent browser storage AND read back successfully.
+function verifyPendingRowPersisted(row) {
+  try {
+    const key = syncKey(row);
+    const stored = JSON.parse(localStorage.getItem("lover_pending_rows") || "[]");
+    return Array.isArray(stored) && stored.some(r => syncKey(r) === key);
+  } catch (err) {
+    console.error("Pending persistence verification failed", err);
+    return false;
+  }
+}
+
+function setDurableSaveStatus(row) {
+  if (verifyPendingRowPersisted(row)) {
+    setSync("已安全保存 · 可以离开", true);
+    return true;
+  }
+  setSync("本机保存未确认 · 请暂时不要离开", false, true);
+  return false;
 }
 
 function setPendingRetrySyncStatus() {
@@ -588,7 +610,7 @@ async function loadFromSheet(options = {}) {
       let json = null;
       let lastError = null;
 
-      // V30.1 FAST PATH: one Apps Script request checks revision and, only when
+      // V30.3 FAST PATH: one Apps Script request checks revision and, only when
       // necessary, returns the month data in the same response. This avoids the
       // old two-step revisionCheck -> loadMonth delay, especially on cold starts.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {

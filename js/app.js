@@ -1073,7 +1073,7 @@ async function saveDailySales(){
   // The pagehide/visibility keepalive fallback remains in sheet.js for pending
   // rows only when the page is actually being closed or backgrounded.
   if(typeof saveLocalDataCache==="function")saveLocalDataCache();
-  setSync("已储存 · 云端后台同步中...");
+  setDurableSaveStatus(localRow);
 
   Promise.resolve().then(async()=>{
     try{
@@ -1221,31 +1221,28 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   if(typeof saveLocalDataCache==="function")saveLocalDataCache();
   showTempMsg("fairSaveMsg");
 
-  try{
-    setSync("已储存，正在后台同步...");
-    const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value;
-    await saveFairSessionToSheetV281(loc,start,end);
-    fairSessionDraftDirtyV282=false;
-    saveFairLocation(loc);
-    saveFairSession();
-    await refreshFairSessionsV281();
-    const result=await saveFairBatchToSheet(loc,records);
-
-    // V29.9: local Fair values are direct replacements, never additions. The server
-    // also removes duplicate Sheet rows whose location differs only by spaces/case.
-    // The response confirms the authoritative overwrite and clears pending rows.
-    records.forEach(i=>clearPendingRow({
-      type:"fair",
-      date:i.date,
-      company:"fair",
-      location:loc
-    }));
-    if(typeof saveLocalDataCache==="function")saveLocalDataCache();
-    setSync("已同步",true);
-  }catch(e){
-    if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();
-    else setSync("同步暂未完成",false,true);
-  }
+  // V30.3: every Fair pending row must survive a localStorage read-back before
+  // the UI says it is safe to leave. Cloud confirmation continues in background.
+  const fairDurable = records.every(i => verifyPendingRowPersisted({type:"fair",date:i.date,company:"fair",location:loc}));
+  if(fairDurable) setSync("已安全保存 · 可以离开", true);
+  else setSync("本机保存未确认 · 请暂时不要离开", false, true);
+  Promise.resolve().then(async()=>{
+    try{
+      const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value;
+      await saveFairSessionToSheetV281(loc,start,end);
+      fairSessionDraftDirtyV282=false;
+      saveFairLocation(loc);
+      saveFairSession();
+      await saveFairBatchToSheet(loc,records);
+      records.forEach(i=>clearPendingRow({type:"fair",date:i.date,company:"fair",location:loc}));
+      if(typeof saveLocalDataCache==="function")saveLocalDataCache();
+      refreshFairSessionsV281().catch(()=>{});
+      setSync("已同步",true);
+    }catch(e){
+      if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();
+      else setSync("同步暂未完成",false,true);
+    }
+  });
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
@@ -1442,7 +1439,7 @@ setTimeout(()=>{
   }catch(e){}
 },0);
 
-// V30.1 FAST STARTUP:
+// V30.3 FAST STARTUP:
 // 1) Render the last safe local snapshot immediately so Sales/Fair/Live inputs are usable.
 // 2) Perform one combined month/revision cloud request in the background.
 // 3) Do not pre-load the full year during startup; historical months load only when needed.
@@ -3987,18 +3984,24 @@ async function saveLiveSales(){
   addPendingRow(localRow);
   renderAll();
   showTempMsg("liveSaveMsg");
-  try{
-    setSync("已储存，正在后台同步...");
-    const saved=await saveLiveToSheet(d,host,amount,now);
-    if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);
-    else rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));
-    clearPendingRow(localRow);
-    renderAll();
-    setSync("已同步",true);
-  }catch(e){
-    if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();
-    else setSync("同步暂未完成",false,true);
-  }
+  if(typeof saveLocalDataCache==="function")saveLocalDataCache();
+  // V30.3: confirm the pending row can be read back from persistent storage
+  // before telling the user it is safe to leave.
+  setDurableSaveStatus(localRow);
+  Promise.resolve().then(async()=>{
+    try{
+      const saved=await saveLiveToSheet(d,host,amount,now);
+      if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);
+      else rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));
+      clearPendingRow(localRow);
+      renderAll();
+      if(typeof saveLocalDataCache==="function")saveLocalDataCache();
+      setSync("已同步",true);
+    }catch(e){
+      if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();
+      else setSync("同步暂未完成",false,true);
+    }
+  });
 }
 let monthGrandHistoryOpenV223=false;
 let monthGrandHistoryLoadingV223=false;

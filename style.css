@@ -2553,7 +2553,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V30.1 Fair / Live four-column summary layout ================= */
+/* ================= V30.3 Fair / Live four-column summary layout ================= */
 .profit-grand-v294{
   grid-template-columns:minmax(142px,1.45fr) minmax(88px,.9fr) minmax(72px,.76fr) minmax(92px,.9fr);
   gap:6px;padding:12px 12px;white-space:nowrap;overflow:hidden;
