@@ -2553,7 +2553,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V31.8 Fair / Live four-column summary layout ================= */
+/* ================= V32.0 Fair / Live four-column summary layout ================= */
 .profit-grand-v294{
   grid-template-columns:minmax(142px,1.45fr) minmax(88px,.9fr) minmax(72px,.76fr) minmax(92px,.9fr);
   gap:6px;padding:12px 12px;white-space:nowrap;overflow:hidden;
@@ -2579,7 +2579,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V31.8 Fair location history ================= */
+/* ================= V32.0 Fair location history ================= */
 .fair-location-history-v309{margin-top:8px;border:1px solid #d8ddd8;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 8px 22px rgba(0,0,0,.08)}
 .fair-location-history-title-v309{padding:9px 12px 6px;font-weight:800;color:#555;font-size:.9rem;background:#f7f8f7}
 .fair-location-history-row-v309{display:grid;grid-template-columns:minmax(0,1fr) 48px;align-items:stretch;border-top:1px solid #ecefec}
@@ -2590,7 +2590,7 @@ body{overflow-x:hidden;}
 @media(max-width:600px){.fair-location-history-v309{margin-top:6px}.fair-location-history-choose-v309{font-size:1rem}.fair-location-history-delete-v309{font-size:1.55rem}}
 
 
-/* ================= V31.8 sales card state ================= */
+/* ================= V32.0 sales card state ================= */
 .sales-card-state-v317{margin:8px 0 12px;padding:10px 12px;border-radius:10px;font-weight:800;font-size:14px;line-height:1.35;border:1px solid transparent;}
 .sales-card-state-v317.is-draft{background:#fff7d6;border-color:#e4b737;color:#725100;}
 .sales-card-state-v317.is-pending{background:#e9f8ee;border-color:#7bc794;color:#0b6b2b;}
@@ -2598,11 +2598,26 @@ body{overflow-x:hidden;}
 @media (max-width:600px){.sales-card-state-v317{font-size:15px;padding:11px 12px;}}
 
 
-/* ================= V31.8 Home on-demand today total profit ================= */
-.home-today-profit-btn-v318{width:100%;margin-top:10px;padding:10px 12px;border:1px solid #d8b15d;border-radius:10px;background:#fff8e6;font-weight:800;font-size:15px;cursor:pointer}
-.home-today-profit-panel-v318{margin-top:8px;border:1px solid #ead7a7;border-radius:10px;overflow:hidden;background:#fffdf7}
-.home-today-profit-row-v318{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid #f0e4c8;font-size:15px}
+/* ================= V32.0 Home on-demand today total profit ================= */
+.home-today-profit-btn-v318{width:100%;margin-top:10px;padding:12px 10px;border:1px solid #d8b15d;border-radius:10px;background:#fff8e6;color:#8f1515;font-weight:900;font-size:18px;line-height:1.2;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.home-today-profit-btn-v318:disabled{color:#8f1515;background:#fff8e6;opacity:.78}
+.home-today-profit-panel-v318{margin-top:8px;border:1px solid #ead7a7;border-radius:10px;overflow:hidden;background:#fffdf7;max-width:100%;box-sizing:border-box}
+.home-today-profit-row-v318{display:grid;grid-template-columns:minmax(0,1fr) minmax(max-content,42%);gap:8px;align-items:center;padding:10px 10px;border-bottom:1px solid #f0e4c8;font-size:18px;line-height:1.2;min-width:0}
 .home-today-profit-row-v318:last-child{border-bottom:0}
-.home-today-profit-row-v318 b{font-variant-numeric:tabular-nums}
-.home-today-profit-total-v318{font-size:16px;font-weight:800;background:#fff3cf}
-@media(max-width:600px){.home-today-profit-btn-v318{font-size:16px;padding:9px 8px}.home-today-profit-row-v318{font-size:16px;padding:8px 9px}.home-today-profit-total-v318{font-size:17px}}
+.home-today-profit-row-v318 span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:800}
+.home-today-profit-row-v318 b{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;font-size:19px;font-weight:900;min-width:0}
+.home-today-profit-total-v318{font-size:20px;font-weight:900;background:#fff3cf;color:#b40000}
+.home-today-profit-total-v318 b{font-size:22px;color:#b40000}
+@media(max-width:600px){
+  .home-today-profit-btn-v318{font-size:19px;padding:11px 7px}
+  .home-today-profit-row-v318{grid-template-columns:minmax(0,1fr) minmax(max-content,45%);gap:6px;font-size:18px;padding:10px 7px}
+  .home-today-profit-row-v318 b{font-size:19px}
+  .home-today-profit-total-v318{font-size:20px}
+  .home-today-profit-total-v318 b{font-size:22px}
+}
+@media(max-width:380px){
+  .home-today-profit-btn-v318{font-size:18px;padding-left:5px;padding-right:5px}
+  .home-today-profit-row-v318{font-size:17px;padding-left:5px;padding-right:5px;gap:4px}
+  .home-today-profit-row-v318 b{font-size:18px}
+  .home-today-profit-total-v318,.home-today-profit-total-v318 b{font-size:20px}
+}

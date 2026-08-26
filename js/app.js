@@ -4,6 +4,28 @@ function getSavedFairLocations(){try{const list=JSON.parse(localStorage.getItem(
 function saveFairLocation(location){const loc=canonicalLocation(location);if(!loc)return;const list=getSavedFairLocations();if(!list.some(x=>normalizeFairLocationKey(x)===normalizeFairLocationKey(loc)))list.push(loc);list.sort((a,b)=>a.localeCompare(b));localStorage.setItem("lover_fair_locations",JSON.stringify(list));renderFairLocationOptions()}
 function deleteFairLocationHistoryV309(location){const key=normalizeFairLocationKey(location);const list=getSavedFairLocations().filter(x=>normalizeFairLocationKey(x)!==key);localStorage.setItem("lover_fair_locations",JSON.stringify(list));renderFairLocationOptions()}
 function collectFairLocations(){return getSavedFairLocations()}
+function fairSessionKeyV320(location){return normalizeFairLocationKey(canonicalLocation(location||""))}
+function getLocalFairSessionsV320(){try{const v=JSON.parse(localStorage.getItem("lover_fair_sessions_v320")||"{}");return v&&typeof v==="object"?v:{}}catch(e){return{}}}
+function saveLocalFairSessionV320(location,start,end,updatedAt=""){
+  const loc=canonicalLocation(location),key=fairSessionKeyV320(loc);if(!loc||!key||!start||!end)return;
+  const all=getLocalFairSessionsV320();all[key]={location:loc,start,end,updatedAt:updatedAt||new Date().toISOString()};
+  localStorage.setItem("lover_fair_sessions_v320",JSON.stringify(all));
+  localStorage.setItem("lover_last_fair_session",JSON.stringify(all[key]));
+}
+function findFairSessionV320(location){
+  const key=fairSessionKeyV320(location);if(!key)return null;
+  const cloud=(Array.isArray(fairSessionsCloudV281)?fairSessionsCloudV281:[]).filter(x=>fairSessionKeyV320(x.location)===key).sort((a,b)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")))[0];
+  if(cloud)return cloud;
+  return getLocalFairSessionsV320()[key]||null;
+}
+function switchFairLocationV320(location){
+  const input=document.getElementById("fairLocation");if(!input)return false;
+  const loc=canonicalLocation(location);input.value=loc;
+  const session=findFairSessionV320(loc);
+  if(session){setDateControl("fairStart",session.start);setDateControl("fairEnd",session.end);saveLocalFairSessionV320(loc,session.start,session.end,session.updatedAt||"");fairSessionDraftDirtyV282=false;}
+  else{fairSessionDraftDirtyV282=true;}
+  updateFairPageMode();syncFairInputs();syncFairProductDatesV203(true);renderFairMonthlyList();refreshProductLinkContextV210("fair");return Boolean(session);
+}
 function renderFairLocationHistoryV309(){
   const panel=document.getElementById("fairLocationHistoryV309");
   if(!panel)return;
@@ -14,7 +36,7 @@ function renderFairLocationHistoryV309(){
   list.forEach(loc=>{
     const row=document.createElement("div");row.className="fair-location-history-row-v309";
     const choose=document.createElement("button");choose.type="button";choose.className="fair-location-history-choose-v309";choose.textContent=loc;
-    choose.addEventListener("click",()=>{const input=document.getElementById("fairLocation");if(input){input.value=loc;fairSessionDraftDirtyV282=true;updateFairPageMode();syncFairInputs();syncFairProductDatesV203(true);input.focus();}panel.classList.add("hidden")});
+    choose.addEventListener("click",()=>{switchFairLocationV320(loc);const input=document.getElementById("fairLocation");if(input)input.focus();panel.classList.add("hidden")});
     const del=document.createElement("button");del.type="button";del.className="fair-location-history-delete-v309";del.setAttribute("aria-label",`删除 ${loc}`);del.textContent="×";
     del.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();deleteFairLocationHistoryV309(loc)});
     row.append(choose,del);panel.appendChild(row);
@@ -22,7 +44,7 @@ function renderFairLocationHistoryV309(){
 }
 function renderFairLocationOptions(){const el=document.getElementById("fairLocationListOptions");if(el){el.innerHTML="";collectFairLocations().forEach(loc=>{const option=document.createElement("option");option.value=loc;el.appendChild(option)})}renderFairLocationHistoryV309()}
 function latestFairSessionV281(){const list=(Array.isArray(fairSessionsCloudV281)?fairSessionsCloudV281:[]).filter(x=>x&&x.location&&x.start&&x.end);return [...list].sort((a,b)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")))[0]||null}
-function applyFairSessionV281(s,{force=false}={}){if(!s)return false;const l=document.getElementById("fairLocation"),a=document.getElementById("fairStart"),b=document.getElementById("fairEnd");if(!l||!a||!b)return false;if(!force&&fairSessionDraftDirtyV282)return false;l.value=canonicalLocation(s.location);setDateControl("fairStart",s.start);setDateControl("fairEnd",s.end);localStorage.setItem("lover_last_fair_session",JSON.stringify({location:canonicalLocation(s.location),start:s.start,end:s.end,updatedAt:s.updatedAt||""}));fairSessionDraftDirtyV282=false;updateFairPageMode();syncFairInputs();renderFairLocationOptions();return true}
+function applyFairSessionV281(s,{force=false}={}){if(!s)return false;const l=document.getElementById("fairLocation"),a=document.getElementById("fairStart"),b=document.getElementById("fairEnd");if(!l||!a||!b)return false;if(!force&&fairSessionDraftDirtyV282)return false;l.value=canonicalLocation(s.location);setDateControl("fairStart",s.start);setDateControl("fairEnd",s.end);saveLocalFairSessionV320(canonicalLocation(s.location),s.start,s.end,s.updatedAt||"");fairSessionDraftDirtyV282=false;updateFairPageMode();syncFairInputs();renderFairLocationOptions();return true}
 async function refreshFairSessionsV281({applyLatest=false,forceApply=false}={}){try{const r=await loadFairSessionsFromSheetV281();fairSessionsCloudV281=Array.isArray(r?.sessions)?r.sessions:[];renderFairLocationOptions();if(applyLatest)applyFairSessionV281(latestFairSessionV281(),{force:forceApply});return fairSessionsCloudV281}catch(e){console.warn("Fair Session cloud sync failed",e);return fairSessionsCloudV281}}
 const companyNames={balakong:"Lover Legend Adenium - Balakong",belimbing:"Lover Legend Gardening - Belimbing",fair:"Fair",live:"Live"};
 function selectedMonth(){return document.getElementById("monthPicker").value}
@@ -1113,11 +1135,7 @@ function saveFairSession(){
 
   if(!location||!start||!end)return;
 
-  localStorage.setItem("lover_last_fair_session",JSON.stringify({
-    location,
-    start,
-    end
-  }));
+  saveLocalFairSessionV320(location,start,end);
 }
 
 function getSavedFairSession(){
@@ -1237,6 +1255,13 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   renderAll();
   if(typeof saveLocalDataCache==="function")saveLocalDataCache();
   showTempMsg("fairSaveMsg");
+  // V32.0: Fair Session is saved even when every daily amount is 0.00.
+  // This preserves each location's date range for instant switching; 0.00 still does not count as sales.
+  const fairStartV320=document.getElementById("fairStart").value;
+  const fairEndV320=document.getElementById("fairEnd").value;
+  saveLocalFairSessionV320(loc,fairStartV320,fairEndV320,now);
+  saveFairLocation(loc);
+  fairSessionDraftDirtyV282=false;
 
   try{
     setSync("已储存，正在后台同步...");
@@ -1246,7 +1271,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     saveFairSession();
     await refreshFairSessionsV281();
     const result=await saveFairBatchToSheet(loc,records);
-    // V31.8: only a successfully saved Fair becomes a reusable history location.
+    // V32.0: only a successfully saved Fair becomes a reusable history location.
     saveFairLocation(loc);
 
     // V29.9: local Fair values are direct replacements, never additions. The server
@@ -1363,8 +1388,8 @@ if(fairLocationInput){
     if(String(fairLocationInput.value||"").trim()){syncFairInputs();syncFairProductDatesV203(true);}
     renderFairMonthlyList();
   });
-  fairLocationInput.addEventListener("change",()=>refreshProductLinkContextV210("fair"));
-  fairLocationInput.addEventListener("blur",()=>refreshProductLinkContextV210("fair"));
+  fairLocationInput.addEventListener("change",()=>{const loc=canonicalLocation(fairLocationInput.value||"");if(loc&&findFairSessionV320(loc))switchFairLocationV320(loc);else refreshProductLinkContextV210("fair")});
+  fairLocationInput.addEventListener("blur",()=>{const loc=canonicalLocation(fairLocationInput.value||"");if(loc&&findFairSessionV320(loc))switchFairLocationV320(loc);else refreshProductLinkContextV210("fair")});
 }
 updateFairPageMode();
 ["fairLocation","fairStart","fairEnd"].forEach(id=>{const el=document.getElementById(id);if(el&&!el.dataset.fairDraftV282){el.dataset.fairDraftV282="1";el.addEventListener("input",()=>{fairSessionDraftDirtyV282=true});el.addEventListener("change",()=>{fairSessionDraftDirtyV282=true})}});
@@ -1444,7 +1469,7 @@ document.getElementById("fairLocation").addEventListener("input",()=>{
 document.getElementById("fairLocation").addEventListener("blur",()=>{
   const input=document.getElementById("fairLocation");
   input.value=canonicalLocation(input.value);
-  // V31.8: typing/blurring alone must not create history. A location is added
+  // V32.0: typing/blurring alone must not create history. A location is added
   // only after Fair is successfully saved to cloud.
   saveFairSession();
   syncFairInputs();
@@ -2899,7 +2924,7 @@ async function loadProductLinksIntoEditorV206(type){
     : null;
 
   if(Array.isArray(cached)){
-    // V31.8: keep the last-known saved cards visible while the exact cloud
+    // V32.0: keep the last-known saved cards visible while the exact cloud
     // context is being verified. Never replace a known draft with a fake blank
     // editor just because priority sync detected a newer card revision.
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
@@ -3669,7 +3694,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
   const onCoreEdit=()=>{markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)};
   [name,q,c,p].forEach(el=>el.addEventListener("input",onCoreEdit));
   [name,q].forEach(el=>el.addEventListener("input",()=>{
-    // V31.8: editing is not confirmation. Keep a saved draft as DRAFT until
+    // V32.0: editing is not confirmation. Keep a saved draft as DRAFT until
     // “确认销售” succeeds; the server is authoritative for the final status.
     if(String(card.dataset.inventoryStatus||"").startsWith("DRAFT")){
       card.dataset.inventoryStatus="DRAFT_INVENTORY_CHANGED";
@@ -3707,7 +3732,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const total=document.createElement("b");total.className="sales-card-price-total-v239";total.textContent="RM0.00";
   header.append(title,total);card.appendChild(header);
 
-  // V31.8: make the sales-card state explicit on Sales / Fair / Live.
+  // V32.0: make the sales-card state explicit on Sales / Fair / Live.
   // Draft is local/saved but NOT a confirmed sale and must never reach Import.
   const stateBoxV317=document.createElement("div");
   stateBoxV317.className="sales-card-state-v317";
@@ -3876,7 +3901,7 @@ async function saveLiveSales(){
 }
 
 
-/* ================= V31.8 Home on-demand today total profit =================
+/* ================= V32.0 Home on-demand today total profit =================
    Deliberately NOT part of startup / priority sync. Turnover + sales-card
    revisions remain foreground priority. Profit is queried only when opened. */
 let homeTodayProfitOpenV318=false;
@@ -5098,7 +5123,7 @@ buildSalesCardTransactionV239=function(type,dataList=[]){const card=_buildSalesC
 
 const _saveProductLinksV240=saveProductLinksV206;
 
-/* ================= V31.8 instant draft save + durable cloud retry =================
+/* ================= V32.0 instant draft save + durable cloud retry =================
    Draft edits must never hold the user on “保存中…”.  The latest draft is written
    to persistent local cache first, the UI is released immediately, and the cloud
    write runs in the background.  Confirmation still waits for cloud so Import/FIFO
@@ -5207,7 +5232,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
 
   if(saveMode==='draft'){
     try{
-      // V31.8: local durable save is the user-facing completion point.
+      // V32.0: local durable save is the user-facing completion point.
       const queued=queueSalesDraftV314(type,ctx.date,ctx.location,items);
       markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds);
       setSync('草稿已安全保存 · 可以离开',true);
@@ -5239,7 +5264,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   finally{releaseButton()}
 };
 
-// V31.8: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
+// V32.0: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
 const _deleteSalesCardTransactionV313=deleteSalesCardTransactionV239;
 deleteSalesCardTransactionV239=async function(type,txnId){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
@@ -5301,10 +5326,10 @@ saveLiveSales=async function(){
       return;
     }
   }catch(e){
-    // V31.8: a cloud preflight timeout must not lock turnover editing.
+    // V32.0: a cloud preflight timeout must not lock turnover editing.
     // The authoritative saveLive() server guard still rejects any amount below
     // active saved cards. With no saved card, the user may edit turnover freely.
-    console.warn("V31.8 销售卡预检暂时失败，继续交由云端保存时核对",e);
+    console.warn("V32.0 销售卡预检暂时失败，继续交由云端保存时核对",e);
   }
 
   const restored=reactivateLiveHostIfNeeded(host);
@@ -5671,7 +5696,7 @@ function scheduleInventoryPendingResumeRefreshV265(){
     refreshInventoryPendingV250(true);
   },500);
 }
-// V31.8: cloud resume synchronization is centralized in update.js.
+// V32.0: cloud resume synchronization is centralized in update.js.
 // Refresh Import reminders once only after that resume cycle completes, instead
 // of competing with it through visibilitychange + focus + pageshow.
 window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);
