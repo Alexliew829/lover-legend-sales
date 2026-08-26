@@ -2551,3 +2551,29 @@ body{overflow-x:hidden;}
   .fair-location-commission-v298{font-size:14px;gap:6px}
   .fair-monthly-commission-v298{font-size:16px}
 }
+
+
+/* ================= V30.0 Fair / Live four-column summary layout ================= */
+.profit-grand-v294{
+  grid-template-columns:minmax(142px,1.45fr) minmax(88px,.9fr) minmax(72px,.76fr) minmax(92px,.9fr);
+  gap:6px;padding:12px 12px;white-space:nowrap;overflow:hidden;
+}
+.profit-grand-v294>strong{min-width:0;white-space:nowrap;font-size:16px}
+.profit-grand-v294>div{min-width:0;text-align:right;white-space:nowrap}
+.profit-grand-v294 span{font-size:12.5px;white-space:nowrap}
+.profit-grand-v294 b{font-size:16.5px;white-space:nowrap}
+@media(max-width:520px){
+  .profit-grand-v294{
+    grid-template-columns:minmax(126px,1.38fr) minmax(74px,.82fr) minmax(62px,.68fr) minmax(78px,.82fr);
+    gap:3px;padding:10px 8px;
+  }
+  .profit-grand-v294>strong{grid-column:auto;font-size:14.5px;letter-spacing:-.35px}
+  .profit-grand-v294 span{font-size:11.5px;letter-spacing:-.25px}
+  .profit-grand-v294 b{font-size:14.5px;letter-spacing:-.35px}
+}
+@media(max-width:390px){
+  .profit-grand-v294{grid-template-columns:minmax(116px,1.34fr) minmax(68px,.8fr) minmax(57px,.66fr) minmax(72px,.8fr);gap:2px;padding:9px 6px}
+  .profit-grand-v294>strong{font-size:13.5px;letter-spacing:-.5px}
+  .profit-grand-v294 span{font-size:10.8px;letter-spacing:-.35px}
+  .profit-grand-v294 b{font-size:13.5px;letter-spacing:-.45px}
+}
