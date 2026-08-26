@@ -1246,7 +1246,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     saveFairSession();
     await refreshFairSessionsV281();
     const result=await saveFairBatchToSheet(loc,records);
-    // V31.4: only a successfully saved Fair becomes a reusable history location.
+    // V31.5: only a successfully saved Fair becomes a reusable history location.
     saveFairLocation(loc);
 
     // V29.9: local Fair values are direct replacements, never additions. The server
@@ -1444,7 +1444,7 @@ document.getElementById("fairLocation").addEventListener("input",()=>{
 document.getElementById("fairLocation").addEventListener("blur",()=>{
   const input=document.getElementById("fairLocation");
   input.value=canonicalLocation(input.value);
-  // V31.4: typing/blurring alone must not create history. A location is added
+  // V31.5: typing/blurring alone must not create history. A location is added
   // only after Fair is successfully saved to cloud.
   saveFairSession();
   syncFairInputs();
@@ -4054,7 +4054,7 @@ async function saveLiveSales(){
 let monthGrandHistoryOpenV223=false;
 let monthGrandHistoryLoadingV223=false;
 
-/* ================= V31.4 Home turnover-only history =================
+/* ================= V31.5 Home turnover-only history =================
    Home monthly/yearly dropdowns deliberately do NOT read Sales_Product_Links,
    aggregate Profit, calculate profit rate, or render profit fields.
    Sales/Fair/Live page profit logic remains unchanged.
@@ -4096,13 +4096,13 @@ async function toggleMonthGrandHistoryV223(){
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
   monthGrandHistoryLoadingV223=true;renderMonthGrandHistoryV223();
   try{
-    // V31.4: only turnover rows are needed. Never load Sales_Product_Links here.
+    // V31.5: only turnover rows are needed. Never load Sales_Product_Links here.
     if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
   }catch(e){console.warn("Month turnover history load skipped:",e)}finally{monthGrandHistoryLoadingV223=false;renderMonthGrandHistoryV223()}
 }
 window.toggleMonthGrandHistoryV223=toggleMonthGrandHistoryV223;
 
-/* ================= V31.4 expandable yearly turnover-only breakdown ================= */
+/* ================= V31.5 expandable yearly turnover-only breakdown ================= */
 const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 
@@ -4139,7 +4139,7 @@ async function toggleYearBreakdownV224(kind){
   yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");yearBreakdownLoadingV224[kind]=true;renderYearBreakdownV224(kind);
   try{
-    // V31.4: no Home profit read/rollup/render; only load turnover history.
+    // V31.5: no Home profit read/rollup/render; only load turnover history.
     if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))await loadYearInBackground(year);
   }catch(e){console.warn("Year turnover breakdown load skipped:",kind,e)}finally{yearBreakdownLoadingV224[kind]=false;renderYearBreakdownV224(kind)}
 }
@@ -4952,7 +4952,7 @@ buildSalesCardTransactionV239=function(type,dataList=[]){const card=_buildSalesC
 
 const _saveProductLinksV240=saveProductLinksV206;
 
-/* ================= V31.4 instant draft save + durable cloud retry =================
+/* ================= V31.5 instant draft save + durable cloud retry =================
    Draft edits must never hold the user on “保存中…”.  The latest draft is written
    to persistent local cache first, the UI is released immediately, and the cloud
    write runs in the background.  Confirmation still waits for cloud so Import/FIFO
@@ -5060,7 +5060,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
 
   if(saveMode==='draft'){
     try{
-      // V31.4: local durable save is the user-facing completion point.
+      // V31.5: local durable save is the user-facing completion point.
       const queued=queueSalesDraftV314(type,ctx.date,ctx.location,items);
       markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds);
       setSync('草稿已安全保存 · 可以离开',true);
@@ -5092,7 +5092,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   finally{releaseButton()}
 };
 
-// V31.4: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
+// V31.5: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
 const _deleteSalesCardTransactionV313=deleteSalesCardTransactionV239;
 deleteSalesCardTransactionV239=async function(type,txnId){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
@@ -5154,10 +5154,10 @@ saveLiveSales=async function(){
       return;
     }
   }catch(e){
-    // V31.4: a cloud preflight timeout must not lock turnover editing.
+    // V31.5: a cloud preflight timeout must not lock turnover editing.
     // The authoritative saveLive() server guard still rejects any amount below
     // active saved cards. With no saved card, the user may edit turnover freely.
-    console.warn("V31.4 销售卡预检暂时失败，继续交由云端保存时核对",e);
+    console.warn("V31.5 销售卡预检暂时失败，继续交由云端保存时核对",e);
   }
 
   const restored=reactivateLiveHostIfNeeded(host);
@@ -5524,7 +5524,7 @@ function scheduleInventoryPendingResumeRefreshV265(){
     refreshInventoryPendingV250(true);
   },500);
 }
-// V31.4: cloud resume synchronization is centralized in update.js.
+// V31.5: cloud resume synchronization is centralized in update.js.
 // Refresh Import reminders once only after that resume cycle completes, instead
 // of competing with it through visibilitychange + focus + pageshow.
 window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);
@@ -5699,7 +5699,7 @@ renderLiveMonthlyList=function(){
   }).catch(e=>console.warn('V29.9 Live 利润读取失败',e));
 };
 
-/* ================= V31.4 on-demand Profit Query =================
+/* ================= V31.5 on-demand Profit Query =================
    Deliberately isolated from Home startup/sync. Sales_Product_Links is read only
    after the user presses 查询利润.
 */

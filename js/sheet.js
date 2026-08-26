@@ -83,6 +83,16 @@ function getLocalDataRevision() {
   return Number(localDataRevision || 0);
 }
 
+const PRIORITY_SYNC_CACHE_KEY_V315="lover_priority_sync_v315";
+function getPrioritySyncLocalV315(){try{return JSON.parse(localStorage.getItem(PRIORITY_SYNC_CACHE_KEY_V315)||"{}")}catch(_){return{}}}
+function setPrioritySyncLocalV315(v){try{localStorage.setItem(PRIORITY_SYNC_CACHE_KEY_V315,JSON.stringify(v||{}))}catch(_){}}
+async function checkPriorityRevisionV315(timeoutMs=4500){return jsonp({action:"priorityRevisionV315"},{timeoutMs});}
+function invalidateSalesCardCachesV315(){
+  try{salesProductLinksCacheV216.clear()}catch(_){}
+  try{allSalesProductLinksCacheV216={links:null,at:0}}catch(_){}
+  try{localStorage.removeItem("lover_sales_card_persistent_cache_v232")}catch(_){}
+}
+
 async function checkCloudRevisionShared(timeoutMs = REVISION_CHECK_TIMEOUT_MS) {
   if (revisionCheckPromise) return revisionCheckPromise;
   revisionCheckPromise = jsonp(
@@ -560,35 +570,32 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V29.9: opening/resuming first checks one tiny revision value.
-      // Full month data is downloaded only when another device changed data.
+      // V31.5: foreground priority sync checks ONLY turnover and sales-card revisions.
+      // Profit/Top5/Report/old-month changes never delay normal Sales/Fair/Live work.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
-          const revisionResult = await checkCloudRevisionShared(Number(options.revisionTimeoutMs || REVISION_CHECK_TIMEOUT_MS));
-          if (revisionResult && revisionResult.ok) {
-            const cloudRevision = Number(revisionResult.dataRevision || 0);
-            if (cloudRevision === getLocalDataRevision()) {
+          const pr = await checkPriorityRevisionV315(Number(options.revisionTimeoutMs || 4500));
+          if (pr && pr.ok) {
+            const localPr=getPrioritySyncLocalV315();
+            const cloudTurn=Number(pr.turnoverRevision||0), cloudCard=Number(pr.salesCardRevision||0);
+            const localTurn=Number(localPr.turnoverRevision||0), localCard=Number(localPr.salesCardRevision||0);
+            if(cloudCard!==localCard){ invalidateSalesCardCachesV315(); }
+            setPrioritySyncLocalV315({turnoverRevision:cloudTurn,salesCardRevision:cloudCard,at:Date.now()});
+            if(cloudTurn===localTurn){
               setSync("已同步", true);
               completedSuccessfully = true;
-              return { ok:true, month, revisionOnly:true, dataRevision:cloudRevision };
+              return {ok:true,month,priorityOnly:true,turnoverRevision:cloudTurn,salesCardRevision:cloudCard};
             }
+            // Turnover changed on another device: continue immediately to current-month load.
           } else {
             setSync("云端确认稍慢 · 可继续使用", false, false);
             completedSuccessfully = true;
-            return { ok:true, month, revisionUnconfirmed:true };
+            return {ok:true,month,revisionUnconfirmed:true};
           }
         } catch (revisionError) {
-          // V29.9: when local data exists, a slow/failed revision check must not
-          // trigger the expensive full-month download. Keep the visible local
-          // data and let the next foreground/interval/manual check try again.
           setSync("云端确认稍慢 · 可继续使用", false, false);
           completedSuccessfully = true;
-          return {
-            ok: true,
-            month,
-            revisionUnconfirmed: true,
-            error: revisionError
-          };
+          return {ok:true,month,revisionUnconfirmed:true,error:revisionError};
         }
       }
       let json = null;
@@ -790,6 +797,7 @@ async function confirmSalesCardInventoryV249(payload) {
 async function saveSalesProductLinksV206(items, saveMode="confirm") {
   const json = await jsonp({ action:"saveSalesProductLinks", itemsJson:JSON.stringify(items||[]), saveMode:String(saveMode||"confirm") }, { timeoutMs:30000 });
   if (!json.ok) throw new Error(json.message || "盆栽资料保存失败");
+  if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
   const first=Array.isArray(items)&&items.length?items[0]:null;
   if(first&&first.type&&first.date&&first.location){
     mergeDailyProfitContextCacheV237(first.type,first.date,first.location,Array.isArray(json.links)?json.links:items);
@@ -999,6 +1007,7 @@ async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "") {
 
   if (!json.ok) throw new Error(json.message || "储存失败");
   applyLocalDataRevision(json.dataRevision);
+  if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
   dispatchSalesNotificationAsync(json.notificationEnvelope);
   return json.row || null;
 }
@@ -1025,6 +1034,7 @@ async function saveFairBatchToSheet(location, records) {
 
   if (!json.ok) throw new Error(json.message || "Fair 储存失败");
   applyLocalDataRevision(json.dataRevision);
+  if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
   dispatchSalesNotificationAsync(json.notificationEnvelope);
   (Array.isArray(records)?records:[]).forEach(r=>{
     if(r&&r.date)Promise.resolve(loadSalesChangeLogFromSheetV200("fair",r.date,{force:true})).catch(()=>{});
@@ -1055,6 +1065,7 @@ async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "") {
   });
   if (!json.ok) throw new Error(json.message || "Live 储存失败");
   applyLocalDataRevision(json.dataRevision);
+  if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
   dispatchSalesNotificationAsync(json.notificationEnvelope);
   Promise.resolve(loadSalesChangeLogFromSheetV200("live",date,{force:true})).catch(()=>{});
   return json.row || null;
