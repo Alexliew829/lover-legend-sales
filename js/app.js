@@ -1255,7 +1255,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   renderAll();
   if(typeof saveLocalDataCache==="function")saveLocalDataCache();
   showTempMsg("fairSaveMsg");
-  // V32.1: Fair Session is saved even when every daily amount is 0.00.
+  // V32.2: Fair Session is saved even when every daily amount is 0.00.
   // This preserves each location's date range for instant switching; 0.00 still does not count as sales.
   const fairStartV320=document.getElementById("fairStart").value;
   const fairEndV320=document.getElementById("fairEnd").value;
@@ -1271,7 +1271,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     saveFairSession();
     await refreshFairSessionsV281();
     const result=await saveFairBatchToSheet(loc,records);
-    // V32.1: only a successfully saved Fair becomes a reusable history location.
+    // V32.2: only a successfully saved Fair becomes a reusable history location.
     saveFairLocation(loc);
 
     // V29.9: local Fair values are direct replacements, never additions. The server
@@ -1469,7 +1469,7 @@ document.getElementById("fairLocation").addEventListener("input",()=>{
 document.getElementById("fairLocation").addEventListener("blur",()=>{
   const input=document.getElementById("fairLocation");
   input.value=canonicalLocation(input.value);
-  // V32.1: typing/blurring alone must not create history. A location is added
+  // V32.2: typing/blurring alone must not create history. A location is added
   // only after Fair is successfully saved to cloud.
   saveFairSession();
   syncFairInputs();
@@ -2924,7 +2924,7 @@ async function loadProductLinksIntoEditorV206(type){
     : null;
 
   if(Array.isArray(cached)){
-    // V32.1: keep the last-known saved cards visible while the exact cloud
+    // V32.2: keep the last-known saved cards visible while the exact cloud
     // context is being verified. Never replace a known draft with a fake blank
     // editor just because priority sync detected a newer card revision.
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
@@ -3284,6 +3284,63 @@ async function deleteSalesCardTransactionV239(type,txnId){
   }catch(e){alert("删除销售卡失败："+(e.message||e))}
 }
 window.deleteSalesCardTransactionV239=deleteSalesCardTransactionV239;
+
+/* ================= V32.2 confirmed-sale edit state =================
+   A sale can be confirmed only once. After confirmation the whole card is locked
+   against deletion, but its products may still be corrected and saved. Those
+   corrections stay a CONFIRMED sale and, when inventory identity/quantity differs,
+   become PENDING_IMPORT_LINK for Import to process as a +/- inventory difference. */
+function salesCardStatusIsConfirmedV322(status){
+  const s=String(status||'').trim();
+  return s==='PENDING_IMPORT_LINK'||s==='INVENTORY_CONFIRMED';
+}
+function salesCardIsConfirmedV322(card){
+  if(!card)return false;
+  if(salesCardStatusIsConfirmedV322(card.dataset.inventoryStatus))return true;
+  return [...card.querySelectorAll('.product-link-item')].some(i=>salesCardStatusIsConfirmedV322(i.dataset.inventoryStatus));
+}
+function updateSalesCardDeleteLockV322(card){
+  if(!card)return;
+  const btn=card.querySelector('.product-link-remove-bottom');
+  if(!btn)return;
+  const locked=salesCardIsConfirmedV322(card);
+  btn.disabled=locked;
+  btn.setAttribute('aria-disabled',locked?'true':'false');
+  btn.classList.toggle('is-confirmed-locked-v322',locked);
+  btn.textContent=locked?'删除销售卡（已确认，不能删除）':'删除销售卡';
+}
+function refreshConfirmSaleButtonV322(type){
+  const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
+  if(!wrap)return;
+  const btn=[...document.querySelectorAll('.confirm-sale-btn-v285')].find(b=>String(b.getAttribute('onclick')||'').includes(`saveProductLinksV206('${type}','confirm'`));
+  if(!btn)return;
+  const cards=[...wrap.querySelectorAll('.sales-card-transaction-v239')];
+  const hasConfirmable=cards.some(card=>!salesCardIsConfirmedV322(card)&&(card.dataset.dirty==='1'||!salesCardIsSavedV241(card)||String(card.dataset.inventoryStatus||'').startsWith('DRAFT')));
+  btn.disabled=!hasConfirmable;
+  btn.classList.toggle('is-confirmed-locked-v322',!hasConfirmable);
+  btn.textContent=hasConfirmable?'✅ 确认销售':'✅ 已确认销售';
+}
+function applyCloudDraftStatusesV322(type,savedLinks){
+  const list=Array.isArray(savedLinks)?savedLinks:[];
+  const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');if(!wrap)return;
+  const byTxn=new Map();
+  list.forEach(x=>{const tx=String(x.transactionId||'');if(!tx)return;if(!byTxn.has(tx))byTxn.set(tx,[]);byTxn.get(tx).push(x)});
+  [...wrap.querySelectorAll('.sales-card-transaction-v239')].forEach(card=>{
+    const recs=byTxn.get(String(card.dataset.transactionId||''));if(!recs)return;
+    const byLink=new Map(recs.map(x=>[String(x.linkId||''),x]));
+    let status='';
+    card.querySelectorAll('.product-link-item').forEach(item=>{
+      const rec=byLink.get(String(item.dataset.linkId||''));if(!rec)return;
+      item.dataset.inventoryStatus=String(rec.importSyncStatus||'');
+      status=status||item.dataset.inventoryStatus;
+    });
+    if(status)card.dataset.inventoryStatus=status;
+    if(card._renderSalesStateV317)card._renderSalesStateV317();
+    updateSalesCardDeleteLockV322(card);
+  });
+  refreshConfirmSaleButtonV322(type);
+}
+window.salesCardIsConfirmedV322=salesCardIsConfirmedV322;
 
 function buildSalesCardTransactionV239(type,dataList=[]){
   const list=Array.isArray(dataList)&&dataList.length?dataList:[{}];
@@ -3694,7 +3751,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
   const onCoreEdit=()=>{markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)};
   [name,q,c,p].forEach(el=>el.addEventListener("input",onCoreEdit));
   [name,q].forEach(el=>el.addEventListener("input",()=>{
-    // V32.1: editing is not confirmation. Keep a saved draft as DRAFT until
+    // V32.2: editing is not confirmation. Keep a saved draft as DRAFT until
     // “确认销售” succeeds; the server is authoritative for the final status.
     if(String(card.dataset.inventoryStatus||"").startsWith("DRAFT")){
       card.dataset.inventoryStatus="DRAFT_INVENTORY_CHANGED";
@@ -3732,7 +3789,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const total=document.createElement("b");total.className="sales-card-price-total-v239";total.textContent="RM0.00";
   header.append(title,total);card.appendChild(header);
 
-  // V32.1: make the sales-card state explicit on Sales / Fair / Live.
+  // V32.2: make the sales-card state explicit on Sales / Fair / Live.
   // Draft is local/saved but NOT a confirmed sale and must never reach Import.
   const stateBoxV317=document.createElement("div");
   stateBoxV317.className="sales-card-state-v317";
@@ -3747,6 +3804,8 @@ function buildSalesCardTransactionV239(type,dataList=[]){
     stateBoxV317.hidden=false;
     stateBoxV317.className="sales-card-state-v317 "+(draft?"is-draft":pending?"is-pending":done?"is-done":"is-draft");
     stateBoxV317.textContent=draft?"🟡 草稿已保存 · 尚未确认销售":pending?"🟢 已确认销售 · 等待 Import 处理库存":done?"✅ 已确认销售 · Import 已处理库存":"🟡 草稿已保存 · 尚未确认销售";
+    updateSalesCardDeleteLockV322(card);
+    setTimeout(()=>refreshConfirmSaleButtonV322(type),0);
   };
   card.appendChild(stateBoxV317);
   card._renderSalesStateV317=renderStateV317;
@@ -3796,7 +3855,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   delivery.inp.addEventListener("blur",()=>{delivery.inp.value=formatAmount(toAmount(delivery.inp.value||0));});
   commission.inp.addEventListener("blur",()=>{commission.inp.value=(Math.max(0,Number(commission.inp.value)||0)).toFixed(2);recalcSalesCardTransactionV239(card)});
 
-  setTimeout(()=>{clearSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card);if(card._renderSalesStateV317)card._renderSalesStateV317()},0);
+  setTimeout(()=>{clearSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card);if(card._renderSalesStateV317)card._renderSalesStateV317();updateSalesCardDeleteLockV322(card);refreshConfirmSaleButtonV322(type)},0);
   return card;
 }
 
@@ -3901,7 +3960,7 @@ async function saveLiveSales(){
 }
 
 
-/* ================= V32.1 Home on-demand today total profit =================
+/* ================= V32.2 Home on-demand today total profit =================
    Deliberately NOT part of startup / priority sync. Turnover + sales-card
    revisions remain foreground priority. Profit is queried only when opened. */
 let homeTodayProfitOpenV318=false;
@@ -5123,12 +5182,12 @@ buildSalesCardTransactionV239=function(type,dataList=[]){const card=_buildSalesC
 
 const _saveProductLinksV240=saveProductLinksV206;
 
-/* ================= V32.1 instant draft save + durable cloud retry =================
+/* ================= V32.2 instant draft save + durable cloud retry =================
    Draft edits must never hold the user on “保存中…”.  The latest draft is written
    to persistent local cache first, the UI is released immediately, and the cloud
    write runs in the background.  Confirmation still waits for cloud so Import/FIFO
    never sees an older draft. */
-// V32.1: Draft profit is real dashboard profit immediately after Save Draft.
+// V32.2: Draft profit is real dashboard profit immediately after Save Draft.
 // Draft/Confirmed are the same sale card for profit purposes; replace by transactionId
 // so repeated saves and later confirmation can never double-count the same card.
 function mergeProfitLinksByTransactionV321(existing,incoming,replaceTxnIds=[]){
@@ -5175,21 +5234,36 @@ function removeSalesDraftPendingV314(key,token=''){
   delete all[key];writeSalesDraftPendingV314(all);
 }
 function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
-  const local=items.map(x=>({...x,importSyncStatus:'DRAFT'}));
   const old=(typeof getSalesCardPersistentCacheV232==='function'?getSalesCardPersistentCacheV232(type,ctx.date,ctx.location):[])||[];
+  const oldByTxn=new Map();
+  old.forEach(x=>{const tx=String(x.transactionId||'');if(!tx)return;if(!oldByTxn.has(tx))oldByTxn.set(tx,[]);oldByTxn.get(tx).push(x)});
+  const cardByTxn=new Map(dirty.map(c=>[String(c.dataset.transactionId||''),c]));
+  const local=items.map(x=>{
+    const tx=String(x.transactionId||''),card=cardByTxn.get(tx),prev=oldByTxn.get(tx)||[];
+    const wasConfirmed=salesCardIsConfirmedV322(card)||prev.some(r=>salesCardStatusIsConfirmedV322(r.importSyncStatus));
+    let status='DRAFT';
+    if(wasConfirmed){
+      // Do not ever downgrade a confirmed sale to Draft while the cloud write runs.
+      // Keep its last confirmed/pending state until the server returns the exact
+      // inventory-difference status for this edit.
+      status=prev.some(r=>String(r.importSyncStatus||'')==='PENDING_IMPORT_LINK')||String(card?.dataset.inventoryStatus||'')==='PENDING_IMPORT_LINK'?'PENDING_IMPORT_LINK':'INVENTORY_CONFIRMED';
+    }
+    return {...x,importSyncStatus:status};
+  });
   const merged=[...old.filter(x=>!dirtyIds.has(String(x.transactionId||''))),...local];
   if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,merged);
   if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,merged);
   if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,ctx.date,ctx.location,merged);
   refreshProfitAggregateCachesV321(local,[...dirtyIds]);
-  const byLink=new Map(local.map(x=>[String(x.linkId||''),x]));
+  const statusByTxn=new Map();local.forEach(x=>{const tx=String(x.transactionId||'');if(tx&&!statusByTxn.has(tx))statusByTxn.set(tx,String(x.importSyncStatus||''))});
   dirty.forEach(card=>{
-    clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;card.dataset.inventoryStatus='DRAFT';
-    card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';i.dataset.inventoryStatus='DRAFT';});
+    clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;
+    const tx=String(card.dataset.transactionId||''),st=statusByTxn.get(tx)||'DRAFT';card.dataset.inventoryStatus=st;
+    card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';i.dataset.inventoryStatus=st;});
     const tag=card.querySelector('.sales-card-header-v239 b:first-child');if(tag)tag.textContent='已保存销售卡';
-    if(card._renderSalesStateV317)card._renderSalesStateV317();
+    if(card._renderSalesStateV317)card._renderSalesStateV317();updateSalesCardDeleteLockV322(card);
   });
-  renumberSavedSalesCardsV241(type);
+  renumberSavedSalesCardsV241(type);refreshConfirmSaleButtonV322(type);
   return merged;
 }
 async function syncQueuedSalesDraftV314(key,expectedToken=''){
@@ -5208,6 +5282,8 @@ async function syncQueuedSalesDraftV314(key,expectedToken=''){
         if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(entry.type,entry.date,entry.location,saved);
         if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(entry.type,entry.date,entry.location,saved);
         refreshProfitAggregateCachesV321(saved,[...new Set(entry.items.map(x=>String(x.transactionId||'')).filter(Boolean))]);
+        applyCloudDraftStatusesV322(entry.type,saved);
+        if(typeof refreshInventoryPendingV250==='function')setTimeout(()=>refreshInventoryPendingV250(true),0);
         setSync('草稿已保存 · 云端已同步',true);
       }
       return result;
@@ -5245,8 +5321,15 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   const originalButtonText=button?.textContent||'';
   if(button){button.dataset.busyV285='1';button.disabled=true;button.textContent=saveMode==='draft'?'保存中…':'确认中…';}
   const releaseButton=()=>{if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}};
-  const cards=salesCardWrappersV239(type),dirty=cards.filter(c=>c.dataset.dirty==='1'||c.dataset.productRemovedV259==='1'||!salesCardIsSavedV241(c)||(saveMode==='confirm'&&String(c.dataset.inventoryStatus||'').startsWith('DRAFT')));
-  if(!dirty.length){alert('销售卡没有需要保存的修改。');releaseButton();return null;}
+  const cards=salesCardWrappersV239(type),dirty=cards.filter(c=>{
+    const needsSave=c.dataset.dirty==='1'||c.dataset.productRemovedV259==='1'||!salesCardIsSavedV241(c)||(saveMode==='confirm'&&String(c.dataset.inventoryStatus||'').startsWith('DRAFT'));
+    if(!needsSave)return false;
+    // V32.2: a confirmed sale can never be confirmed a second time. Any later
+    // correction must use 保存草稿 so the server can create only the inventory diff.
+    if(saveMode==='confirm'&&salesCardIsConfirmedV322(c))return false;
+    return true;
+  });
+  if(!dirty.length){alert(saveMode==='confirm'?'这张销售卡已经确认销售。后续修改请使用「保存草稿」。':'销售卡没有需要保存的修改。');releaseButton();refreshConfirmSaleButtonV322(type);return null;}
   const all=collectProductLinksV206(type),dirtyIds=new Set(dirty.map(c=>String(c.dataset.transactionId||''))),items=all.filter(x=>dirtyIds.has(String(x.transactionId||'')));
   if(!items.length){alert('请填写销售卡产品资料。');releaseButton();return null;}
   const official=salesCardsOfficialAmountV241(type),allTotal=all.reduce((s,x)=>s+Number(x.actualPrice||0),0);
@@ -5260,7 +5343,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
 
   if(saveMode==='draft'){
     try{
-      // V32.1: local durable save is the user-facing completion point.
+      // V32.2: local durable save is the user-facing completion point.
       const queued=queueSalesDraftV314(type,ctx.date,ctx.location,items);
       markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds);
       setSync('草稿已安全保存 · 可以离开',true);
@@ -5289,12 +5372,12 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
     refreshProfitAggregateCachesV321(saved,[...dirtyIds]);
     const savedByLink=new Map(saved.map(x=>[String(x.linkId||''),x]));
     dirty.forEach(card=>{clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;let cardStatus='';card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';const rec=savedByLink.get(String(i.dataset.linkId||''));if(rec){i.dataset.inventoryStatus=String(rec.importSyncStatus||'');cardStatus=cardStatus||i.dataset.inventoryStatus;}});if(cardStatus)card.dataset.inventoryStatus=cardStatus;if(card._renderSalesStateV317)card._renderSalesStateV317();});
-    renumberSavedSalesCardsV241(type);setSync('销售已确认',true);alert('销售确认成功。\n\n如有库存变动，请到 Import Cost System 处理。');if(result?.warning)alert(result.warning);return result;
+    renumberSavedSalesCardsV241(type);dirty.forEach(updateSalesCardDeleteLockV322);refreshConfirmSaleButtonV322(type);if(typeof refreshInventoryPendingV250==='function')setTimeout(()=>refreshInventoryPendingV250(true),0);setSync('销售已确认',true);alert('销售确认成功。\n\n如有库存变动，请到 Import Cost System 处理。');if(result?.warning)alert(result.warning);return result;
   }catch(e){setSync('销售确认失败',false,true);alert('销售确认失败：'+(e.message||e)+'\n\n草稿仍保留，请稍后重试确认销售。');return null}
   finally{releaseButton()}
 };
 
-// V32.1: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
+// V32.2: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
 const _deleteSalesCardTransactionV313=deleteSalesCardTransactionV239;
 deleteSalesCardTransactionV239=async function(type,txnId){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
@@ -5356,10 +5439,10 @@ saveLiveSales=async function(){
       return;
     }
   }catch(e){
-    // V32.1: a cloud preflight timeout must not lock turnover editing.
+    // V32.2: a cloud preflight timeout must not lock turnover editing.
     // The authoritative saveLive() server guard still rejects any amount below
     // active saved cards. With no saved card, the user may edit turnover freely.
-    console.warn("V32.1 销售卡预检暂时失败，继续交由云端保存时核对",e);
+    console.warn("V32.2 销售卡预检暂时失败，继续交由云端保存时核对",e);
   }
 
   const restored=reactivateLiveHostIfNeeded(host);
@@ -5726,7 +5809,7 @@ function scheduleInventoryPendingResumeRefreshV265(){
     refreshInventoryPendingV250(true);
   },500);
 }
-// V32.1: cloud resume synchronization is centralized in update.js.
+// V32.2: cloud resume synchronization is centralized in update.js.
 // Refresh Import reminders once only after that resume cycle completes, instead
 // of competing with it through visibilitychange + focus + pageshow.
 window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);

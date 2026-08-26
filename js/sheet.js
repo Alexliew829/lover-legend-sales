@@ -88,7 +88,7 @@ function getPrioritySyncLocalV315(){try{return JSON.parse(localStorage.getItem(P
 function setPrioritySyncLocalV315(v){try{localStorage.setItem(PRIORITY_SYNC_CACHE_KEY_V315,JSON.stringify(v||{}))}catch(_){}}
 async function checkPriorityRevisionV315(timeoutMs=4500){return jsonp({action:"priorityRevisionV315"},{timeoutMs});}
 function invalidateSalesCardCachesV315(){
-  // V32.1: a newer sales-card revision must invalidate only in-memory/session data.
+  // V32.2: a newer sales-card revision must invalidate only in-memory/session data.
   // Keep the exact-context persistent cache as the last-known-good snapshot so
   // Sales/Fair/Live never flashes a fake blank/new card while cloud verification
   // is still running. loadProductLinksIntoEditorV206() paints this snapshot first
@@ -574,7 +574,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V32.1: foreground priority sync checks ONLY turnover and sales-card revisions.
+      // V32.2: foreground priority sync checks ONLY turnover and sales-card revisions.
       // Profit/Top5/Report/old-month changes never delay normal Sales/Fair/Live work.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
@@ -966,7 +966,7 @@ async function deleteSalesProductLinkV206(linkId) {
 let allSalesProductLinksCacheV216={links:null,at:0};
 let allSalesProductLinksPendingV216=null;
 
-// V32.1: keep already-loaded profit rollup data current when a Draft is saved.
+// V32.2: keep already-loaded profit rollup data current when a Draft is saved.
 // Only patch the cache when it already represents a complete getAll result; if it
 // has never been loaded, leave it null so the next profit query still fetches all rows.
 function mergeAllSalesProductLinksCacheV321(savedLinks, replaceTransactionIds=[]){
