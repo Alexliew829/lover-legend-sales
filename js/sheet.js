@@ -24,7 +24,7 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
 const REVISION_CHECK_TIMEOUT_MS = 2500;
-// V29.9: notification dispatch uses the existing keepalive transport.
+// V30.0: notification dispatch uses the existing keepalive transport.
 // It is fire-and-forget after a successful business save, so OneSignal never
 // blocks the Sales/Fair/Live save or cloud-sync path on mobile or desktop.
 function getSalesLaunchUrlV194(){
@@ -107,12 +107,12 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-/* V29.9: first paint must not wait for the full system render. */
+/* V30.0: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
 
 function renderHomeFirst() {
-  // V29.9: first paint must stay lightweight. Cloud merge performs dedupe later.
+  // V30.0: first paint must stay lightweight. Cloud merge performs dedupe later.
   if (typeof renderDashboard === "function") {
     renderDashboard();
   }
@@ -188,7 +188,7 @@ function loadLocalDataCache() {
     scheduleDeferredFullRender(50);
     return true;
   } catch (err) {
-    // V29.9: damaged/partial cache must never trap startup.
+    // V30.0: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
     return false;
@@ -295,7 +295,7 @@ function markCloudCheckPending(text = "本机资料已显示 · 云端后台同�
   if (el) el.textContent = "🟡 " + text;
 }
 
-// V29.9: best-effort immediate cloud dispatch for mobile saves.
+// V30.0: best-effort immediate cloud dispatch for mobile saves.
 // The row stays in pendingRows until a normal JSONP confirmation succeeds, so
 // closing/suspending the page cannot silently lose the user's entry.
 function dispatchKeepalive(params) {
@@ -488,7 +488,7 @@ async function loadYearInBackground(year) {
       if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
       renderHomeFirst();
       scheduleDeferredFullRender(0);
-      // V29.9: if Fair is currently open, repaint its date inputs from the
+      // V30.0: if Fair is currently open, repaint its date inputs from the
       // newly merged cloud rows, unless the user has an unsaved Fair draft.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (fairPageActive && !fairDraftDirtyBeforeCloud && typeof refreshFairInputsFromRows === "function") {
@@ -560,7 +560,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V29.9: opening/resuming first checks one tiny revision value.
+      // V30.0: opening/resuming first checks one tiny revision value.
       // Full month data is downloaded only when another device changed data.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
@@ -578,7 +578,7 @@ async function loadFromSheet(options = {}) {
             return { ok:true, month, revisionUnconfirmed:true };
           }
         } catch (revisionError) {
-          // V29.9: when local data exists, a slow/failed revision check must not
+          // V30.0: when local data exists, a slow/failed revision check must not
           // trigger the expensive full-month download. Keep the visible local
           // data and let the next foreground/interval/manual check try again.
           setSync("本机资料已显示 · 云端暂未确认", false, true);
@@ -627,7 +627,7 @@ async function loadFromSheet(options = {}) {
 
       renderHomeFirst();
       scheduleDeferredFullRender(0);
-      // V29.9: keep Fair's visible daily amount inputs consistent with rows after
+      // V30.0: keep Fair's visible daily amount inputs consistent with rows after
       // cloud refresh. Do not overwrite any unsaved Fair edits.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (typeof refreshFairInputsFromRows === "function" && !fairDraftDirtyBeforeCloud && (fairPageActive || options.refreshFairInputs === true)) {
@@ -646,7 +646,7 @@ async function loadFromSheet(options = {}) {
 
       const year = month.slice(0, 4);
 
-      // V29.9 mobile performance: startup loads only the selected month.
+      // V30.0 mobile performance: startup loads only the selected month.
       // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
         setTimeout(() => {
@@ -678,88 +678,48 @@ async function loadFromSheet(options = {}) {
   }
 }
 
+async function savePendingRowsBatchToSheetV300(records){
+  const json=await jsonp({
+    action:"savePendingRowsBatchV300",
+    rows:JSON.stringify(Array.isArray(records)?records:[])
+  },{timeoutMs:20000});
+  if(!json.ok)throw new Error(json.message||"批量同步失败");
+  applyLocalDataRevision(json.dataRevision);
+  dispatchSalesNotificationAsync(json.notificationEnvelope);
+  return json;
+}
+
 async function syncPendingRows() {
   if (pendingSyncRunning) return;
   pendingSyncRunning = true;
 
   try {
     loadPendingRows();
-
     if (pendingRows.length === 0) {
-      if (initialCloudSyncFinished && !cloudLoadPromise) {
-        setSync("已同步", true);
-      }
+      if (initialCloudSyncFinished && !cloudLoadPromise) setSync("已同步", true);
       return;
     }
 
-    setSync(`正在自动同步 ${pendingRows.length} 笔资料...`);
+    // V30.0: send all queued Sales/Fair/Live turnover rows in ONE Apps Script
+    // request. Older versions sent Daily/Live one-by-one, which made a queue of
+    // 10 records visibly crawl through repeated network round-trips.
+    const snapshot=dedupeRows(Array.isArray(pendingRows)?pendingRows:[]);
+    setSync(`后台快速同步 ${snapshot.length} 笔资料...`);
+    const result=await savePendingRowsBatchToSheetV300(snapshot);
+    const savedRows=Array.isArray(result&&result.rows)?result.rows:[];
 
-    const dailyRows = pendingRows.filter(r => r.type === "daily");
-    const fairRows = pendingRows.filter(r => r.type === "fair");
-    const liveRows = pendingRows.filter(r => r.type === "live");
-
-    for (const row of dailyRows) {
-      const saved = await saveDailyToSheet(
-        row.date,
-        row.company,
-        row.amount,
-        row.clientUpdatedAt || ""
-      );
-      if (saved) upsertLocalRow(saved);
-      clearPendingRow(row);
-    }
-
-    const fairGroups = new Map();
-
-    fairRows.forEach(row => {
-      const loc = canonicalLocation(row.location);
-      if (!fairGroups.has(loc)) fairGroups.set(loc, []);
-      fairGroups.get(loc).push({
-        date: row.date,
-        amount: Number(row.amount || 0),
-        clientUpdatedAt: row.clientUpdatedAt || ""
-      });
+    savedRows.forEach(saved=>{
+      const amount=Number(saved.amount||0);
+      if(amount>0)upsertLocalRow(saved);
+      else rows=rows.filter(x=>syncKey(x)!==syncKey(saved));
     });
-
-    for (const row of liveRows) {
-      const saved = await saveLiveToSheet(
-        row.date,
-        row.location,
-        row.amount,
-        row.clientUpdatedAt || ""
-      );
-      if (saved && Number(saved.amount) > 0) upsertLocalRow(saved);
-      else rows = rows.filter(x => syncKey(x) !== syncKey(row));
-      clearPendingRow(row);
-    }
-
-    for (const [location, records] of fairGroups.entries()) {
-      const result = await saveFairBatchToSheet(location, records);
-
-      if (result && Array.isArray(result.rows)) {
-        result.rows.forEach(r => {
-          if (Number(r.amount) <= 0) {
-            rows = rows.filter(x => syncKey(x) !== syncKey(r));
-          } else {
-            upsertLocalRow(r);
-          }
-        });
-      }
-
-      records.forEach(item => {
-        clearPendingRow({
-          type: "fair",
-          date: item.date,
-          company: "belimbing",
-          location
-        });
-      });
-    }
+    snapshot.forEach(clearPendingRow);
 
     renderAll();
     saveLocalDataCache();
     setSync("已同步", true);
   } catch (err) {
+    console.warn("V30.0 batch pending sync delayed",err);
     setPendingRetrySyncStatus();
   } finally {
     pendingSyncRunning = false;
@@ -799,7 +759,7 @@ async function saveSalesProductLinksV206(items, saveMode="confirm") {
 
 
 
-/* ================= V29.9 Profit / Change Log persistent cache ================= */
+/* ================= V30.0 Profit / Change Log persistent cache ================= */
 const PROFIT_CACHE_KEY_V237="lover_daily_profit_cache_v237";
 const CHANGE_LOG_CACHE_KEY_V237="lover_sales_change_log_cache_v237";
 const VIEW_CACHE_MAX_AGE_V237=30*24*60*60*1000;
@@ -1129,10 +1089,12 @@ async function resetCommissionSettingsInSheet() {
   return json.commissionSettings || null;
 }
 
+// V30.0: queued writes are already dispatched immediately after each save.
+// Retry quietly once per minute instead of waking the network every 30 seconds.
 setInterval(() => {
   loadPendingRows();
-  if (pendingRows.length > 0) syncPendingRows();
-}, 30000);
+  if (pendingRows.length > 0 && navigator.onLine !== false) syncPendingRows();
+}, 60000);
 
 window.addEventListener("online", () => {
   loadPendingRows();
@@ -1231,11 +1193,11 @@ async function verifyAccessBackendVersion() {
 
   return json;
 }
-// V29.9 stable API alias: UI save function must never shadow the transport function.
+// V30.0 stable API alias: UI save function must never shadow the transport function.
 async function deleteSalesTransactionV256(saleId){
   const json=await jsonp({action:"deleteSalesTransaction",saleId:String(saleId||"")},{timeoutMs:20000});
   if(!json.ok)throw new Error(json.error||"删除销售卡失败");
-  // V29.9: deleted cards must disappear from profit/editor caches immediately.
+  // V30.0: deleted cards must disappear from profit/editor caches immediately.
   salesProductLinksCacheV216.clear();
   allSalesProductLinksCacheV216={links:null,at:0};
   clearDailyProfitCacheV237();
