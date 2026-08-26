@@ -1035,37 +1035,6 @@ function renderDashboard(){const bt=totalBy("daily","balakong","today"),blt=tota
 function sortReportRows(list){const rank=r=>r.type==="daily"&&r.company==="balakong"?0:r.type==="daily"&&r.company==="belimbing"?1:2;return [...list].sort((a,b)=>rank(a)-rank(b)||canonicalLocation(a.location).localeCompare(canonicalLocation(b.location))||displayToISO(a.date).localeCompare(displayToISO(b.date)))}
 function renderTable(){const s=sortReportRows(dedupeRows(rows).filter(r=>sameMonth(r.date)&&Number(r.amount)>0));document.getElementById("recordTable").innerHTML=s.map(r=>`<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":"每日"}</td><td>${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td></tr>`).join("")||'<tr><td colspan="5" style="text-align:center;">这个月份还没有记录</td></tr>'}
 function renderAll(){rows=dedupeRows(rows);renderDashboard();renderBusinessTop3();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions();updateFairPageMode();renderFairMonthlyList();renderFairDailySummary();renderFairPageTop3();renderLiveDailySummary();renderLiveMonthlyList();renderLivePageTop3()}
-// V30.5: keep the save button's critical path tiny. Once pendingRows has
-// survived a localStorage read-back, yield to the browser immediately so the
-// green safe-to-leave state can paint before expensive dashboard rendering,
-// profit summaries, Top 5 work, or full local cache serialization.
-function schedulePostLocalSaveUiV305(tempMsgId="") {
-  const renderLater = () => {
-    try { renderAll(); } catch (e) { console.warn("Deferred post-save render failed", e); }
-    try { if (tempMsgId) showTempMsg(tempMsgId); } catch (_) {}
-  };
-  if (typeof requestAnimationFrame === "function") {
-    requestAnimationFrame(() => setTimeout(renderLater, 0));
-  } else {
-    setTimeout(renderLater, 0);
-  }
-
-  const cacheLater = () => {
-    try { if (typeof saveLocalDataCache === "function") saveLocalDataCache(); } catch (_) {}
-  };
-  if (typeof requestIdleCallback === "function") {
-    requestIdleCallback(cacheLater, { timeout: 1500 });
-  } else {
-    setTimeout(cacheLater, 250);
-  }
-}
-
-function schedulePostLocalSaveCloudV305(task) {
-  setTimeout(() => {
-    Promise.resolve().then(task).catch(() => {});
-  }, 0);
-}
-
 async function saveDailySales(){
   if(!ensureWritableSelection())return;
   const d=isoToDisplay(document.getElementById("saleDate").value);
@@ -1093,11 +1062,9 @@ async function saveDailySales(){
 
   upsertLocalRow(localRow);
   addPendingRow(localRow);
-  // V30.5: durable pending first, status second. Nothing expensive may run
-  // before this point. This is what makes Save feel immediate on mobile.
-  setDurableSaveStatus(localRow);
   document.getElementById("dailySales").value=formatAmount(a);
-  schedulePostLocalSaveUiV305("saveMsg");
+  renderAll();
+  showTempMsg("saveMsg");
 
   // V29.9: normal Save uses exactly one cloud write.
   // This prevents the immediate keepalive request from racing the normal save,
@@ -1105,11 +1072,15 @@ async function saveDailySales(){
   // comparison and suppress the modification notification.
   // The pagehide/visibility keepalive fallback remains in sheet.js for pending
   // rows only when the page is actually being closed or backgrounded.
-  schedulePostLocalSaveCloudV305(async()=>{
+  if(typeof saveLocalDataCache==="function")saveLocalDataCache();
+  setSync("已储存 · 云端后台同步中...");
+
+  Promise.resolve().then(async()=>{
     try{
       const saved=await saveDailyToSheet(d,c,a,localRow.clientUpdatedAt);
       if(saved)upsertLocalRow(saved);
       clearPendingRow(localRow);
+      renderAll();
       if(typeof saveLocalDataCache==="function")saveLocalDataCache();
       setSync("已同步",true);
     }catch(e){
@@ -1246,28 +1217,35 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     if(typeof markLocalRowMutation==="function")markLocalRowMutation(row);
   });
 
-  // V30.5: verify persistent pending rows before any full render/cache work.
-  const fairDurable = records.every(i => verifyPendingRowPersisted({type:"fair",date:i.date,company:"fair",location:loc}));
-  if(fairDurable) setSync("已安全保存 · 可以离开", true);
-  else setSync("本机保存未确认 · 请暂时不要离开", false, true);
-  schedulePostLocalSaveUiV305("fairSaveMsg");
-  schedulePostLocalSaveCloudV305(async()=>{
-    try{
-      const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value;
-      await saveFairSessionToSheetV281(loc,start,end);
-      fairSessionDraftDirtyV282=false;
-      saveFairLocation(loc);
-      saveFairSession();
-      await saveFairBatchToSheet(loc,records);
-      records.forEach(i=>clearPendingRow({type:"fair",date:i.date,company:"fair",location:loc}));
-      if(typeof saveLocalDataCache==="function")saveLocalDataCache();
-      refreshFairSessionsV281().catch(()=>{});
-      setSync("已同步",true);
-    }catch(e){
-      if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();
-      else setSync("同步暂未完成",false,true);
-    }
-  });
+  renderAll();
+  if(typeof saveLocalDataCache==="function")saveLocalDataCache();
+  showTempMsg("fairSaveMsg");
+
+  try{
+    setSync("已储存，正在后台同步...");
+    const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value;
+    await saveFairSessionToSheetV281(loc,start,end);
+    fairSessionDraftDirtyV282=false;
+    saveFairLocation(loc);
+    saveFairSession();
+    await refreshFairSessionsV281();
+    const result=await saveFairBatchToSheet(loc,records);
+
+    // V29.9: local Fair values are direct replacements, never additions. The server
+    // also removes duplicate Sheet rows whose location differs only by spaces/case.
+    // The response confirms the authoritative overwrite and clears pending rows.
+    records.forEach(i=>clearPendingRow({
+      type:"fair",
+      date:i.date,
+      company:"fair",
+      location:loc
+    }));
+    if(typeof saveLocalDataCache==="function")saveLocalDataCache();
+    setSync("已同步",true);
+  }catch(e){
+    if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();
+    else setSync("同步暂未完成",false,true);
+  }
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
@@ -1464,46 +1442,73 @@ setTimeout(()=>{
   }catch(e){}
 },0);
 
-// V30.5 FAST STARTUP:
-// 1) Render the last safe local snapshot immediately so Sales/Fair/Live inputs are usable.
-// 2) Perform one combined month/revision cloud request in the background.
-// 3) Do not pre-load the full year during startup; historical months load only when needed.
 let startupCacheLoaded = false;
 let startupSalesSyncPromise = null;
 
-try {
-  startupCacheLoaded = typeof loadLocalDataCache === "function" && loadLocalDataCache();
-} catch (error) {
-  startupCacheLoaded = false;
-  console.warn("Local cache startup failed", error);
+function waitForFirstHomePaint() {
+  return new Promise(resolve => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
 }
 
 async function startInitialSalesDataLoad() {
   if (startupSalesSyncPromise) return startupSalesSyncPromise;
 
-  if (typeof markCloudCheckPending === "function") {
-    markCloudCheckPending(startupCacheLoaded ? "后台同步中" : "可立即输入 · 云端读取中");
-  }
+  let startupStatusTimer = setTimeout(() => {
+    if (typeof markCloudCheckPending === "function") {
+      markCloudCheckPending("正在快速确认云端...");
+    }
+  }, 2200);
 
-  startupSalesSyncPromise = loadFromSheet({
-    background: true,
-    force: false,
-    loadYear: false,
-    suppressStartStatus: true,
-    fastStartup: true,
-    timeoutMs: 12000
-  }).then(result => {
+  startupSalesSyncPromise = (async () => {
+    await waitForFirstHomePaint();
+
+    try {
+      startupCacheLoaded = typeof loadLocalDataCacheAsync === "function"
+        ? await loadLocalDataCacheAsync()
+        : (typeof loadLocalDataCache === "function" && loadLocalDataCache());
+    } catch (error) {
+      startupCacheLoaded = false;
+      console.warn("Local cache startup failed", error);
+    }
+
+    if (typeof markCloudCheckPending === "function") {
+      markCloudCheckPending(startupCacheLoaded
+        ? "正在快速确认云端..."
+        : "正在读取云端资料");
+    }
+
+    // This forced read is deliberately inside finally-style startup flow:
+    // local cache failure can never prevent cloud synchronization.
+    const result = await loadFromSheet({
+      background: true,
+      force: false,
+      loadYear: false,
+      suppressStartStatus: true,
+      revisionTimeoutMs: 2500,
+      timeoutMs: 10000
+    });
+
     try { syncFairInputs(); } catch (error) {}
     return result;
-  }).catch(error => {
+  })().catch(error => {
     console.warn("Initial sales data load failed", error);
     return { ok:false, error };
+  }).finally(() => {
+    clearTimeout(startupStatusTimer);
   });
 
   return startupSalesSyncPromise;
 }
 
-startInitialSalesDataLoad();
+// V29.9: start cached Home immediately, then warm the current year's historical
+// months in the background so Monthly Summary is complete on first open.
+startInitialSalesDataLoad().finally(()=>{
+  const startupYear=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
+  if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(startupYear)){
+    loadYearInBackground(startupYear).catch(()=>{});
+  }
+});
 
 
 /* ===== V7.3 Live Module ===== */
@@ -4007,23 +4012,20 @@ async function saveLiveSales(){
   if(amount<=0)rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));
   else upsertLocalRow(localRow);
   addPendingRow(localRow);
-  // V30.5: persistent pending confirmation is the only work allowed before
-  // showing the user that it is safe to leave.
-  setDurableSaveStatus(localRow);
-  schedulePostLocalSaveUiV305("liveSaveMsg");
-  schedulePostLocalSaveCloudV305(async()=>{
-    try{
-      const saved=await saveLiveToSheet(d,host,amount,now);
-      if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);
-      else rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));
-      clearPendingRow(localRow);
-      if(typeof saveLocalDataCache==="function")saveLocalDataCache();
-      setSync("已同步",true);
-    }catch(e){
-      if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();
-      else setSync("同步暂未完成",false,true);
-    }
-  });
+  renderAll();
+  showTempMsg("liveSaveMsg");
+  try{
+    setSync("已储存，正在后台同步...");
+    const saved=await saveLiveToSheet(d,host,amount,now);
+    if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);
+    else rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));
+    clearPendingRow(localRow);
+    renderAll();
+    setSync("已同步",true);
+  }catch(e){
+    if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();
+    else setSync("同步暂未完成",false,true);
+  }
 }
 let monthGrandHistoryOpenV223=false;
 let monthGrandHistoryLoadingV223=false;

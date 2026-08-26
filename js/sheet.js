@@ -107,25 +107,6 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-// V30.5: one round-trip replaces revisionCheck + optional loadMonth.
-// When the revision is unchanged the server returns only a tiny response; when
-// changed it returns the current month in the same request.
-async function loadMonthIfChangedCloudShared(month, knownRevision = 0, timeoutMs = 10000) {
-  const key = /^\d{4}-\d{2}$/.test(String(month || "")) ? String(month) : new Date().toISOString().slice(0, 7);
-  const requestKey = "ifchanged:" + key;
-  if (cloudLoadPromisesByMonth.has(requestKey)) return cloudLoadPromisesByMonth.get(requestKey);
-
-  const request = jsonp(
-    { action: "loadMonthIfChangedV305", month: key, knownRevision: Number(knownRevision || 0) },
-    { timeoutMs: Number(timeoutMs || 10000) }
-  ).finally(() => {
-    if (cloudLoadPromisesByMonth.get(requestKey) === request) cloudLoadPromisesByMonth.delete(requestKey);
-  });
-
-  cloudLoadPromisesByMonth.set(requestKey, request);
-  return request;
-}
-
 /* V29.9: first paint must not wait for the full system render. */
 let localCacheRenderedOnce = false;
 let deferredFullRenderTimer = null;
@@ -268,28 +249,6 @@ function savePendingRows() {
   localStorage.setItem("lover_pending_rows", JSON.stringify(pendingRows));
 }
 
-// V30.5: a green "safe to leave" state is only allowed after the pending
-// queue has been written to persistent browser storage AND read back successfully.
-function verifyPendingRowPersisted(row) {
-  try {
-    const key = syncKey(row);
-    const stored = JSON.parse(localStorage.getItem("lover_pending_rows") || "[]");
-    return Array.isArray(stored) && stored.some(r => syncKey(r) === key);
-  } catch (err) {
-    console.error("Pending persistence verification failed", err);
-    return false;
-  }
-}
-
-function setDurableSaveStatus(row) {
-  if (verifyPendingRowPersisted(row)) {
-    setSync("已安全保存 · 可以离开", true);
-    return true;
-  }
-  setSync("本机保存未确认 · 请暂时不要离开", false, true);
-  return false;
-}
-
 function setPendingRetrySyncStatus() {
   loadPendingRows();
   if (pendingRows.length > 0) {
@@ -331,7 +290,7 @@ function setSync(text, good = false, error = false) {
 }
 
 
-function markCloudCheckPending(text = "后台同步中") {
+function markCloudCheckPending(text = "本机资料已显示 · 云端后台同步中") {
   const el = document.getElementById("syncStatus");
   if (el) el.textContent = "🟡 " + text;
 }
@@ -567,37 +526,6 @@ function salesSyncDelay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-let startupCloudRetryTimerV305 = null;
-let startupCloudRetryAttemptV305 = 0;
-function scheduleStartupCloudRetryV305(month = "") {
-  if (startupCloudRetryTimerV305) return;
-  const delays = [2500, 8000, 20000];
-  const idx = Math.min(startupCloudRetryAttemptV305, delays.length - 1);
-  const delay = delays[idx];
-  startupCloudRetryAttemptV305 += 1;
-  startupCloudRetryTimerV305 = setTimeout(async () => {
-    startupCloudRetryTimerV305 = null;
-    try {
-      const result = await loadFromSheet({
-        background:true,
-        force:false,
-        silent:true,
-        loadYear:false,
-        fastStartup:false,
-        timeoutMs:30000,
-        month
-      });
-      if (result && result.ok && !result.cloudRetryPending) {
-        startupCloudRetryAttemptV305 = 0;
-      } else if (startupCloudRetryAttemptV305 < 3) {
-        scheduleStartupCloudRetryV305(month);
-      }
-    } catch (_) {
-      if (startupCloudRetryAttemptV305 < 3) scheduleStartupCloudRetryV305(month);
-    }
-  }, delay);
-}
-
 async function loadFromSheet(options = {}) {
   if (settingsWritePromise) {
     await settingsWritePromise.catch(() => {});
@@ -606,7 +534,6 @@ async function loadFromSheet(options = {}) {
   const silent = options.silent === true;
   const suppressStartStatus = options.suppressStartStatus === true;
   const statusText = String(options.statusText || "").trim();
-  const fastStartup = options.fastStartup === true;
   const now = Date.now();
   if (cloudLoadPromise) return cloudLoadPromise;
   if (!force && now - lastCloudLoadAt < CLOUD_LOAD_COOLDOWN_MS) {
@@ -619,15 +546,11 @@ async function loadFromSheet(options = {}) {
     loadPendingRows();
     const pendingCountAtStart = pendingRows.length;
 
-    const hasLocalData = rows.length > 0 ? true : loadLocalDataCache();
+    const hasLocalData = rows.length > 0
+      ? true
+      : loadLocalDataCache();
     if (!silent && !suppressStartStatus) {
-      setSync(statusText || (hasLocalData ? "后台同步中" : "正在读取云端资料"));
-    }
-
-    // Never make the user wait to type. Old pending writes start retrying at once
-    // in the background; they remain in localStorage until the server confirms.
-    if (pendingCountAtStart > 0 && !pendingSyncRunning) {
-      setTimeout(() => syncPendingRows().catch(() => {}), 0);
+      setSync(statusText || (hasLocalData ? "本机资料已显示 · 云端后台同步中" : "正在读取本月云端资料"));
     }
 
     try {
@@ -636,68 +559,58 @@ async function loadFromSheet(options = {}) {
         : "";
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
-      const requestStartedAt = Date.now();
 
+      // V29.9: opening/resuming first checks one tiny revision value.
+      // Full month data is downloaded only when another device changed data.
+      if (!force && hasLocalData && options.skipRevisionCheck !== true) {
+        try {
+          const revisionResult = await checkCloudRevisionShared(Number(options.revisionTimeoutMs || REVISION_CHECK_TIMEOUT_MS));
+          if (revisionResult && revisionResult.ok) {
+            const cloudRevision = Number(revisionResult.dataRevision || 0);
+            if (cloudRevision === getLocalDataRevision()) {
+              setSync("已同步", true);
+              completedSuccessfully = true;
+              return { ok:true, month, revisionOnly:true, dataRevision:cloudRevision };
+            }
+          } else {
+            setSync("本机资料已显示 · 云端暂未确认", false, true);
+            completedSuccessfully = true;
+            return { ok:true, month, revisionUnconfirmed:true };
+          }
+        } catch (revisionError) {
+          // V29.9: when local data exists, a slow/failed revision check must not
+          // trigger the expensive full-month download. Keep the visible local
+          // data and let the next foreground/interval/manual check try again.
+          setSync("本机资料已显示 · 云端暂未确认", false, true);
+          completedSuccessfully = true;
+          return {
+            ok: true,
+            month,
+            revisionUnconfirmed: true,
+            error: revisionError
+          };
+        }
+      }
       let json = null;
       let lastError = null;
+      const requestStartedAt = Date.now();
 
-      // V30.5 FAST PATH: one Apps Script request checks revision and, only when
-      // necessary, returns the month data in the same response. This avoids the
-      // old two-step revisionCheck -> loadMonth delay, especially on cold starts.
-      if (!force && options.skipRevisionCheck !== true) {
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
         try {
-          json = await loadMonthIfChangedCloudShared(
-            month,
-            getLocalDataRevision(),
-            Number(options.timeoutMs || (fastStartup ? 12000 : 20000))
-          );
+          json = await loadMonthCloudShared(month, Number(options.timeoutMs || 15000));
           if (!json || !json.ok) throw new Error((json && json.message) || "读取失败");
-
-          if (json.unchanged === true) {
-            applyLocalDataRevision(json.dataRevision);
-            if (pendingCountAtStart > 0) {
-              setSync(`正在同步 ${pendingCountAtStart} 笔未完成资料...`);
-            } else {
-              setSync("已同步", true);
-            }
-            completedSuccessfully = true;
-            return { ok:true, month, revisionOnly:true, dataRevision:Number(json.dataRevision||0) };
-          }
+          lastError = null;
+          break;
         } catch (err) {
           lastError = err;
-        }
-      }
-
-      // Force/manual reads and fallback after a failed fast request use the
-      // normal monthly endpoint. Startup stays usable because local data is
-      // already rendered; this work is fully background.
-      if (!json || json.unchanged === true || !json.rows) {
-        if (lastError && fastStartup) {
-          // V30.5: startup must never block data entry or show a scary red timeout.
-          // Keep the local screen usable and retry the same current-month request
-          // silently with a longer timeout. Pending writes remain durable meanwhile.
-          if (!silent) setSync("可立即输入 · 云端后台重试");
-          scheduleStartupCloudRetryV305(month);
-          completedSuccessfully = true;
-          return { ok:true, month, cloudRetryPending:true, error:lastError };
-        }
-
-        for (let attempt = 1; attempt <= 2; attempt += 1) {
-          try {
-            json = await loadMonthCloudShared(month, Number(options.timeoutMs || 15000));
-            if (!json || !json.ok) throw new Error((json && json.message) || "读取失败");
-            lastError = null;
-            break;
-          } catch (err) {
-            lastError = err;
-            if (attempt === 1) {
-              if (!silent) setSync("正在重新连接云端...");
-              await salesSyncDelay(500);
-            }
+          if (attempt === 1) {
+            if (!silent) setSync("首次连接较慢，正在重新连接云端...");
+            await salesSyncDelay(1200);
           }
         }
-        if (lastError) throw lastError;
       }
+
+      if (lastError) throw lastError;
 
       const fairDraftDirtyBeforeCloud = typeof fairInputsHaveUnsavedChanges === "function"
         ? fairInputsHaveUnsavedChanges()
@@ -714,6 +627,8 @@ async function loadFromSheet(options = {}) {
 
       renderHomeFirst();
       scheduleDeferredFullRender(0);
+      // V29.9: keep Fair's visible daily amount inputs consistent with rows after
+      // cloud refresh. Do not overwrite any unsaved Fair edits.
       const fairPageActive = !!document.getElementById("page-fair")?.classList.contains("active");
       if (typeof refreshFairInputsFromRows === "function" && !fairDraftDirtyBeforeCloud && (fairPageActive || options.refreshFairInputs === true)) {
         refreshFairInputsFromRows(true);
@@ -723,19 +638,26 @@ async function loadFromSheet(options = {}) {
       setSync("已同步", true);
       completedSuccessfully = true;
 
+      // Initial read has priority. Retry pending writes only after the latest
+      // cloud month is visible, avoiding two simultaneous Apps Script calls.
+      if (pendingCountAtStart > 0) {
+        setTimeout(() => syncPendingRows().catch(() => {}), 50);
+      }
+
+      const year = month.slice(0, 4);
+
+      // V29.9 mobile performance: startup loads only the selected month.
+      // Full-year data is requested only when the user opens Monthly Summary.
       if (options.loadYear === true) {
-        setTimeout(() => { loadYearInBackground(month.slice(0,4)).catch(() => {}); }, 1200);
+        setTimeout(() => {
+          loadYearInBackground(year).catch(() => {});
+        }, 1400);
       }
 
       return { ok:true, month, refreshedAt:Date.now() };
     } catch (err) {
       if (!silent) {
-        if (options.background === true || fastStartup) {
-          setSync("可立即输入 · 云端后台重试");
-          try { scheduleStartupCloudRetryV305((typeof selectedMonth === "function" && selectedMonth()) || ""); } catch (_) {}
-        } else {
-          setSync(hasLocalData ? "可继续使用 · 云端稍后重试" : "同步失败：" + err.message, false, !hasLocalData);
-        }
+        setSync(hasLocalData ? "已显示本机资料，云端稍后重试" : "同步失败：" + err.message, false, true);
       }
       return { ok:false, error:err };
     }
