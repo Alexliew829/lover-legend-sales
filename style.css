@@ -2284,7 +2284,7 @@ button:disabled{cursor:wait;opacity:.68}
 @media(max-width:390px){.year-profit-head-v286,.year-profit-row-v286{grid-template-columns:54px minmax(76px,1.35fr) minmax(76px,1.35fr) 44px;gap:2px}.year-profit-row-v286,.year-profit-row-v286 b{font-size:10px;letter-spacing:-.3px}}
 
 
-/* V29.6 Home annual summary: keep both columns inside the main frame. */
+/* V29.7 Home annual summary: keep both columns inside the main frame. */
 #page-home .year-summary-frame .dash{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 #page-home .year-summary-frame .box{min-width:0;overflow:hidden}
 #page-home .year-summary-frame .box.total{grid-column:1 / -1}
@@ -2296,7 +2296,7 @@ button:disabled{cursor:wait;opacity:.68}
 #page-home .year-summary-frame .year-profit-head-v286 span,#page-home .year-summary-frame .year-profit-row-v286 span,#page-home .year-summary-frame .year-profit-row-v286 b{min-width:0;overflow:hidden;text-overflow:clip}
 @media(max-width:430px){#page-home .year-summary-frame .dash{gap:8px}#page-home .year-summary-frame .box{padding:12px}#page-home .year-summary-frame .amount{font-size:clamp(22px,6.2vw,28px)}}
 
-/* ================= V29.6 scoped display fixes ================= */
+/* ================= V29.7 scoped display fixes ================= */
 /* Keep the normal application frame. Do not use global page scaling/zoom fixes. */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 body{overflow-x:hidden;}
@@ -2342,7 +2342,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V29.6 scoped layout fixes ================= */
+/* ================= V29.7 scoped layout fixes ================= */
 /* Report + More: keep desktop content inside the same application frame as other pages. */
 #page-report,#page-more{
   width:100%;
@@ -2398,7 +2398,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V29.6 phone Home annual table refinement ================= */
+/* ================= V29.7 phone Home annual table refinement ================= */
 /* Date needs only 12-2026 space. Give more room to readable numbers. */
 @media(max-width:430px){
   #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286,
@@ -2423,7 +2423,7 @@ body{overflow-x:hidden;}
   }
 }
 
-/* ================= V29.6 Fair / Live monthly profit summary ================= */
+/* ================= V29.7 Fair / Live monthly profit summary ================= */
 .month-profit-row-v294{display:grid;grid-template-columns:minmax(88px,.9fr) minmax(90px,1fr) minmax(82px,.9fr) minmax(72px,.75fr);gap:10px;align-items:center;padding:7px 0}
 .month-profit-row-v294+.month-profit-row-v294{border-top:1px dashed #e5e5e5}
 .month-profit-row-v294>span:not(:first-child),.month-profit-row-v294>strong{text-align:right}
@@ -2441,7 +2441,7 @@ body{overflow-x:hidden;}
   .profit-grand-v294{grid-template-columns:1fr 1fr 1fr;gap:8px}.profit-grand-v294>strong{grid-column:1/-1}.profit-grand-v294 b{font-size:14px}
 }
 
-/* ================= V29.6 Home monthly total turnover + profit table ================= */
+/* ================= V29.7 Home monthly total turnover + profit table ================= */
 #page-home .month-grand-profit-table-v295{width:100%;min-width:0;font-variant-numeric:tabular-nums}
 #page-home .month-grand-profit-head-v295,
 #page-home .month-grand-profit-row-v295{display:grid;grid-template-columns:minmax(62px,.8fr) minmax(100px,1.45fr) minmax(78px,.95fr) minmax(70px,.85fr);gap:6px;align-items:center;min-width:0}
@@ -2475,4 +2475,65 @@ body{overflow-x:hidden;}
   #page-home .month-grand-profit-head-v295{font-size:13.5px}
   #page-home .month-grand-profit-row-v295,
   #page-home .month-grand-profit-row-v295 b{font-size:15px;letter-spacing:-.28px}
+}
+
+
+/* ================= V29.7 Live compact five-column rows + larger Home annual phone type ================= */
+/* Live: commission is a real column, not a second line under the date. */
+.live-profit-row-v294{grid-template-columns:minmax(58px,.68fr) minmax(72px,.82fr) minmax(88px,1fr) minmax(74px,.84fr) minmax(66px,.74fr);gap:8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.live-profit-row-v294>span,.live-profit-row-v294>strong{min-width:0;white-space:nowrap}
+.live-profit-row-v294>span:not(:first-child),.live-profit-row-v294>strong{text-align:right}
+.live-profit-head-v297{font-size:12px;font-weight:900;color:#666;border-bottom:1px solid #ddd}
+.live-commission-value-v297{font-weight:800}
+@media(max-width:520px){
+  .live-profit-row-v294{grid-template-columns:45px 58px minmax(76px,1fr) minmax(62px,.82fr) 58px;gap:3px;font-size:14.5px;padding:8px 0}
+  .live-profit-head-v297{font-size:12px;letter-spacing:-.2px}
+  .live-profit-row-v294>span,.live-profit-row-v294>strong{font-size:14.5px;letter-spacing:-.35px}
+  .live-profit-row-v294 .profit-rate-v294{font-size:14px}
+  .live-profit-row-v294.month-profit-total-v294>span{font-size:13px;letter-spacing:-.4px}
+}
+@media(max-width:390px){
+  .live-profit-row-v294{grid-template-columns:42px 55px minmax(72px,1fr) minmax(58px,.8fr) 55px;gap:2px}
+  .live-profit-row-v294>span,.live-profit-row-v294>strong{font-size:13.5px;letter-spacing:-.45px}
+  .live-profit-head-v297{font-size:11.5px}
+}
+
+/* Home annual cards: use less empty column space so phone text can be meaningfully larger. */
+@media(max-width:430px){
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286,
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286{
+    grid-template-columns:50px minmax(104px,1.55fr) minmax(66px,.82fr) minmax(68px,.86fr);
+    gap:3px;
+  }
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286{font-size:15.5px;line-height:1.15;letter-spacing:-.3px}
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286,
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286 b{font-size:17px;line-height:1.2;letter-spacing:-.45px}
+}
+@media(max-width:390px){
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286,
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286{
+    grid-template-columns:47px minmax(98px,1.5fr) minmax(63px,.8fr) minmax(64px,.84fr);
+    gap:2px;
+  }
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286{font-size:14.5px}
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286,
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286 b{font-size:16px;letter-spacing:-.55px}
+}
+
+/* V29.7 final phone annual sizing: readable dates, larger numeric text, no wasted gaps. */
+@media(max-width:430px){
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286,
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286{grid-template-columns:58px minmax(100px,1.5fr) minmax(62px,.78fr) minmax(66px,.84fr);gap:2px}
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286{font-size:15px}
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286,
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286 b{font-size:17px}
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286>span:first-child{font-size:15.5px;letter-spacing:-.45px}
+}
+@media(max-width:390px){
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286,
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286{grid-template-columns:56px minmax(96px,1.48fr) minmax(60px,.76fr) minmax(63px,.82fr);gap:2px}
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-head-v286{font-size:14px}
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286,
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286 b{font-size:16px}
+  #page-home .year-summary-frame .box.year-breakdown-expanded-v290 .year-profit-row-v286>span:first-child{font-size:15px}
 }
