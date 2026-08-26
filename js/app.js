@@ -1221,7 +1221,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   if(typeof saveLocalDataCache==="function")saveLocalDataCache();
   showTempMsg("fairSaveMsg");
 
-  // V30.3: every Fair pending row must survive a localStorage read-back before
+  // V30.4: every Fair pending row must survive a localStorage read-back before
   // the UI says it is safe to leave. Cloud confirmation continues in background.
   const fairDurable = records.every(i => verifyPendingRowPersisted({type:"fair",date:i.date,company:"fair",location:loc}));
   if(fairDurable) setSync("已安全保存 · 可以离开", true);
@@ -1439,7 +1439,7 @@ setTimeout(()=>{
   }catch(e){}
 },0);
 
-// V30.3 FAST STARTUP:
+// V30.4 FAST STARTUP:
 // 1) Render the last safe local snapshot immediately so Sales/Fair/Live inputs are usable.
 // 2) Perform one combined month/revision cloud request in the background.
 // 3) Do not pre-load the full year during startup; historical months load only when needed.
@@ -1457,7 +1457,7 @@ async function startInitialSalesDataLoad() {
   if (startupSalesSyncPromise) return startupSalesSyncPromise;
 
   if (typeof markCloudCheckPending === "function") {
-    markCloudCheckPending(startupCacheLoaded ? "后台同步中" : "正在读取云端资料");
+    markCloudCheckPending(startupCacheLoaded ? "后台同步中" : "可立即输入 · 云端读取中");
   }
 
   startupSalesSyncPromise = loadFromSheet({
@@ -1466,7 +1466,7 @@ async function startInitialSalesDataLoad() {
     loadYear: false,
     suppressStartStatus: true,
     fastStartup: true,
-    timeoutMs: 10000
+    timeoutMs: 12000
   }).then(result => {
     try { syncFairInputs(); } catch (error) {}
     return result;
@@ -3985,7 +3985,7 @@ async function saveLiveSales(){
   renderAll();
   showTempMsg("liveSaveMsg");
   if(typeof saveLocalDataCache==="function")saveLocalDataCache();
-  // V30.3: confirm the pending row can be read back from persistent storage
+  // V30.4: confirm the pending row can be read back from persistent storage
   // before telling the user it is safe to leave.
   setDurableSaveStatus(localRow);
   Promise.resolve().then(async()=>{

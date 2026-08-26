@@ -107,7 +107,7 @@ async function loadMonthCloudShared(month, timeoutMs = 15000) {
   return request;
 }
 
-// V30.3: one round-trip replaces revisionCheck + optional loadMonth.
+// V30.4: one round-trip replaces revisionCheck + optional loadMonth.
 // When the revision is unchanged the server returns only a tiny response; when
 // changed it returns the current month in the same request.
 async function loadMonthIfChangedCloudShared(month, knownRevision = 0, timeoutMs = 10000) {
@@ -116,7 +116,7 @@ async function loadMonthIfChangedCloudShared(month, knownRevision = 0, timeoutMs
   if (cloudLoadPromisesByMonth.has(requestKey)) return cloudLoadPromisesByMonth.get(requestKey);
 
   const request = jsonp(
-    { action: "loadMonthIfChangedV302", month: key, knownRevision: Number(knownRevision || 0) },
+    { action: "loadMonthIfChangedV304", month: key, knownRevision: Number(knownRevision || 0) },
     { timeoutMs: Number(timeoutMs || 10000) }
   ).finally(() => {
     if (cloudLoadPromisesByMonth.get(requestKey) === request) cloudLoadPromisesByMonth.delete(requestKey);
@@ -268,7 +268,7 @@ function savePendingRows() {
   localStorage.setItem("lover_pending_rows", JSON.stringify(pendingRows));
 }
 
-// V30.3: a green "safe to leave" state is only allowed after the pending
+// V30.4: a green "safe to leave" state is only allowed after the pending
 // queue has been written to persistent browser storage AND read back successfully.
 function verifyPendingRowPersisted(row) {
   try {
@@ -567,6 +567,37 @@ function salesSyncDelay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+let startupCloudRetryTimerV304 = null;
+let startupCloudRetryAttemptV304 = 0;
+function scheduleStartupCloudRetryV304(month = "") {
+  if (startupCloudRetryTimerV304) return;
+  const delays = [2500, 8000, 20000];
+  const idx = Math.min(startupCloudRetryAttemptV304, delays.length - 1);
+  const delay = delays[idx];
+  startupCloudRetryAttemptV304 += 1;
+  startupCloudRetryTimerV304 = setTimeout(async () => {
+    startupCloudRetryTimerV304 = null;
+    try {
+      const result = await loadFromSheet({
+        background:true,
+        force:false,
+        silent:true,
+        loadYear:false,
+        fastStartup:false,
+        timeoutMs:30000,
+        month
+      });
+      if (result && result.ok && !result.cloudRetryPending) {
+        startupCloudRetryAttemptV304 = 0;
+      } else if (startupCloudRetryAttemptV304 < 3) {
+        scheduleStartupCloudRetryV304(month);
+      }
+    } catch (_) {
+      if (startupCloudRetryAttemptV304 < 3) scheduleStartupCloudRetryV304(month);
+    }
+  }, delay);
+}
+
 async function loadFromSheet(options = {}) {
   if (settingsWritePromise) {
     await settingsWritePromise.catch(() => {});
@@ -610,15 +641,15 @@ async function loadFromSheet(options = {}) {
       let json = null;
       let lastError = null;
 
-      // V30.3 FAST PATH: one Apps Script request checks revision and, only when
+      // V30.4 FAST PATH: one Apps Script request checks revision and, only when
       // necessary, returns the month data in the same response. This avoids the
       // old two-step revisionCheck -> loadMonth delay, especially on cold starts.
-      if (!force && hasLocalData && options.skipRevisionCheck !== true) {
+      if (!force && options.skipRevisionCheck !== true) {
         try {
           json = await loadMonthIfChangedCloudShared(
             month,
             getLocalDataRevision(),
-            Number(options.timeoutMs || (fastStartup ? 10000 : 15000))
+            Number(options.timeoutMs || (fastStartup ? 12000 : 20000))
           );
           if (!json || !json.ok) throw new Error((json && json.message) || "读取失败");
 
@@ -642,9 +673,11 @@ async function loadFromSheet(options = {}) {
       // already rendered; this work is fully background.
       if (!json || json.unchanged === true || !json.rows) {
         if (lastError && fastStartup) {
-          // Do not flash a scary red "cloud unconfirmed" message. Keep working
-          // from the safe local snapshot and retry automatically on focus/interval.
-          if (!silent) setSync("可继续使用 · 云端稍后重试");
+          // V30.4: startup must never block data entry or show a scary red timeout.
+          // Keep the local screen usable and retry the same current-month request
+          // silently with a longer timeout. Pending writes remain durable meanwhile.
+          if (!silent) setSync("可立即输入 · 云端后台重试");
+          scheduleStartupCloudRetryV304(month);
           completedSuccessfully = true;
           return { ok:true, month, cloudRetryPending:true, error:lastError };
         }
@@ -697,7 +730,12 @@ async function loadFromSheet(options = {}) {
       return { ok:true, month, refreshedAt:Date.now() };
     } catch (err) {
       if (!silent) {
-        setSync(hasLocalData ? "可继续使用 · 云端稍后重试" : "同步失败：" + err.message, false, !hasLocalData);
+        if (options.background === true || fastStartup) {
+          setSync("可立即输入 · 云端后台重试");
+          try { scheduleStartupCloudRetryV304((typeof selectedMonth === "function" && selectedMonth()) || ""); } catch (_) {}
+        } else {
+          setSync(hasLocalData ? "可继续使用 · 云端稍后重试" : "同步失败：" + err.message, false, !hasLocalData);
+        }
       }
       return { ok:false, error:err };
     }
