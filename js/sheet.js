@@ -88,9 +88,13 @@ function getPrioritySyncLocalV315(){try{return JSON.parse(localStorage.getItem(P
 function setPrioritySyncLocalV315(v){try{localStorage.setItem(PRIORITY_SYNC_CACHE_KEY_V315,JSON.stringify(v||{}))}catch(_){}}
 async function checkPriorityRevisionV315(timeoutMs=4500){return jsonp({action:"priorityRevisionV315"},{timeoutMs});}
 function invalidateSalesCardCachesV315(){
+  // V31.8: a newer sales-card revision must invalidate only in-memory/session data.
+  // Keep the exact-context persistent cache as the last-known-good snapshot so
+  // Sales/Fair/Live never flashes a fake blank/new card while cloud verification
+  // is still running. loadProductLinksIntoEditorV206() paints this snapshot first
+  // and then force-loads the authoritative cloud cards for the same context.
   try{salesProductLinksCacheV216.clear()}catch(_){}
   try{allSalesProductLinksCacheV216={links:null,at:0}}catch(_){}
-  try{localStorage.removeItem("lover_sales_card_persistent_cache_v232")}catch(_){}
 }
 
 async function checkCloudRevisionShared(timeoutMs = REVISION_CHECK_TIMEOUT_MS) {
@@ -570,7 +574,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V31.7: foreground priority sync checks ONLY turnover and sales-card revisions.
+      // V31.8: foreground priority sync checks ONLY turnover and sales-card revisions.
       // Profit/Top5/Report/old-month changes never delay normal Sales/Fair/Live work.
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {

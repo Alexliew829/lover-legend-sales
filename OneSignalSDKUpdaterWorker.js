@@ -1,2 +1,2 @@
-// V31.7 - Legacy OneSignal updater worker path retained.
+// V31.8 - Legacy OneSignal updater worker path retained.
 importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDKUpdaterWorker.js");
