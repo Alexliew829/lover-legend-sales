@@ -1255,7 +1255,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   renderAll();
   if(typeof saveLocalDataCache==="function")saveLocalDataCache();
   showTempMsg("fairSaveMsg");
-  // V32.0: Fair Session is saved even when every daily amount is 0.00.
+  // V32.1: Fair Session is saved even when every daily amount is 0.00.
   // This preserves each location's date range for instant switching; 0.00 still does not count as sales.
   const fairStartV320=document.getElementById("fairStart").value;
   const fairEndV320=document.getElementById("fairEnd").value;
@@ -1271,7 +1271,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     saveFairSession();
     await refreshFairSessionsV281();
     const result=await saveFairBatchToSheet(loc,records);
-    // V32.0: only a successfully saved Fair becomes a reusable history location.
+    // V32.1: only a successfully saved Fair becomes a reusable history location.
     saveFairLocation(loc);
 
     // V29.9: local Fair values are direct replacements, never additions. The server
@@ -1469,7 +1469,7 @@ document.getElementById("fairLocation").addEventListener("input",()=>{
 document.getElementById("fairLocation").addEventListener("blur",()=>{
   const input=document.getElementById("fairLocation");
   input.value=canonicalLocation(input.value);
-  // V32.0: typing/blurring alone must not create history. A location is added
+  // V32.1: typing/blurring alone must not create history. A location is added
   // only after Fair is successfully saved to cloud.
   saveFairSession();
   syncFairInputs();
@@ -2924,7 +2924,7 @@ async function loadProductLinksIntoEditorV206(type){
     : null;
 
   if(Array.isArray(cached)){
-    // V32.0: keep the last-known saved cards visible while the exact cloud
+    // V32.1: keep the last-known saved cards visible while the exact cloud
     // context is being verified. Never replace a known draft with a fake blank
     // editor just because priority sync detected a newer card revision.
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
@@ -3694,7 +3694,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
   const onCoreEdit=()=>{markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)};
   [name,q,c,p].forEach(el=>el.addEventListener("input",onCoreEdit));
   [name,q].forEach(el=>el.addEventListener("input",()=>{
-    // V32.0: editing is not confirmation. Keep a saved draft as DRAFT until
+    // V32.1: editing is not confirmation. Keep a saved draft as DRAFT until
     // “确认销售” succeeds; the server is authoritative for the final status.
     if(String(card.dataset.inventoryStatus||"").startsWith("DRAFT")){
       card.dataset.inventoryStatus="DRAFT_INVENTORY_CHANGED";
@@ -3732,7 +3732,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const total=document.createElement("b");total.className="sales-card-price-total-v239";total.textContent="RM0.00";
   header.append(title,total);card.appendChild(header);
 
-  // V32.0: make the sales-card state explicit on Sales / Fair / Live.
+  // V32.1: make the sales-card state explicit on Sales / Fair / Live.
   // Draft is local/saved but NOT a confirmed sale and must never reach Import.
   const stateBoxV317=document.createElement("div");
   stateBoxV317.className="sales-card-state-v317";
@@ -3901,7 +3901,7 @@ async function saveLiveSales(){
 }
 
 
-/* ================= V32.0 Home on-demand today total profit =================
+/* ================= V32.1 Home on-demand today total profit =================
    Deliberately NOT part of startup / priority sync. Turnover + sales-card
    revisions remain foreground priority. Profit is queried only when opened. */
 let homeTodayProfitOpenV318=false;
@@ -5123,11 +5123,37 @@ buildSalesCardTransactionV239=function(type,dataList=[]){const card=_buildSalesC
 
 const _saveProductLinksV240=saveProductLinksV206;
 
-/* ================= V32.0 instant draft save + durable cloud retry =================
+/* ================= V32.1 instant draft save + durable cloud retry =================
    Draft edits must never hold the user on “保存中…”.  The latest draft is written
    to persistent local cache first, the UI is released immediately, and the cloud
    write runs in the background.  Confirmation still waits for cloud so Import/FIFO
    never sees an older draft. */
+// V32.1: Draft profit is real dashboard profit immediately after Save Draft.
+// Draft/Confirmed are the same sale card for profit purposes; replace by transactionId
+// so repeated saves and later confirmation can never double-count the same card.
+function mergeProfitLinksByTransactionV321(existing,incoming,replaceTxnIds=[]){
+  const fresh=(Array.isArray(incoming)?incoming:[]).filter(x=>!['deleted','cancelled'].includes(String(x?.status||'active').toLowerCase()));
+  const txns=new Set((Array.isArray(replaceTxnIds)?replaceTxnIds:[]).map(String).filter(Boolean));
+  fresh.forEach(x=>{const id=String(x?.transactionId||'').trim();if(id)txns.add(id)});
+  const linkIds=new Set(fresh.map(x=>String(x?.linkId||'').trim()).filter(Boolean));
+  const kept=(Array.isArray(existing)?existing:[]).filter(x=>{
+    if(['deleted','cancelled'].includes(String(x?.status||'active').toLowerCase()))return false;
+    const txn=String(x?.transactionId||'').trim(),link=String(x?.linkId||'').trim();
+    return !(txn&&txns.has(txn))&&!(link&&linkIds.has(link));
+  });
+  return [...kept,...fresh];
+}
+function refreshProfitAggregateCachesV321(savedLinks,replaceTxnIds=[]){
+  const incoming=Array.isArray(savedLinks)?savedLinks:[];
+  if(typeof mergeAllSalesProductLinksCacheV321==='function')mergeAllSalesProductLinksCacheV321(incoming,replaceTxnIds);
+  if(Array.isArray(monthGrandProfitLinksV295))monthGrandProfitLinksV295=mergeProfitLinksByTransactionV321(monthGrandProfitLinksV295,incoming,replaceTxnIds);
+  if(Array.isArray(yearBreakdownLinksV286))yearBreakdownLinksV286=mergeProfitLinksByTransactionV321(yearBreakdownLinksV286,incoming,replaceTxnIds);
+  // Repaint only panels the user already opened; this does not join foreground sync.
+  if(monthGrandHistoryOpenV223)renderMonthGrandHistoryV223();
+  if(Object.values(yearBreakdownOpenV224||{}).some(Boolean))renderAllYearBreakdownsV224();
+}
+window.refreshProfitAggregateCachesV321=refreshProfitAggregateCachesV321;
+
 const SALES_DRAFT_PENDING_KEY_V314='lover_sales_draft_pending_v314';
 const SALES_DRAFT_INFLIGHT_V314=new Map();
 let SALES_DRAFT_RETRY_TIMER_V314=null;
@@ -5155,6 +5181,7 @@ function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
   if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,merged);
   if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,merged);
   if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,ctx.date,ctx.location,merged);
+  refreshProfitAggregateCachesV321(local,[...dirtyIds]);
   const byLink=new Map(local.map(x=>[String(x.linkId||''),x]));
   dirty.forEach(card=>{
     clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;card.dataset.inventoryStatus='DRAFT';
@@ -5180,6 +5207,7 @@ async function syncQueuedSalesDraftV314(key,expectedToken=''){
         if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(entry.type,entry.date,entry.location,saved);
         if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(entry.type,entry.date,entry.location,saved);
         if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(entry.type,entry.date,entry.location,saved);
+        refreshProfitAggregateCachesV321(saved,[...new Set(entry.items.map(x=>String(x.transactionId||'')).filter(Boolean))]);
         setSync('草稿已保存 · 云端已同步',true);
       }
       return result;
@@ -5232,7 +5260,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
 
   if(saveMode==='draft'){
     try{
-      // V32.0: local durable save is the user-facing completion point.
+      // V32.1: local durable save is the user-facing completion point.
       const queued=queueSalesDraftV314(type,ctx.date,ctx.location,items);
       markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds);
       setSync('草稿已安全保存 · 可以离开',true);
@@ -5257,6 +5285,8 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
     const final=[...old.filter(x=>!dirtyIds.has(String(x.transactionId||''))),...saved];
     if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,final);
     if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,final);
+    if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,ctx.date,ctx.location,final);
+    refreshProfitAggregateCachesV321(saved,[...dirtyIds]);
     const savedByLink=new Map(saved.map(x=>[String(x.linkId||''),x]));
     dirty.forEach(card=>{clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;let cardStatus='';card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';const rec=savedByLink.get(String(i.dataset.linkId||''));if(rec){i.dataset.inventoryStatus=String(rec.importSyncStatus||'');cardStatus=cardStatus||i.dataset.inventoryStatus;}});if(cardStatus)card.dataset.inventoryStatus=cardStatus;if(card._renderSalesStateV317)card._renderSalesStateV317();});
     renumberSavedSalesCardsV241(type);setSync('销售已确认',true);alert('销售确认成功。\n\n如有库存变动，请到 Import Cost System 处理。');if(result?.warning)alert(result.warning);return result;
@@ -5264,7 +5294,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   finally{releaseButton()}
 };
 
-// V32.0: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
+// V32.1: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
 const _deleteSalesCardTransactionV313=deleteSalesCardTransactionV239;
 deleteSalesCardTransactionV239=async function(type,txnId){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
@@ -5326,10 +5356,10 @@ saveLiveSales=async function(){
       return;
     }
   }catch(e){
-    // V32.0: a cloud preflight timeout must not lock turnover editing.
+    // V32.1: a cloud preflight timeout must not lock turnover editing.
     // The authoritative saveLive() server guard still rejects any amount below
     // active saved cards. With no saved card, the user may edit turnover freely.
-    console.warn("V32.0 销售卡预检暂时失败，继续交由云端保存时核对",e);
+    console.warn("V32.1 销售卡预检暂时失败，继续交由云端保存时核对",e);
   }
 
   const restored=reactivateLiveHostIfNeeded(host);
@@ -5696,7 +5726,7 @@ function scheduleInventoryPendingResumeRefreshV265(){
     refreshInventoryPendingV250(true);
   },500);
 }
-// V32.0: cloud resume synchronization is centralized in update.js.
+// V32.1: cloud resume synchronization is centralized in update.js.
 // Refresh Import reminders once only after that resume cycle completes, instead
 // of competing with it through visibilitychange + focus + pageshow.
 window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);
