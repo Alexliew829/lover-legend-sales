@@ -301,12 +301,14 @@ function monthAfter(m){
 }
 
 
-// V21.1: Fair 地点键值忽略所有空格及英文字母大小写，但保留符号。
-// 例如 "JB AEON Mall , Terbau City" 与 "JB AEON Mall,Terbau City" 是同一地点。
+// V32.8: Fair 地点键值跨设备统一：忽略大小写、所有空格、标点和符号。
+// Sunway Mall / sunwaymall / Sunway-Mall / SUNWAY_MALL 均视为同一地点。
 function normalizeFairLocationKey(value){
-  return canonicalLocation(value||"")
-    .replace(/\s+/g,"")
-    .toLowerCase();
+  return String(value||"")
+    .normalize("NFKC")
+    .trim()
+    .toLowerCase()
+    .replace(/[\p{P}\p{S}\s]+/gu,"");
 }
 
 function yearAfter(y){

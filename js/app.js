@@ -1,9 +1,20 @@
 let fairSessionsCloudV281=[];
 let fairSessionDraftDirtyV282=false;
 function getSavedFairLocations(){try{const list=JSON.parse(localStorage.getItem("lover_fair_locations")||"[]");return Array.isArray(list)?list.map(x=>canonicalLocation(x)).filter(Boolean):[]}catch(e){return[]}}
-function saveFairLocation(location){const loc=canonicalLocation(location);if(!loc)return;const list=getSavedFairLocations();if(!list.some(x=>normalizeFairLocationKey(x)===normalizeFairLocationKey(loc)))list.push(loc);list.sort((a,b)=>a.localeCompare(b));localStorage.setItem("lover_fair_locations",JSON.stringify(list));renderFairLocationOptions()}
-function deleteFairLocationHistoryV309(location){const key=normalizeFairLocationKey(location);const list=getSavedFairLocations().filter(x=>normalizeFairLocationKey(x)!==key);localStorage.setItem("lover_fair_locations",JSON.stringify(list));renderFairLocationOptions()}
-function collectFairLocations(){return getSavedFairLocations()}
+function getHiddenFairLocationKeysV328(){try{const x=JSON.parse(localStorage.getItem("lover_fair_locations_hidden_v328")||"[]");return new Set(Array.isArray(x)?x.map(String):[])}catch(_){return new Set()}}
+function saveFairLocation(location){const loc=canonicalLocation(location);if(!loc)return;const key=normalizeFairLocationKey(loc),list=getSavedFairLocations();if(!list.some(x=>normalizeFairLocationKey(x)===key))list.push(loc);list.sort((a,b)=>a.localeCompare(b));localStorage.setItem("lover_fair_locations",JSON.stringify(list));const hidden=getHiddenFairLocationKeysV328();if(hidden.delete(key))localStorage.setItem("lover_fair_locations_hidden_v328",JSON.stringify([...hidden]));renderFairLocationOptions()}
+function deleteFairLocationHistoryV309(location){const key=normalizeFairLocationKey(location),list=getSavedFairLocations().filter(x=>normalizeFairLocationKey(x)!==key),hidden=getHiddenFairLocationKeysV328();hidden.add(key);localStorage.setItem("lover_fair_locations",JSON.stringify(list));localStorage.setItem("lover_fair_locations_hidden_v328",JSON.stringify([...hidden]));renderFairLocationOptions()}
+function collectFairLocations(){
+  const merged=[];
+  const add=value=>{const display=canonicalLocation(value),key=normalizeFairLocationKey(display);if(!display||!key||merged.some(x=>x.key===key))return;merged.push({key,display})};
+  // Preserve the first locally-known display label, then add shared cloud and
+  // historical turnover locations so every phone/computer sees the same list.
+  getSavedFairLocations().forEach(add);
+  Object.values(getLocalFairSessionsV320()).forEach(x=>add(x?.location));
+  (Array.isArray(fairSessionsCloudV281)?fairSessionsCloudV281:[]).forEach(x=>add(x?.location));
+  (Array.isArray(rows)?rows:[]).filter(x=>String(x?.type||"").toLowerCase()==="fair").forEach(x=>add(x?.location));
+  const hidden=getHiddenFairLocationKeysV328();return merged.filter(x=>!hidden.has(x.key)).map(x=>x.display).sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"}));
+}
 function fairSessionKeyV320(location){return normalizeFairLocationKey(canonicalLocation(location||""))}
 function getLocalFairSessionsV320(){try{const v=JSON.parse(localStorage.getItem("lover_fair_sessions_v320")||"{}");return v&&typeof v==="object"?v:{}}catch(e){return{}}}
 function saveLocalFairSessionV320(location,start,end,updatedAt=""){
@@ -45,7 +56,7 @@ function renderFairLocationHistoryV309(){
 function renderFairLocationOptions(){const el=document.getElementById("fairLocationListOptions");if(el){el.innerHTML="";collectFairLocations().forEach(loc=>{const option=document.createElement("option");option.value=loc;el.appendChild(option)})}renderFairLocationHistoryV309()}
 function latestFairSessionV281(){const list=(Array.isArray(fairSessionsCloudV281)?fairSessionsCloudV281:[]).filter(x=>x&&x.location&&x.start&&x.end);return [...list].sort((a,b)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")))[0]||null}
 function applyFairSessionV281(s,{force=false}={}){if(!s)return false;const l=document.getElementById("fairLocation"),a=document.getElementById("fairStart"),b=document.getElementById("fairEnd");if(!l||!a||!b)return false;if(!force&&fairSessionDraftDirtyV282)return false;l.value=canonicalLocation(s.location);setDateControl("fairStart",s.start);setDateControl("fairEnd",s.end);saveLocalFairSessionV320(canonicalLocation(s.location),s.start,s.end,s.updatedAt||"");fairSessionDraftDirtyV282=false;updateFairPageMode();syncFairInputs();renderFairLocationOptions();return true}
-async function refreshFairSessionsV281({applyLatest=false,forceApply=false}={}){try{const r=await loadFairSessionsFromSheetV281();fairSessionsCloudV281=Array.isArray(r?.sessions)?r.sessions:[];renderFairLocationOptions();if(applyLatest)applyFairSessionV281(latestFairSessionV281(),{force:forceApply});return fairSessionsCloudV281}catch(e){console.warn("Fair Session cloud sync failed",e);return fairSessionsCloudV281}}
+async function refreshFairSessionsV281({applyLatest=false,forceApply=false}={}){try{const r=await loadFairSessionsFromSheetV281();fairSessionsCloudV281=Array.isArray(r?.sessions)?r.sessions:[];fairSessionsCloudV281.forEach(s=>{if(s?.location&&s?.start&&s?.end)saveLocalFairSessionV320(s.location,s.start,s.end,s.updatedAt||"")});renderFairLocationOptions();if(applyLatest)applyFairSessionV281(latestFairSessionV281(),{force:forceApply});return fairSessionsCloudV281}catch(e){console.warn("Fair Session cloud sync failed",e);return fairSessionsCloudV281}}
 const companyNames={balakong:"Lover Legend Adenium - Balakong",belimbing:"Lover Legend Gardening - Belimbing",fair:"Fair",live:"Live"};
 function selectedMonth(){return document.getElementById("monthPicker").value}
 function selectedYear(){return document.getElementById("yearPicker").value}
@@ -4958,7 +4969,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3270",
+    version:"3280",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -4986,7 +4997,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    downloadFile(`Lover_Legend_Sales_V32_7_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+    downloadFile(`Lover_Legend_Sales_V32_8_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSync("Backup 已完成",true);
     alert(`Backup 成功。\n\n营业记录：${payload.rows.length} 笔\n销售卡：${payload.productLinks.length} 笔\n新增/修改历史：${payload.salesChangeLogs.length} 笔\n\nBackup 文件已经生成。`);
@@ -5318,7 +5329,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleSa
 setTimeout(()=>scheduleSalesDraftRetryV314(1200),0);
 
 
-/* ================= V32.7 Sales stock oversell guard =================
+/* ================= V32.8 Sales stock oversell guard =================
    Before Save Draft / Confirm, re-read Import current stock.  New/unprocessed
    cards must fit the full requested quantity.  A card already confirmed AND
    fully inventory-confirmed only needs enough stock for its positive net
@@ -6061,4 +6072,3 @@ renderLiveMonthlyList=function(){
     container.insertAdjacentHTML('beforeend',`<div class="profit-grand-v294"><strong>Live 全部主播总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>${money(totalProfit)}</b></div><div><span>整体利润率</span><b>${marginTextV294(totalProfit,total)}</b></div></div>`);
   }).catch(e=>console.warn('V29.9 Live 利润读取失败',e));
 };
-
