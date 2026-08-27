@@ -4958,7 +4958,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"2830",
+    version:"3270",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -4986,7 +4986,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    downloadFile(`Lover_Legend_Sales_V28_2_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+    downloadFile(`Lover_Legend_Sales_V32_7_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSync("Backup 已完成",true);
     alert(`Backup 成功。\n\n营业记录：${payload.rows.length} 笔\n销售卡：${payload.productLinks.length} 笔\n新增/修改历史：${payload.salesChangeLogs.length} 笔\n\nBackup 文件已经生成。`);
@@ -5318,7 +5318,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleSa
 setTimeout(()=>scheduleSalesDraftRetryV314(1200),0);
 
 
-/* ================= V32.6 Sales stock oversell guard =================
+/* ================= V32.7 Sales stock oversell guard =================
    Before Save Draft / Confirm, re-read Import current stock.  New/unprocessed
    cards must fit the full requested quantity.  A card already confirmed AND
    fully inventory-confirmed only needs enough stock for its positive net
@@ -5328,12 +5328,21 @@ async function validateSalesInventoryAvailabilityV325(type,items,saveMode='draft
   const mapped=list.filter(x=>String(x?.productId||'').trim());
   if(!mapped.length)return true;
   let records=[];
-  try{
-    records=await Promise.race([
-      loadImportProductsV214(true),
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('库存云端核对超时')),7000))
-    ]);
-  }catch(err){
+  let lastInventoryError=null;
+  for(let attempt=1;attempt<=2;attempt++){
+    try{
+      records=await Promise.race([
+        loadImportProductsV214(true),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error('库存云端核对超时')),attempt===1?7000:10000))
+      ]);
+      lastInventoryError=null;break;
+    }catch(err){
+      lastInventoryError=err;
+      if(attempt===1)await new Promise(resolve=>setTimeout(resolve,450));
+    }
+  }
+  if(lastInventoryError){
+    const err=lastInventoryError;
     alert('⚠️ 无法核对 Import 最新库存，销售卡未保存。\n\n'+String(err?.message||err)+'\n\n请稍后再试，避免超卖。');
     return false;
   }
@@ -5781,7 +5790,7 @@ function renderInventoryPendingGlobalV250(){
         location:String(first.location||"")
       };
       return `<button type="button" class="inventory-summary-v264${stale?" stale-v250":""}" onclick='openImportCostSystemV266(${JSON.stringify(targetPayload)})'>
-        <div class="inventory-summary-title-v264">⚠️ 有 ${itemCount} 项库存变动</div>
+        <div class="inventory-summary-title-v264">⚠️ 有 ${itemCount} 项需要处理的库存变动</div>
         <div class="inventory-summary-meta-v264">${escapeChangeLogHtmlV200(first.date)}${inventoryPendingTimeV325(first)?" "+escapeChangeLogHtmlV200(inventoryPendingTimeV325(first)):""} · ${String(first.type||"").toLowerCase()==="daily"?"Sales · Belimbing":String(first.type||"").toLowerCase()==="live"?"Live · "+escapeChangeLogHtmlV200(first.location):"Fair · "+escapeChangeLogHtmlV200(first.location)}</div>
         <div class="inventory-summary-action-v264">请到 Import Cost System 处理 <span aria-hidden="true">›</span></div>
       </button>`;
@@ -6052,5 +6061,4 @@ renderLiveMonthlyList=function(){
     container.insertAdjacentHTML('beforeend',`<div class="profit-grand-v294"><strong>Live 全部主播总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>${money(totalProfit)}</b></div><div><span>整体利润率</span><b>${marginTextV294(totalProfit,total)}</b></div></div>`);
   }).catch(e=>console.warn('V29.9 Live 利润读取失败',e));
 };
-
 
