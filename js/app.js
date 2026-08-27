@@ -1982,21 +1982,21 @@ function renderLiveMonthlyList(){
       <div class="live-sales-group-title"><span>${group.name}</span></div>
       <div class="live-record-row live-record-head">
         <span>日期</span>
-        <span class="live-record-value">营业额</span>
-        <span class="live-record-commission">佣金10%</span>
-        <span class="live-record-rate"></span>
+        <span class="live-record-value">销售额</span>
+        <span class="live-record-rate">佣金率</span>
+        <span class="live-record-commission">佣金</span>
       </div>
       ${group.rows.map(r=>`<div class="live-record-row">
         <span>${r.date}</span>
         <strong class="live-record-value">${money(r.amount)}</strong>
-        <strong class="live-record-commission">${money(r.commissionAmount)}</strong>
         <span class="live-record-rate">${r.commissionRate}%</span>
+        <strong class="live-record-commission">${money(r.commissionAmount)}</strong>
       </div>`).join("")}
       <div class="live-record-row live-record-total">
         <span>总数</span>
         <strong class="live-record-value">${money(hostTotal)}</strong>
+        <span class="live-record-rate">10%</span>
         <strong class="live-record-commission">${money(hostCommission)}</strong>
-        <span></span>
       </div>
     </div>`;
   }).join("");
@@ -5994,13 +5994,13 @@ function shortDayMonthV297(date){
 }
 function liveProfitRowV294(r,profit){
   const sales=Number(r.amount||0);
-  return `<div class="month-profit-row-v294 live-profit-row-v294"><span>${shortDayMonthV297(r.date)}</span><strong>${money(sales)}</strong><strong class="live-commission-value-v297">${money(r.commissionAmount)}</strong><strong class="profit-value-v294">${money(profit)}</strong><strong class="profit-rate-v294">${marginTextV294(profit,sales)}</strong></div>`;
+  return `<div class="month-profit-row-v294 live-profit-row-v294"><span>${shortDayMonthV297(r.date)}</span><strong class="live-commission-value-v297">${money(r.commissionAmount)}</strong><strong>${money(sales)}</strong><strong class="profit-value-v294">${money(profit)}</strong><strong class="profit-rate-v294">${marginTextV294(profit,sales)}</strong></div>`;
 }
 function profitHeadV294(){return `<div class="month-profit-row-v294 month-profit-head-v294"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>`}
 function liveProfitHeadV297(group){
   const rates=[...new Set((group&&Array.isArray(group.rows)?group.rows:[]).map(r=>Number(r.commissionRate||0).toFixed(2).replace(/\.00$/,'')).filter(Boolean))];
   const label=rates.length===1?`佣金 ${rates[0]}%`:'佣金';
-  return `<div class="month-profit-row-v294 live-profit-row-v294 live-profit-head-v297"><span>日期</span><span>营业额</span><span>${label}</span><span>利润</span><span>利润率</span></div>`;
+  return `<div class="month-profit-row-v294 live-profit-row-v294 live-profit-head-v297"><span>日期</span><span>${label}</span><span>营业额</span><span>利润</span><span>利润率</span></div>`;
 }
 
 renderFairMonthlyList=function(){
