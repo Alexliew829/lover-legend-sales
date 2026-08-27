@@ -1995,7 +1995,7 @@ function renderLiveMonthlyList(){
       <div class="live-record-row live-record-total">
         <span>总数</span>
         <strong class="live-record-value">${money(hostTotal)}</strong>
-        <span class="live-record-rate">10%</span>
+        <span></span>
         <strong class="live-record-commission">${money(hostCommission)}</strong>
       </div>
     </div>`;
