@@ -1982,21 +1982,21 @@ function renderLiveMonthlyList(){
       <div class="live-sales-group-title"><span>${group.name}</span></div>
       <div class="live-record-row live-record-head">
         <span>日期</span>
-        <span class="live-record-value">销售额</span>
-        <span class="live-record-rate">佣金率</span>
-        <span class="live-record-commission">佣金</span>
+        <span class="live-record-value">营业额</span>
+        <span class="live-record-commission">佣金10%</span>
+        <span class="live-record-rate"></span>
       </div>
       ${group.rows.map(r=>`<div class="live-record-row">
         <span>${r.date}</span>
         <strong class="live-record-value">${money(r.amount)}</strong>
-        <span class="live-record-rate">${r.commissionRate}%</span>
         <strong class="live-record-commission">${money(r.commissionAmount)}</strong>
+        <span class="live-record-rate">${r.commissionRate}%</span>
       </div>`).join("")}
       <div class="live-record-row live-record-total">
         <span>总数</span>
         <strong class="live-record-value">${money(hostTotal)}</strong>
-        <span></span>
         <strong class="live-record-commission">${money(hostCommission)}</strong>
+        <span></span>
       </div>
     </div>`;
   }).join("");
