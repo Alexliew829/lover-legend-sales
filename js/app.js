@@ -1255,7 +1255,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   renderAll();
   if(typeof saveLocalDataCache==="function")saveLocalDataCache();
   showTempMsg("fairSaveMsg");
-  // V32.5: Fair Session is saved even when every daily amount is 0.00.
+  // V32.6: Fair Session is saved even when every daily amount is 0.00.
   // This preserves each location's date range for instant switching; 0.00 still does not count as sales.
   const fairStartV320=document.getElementById("fairStart").value;
   const fairEndV320=document.getElementById("fairEnd").value;
@@ -1271,7 +1271,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     saveFairSession();
     await refreshFairSessionsV281();
     const result=await saveFairBatchToSheet(loc,records);
-    // V32.5: only a successfully saved Fair becomes a reusable history location.
+    // V32.6: only a successfully saved Fair becomes a reusable history location.
     saveFairLocation(loc);
 
     // V29.9: local Fair values are direct replacements, never additions. The server
@@ -1469,7 +1469,7 @@ document.getElementById("fairLocation").addEventListener("input",()=>{
 document.getElementById("fairLocation").addEventListener("blur",()=>{
   const input=document.getElementById("fairLocation");
   input.value=canonicalLocation(input.value);
-  // V32.5: typing/blurring alone must not create history. A location is added
+  // V32.6: typing/blurring alone must not create history. A location is added
   // only after Fair is successfully saved to cloud.
   saveFairSession();
   syncFairInputs();
@@ -2926,7 +2926,7 @@ async function loadProductLinksIntoEditorV206(type){
     : null;
 
   if(Array.isArray(cached)){
-    // V32.5: keep the last-known saved cards visible while the exact cloud
+    // V32.6: keep the last-known saved cards visible while the exact cloud
     // context is being verified. Never replace a known draft with a fake blank
     // editor just because priority sync detected a newer card revision.
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
@@ -3287,7 +3287,7 @@ async function deleteSalesCardTransactionV239(type,txnId){
 }
 window.deleteSalesCardTransactionV239=deleteSalesCardTransactionV239;
 
-/* ================= V32.5 confirmed-sale edit state =================
+/* ================= V32.6 confirmed-sale edit state =================
    A sale can be confirmed only once. After confirmation the whole card is locked
    against deletion, but its products may still be corrected and saved. Those
    corrections stay a CONFIRMED sale and, when inventory identity/quantity differs,
@@ -3753,7 +3753,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
   const onCoreEdit=()=>{markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)};
   [name,q,c,p].forEach(el=>el.addEventListener("input",onCoreEdit));
   [name,q].forEach(el=>el.addEventListener("input",()=>{
-    // V32.5: editing is not confirmation. Keep a saved draft as DRAFT until
+    // V32.6: editing is not confirmation. Keep a saved draft as DRAFT until
     // “确认销售” succeeds; the server is authoritative for the final status.
     if(String(card.dataset.inventoryStatus||"").startsWith("DRAFT")){
       card.dataset.inventoryStatus="DRAFT_INVENTORY_CHANGED";
@@ -3791,7 +3791,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const total=document.createElement("b");total.className="sales-card-price-total-v239";total.textContent="RM0.00";
   header.append(title,total);card.appendChild(header);
 
-  // V32.5: make the sales-card state explicit on Sales / Fair / Live.
+  // V32.6: make the sales-card state explicit on Sales / Fair / Live.
   // Draft is local/saved but NOT a confirmed sale and must never reach Import.
   const stateBoxV317=document.createElement("div");
   stateBoxV317.className="sales-card-state-v317";
@@ -3962,7 +3962,7 @@ async function saveLiveSales(){
 }
 
 
-/* ================= V32.5 Home on-demand today total profit =================
+/* ================= V32.6 Home on-demand today total profit =================
    Deliberately NOT part of startup / priority sync. Turnover + sales-card
    revisions remain foreground priority. Profit is queried only when opened. */
 let homeTodayProfitOpenV318=false;
@@ -5184,12 +5184,12 @@ buildSalesCardTransactionV239=function(type,dataList=[]){const card=_buildSalesC
 
 const _saveProductLinksV240=saveProductLinksV206;
 
-/* ================= V32.5 instant draft save + durable cloud retry =================
+/* ================= V32.6 instant draft save + durable cloud retry =================
    Draft edits must never hold the user on “保存中…”.  The latest draft is written
    to persistent local cache first, the UI is released immediately, and the cloud
    write runs in the background.  Confirmation still waits for cloud so Import/FIFO
    never sees an older draft. */
-// V32.5: Draft profit is real dashboard profit immediately after Save Draft.
+// V32.6: Draft profit is real dashboard profit immediately after Save Draft.
 // Draft/Confirmed are the same sale card for profit purposes; replace by transactionId
 // so repeated saves and later confirmation can never double-count the same card.
 function mergeProfitLinksByTransactionV321(existing,incoming,replaceTxnIds=[]){
@@ -5318,7 +5318,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleSa
 setTimeout(()=>scheduleSalesDraftRetryV314(1200),0);
 
 
-/* ================= V32.5 Sales stock oversell guard =================
+/* ================= V32.6 Sales stock oversell guard =================
    Before Save Draft / Confirm, re-read Import current stock.  New/unprocessed
    cards must fit the full requested quantity.  A card already confirmed AND
    fully inventory-confirmed only needs enough stock for its positive net
@@ -5383,7 +5383,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   const cards=salesCardWrappersV239(type),dirty=cards.filter(c=>{
     const needsSave=c.dataset.dirty==='1'||c.dataset.productRemovedV259==='1'||!salesCardIsSavedV241(c)||(saveMode==='confirm'&&String(c.dataset.inventoryStatus||'').startsWith('DRAFT'));
     if(!needsSave)return false;
-    // V32.5: a confirmed sale can never be confirmed a second time. Any later
+    // V32.6: a confirmed sale can never be confirmed a second time. Any later
     // correction must use 保存草稿 so the server can create only the inventory diff.
     if(saveMode==='confirm'&&salesCardIsConfirmedV322(c))return false;
     return true;
@@ -5403,7 +5403,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
 
   if(saveMode==='draft'){
     try{
-      // V32.5: local durable save is the user-facing completion point.
+      // V32.6: local durable save is the user-facing completion point.
       const queued=queueSalesDraftV314(type,ctx.date,ctx.location,items);
       markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds);
       setSync('草稿已安全保存 · 可以离开',true);
@@ -5418,7 +5418,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   }
 
   try{
-    // V32.5: “直接确认” and “先保存草稿再确认” are intentionally the same
+    // V32.6: “直接确认” and “先保存草稿再确认” are intentionally the same
     // transaction path. If a draft exists, flush it first; if it does not, the
     // confirm API atomically saves the current card and confirms that SAME
     // transaction/link set. There is never a second sale/card created here.
@@ -5439,7 +5439,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   finally{releaseButton()}
 };
 
-// V32.5: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
+// V32.6: draft cards may be edited/deleted at any time; once confirmed they are immutable for deletion.
 const _deleteSalesCardTransactionV313=deleteSalesCardTransactionV239;
 deleteSalesCardTransactionV239=async function(type,txnId){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
@@ -5501,10 +5501,10 @@ saveLiveSales=async function(){
       return;
     }
   }catch(e){
-    // V32.5: a cloud preflight timeout must not lock turnover editing.
+    // V32.6: a cloud preflight timeout must not lock turnover editing.
     // The authoritative saveLive() server guard still rejects any amount below
     // active saved cards. With no saved card, the user may edit turnover freely.
-    console.warn("V32.5 销售卡预检暂时失败，继续交由云端保存时核对",e);
+    console.warn("V32.6 销售卡预检暂时失败，继续交由云端保存时核对",e);
   }
 
   const restored=reactivateLiveHostIfNeeded(host);
@@ -5878,7 +5878,7 @@ function scheduleInventoryPendingResumeRefreshV265(){
     refreshInventoryPendingV250(true);
   },500);
 }
-// V32.5: cloud resume synchronization is centralized in update.js.
+// V32.6: cloud resume synchronization is centralized in update.js.
 // Refresh Import reminders once only after that resume cycle completes, instead
 // of competing with it through visibilitychange + focus + pageshow.
 window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);
