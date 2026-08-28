@@ -17,6 +17,21 @@ const localRowMutationAt = new Map();
 const fairWriteQueuesV343 = new Map();
 const CLIENT_DEVICE_KEY_V344="lover_sales_client_device_v344";
 const CLIENT_SEQUENCE_KEY_V344="lover_sales_client_sequence_v344";
+const RESTORE_GENERATION_KEY_V347="lover_restore_generation_v347";
+function getLocalRestoreGenerationV347(){try{return Math.max(0,Number(localStorage.getItem(RESTORE_GENERATION_KEY_V347)||0))}catch(_){return 0}}
+function clearStaleRestoreQueuesV347(){
+  pendingRows=[];
+  try{localStorage.removeItem("lover_pending_rows");localStorage.removeItem("lover_sales_draft_pending_v314");localStorage.removeItem(LOCAL_DATA_CACHE_KEY);localStorage.removeItem("lover_daily_profit_cache_v237");localStorage.removeItem("lover_sales_change_log_cache_v237")}catch(_){}
+}
+function applyRestoreGenerationV347(value){
+  const incoming=Math.max(0,Number(value||0)),current=getLocalRestoreGenerationV347();
+  if(incoming<=current)return false;
+  clearStaleRestoreQueuesV347();
+  try{localStorage.setItem(RESTORE_GENERATION_KEY_V347,String(incoming))}catch(_){}
+  return true;
+}
+window.getLocalRestoreGenerationV347=getLocalRestoreGenerationV347;
+window.applyRestoreGenerationV347=applyRestoreGenerationV347;
 
 function nextClientMutationV344(){
   let deviceId="";
@@ -27,7 +42,7 @@ function nextClientMutationV344(){
   }
   let sequence=0;
   try{sequence=Number(localStorage.getItem(CLIENT_SEQUENCE_KEY_V344)||0)+1;localStorage.setItem(CLIENT_SEQUENCE_KEY_V344,String(sequence))}catch(_){sequence=Date.now()}
-  return{clientDeviceId:deviceId,clientSequence:sequence};
+  return{clientDeviceId:deviceId,clientSequence:sequence,restoreGeneration:getLocalRestoreGenerationV347()};
 }
 
 const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache";
@@ -295,7 +310,7 @@ function addPendingRow(row) {
   savePendingRows();
 }
 
-// V34.6: a completed older request may only acknowledge the exact pending
+// V34.7: a completed older request may only acknowledge the exact pending
 // version it sent.  It must not remove a newer edit for the same Fair date.
 function clearPendingRowIfVersionV343(row) {
   loadPendingRows();
@@ -309,7 +324,7 @@ function clearPendingRowIfVersionV343(row) {
   savePendingRows();
 }
 
-// V34.6: a pagehide keepalive request can reach Google Sheet even though the
+// V34.7: a pagehide keepalive request can reach Google Sheet even though the
 // browser cannot read its no-cors response.  On the next cloud load, treat an
 // identical authoritative row as the acknowledgement and permanently remove
 // the stale local retry item.  This prevents the same successful save from
@@ -322,7 +337,7 @@ function reconcilePendingRowsFromCloudV329(cloudRows) {
   const before = pendingRows.length;
   pendingRows = pendingRows.filter(pending => {
     const cloud = cloudByKey.get(syncKey(pending));
-    // V34.6: a zero-amount pending row means deletion.  When the authoritative
+    // V34.7: a zero-amount pending row means deletion.  When the authoritative
     // cloud read no longer contains that key, the deletion is already complete.
     if (!cloud) return Number(pending.amount || 0) > 0.005;
     return Math.abs(Number(cloud.amount || 0) - Number(pending.amount || 0)) > 0.005;
@@ -439,6 +454,8 @@ function jsonp(params, options = {}) {
   const timeoutMs = Number(options.timeoutMs || 15000);
   return new Promise((resolve, reject) => {
     const callback = "ll_cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+    params={...params};
+    if(params.restoreGeneration===undefined)params.restoreGeneration=getLocalRestoreGenerationV347();
     params.callback = callback;
     params._ts = Date.now();
 
@@ -455,6 +472,8 @@ function jsonp(params, options = {}) {
       clearTimeout(timer);
       delete window[callback];
       script.remove();
+      if(data&&data.restoreGeneration!==undefined)applyRestoreGenerationV347(data.restoreGeneration);
+      if(data&&data.systemState&&data.systemState.restoreGeneration!==undefined)applyRestoreGenerationV347(data.systemState.restoreGeneration);
       resolve(data);
     };
 
@@ -773,7 +792,7 @@ async function syncPendingRows() {
         row.clientUpdatedAt || "",
         row.clientDeviceId||"",
         Number(row.clientSequence||0)
-        ,row.baseCloudUpdatedAt||""
+        ,row.baseCloudUpdatedAt||"",false,Number(row.restoreGeneration||0)
       );
       if (saved) upsertLocalRow(saved);
       clearPendingRowIfVersionV343(row);
@@ -791,6 +810,7 @@ async function syncPendingRows() {
         ,clientDeviceId:row.clientDeviceId||""
         ,clientSequence:Number(row.clientSequence||0)
         ,baseCloudUpdatedAt:row.baseCloudUpdatedAt||""
+        ,restoreGeneration:Number(row.restoreGeneration||0)
       });
     });
 
@@ -802,7 +822,7 @@ async function syncPendingRows() {
         row.clientUpdatedAt || "",
         row.clientDeviceId||"",
         Number(row.clientSequence||0)
-        ,row.baseCloudUpdatedAt||""
+        ,row.baseCloudUpdatedAt||"",false,Number(row.restoreGeneration||0)
       );
       if (saved && Number(saved.amount) > 0) upsertLocalRow(saved);
       else rows = rows.filter(x => syncKey(x) !== syncKey(row));
@@ -868,8 +888,8 @@ async function confirmSalesCardInventoryV249(payload) {
   return json;
 }
 
-async function saveSalesProductLinksV206(items, saveMode="confirm") {
-  const json = await jsonp({ action:"saveSalesProductLinks", itemsJson:JSON.stringify(items||[]), saveMode:String(saveMode||"confirm") }, { timeoutMs:30000 });
+async function saveSalesProductLinksV206(items, saveMode="confirm", restoreGeneration=getLocalRestoreGenerationV347()) {
+  const json = await jsonp({ action:"saveSalesProductLinks", itemsJson:JSON.stringify(items||[]), saveMode:String(saveMode||"confirm"), restoreGeneration }, { timeoutMs:30000 });
   if (!json.ok) throw new Error(json.message || "盆栽资料保存失败");
   if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
   const first=Array.isArray(items)&&items.length?items[0]:null;
@@ -1092,13 +1112,13 @@ async function loadAllSalesChangeLogsV236() {
   return Array.isArray(json.logs) ? json.logs : [];
 }
 
-async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false) {
+async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347()) {
   const json = await jsonp({
     action: "saveDaily",
     date,
     company,
     amount,
-    clientUpdatedAt,clientDeviceId,clientSequence,baseCloudUpdatedAt,foregroundSave:foregroundSave?"1":""
+    clientUpdatedAt,clientDeviceId,clientSequence,baseCloudUpdatedAt,foregroundSave:foregroundSave?"1":"",restoreGeneration
   });
 
   if (!json.ok) throw new Error(json.message || "储存失败");
@@ -1122,11 +1142,12 @@ async function loadFairSessionsFromSheetV281(){
 }
 
 async function sendFairBatchToSheetV343(location, records, foregroundSave=false) {
+  const restoreGeneration=Array.isArray(records)&&records.length?Number(records[0].restoreGeneration||0):getLocalRestoreGenerationV347();
   const json = await jsonp({
     action: "saveFairBatch",
     location,
     records: JSON.stringify(records),
-    foregroundSave:foregroundSave?"1":""
+    foregroundSave:foregroundSave?"1":"",restoreGeneration
   });
 
   if (!json.ok) throw new Error(json.message || "Fair 储存失败");
@@ -1166,13 +1187,13 @@ async function saveFairToSheet(location, records) {
 }
 
 
-async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false) {
+async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347()) {
   const json = await jsonp({
     action: "saveLive",
     date,
     host,
     amount,
-    clientUpdatedAt,clientDeviceId,clientSequence,baseCloudUpdatedAt,foregroundSave:foregroundSave?"1":""
+    clientUpdatedAt,clientDeviceId,clientSequence,baseCloudUpdatedAt,foregroundSave:foregroundSave?"1":"",restoreGeneration
   });
   if (!json.ok) throw new Error(json.message || "Live 储存失败");
   applyLocalDataRevision(json.dataRevision);
