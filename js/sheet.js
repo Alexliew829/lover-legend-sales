@@ -286,6 +286,26 @@ function clearPendingRow(row) {
   savePendingRows();
 }
 
+// V32.9: a pagehide keepalive request can reach Google Sheet even though the
+// browser cannot read its no-cors response.  On the next cloud load, treat an
+// identical authoritative row as the acknowledgement and permanently remove
+// the stale local retry item.  This prevents the same successful save from
+// alternating between "已同步" and "1 笔未同步" on later opens.
+function reconcilePendingRowsFromCloudV329(cloudRows) {
+  loadPendingRows();
+  if (!pendingRows.length || !Array.isArray(cloudRows)) return 0;
+  const cloudByKey = new Map();
+  cloudRows.forEach(row => cloudByKey.set(syncKey(row), row));
+  const before = pendingRows.length;
+  pendingRows = pendingRows.filter(pending => {
+    const cloud = cloudByKey.get(syncKey(pending));
+    if (!cloud) return true;
+    return Math.abs(Number(cloud.amount || 0) - Number(pending.amount || 0)) > 0.005;
+  });
+  if (pendingRows.length !== before) savePendingRows();
+  return before - pendingRows.length;
+}
+
 function setSync(text, good = false, error = false) {
   const el = document.getElementById("syncStatus");
   if (!el) return;
@@ -493,6 +513,7 @@ async function loadYearInBackground(year) {
         ? fairInputsHaveUnsavedChanges()
         : false;
       loadPendingRows();
+      reconcilePendingRowsFromCloudV329(json.rows || []);
       mergeCloudYearRows(y, json.rows || [], requestStartedAt);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
       if (json.commissionSettings) {
@@ -627,6 +648,7 @@ async function loadFromSheet(options = {}) {
         ? fairInputsHaveUnsavedChanges()
         : false;
       loadPendingRows();
+      reconcilePendingRowsFromCloudV329(json.rows || []);
       mergeCloudMonthRows(month, json.rows || [], requestStartedAt);
       applyLocalDataRevision(json.dataRevision);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
