@@ -1360,7 +1360,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3500",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3510",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1378,7 +1378,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3500";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3510";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3027,6 +3027,12 @@ function renderProductLinksLoadingV231(type){
   wrap.innerHTML='<div class="product-link-loading-v231">正在读取已保存销售卡…</div>';
 }
 const SALES_CARD_LOAD_SEQ_V245={live:0,fair:0};
+// V35.1: invalidate any cloud read that began before a local delete/save acknowledgement.
+function invalidateSalesCardLoadRequestsV351(type){
+  const t=String(type||'');if(!t)return;
+  SALES_CARD_LOAD_SEQ_V245[t]=(SALES_CARD_LOAD_SEQ_V245[t]||0)+1;
+}
+window.invalidateSalesCardLoadRequestsV351=invalidateSalesCardLoadRequestsV351;
 function salesCardContextKeyV245(type,date,location){
   return [String(type||""),String(date||""),String(location||"").trim().toLowerCase()].join("|");
 }
@@ -5135,7 +5141,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3500",
+    version:"3510",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5428,6 +5434,16 @@ function getDeletedSalesLinkIdsV350(type,date,location){const all=readDeletedSal
 function rememberDeletedSalesLinkV350(type,date,location,linkId){const id=String(linkId||'').trim();if(!id)return;const all=readDeletedSalesLinksV350(),key=deletedSalesLinksKeyV350(type,date,location),set=new Set(Array.isArray(all[key])?all[key].map(String):[]);set.add(id);all[key]=[...set];writeDeletedSalesLinksV350(all)}
 function clearDeletedSalesLinkIdsV350(type,date,location,ids=[]){const remove=new Set((Array.isArray(ids)?ids:[]).map(String).filter(Boolean));if(!remove.size)return;const all=readDeletedSalesLinksV350(),key=deletedSalesLinksKeyV350(type,date,location),left=(Array.isArray(all[key])?all[key]:[]).map(String).filter(id=>!remove.has(id));if(left.length)all[key]=left;else delete all[key];writeDeletedSalesLinksV350(all)}
 function filterDeletedSalesLinksV350(type,date,location,links){const dead=new Set(getDeletedSalesLinkIdsV350(type,date,location));return (Array.isArray(links)?links:[]).filter(x=>!dead.has(String(x?.linkId||'')))}
+function acknowledgeDeletedSalesLinksV351(type,date,location,ids,authoritativeLinks){
+  const dead=[...new Set((Array.isArray(ids)?ids:[]).map(x=>String(x||'').trim()).filter(Boolean))];
+  if(!dead.length)return true;
+  const stillThere=new Set((Array.isArray(authoritativeLinks)?authoritativeLinks:[]).map(x=>String(x?.linkId||'').trim()).filter(Boolean));
+  if(dead.some(id=>stillThere.has(id)))return false;
+  invalidateSalesCardLoadRequestsV351(type);
+  clearDeletedSalesLinkIdsV350(type,date,location,dead);
+  return true;
+}
+window.acknowledgeDeletedSalesLinksV351=acknowledgeDeletedSalesLinksV351;
 window.getDeletedSalesLinkIdsV350=getDeletedSalesLinkIdsV350;
 const SALES_DRAFT_PENDING_KEY_V314='lover_sales_draft_pending_v314';
 const SALES_DRAFT_INFLIGHT_V314=new Map();
@@ -5525,7 +5541,17 @@ async function flushSalesDraftBeforeConfirmV314(type,date,location){
   const key=salesDraftPendingKeyV314(type,date,location);
   const inflight=SALES_DRAFT_INFLIGHT_V314.get(key);if(inflight){try{await inflight}catch(_){}}
   const current=readSalesDraftPendingV314()[key];
-  if(current){const result=await window.saveSalesProductLinksApiV241(current.items,'draft',Number(current.restoreGeneration||0),String(current.clientDeviceId||''),Number(current.clientSequence||0),Array.isArray(current.deletedLinkIds)?current.deletedLinkIds:[]);removeSalesDraftPendingV314(key,current.token);clearDeletedSalesLinkIdsV350(current.type,current.date,current.location,current.deletedLinkIds||[]);return result}
+  if(current){
+    let result=await window.saveSalesProductLinksApiV241(current.items,'draft',Number(current.restoreGeneration||0),String(current.clientDeviceId||''),Number(current.clientSequence||0),Array.isArray(current.deletedLinkIds)?current.deletedLinkIds:[]);
+    if(result?.staleMutation&&Array.isArray(current.deletedLinkIds)&&current.deletedLinkIds.length){
+      const retryMutation=nextClientMutationV344();
+      result=await window.saveSalesProductLinksApiV241(current.items,'draft',Number(current.restoreGeneration||0),String(retryMutation.clientDeviceId||''),Number(retryMutation.clientSequence||0),current.deletedLinkIds);
+      if(result?.staleMutation)throw new Error('删除产品同步遇到较新的云端版本，请再次保存草稿');
+    }
+    removeSalesDraftPendingV314(key,current.token);
+    acknowledgeDeletedSalesLinksV351(current.type,current.date,current.location,current.deletedLinkIds||[],Array.isArray(result?.links)?result.links:current.items);
+    return result
+  }
   return null;
 }
 window.addEventListener('online',()=>scheduleSalesDraftRetryV314(100));
@@ -5650,9 +5676,14 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
     setSync('销售确认同步中...');
     const mutationV350=nextClientMutationV344();
     const deletedLinkIdsV350=getDeletedSalesLinkIdsV350(type,ctx.date,ctx.location);
-    const result=await window.saveSalesProductLinksApiV241(items,'confirm',typeof getLocalRestoreGenerationV347==='function'?getLocalRestoreGenerationV347():0,String(mutationV350.clientDeviceId||''),Number(mutationV350.clientSequence||0),deletedLinkIdsV350);
-    clearDeletedSalesLinkIdsV350(type,ctx.date,ctx.location,deletedLinkIdsV350);
-    const saved=Array.isArray(result?.links)&&result.links.length?result.links:items;
+    let result=await window.saveSalesProductLinksApiV241(items,'confirm',typeof getLocalRestoreGenerationV347==='function'?getLocalRestoreGenerationV347():0,String(mutationV350.clientDeviceId||''),Number(mutationV350.clientSequence||0),deletedLinkIdsV350);
+    if(result?.staleMutation&&deletedLinkIdsV350.length){
+      const retryMutationV351=nextClientMutationV344();
+      result=await window.saveSalesProductLinksApiV241(items,'confirm',typeof getLocalRestoreGenerationV347==='function'?getLocalRestoreGenerationV347():0,String(retryMutationV351.clientDeviceId||''),Number(retryMutationV351.clientSequence||0),deletedLinkIdsV350);
+      if(result?.staleMutation)throw new Error('删除产品同步遇到较新的云端版本，请先保存草稿后再确认销售');
+    }
+    const saved=Array.isArray(result?.links)?result.links:items;
+    if(!acknowledgeDeletedSalesLinksV351(type,ctx.date,ctx.location,deletedLinkIdsV350,saved))throw new Error('云端仍返回已删除产品，已保留删除保护，请重新保存草稿');
     const old=(typeof getSalesCardPersistentCacheV232==='function'?getSalesCardPersistentCacheV232(type,ctx.date,ctx.location):[])||[];
     const final=[...old.filter(x=>!dirtyIds.has(String(x.transactionId||''))),...saved];
     if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,final);
@@ -6357,7 +6388,22 @@ syncQueuedSalesDraftV314=async function(key,expectedToken=''){
   const task=(async()=>{try{
     const result=await window.saveSalesProductLinksApiV241(entry.items,'draft',Number(entry.restoreGeneration||0),String(entry.clientDeviceId||''),Number(entry.clientSequence||0),Array.isArray(entry.deletedLinkIds)?entry.deletedLinkIds:[]),latest=readSalesDraftPendingV314()[key];
     if(latest&&String(latest.token)===String(entry.token)){
-      removeSalesDraftPendingV314(key,entry.token);clearDeletedSalesLinkIdsV350(entry.type,entry.date,entry.location,entry.deletedLinkIds||[]);const saved=Array.isArray(result?.links)?result.links:entry.items;
+      const deletedIds=Array.isArray(entry.deletedLinkIds)?entry.deletedLinkIds:[];
+      if(result?.staleMutation&&deletedIds.length){
+        const all=readSalesDraftPendingV314(),cur=all[key];
+        if(cur&&String(cur.token)===String(entry.token)){
+          const m=nextClientMutationV344();
+          all[key]={...cur,clientDeviceId:String(m.clientDeviceId||''),clientSequence:Number(m.clientSequence||0),token:Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),savedAt:Date.now()};
+          writeSalesDraftPendingV314(all);scheduleSalesDraftRetryV314(80);
+        }
+        setSync('删除产品正在重新确认云端版本...',false,true);
+        return result;
+      }
+      const saved=Array.isArray(result?.links)?result.links:entry.items;
+      if(!acknowledgeDeletedSalesLinksV351(entry.type,entry.date,entry.location,deletedIds,saved)){
+        scheduleSalesDraftRetryV314(300);throw new Error('云端仍返回已删除产品，继续保留删除保护');
+      }
+      removeSalesDraftPendingV314(key,entry.token);
       setCachedSalesProductLinksV216(entry.type,entry.date,entry.location,saved);setSalesCardPersistentCacheV232(entry.type,entry.date,entry.location,saved);mergeDailyProfitContextCacheV237(entry.type,entry.date,entry.location,saved);
       refreshProfitAggregateCachesV321(saved,[...new Set(entry.items.map(x=>String(x.transactionId||'')).filter(Boolean))]);applyCloudDraftStatusesV322(entry.type,saved);setSync('草稿已保存 · 云端已同步',true);
     }return result;
@@ -6391,8 +6437,10 @@ removeProductLinkItemV206=async function(type,id){
   try{
     setSync('正在从销售卡及云端删除产品...');
     rememberDeletedSalesLinkV350(type,ctx.date,ctx.location,linkId);
+    invalidateSalesCardLoadRequestsV351(type);
     await deleteSalesProductLinkV206(linkId);
     purgeDeletedSalesLinkV348(linkId);
+    invalidateSalesCardLoadRequestsV351(type);
     clearDeletedSalesLinkIdsV350(type,ctx.date,ctx.location,[linkId]);
     el.remove();
     const cloud=await loadSalesProductLinksV206(type,ctx.date,ctx.location,{force:true,maxAgeMs:0});
@@ -6414,7 +6462,7 @@ removeProductFromTransactionV239=async function(type,card,item){
   item.dataset.deletingV253='1';
   // Immediately invalidate every older local snapshot/cache containing this
   // line. The card remains dirty until Save Draft completes the cloud delete.
-  if(linkId){rememberDeletedSalesLinkV350(type,productLinkContextV206(type).date,productLinkContextV206(type).location,linkId);purgeDeletedSalesLinkV348(linkId);}
+  if(linkId){rememberDeletedSalesLinkV350(type,productLinkContextV206(type).date,productLinkContextV206(type).location,linkId);invalidateSalesCardLoadRequestsV351(type);purgeDeletedSalesLinkV348(linkId);}
   item.remove();renumberTransactionProductsV239(card);markSalesCardTransactionDirtyV239(card);card.dataset.productRemovedV259='1';recalcSalesCardTransactionV239(card);
   setSync('产品已从本机草稿删除 · 请点击保存草稿同步云端',false,true);
 };
