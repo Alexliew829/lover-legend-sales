@@ -21,6 +21,9 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .fair-location-title{font-size:17px;font-weight:900;color:#111;margin-bottom:5px}.fair-total-line{border-top:1px dashed #ccc;padding-top:8px;margin-top:8px}
 .sub,.note{font-size:13px;color:#666;line-height:1.45;margin-top:6px}
 .sales-date-result,.sync-line{margin-top:10px;padding:10px;border-radius:12px;background:#fff7dc;border:1px solid #e4c45f;font-weight:900;color:#5b4200}
+.sales-date-result{display:flex;flex-direction:column;align-items:flex-start;gap:4px;line-height:1.3;overflow-wrap:anywhere}
+.saved-turnover-name-v333{font-size:17px;color:#5b4200}
+.saved-turnover-detail-v333{font-size:14px;color:#785f18;font-weight:800}
 .last-sync{margin-top:6px;font-size:12px;color:#666;font-weight:800}.warning{background:#ffe7e7;color:#9b0000;border:1px solid #f2b3b3;border-radius:12px;padding:10px;margin-bottom:10px;font-weight:900}
 .done,.save-msg{background:#e6f7ea;color:#0b6b2b;border:1px solid #9ad6a8;border-radius:12px;padding:10px;margin-top:10px;font-weight:900;text-align:center}.done{margin-bottom:10px;text-align:left}
 .hidden{display:none}.page{display:none}.page.active{display:block}
@@ -2498,7 +2501,7 @@ body{overflow-x:hidden;}
   .live-profit-head-v297{font-size:11.5px}
 }
 
-/* V33.1: separate each host visually and keep the natural reading order:
+/* V33.3: separate each host visually and keep the natural reading order:
    date, turnover, commission, profit, margin. */
 .live-sales-group.month-profit-group-v294{margin:12px 0 18px;padding:14px;border:1px solid #d8e5da;border-radius:14px;background:#fff}
 .live-sales-group.month-profit-group-v294+.live-sales-group.month-profit-group-v294{margin-top:20px}
