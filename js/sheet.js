@@ -295,7 +295,7 @@ function addPendingRow(row) {
   savePendingRows();
 }
 
-// V34.4: a completed older request may only acknowledge the exact pending
+// V34.5: a completed older request may only acknowledge the exact pending
 // version it sent.  It must not remove a newer edit for the same Fair date.
 function clearPendingRowIfVersionV343(row) {
   loadPendingRows();
@@ -309,7 +309,7 @@ function clearPendingRowIfVersionV343(row) {
   savePendingRows();
 }
 
-// V34.4: a pagehide keepalive request can reach Google Sheet even though the
+// V34.5: a pagehide keepalive request can reach Google Sheet even though the
 // browser cannot read its no-cors response.  On the next cloud load, treat an
 // identical authoritative row as the acknowledgement and permanently remove
 // the stale local retry item.  This prevents the same successful save from

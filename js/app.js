@@ -145,7 +145,7 @@ let historicalHighsMemory=null;
 let historicalHighsPromise=null;
 
 function readHistoricalHighsCache(){
-  // V34.4: an all-time record does not become invalid merely because normal
+  // V34.5: an all-time record does not become invalid merely because normal
   // turnover revision changes. Keep the last confirmed local record available
   // immediately and let a low-priority cloud check improve it in background.
   if(historicalHighsMemory)return historicalHighsMemory;
@@ -337,7 +337,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V34.4: Top 5 and its last confirmed local record paint immediately.
+    // V34.5: Top 5 and its last confirmed local record paint immediately.
     // Cloud comparison waits for browser idle time and never blocks page sync.
     scheduleHistoricalHighsCheckV331();
   }
@@ -1274,7 +1274,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 
   const now=new Date().toISOString();
   const mutationV344=nextClientMutationV344();
-  // V34.4: send only real changes.  Unchanged Date Range days (especially
+  // V34.5: send only real changes.  Unchanged Date Range days (especially
   // untouched 0.00 days) are not pending work and must never reappear as ten
   // "未同步" records on the next open.
   const records=[...inputs].map(i=>{
@@ -1724,7 +1724,7 @@ function updateLiveInputFromSelectedDate(){
   const d=isoToDisplay(dateEl.value);
   const host=selectedLiveHost();
   const amount=host?getLiveAmount(d,host):0;
-  // V34.4: background render/sync must never overwrite an unsaved amount.
+  // V34.5: background render/sync must never overwrite an unsaved amount.
   // Drafts are isolated by exact host + date and survive mobile page suspension.
   const draft=getLiveTurnoverDraftV332();
   amountEl.value=draft?String(draft.value):formatAmount(amount);
@@ -2762,6 +2762,10 @@ function ensureProductLinkFirstCardV208(type){
 function toggleProductLinkBoxV206(type){
   const pre=productLinkPreV208(type),box=document.getElementById(pre+"ProductLinkBox"),body=document.getElementById(pre+"ProductLinkBody");
   if(!box||!body)return;
+  // V34.5: opening the Fair sales card is a view action, not a Date Range
+  // reset. Preserve the user's selected associated date so the editor loads
+  // that exact day's cards instead of silently jumping back to today.
+  const selectedFairDate=type==="fair"?String(document.getElementById("fairProductDate")?.value||""):"";
   const opening=body.classList.contains("hidden");
   if(!opening&&!confirmDiscardSalesCardChangesV238(type))return false;
   body.classList.toggle("hidden",!opening);box.classList.toggle("product-link-collapsed",!opening);
@@ -2774,7 +2778,13 @@ function toggleProductLinkBoxV206(type){
     const profitBtn=document.querySelector(`#${pre}ProductLinkBox .product-profit-toggle-btn`);
     if(profitBtn){profitBtn.textContent="📊 当天利润";profitBtn.disabled=false}
     // V29.9: saved cards first. Do not flash a fake 0.00 card while cloud data loads.
-    if(type==="fair")syncFairProductDatesV203(true);
+    if(type==="fair"){
+      syncFairProductDatesV203(false);
+      const fairDateSelect=document.getElementById("fairProductDate");
+      if(fairDateSelect&&selectedFairDate&&[...fairDateSelect.options].some(option=>option.value===selectedFairDate)){
+        fairDateSelect.value=selectedFairDate;
+      }
+    }
     Promise.resolve(loadProductLinksIntoEditorV206(type)).catch(()=>{});
   }
 }
@@ -3194,7 +3204,7 @@ function recalcSalesCardTransactionV239(card){
   const rate=totalPrice>0?totalProfit/totalPrice*100:0;
   const set=(sel,val)=>{const el=card.querySelector(sel);if(el)el.textContent=val};
   set(".sales-card-price-total-v239","RM"+formatAmount(totalPrice));
-  // V34.4: displayed total cost uses the same complete cost basis as profit.
+  // V34.5: displayed total cost uses the same complete cost basis as profit.
   // Profit itself is intentionally unchanged to avoid double-deducting fees.
   set(".sales-card-cost-total-v239","RM"+formatAmount(totalCost+totalDelivery+totalExtra+totalCommission));
   set(".sales-card-commission-amount-v239","RM"+formatAmount(totalCommission));
@@ -3830,7 +3840,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     const crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"]];
-    // V34.4: localDelivery remains the saved product-delivery TOTAL for full
+    // V34.5: localDelivery remains the saved product-delivery TOTAL for full
     // backward compatibility. Infer the per-tree crate rate from either the
     // new total/quantity value or the old one-charge legacy value.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
@@ -5066,6 +5076,26 @@ async function resetFairCommissionSettings(){
 /* ================= V29.9 Reliable Backup / Restore ================= */
 const BACKUP_RESTORE_STATE_KEY_V234="lover_backup_restore_status_v234";
 let backupRestoreOperationRunningV234=false;
+let remoteRestoreMaintenanceActiveV345=false;
+
+function renderRemoteRestoreMaintenanceV345(active,message=""){
+  remoteRestoreMaintenanceActiveV345=Boolean(active)&&!backupRestoreOperationRunningV234;
+  let overlay=document.getElementById("restoreMaintenanceOverlayV345");
+  if(!remoteRestoreMaintenanceActiveV345){if(overlay)overlay.remove();return}
+  if(!overlay){
+    overlay=document.createElement("div");overlay.id="restoreMaintenanceOverlayV345";
+    overlay.style.cssText="position:fixed;inset:0;z-index:100000;background:rgba(243,246,241,.96);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center";
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML=`<div style="max-width:560px;background:#fff;border:2px solid #d6a51f;border-radius:22px;padding:28px;box-shadow:0 12px 40px rgba(0,0,0,.15)"><div style="font-size:42px">♻️</div><h2 style="margin:10px 0;color:#8a5a00">Sales 系统正在 Restore</h2><p style="font-size:18px;line-height:1.6;margin:0">${escapeChangeLogHtmlV200(message||"另一台设备正在恢复完整备份。")}</p><p style="font-size:16px;color:#666;margin:12px 0 0">为避免覆盖恢复中的资料，本设备暂时不能保存、同步或确认销售。Restore 完成后页面会自动恢复。</p></div>`;
+}
+async function checkRemoteRestoreMaintenanceV345(){
+  if(backupRestoreOperationRunningV234){renderRemoteRestoreMaintenanceV345(false);return}
+  try{
+    const status=await jsonp({action:"maintenanceStatusV345"},{timeoutMs:7000});
+    renderRemoteRestoreMaintenanceV345(Boolean(status&&status.active),status&&status.message);
+  }catch(_){}
+}
 
 function getBackupRestoreStateV234(){
   try{return JSON.parse(localStorage.getItem(BACKUP_RESTORE_STATE_KEY_V234)||"null")}catch(e){return null}
@@ -5095,7 +5125,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3440",
+    version:"3450",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5123,7 +5153,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    downloadFile(`Lover_Legend_Sales_V34_4_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+    downloadFile(`Lover_Legend_Sales_V34_5_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSync("Backup 已完成",true);
     alert(`Backup 成功。\n\n营业记录：${payload.rows.length} 笔\n销售卡：${payload.productLinks.length} 笔\n新增/修改历史：${payload.salesChangeLogs.length} 笔\n\nBackup 文件已经生成。`);
@@ -5271,6 +5301,8 @@ setTimeout(async()=>{
   }
   resumeRestoreStatusV234();
 },800);
+setTimeout(checkRemoteRestoreMaintenanceV345,1200);
+setInterval(checkRemoteRestoreMaintenanceV345,5000);
 
 let lastObservedSystemMonth=monthISO();setInterval(()=>{const nowMonth=monthISO();if(nowMonth!==lastObservedSystemMonth){lastObservedSystemMonth=nowMonth;systemState.currentMonth=nowMonth;document.getElementById("monthPicker").value=nowMonth;document.getElementById("yearPicker").value=nowMonth.slice(0,4);renderAll();updateReadOnlyMode();loadFromSheet({force:true})}},60000);
 
@@ -5455,7 +5487,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleSa
 setTimeout(()=>scheduleSalesDraftRetryV314(1200),0);
 
 
-/* ================= V34.4 Sales stock oversell guard =================
+/* ================= V34.5 Sales stock oversell guard =================
    Before Save Draft / Confirm, re-read Import current stock.  New/unprocessed
    cards must fit the full requested quantity.  A card already confirmed AND
    fully inventory-confirmed only needs enough stock for its positive net
@@ -5762,8 +5794,8 @@ productProfitMobileCardsV216=function(list){
 
 
 
-/* ================= V34.4 labelled profit rollup + true overall margin ================= */
-// V34.4: the displayed cost uses inventory cost + product delivery + extra fee.
+/* ================= V34.5 labelled profit rollup + true overall margin ================= */
+// V34.5: the displayed cost uses inventory cost + product delivery + extra fee.
 // Commission remains a separate card-level deduction and is not added here.
 function productOperatingCostV335(x){
   const q=Math.max(1,Number(x&&x.quantity||1));
