@@ -14,6 +14,7 @@ let settingsWriteDepth = 0;
 let yearLoadPromises = new Map();
 let loadedCloudYears = new Set();
 const localRowMutationAt = new Map();
+const fairWriteQueuesV343 = new Map();
 
 const LOCAL_DATA_CACHE_KEY = "lover_sales_data_cache";
 const LEGACY_LOCAL_DATA_CACHE_KEYS = [
@@ -286,7 +287,21 @@ function clearPendingRow(row) {
   savePendingRows();
 }
 
-// V34.2: a pagehide keepalive request can reach Google Sheet even though the
+// V34.3: a completed older request may only acknowledge the exact pending
+// version it sent.  It must not remove a newer edit for the same Fair date.
+function clearPendingRowIfVersionV343(row) {
+  loadPendingRows();
+  const key = syncKey(row);
+  const expected = String(row && (row.clientUpdatedAt || row.updatedAt) || "");
+  pendingRows = pendingRows.filter(current => {
+    if (syncKey(current) !== key) return true;
+    const actual = String(current.clientUpdatedAt || current.updatedAt || "");
+    return Boolean(expected && actual !== expected);
+  });
+  savePendingRows();
+}
+
+// V34.3: a pagehide keepalive request can reach Google Sheet even though the
 // browser cannot read its no-cors response.  On the next cloud load, treat an
 // identical authoritative row as the acknowledgement and permanently remove
 // the stale local retry item.  This prevents the same successful save from
@@ -780,11 +795,12 @@ async function syncPendingRows() {
       }
 
       records.forEach(item => {
-        clearPendingRow({
+        clearPendingRowIfVersionV343({
           type: "fair",
           date: item.date,
           company: "belimbing",
-          location
+          location,
+          clientUpdatedAt:item.clientUpdatedAt||""
         });
       });
     }
@@ -1072,7 +1088,7 @@ async function loadFairSessionsFromSheetV281(){
   return json;
 }
 
-async function saveFairBatchToSheet(location, records) {
+async function sendFairBatchToSheetV343(location, records) {
   const json = await jsonp({
     action: "saveFairBatch",
     location,
@@ -1087,6 +1103,20 @@ async function saveFairBatchToSheet(location, records) {
     if(r&&r.date)Promise.resolve(loadSalesChangeLogFromSheetV200("fair",r.date,{force:true})).catch(()=>{});
   });
   return json;
+}
+
+// Keep all writes for one canonical Fair location in creation order.  This
+// closes the foreground-save/background-retry race on the same device; the
+// Apps Script timestamp guard remains authoritative across devices/pagehide.
+function saveFairBatchToSheet(location, records) {
+  const queueKey=normalizeFairLocationKey(location);
+  const previous=fairWriteQueuesV343.get(queueKey)||Promise.resolve();
+  const task=previous.catch(()=>{}).then(()=>sendFairBatchToSheetV343(location,records));
+  fairWriteQueuesV343.set(queueKey,task);
+  task.finally(()=>{
+    if(fairWriteQueuesV343.get(queueKey)===task)fairWriteQueuesV343.delete(queueKey);
+  }).catch(()=>{});
+  return task;
 }
 
 async function saveFairSingleToSheet(date, location, amount, clientUpdatedAt = "") {
