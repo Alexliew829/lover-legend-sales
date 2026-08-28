@@ -184,8 +184,6 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
   color:#111;
 }
 .live-sales-group-title b{color:#b40000}
-.live-sales-group-title>div{display:flex;align-items:flex-end;gap:12px}
-.live-sales-group-title>div small{color:#555;font-size:13px;font-weight:800}
 
 .live-sales-host-total{
   display:flex;
@@ -2500,15 +2498,13 @@ body{overflow-x:hidden;}
   .live-profit-head-v297{font-size:11.5px}
 }
 
-/* V32.9: separate each host visually and keep the natural reading order:
+/* V33.0: separate each host visually and keep the natural reading order:
    date, turnover, commission, profit, margin. */
 .live-sales-group.month-profit-group-v294{margin:12px 0 18px;padding:14px;border:1px solid #d8e5da;border-radius:14px;background:#fff}
 .live-sales-group.month-profit-group-v294+.live-sales-group.month-profit-group-v294{margin-top:20px}
 .live-sales-group.month-profit-group-v294 .month-profit-total-v294{background:#f3f8f4;border-radius:9px;padding:10px 6px}
 @media(max-width:520px){
   .live-sales-group-title{align-items:flex-start}
-  .live-sales-group-title>div{flex-direction:column;gap:2px;text-align:right}
-  .live-sales-group-title>div small{font-size:11px}
 }
 
 /* Home annual cards: use less empty column space so phone text can be meaningfully larger. */
