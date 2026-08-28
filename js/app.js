@@ -145,7 +145,7 @@ let historicalHighsMemory=null;
 let historicalHighsPromise=null;
 
 function readHistoricalHighsCache(){
-  // V34.0: an all-time record does not become invalid merely because normal
+  // V34.1: an all-time record does not become invalid merely because normal
   // turnover revision changes. Keep the last confirmed local record available
   // immediately and let a low-priority cloud check improve it in background.
   if(historicalHighsMemory)return historicalHighsMemory;
@@ -337,7 +337,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V34.0: Top 5 and its last confirmed local record paint immediately.
+    // V34.1: Top 5 and its last confirmed local record paint immediately.
     // Cloud comparison waits for browser idle time and never blocks page sync.
     scheduleHistoricalHighsCheckV331();
   }
@@ -1230,32 +1230,7 @@ function updateFairPageMode(){
   }
 }
 
-function syncFairInputs(){
-  const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value;
-  const loc=canonicalLocation(document.getElementById("fairLocation").value.trim());
-  const container=document.getElementById("fairInputs");
-  if(!start||!end||new Date(start)>new Date(end)){container.innerHTML="";return}
-  syncFairProductDatesV203();
-  const selected=String(document.getElementById("fairProductDate")?.value||"");
-  let html="<h3>Fair 每日营业额</h3>";
-  dateRange(start,end).forEach(d=>{
-    const old=rows.find(r=>r.type==="fair"&&r.date===d&&normalizeFairLocationKey(r.location)===normalizeFairLocationKey(loc));
-    const hasSales=Number(old?.amount||0)>0.005;
-    const active=d===selected?" is-selected-v339":"";
-    const dateControl=hasSales
-      ?`<button type="button" class="fair-day-open-v339" data-date="${d}" onclick="openFairBusinessDateV339('${d}',this)" aria-pressed="${d===selected?"true":"false"}">
-          <span>${d}</span><small>${d===selected?"当前编辑":"销售卡 / 利润"}</small>
-        </button>`
-      :`<div class="fair-day-static-v340" aria-label="${d} 尚未有营业额"><span>${d}</span><small>未有营业额</small></div>`;
-    html+=`<div class="fair-day-entry-v339${active}" data-fair-day="${d}" data-has-sales="${hasSales?"1":"0"}">
-      ${dateControl}
-      <input type="text" class="fairAmount money-input" data-date="${d}" value="${old?formatAmount(old.amount):"0.00"}" inputmode="decimal" aria-label="${d} Fair 营业额">
-    </div>`;
-  });
-  container.innerHTML=html;
-  attachMoneyInputs();
-  highlightFairBusinessDateV339();
-}
+function syncFairInputs(){const start=document.getElementById("fairStart").value,end=document.getElementById("fairEnd").value,loc=canonicalLocation(document.getElementById("fairLocation").value.trim());if(!start||!end||new Date(start)>new Date(end)){document.getElementById("fairInputs").innerHTML="";return}let html="<h3>Fair 每日营业额</h3>";dateRange(start,end).forEach(d=>{const old=rows.find(r=>r.type==="fair"&&r.date===d&&normalizeFairLocationKey(r.location)===normalizeFairLocationKey(loc));html+=`<label>${d} 营业额</label><input type="text" class="fairAmount money-input fair-amount-v341" data-date="${d}" value="${old?formatAmount(old.amount):"0.00"}" inputmode="decimal">`});document.getElementById("fairInputs").innerHTML=html;attachMoneyInputs();syncFairProductDatesV203()}
 function fairInputsHaveUnsavedChanges(){
   const container=document.getElementById("fairInputs");
   const location=canonicalLocation(String(document.getElementById("fairLocation")?.value||"").trim());
@@ -1729,7 +1704,7 @@ function updateLiveInputFromSelectedDate(){
   const d=isoToDisplay(dateEl.value);
   const host=selectedLiveHost();
   const amount=host?getLiveAmount(d,host):0;
-  // V34.0: background render/sync must never overwrite an unsaved amount.
+  // V34.1: background render/sync must never overwrite an unsaved amount.
   // Drafts are isolated by exact host + date and survive mobile page suspension.
   const draft=getLiveTurnoverDraftV332();
   amountEl.value=draft?String(draft.value):formatAmount(amount);
@@ -2779,7 +2754,7 @@ function toggleProductLinkBoxV206(type){
     const profitBtn=document.querySelector(`#${pre}ProductLinkBox .product-profit-toggle-btn`);
     if(profitBtn){profitBtn.textContent="📊 当天利润";profitBtn.disabled=false}
     // V29.9: saved cards first. Do not flash a fake 0.00 card while cloud data loads.
-    if(type==="fair")syncFairProductDatesV203(false);
+    if(type==="fair")syncFairProductDatesV203(true);
     Promise.resolve(loadProductLinksIntoEditorV206(type)).catch(()=>{});
   }
 }
@@ -2934,51 +2909,6 @@ function fairDefaultProductDateV277(dates){
   if(past.length)return past[past.length-1];
   return list[0];
 }
-const FAIR_SELECTED_DATE_KEY_V339="lover_fair_selected_business_date_v340";
-function fairSelectionContextKeyV339(){
-  const location=normalizeFairLocationKey(document.getElementById("fairLocation")?.value||"");
-  const start=String(document.getElementById("fairStart")?.value||"");
-  const end=String(document.getElementById("fairEnd")?.value||start);
-  return location&&start&&end?[location,start,end].join("|"):"";
-}
-function readFairSelectedDatesV339(){try{const value=JSON.parse(localStorage.getItem(FAIR_SELECTED_DATE_KEY_V339)||"{}");return value&&typeof value==="object"?value:{}}catch(_){return{}}}
-function savedFairSelectedDateV339(){const key=fairSelectionContextKeyV339();return key?String(readFairSelectedDatesV339()[key]||""):""}
-function saveFairSelectedDateV339(date){
-  const key=fairSelectionContextKeyV339();if(!key)return;
-  const values=readFairSelectedDatesV339();values[key]=String(date||"");
-  try{localStorage.setItem(FAIR_SELECTED_DATE_KEY_V339,JSON.stringify(values))}catch(_){}
-}
-function highlightFairBusinessDateV339(){
-  const selected=String(document.getElementById("fairProductDate")?.value||"");
-  document.querySelectorAll("#fairInputs .fair-day-entry-v339").forEach(row=>{
-    const active=String(row.dataset.fairDay||"")===selected&&row.dataset.hasSales==="1";
-    row.classList.toggle("is-selected-v339",active);
-    const button=row.querySelector(".fair-day-open-v339");
-    if(button){button.setAttribute("aria-pressed",active?"true":"false");const hint=button.querySelector("small");if(hint)hint.textContent=active?"当前编辑":"销售卡 / 利润"}
-  });
-}
-async function openFairBusinessDateV339(date,button){
-  const location=canonicalLocation(String(document.getElementById("fairLocation")?.value||"").trim());
-  const start=String(document.getElementById("fairStart")?.value||""),end=String(document.getElementById("fairEnd")?.value||start);
-  if(!location||!dateRange(start,end).includes(String(date||"")))return false;
-  const savedAmount=dedupeRows(rows).filter(r=>r.type==="fair"&&r.date===String(date||"")&&normalizeFairLocationKey(r.location)===normalizeFairLocationKey(location)).reduce((max,r)=>Math.max(max,Number(r.amount||0)),0);
-  if(savedAmount<=0.005)return false;
-  if(!confirmDiscardSalesCardChangesV238("fair"))return false;
-  const sel=document.getElementById("fairProductDate");if(!sel)return false;
-  sel.value=String(date);
-  sel.dataset.acceptedContextV273=String(date);
-  saveFairSelectedDateV339(date);
-  highlightFairBusinessDateV339();
-  if(button){button.classList.add("was-activated-v339");setTimeout(()=>button.classList.remove("was-activated-v339"),260)}
-  const panel=productProfitSummaryPanelV216("fair");
-  if(panel){panel.classList.add("hidden");panel.innerHTML=""}
-  productProfitSummaryOpenV216.fair=false;
-  const profitBtn=document.querySelector("#fairProductLinkBox .product-profit-toggle-btn");
-  if(profitBtn){profitBtn.textContent="📊 当天利润";profitBtn.disabled=false}
-  await loadProductLinksIntoEditorV206("fair");
-  return true;
-}
-window.openFairBusinessDateV339=openFairBusinessDateV339;
 function syncFairProductDatesV203(forceDefault=false){
   const sel=document.getElementById("fairProductDate");if(!sel)return;
   const start=document.getElementById("fairStart")?.value,end=document.getElementById("fairEnd")?.value||start;
@@ -2990,14 +2920,9 @@ function syncFairProductDatesV203(forceDefault=false){
   const current=sel.value;
   const dates=dateRange(start,end);
   const target=fairDefaultProductDateV277(dates);
-  const saved=savedFairSelectedDateV339();
   sel.innerHTML=dates.map(d=>`<option value="${d}">${d}</option>`).join("");
   if(!forceDefault&&dates.includes(current))sel.value=current;
-  else if(dates.includes(saved))sel.value=saved;
   else if(target)sel.value=target;
-  if(sel.value)saveFairSelectedDateV339(sel.value);
-  sel.dataset.acceptedContextV273=String(sel.value||"");
-  highlightFairBusinessDateV339();
   if(typeof refreshSalesActionLocksV270==="function")refreshSalesActionLocksV270();
 }
 function collectProductLinksV206(type){
@@ -3239,7 +3164,7 @@ function recalcSalesCardTransactionV239(card){
   const rate=totalPrice>0?totalProfit/totalPrice*100:0;
   const set=(sel,val)=>{const el=card.querySelector(sel);if(el)el.textContent=val};
   set(".sales-card-price-total-v239","RM"+formatAmount(totalPrice));
-  // V34.0: displayed total cost uses the same complete cost basis as profit.
+  // V34.1: displayed total cost uses the same complete cost basis as profit.
   // Profit itself is intentionally unchanged to avoid double-deducting fees.
   set(".sales-card-cost-total-v239","RM"+formatAmount(totalCost+totalDelivery+totalExtra+totalCommission));
   set(".sales-card-commission-amount-v239","RM"+formatAmount(totalCommission));
@@ -3875,7 +3800,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     const crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"]];
-    // V34.0: localDelivery remains the saved product-delivery TOTAL for full
+    // V34.1: localDelivery remains the saved product-delivery TOTAL for full
     // backward compatibility. Infer the per-tree crate rate from either the
     // new total/quantity value or the old one-charge legacy value.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
@@ -5140,7 +5065,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3400",
+    version:"3410",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5168,7 +5093,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    downloadFile(`Lover_Legend_Sales_V34_0_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+    downloadFile(`Lover_Legend_Sales_V34_1_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSync("Backup 已完成",true);
     alert(`Backup 成功。\n\n营业记录：${payload.rows.length} 笔\n销售卡：${payload.productLinks.length} 笔\n新增/修改历史：${payload.salesChangeLogs.length} 笔\n\nBackup 文件已经生成。`);
@@ -5500,7 +5425,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleSa
 setTimeout(()=>scheduleSalesDraftRetryV314(1200),0);
 
 
-/* ================= V34.0 Sales stock oversell guard =================
+/* ================= V34.1 Sales stock oversell guard =================
    Before Save Draft / Confirm, re-read Import current stock.  New/unprocessed
    cards must fit the full requested quantity.  A card already confirmed AND
    fully inventory-confirmed only needs enough stock for its positive net
@@ -5805,8 +5730,8 @@ productProfitMobileCardsV216=function(list){
 
 
 
-/* ================= V34.0 labelled profit rollup + true overall margin ================= */
-// V34.0: the displayed cost uses inventory cost + product delivery + extra fee.
+/* ================= V34.1 labelled profit rollup + true overall margin ================= */
+// V34.1: the displayed cost uses inventory cost + product delivery + extra fee.
 // Commission remains a separate card-level deduction and is not added here.
 function productOperatingCostV335(x){
   const q=Math.max(1,Number(x&&x.quantity||1));
