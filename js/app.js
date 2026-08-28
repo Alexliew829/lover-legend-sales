@@ -1285,6 +1285,10 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     return{date,amount,clientUpdatedAt:now,...mutationV344,baseCloudUpdatedAt:String(previous?.updatedAt||"")};
   }).filter(Boolean);
 
+  // V35.2 DATA-SAFETY: queue the exact mutation first, but do NOT mutate the
+  // authoritative local rows/Home until Google Sheet confirms the write.
+  // This prevents the dangerous half-success state where this device shows
+  // RM1350 while every other device/cloud still has RM1200.
   records.forEach(i=>{
     const row={
       type:"fair",
@@ -1293,27 +1297,19 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
       location:loc,
       amount:i.amount,
       updatedAt:now,
-      clientUpdatedAt:now
+      clientUpdatedAt:i.clientUpdatedAt||now,
+      clientDeviceId:i.clientDeviceId||"",
+      clientSequence:Number(i.clientSequence||0),
+      baseCloudUpdatedAt:i.baseCloudUpdatedAt||"",
+      restoreGeneration:Number(i.restoreGeneration||0)
     };
-
-    if(Number(i.amount)<=0){
-      rows=rows.filter(r=>!(
-        r.type==="fair" &&
-        r.date===i.date &&
-        normalizeFairLocationKey(r.location)===normalizeFairLocationKey(loc)
-      ));
-    }else{
-      upsertLocalRow(row);
-    }
-
     addPendingRow(row);
     if(typeof markLocalRowMutation==="function")markLocalRowMutation(row);
   });
 
-  renderAll();
-  syncFairInputs();
-  if(typeof saveLocalDataCache==="function")saveLocalDataCache();
-  showTempMsg("fairSaveMsg");
+  // Keep the user's edited values visible in the Fair inputs while pending.
+  // Home/dashboard continues to show only the last cloud-confirmed value.
+  if(records.length)setSync("正在储存 Fair 到云端，请勿关闭页面...");
   // V32.6: Fair Session is saved even when every daily amount is 0.00.
   // This preserves each location's date range for instant switching; 0.00 still does not count as sales.
   const fairStartV320=document.getElementById("fairStart").value;
@@ -1352,15 +1348,29 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
       clientUpdatedAt:i.clientUpdatedAt
     }));
     if(typeof saveLocalDataCache==="function")saveLocalDataCache();
-    setSync("已同步",true);
+    if(records.length){
+      showTempMsg("fairSaveMsg");
+      const inline=result&&result.inlineNotification;
+      if(inline&&inline.inline&&inline.attempted>0&&Number(inline.failed||0)>0){
+        setSync("Fair 已储存到云端，但通知发送失败",true);
+        if(typeof setLastNotificationDispatchStatus==="function")setLastNotificationDispatchStatus(inline);
+      }else{
+        setSync("已同步",true);
+        if(inline&&inline.inline&&typeof setLastNotificationDispatchStatus==="function")setLastNotificationDispatchStatus(inline);
+      }
+    }else setSync("已同步",true);
   }catch(e){
+    // V35.2: never report a failed cloud save as stored.  The exact edited
+    // amount remains durable in pendingRows and will retry automatically.
     if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();
     else setSync("同步暂未完成",false,true);
+    const msg=document.getElementById("fairSaveMsg");
+    if(msg){msg.textContent="⚠️ 尚未写入云端，已保留待同步资料";msg.classList.remove("hidden");setTimeout(()=>msg.classList.add("hidden"),5000);}
   }
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3510",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3520",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1378,7 +1388,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3510";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3520";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3027,7 +3037,7 @@ function renderProductLinksLoadingV231(type){
   wrap.innerHTML='<div class="product-link-loading-v231">正在读取已保存销售卡…</div>';
 }
 const SALES_CARD_LOAD_SEQ_V245={live:0,fair:0};
-// V35.1: invalidate any cloud read that began before a local delete/save acknowledgement.
+// V35.2: invalidate any cloud read that began before a local delete/save acknowledgement.
 function invalidateSalesCardLoadRequestsV351(type){
   const t=String(type||'');if(!t)return;
   SALES_CARD_LOAD_SEQ_V245[t]=(SALES_CARD_LOAD_SEQ_V245[t]||0)+1;
@@ -5141,7 +5151,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3510",
+    version:"3520",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),

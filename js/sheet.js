@@ -400,6 +400,7 @@ function flushPendingRowsKeepalive() {
           clientDeviceId:row.clientDeviceId||"",
           clientSequence:Number(row.clientSequence||0),
           baseCloudUpdatedAt:row.baseCloudUpdatedAt||"",
+          restoreGeneration:Number(row.restoreGeneration||0),
           notifyInline:"1",
           clientVersion:"24.1",
           launchUrl:getSalesLaunchUrlV194()
@@ -414,6 +415,7 @@ function flushPendingRowsKeepalive() {
           clientDeviceId:row.clientDeviceId||"",
           clientSequence:Number(row.clientSequence||0),
           baseCloudUpdatedAt:row.baseCloudUpdatedAt||"",
+          restoreGeneration:Number(row.restoreGeneration||0),
           notifyInline:"1",
           clientVersion:"24.1",
           launchUrl:getSalesLaunchUrlV194()
@@ -428,6 +430,7 @@ function flushPendingRowsKeepalive() {
           ,clientDeviceId:row.clientDeviceId||""
           ,clientSequence:Number(row.clientSequence||0)
           ,baseCloudUpdatedAt:row.baseCloudUpdatedAt||""
+          ,restoreGeneration:Number(row.restoreGeneration||0)
         });
       }
     });
@@ -437,6 +440,7 @@ function flushPendingRowsKeepalive() {
         action:"saveFairBatch",
         location,
         records:JSON.stringify(records),
+        restoreGeneration:records.length?Number(records[0].restoreGeneration||0):getLocalRestoreGenerationV347(),
         notifyInline:"1",
         clientVersion:"24.1",
         launchUrl:getSalesLaunchUrlV194()
@@ -1150,13 +1154,18 @@ async function sendFairBatchToSheetV343(location, records, foregroundSave=false)
     action: "saveFairBatch",
     location,
     records: JSON.stringify(records),
-    foregroundSave:foregroundSave?"1":"",restoreGeneration
+    foregroundSave:foregroundSave?"1":"",restoreGeneration,
+    notifyInline:foregroundSave?"1":"",
+    clientVersion:"35.2",
+    launchUrl:getSalesLaunchUrlV194()
   });
 
   if (!json.ok) throw new Error(json.message || "Fair 储存失败");
   applyLocalDataRevision(json.dataRevision);
   if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
-  dispatchSalesNotificationAsync(json.notificationEnvelope);
+  // V35.2 foreground Fair saves send OneSignal inside the same server request.
+  // Background retry still uses the signed async envelope after cloud success.
+  if(!(json.inlineNotification&&json.inlineNotification.inline))dispatchSalesNotificationAsync(json.notificationEnvelope);
   (Array.isArray(records)?records:[]).forEach(r=>{
     if(r&&r.date)Promise.resolve(loadSalesChangeLogFromSheetV200("fair",r.date,{force:true})).catch(()=>{});
   });
