@@ -145,7 +145,7 @@ let historicalHighsMemory=null;
 let historicalHighsPromise=null;
 
 function readHistoricalHighsCache(){
-  // V33.7: an all-time record does not become invalid merely because normal
+  // V33.8: an all-time record does not become invalid merely because normal
   // turnover revision changes. Keep the last confirmed local record available
   // immediately and let a low-priority cloud check improve it in background.
   if(historicalHighsMemory)return historicalHighsMemory;
@@ -337,7 +337,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V33.7: Top 5 and its last confirmed local record paint immediately.
+    // V33.8: Top 5 and its last confirmed local record paint immediately.
     // Cloud comparison waits for browser idle time and never blocks page sync.
     scheduleHistoricalHighsCheckV331();
   }
@@ -1703,7 +1703,7 @@ function updateLiveInputFromSelectedDate(){
   const d=isoToDisplay(dateEl.value);
   const host=selectedLiveHost();
   const amount=host?getLiveAmount(d,host):0;
-  // V33.7: background render/sync must never overwrite an unsaved amount.
+  // V33.8: background render/sync must never overwrite an unsaved amount.
   // Drafts are isolated by exact host + date and survive mobile page suspension.
   const draft=getLiveTurnoverDraftV332();
   amountEl.value=draft?String(draft.value):formatAmount(amount);
@@ -3163,7 +3163,7 @@ function recalcSalesCardTransactionV239(card){
   const rate=totalPrice>0?totalProfit/totalPrice*100:0;
   const set=(sel,val)=>{const el=card.querySelector(sel);if(el)el.textContent=val};
   set(".sales-card-price-total-v239","RM"+formatAmount(totalPrice));
-  // V33.7: displayed total cost uses the same complete cost basis as profit.
+  // V33.8: displayed total cost uses the same complete cost basis as profit.
   // Profit itself is intentionally unchanged to avoid double-deducting fees.
   set(".sales-card-cost-total-v239","RM"+formatAmount(totalCost+totalDelivery+totalExtra+totalCommission));
   set(".sales-card-commission-amount-v239","RM"+formatAmount(totalCommission));
@@ -3379,7 +3379,7 @@ window.deleteSalesCardTransactionV239=deleteSalesCardTransactionV239;
    become PENDING_IMPORT_LINK for Import to process as a +/- inventory difference. */
 function salesCardStatusIsConfirmedV322(status){
   const s=String(status||'').trim();
-  return s==='PENDING_IMPORT_LINK'||s==='INVENTORY_CONFIRMED';
+  return s==='PENDING_IMPORT_LINK'||s==='INVENTORY_CONFIRMED'||s==='NON_INVENTORY';
 }
 function salesCardIsConfirmedV322(card){
   if(!card)return false;
@@ -3799,7 +3799,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     const crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"]];
-    // V33.7: localDelivery remains the saved product-delivery TOTAL for full
+    // V33.8: localDelivery remains the saved product-delivery TOTAL for full
     // backward compatibility. Infer the per-tree crate rate from either the
     // new total/quantity value or the old one-charge legacy value.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
@@ -3906,10 +3906,11 @@ function buildSalesCardTransactionV239(type,dataList=[]){
     const sts=savedItems.map(i=>String(i.dataset.inventoryStatus||card.dataset.inventoryStatus||"").trim()).filter(Boolean);
     const draft=sts.some(st=>st==="DRAFT"||st==="DRAFT_INVENTORY_CHANGED")||String(card.dataset.inventoryStatus||"").startsWith("DRAFT");
     const pending=!draft&&(sts.some(st=>st==="PENDING_IMPORT_LINK")||String(card.dataset.inventoryStatus||"")==="PENDING_IMPORT_LINK");
-    const done=!draft&&!pending&&sts.length>0&&sts.every(st=>st==="INVENTORY_CONFIRMED");
+    const done=!draft&&!pending&&sts.length>0&&sts.every(st=>st==="INVENTORY_CONFIRMED"||st==="NON_INVENTORY");
+    const allNonInventory=done&&sts.every(st=>st==="NON_INVENTORY");
     stateBoxV317.hidden=false;
     stateBoxV317.className="sales-card-state-v317 "+(draft?"is-draft":pending?"is-pending":done?"is-done":"is-draft");
-    stateBoxV317.textContent=draft?"🟡 草稿已保存 · 尚未确认销售":pending?"🟢 已确认销售 · 等待 Import 处理库存":done?"✅ 已确认销售 · Import 已处理库存":"🟡 草稿已保存 · 尚未确认销售";
+    stateBoxV317.textContent=draft?"🟡 草稿已保存 · 尚未确认销售":pending?"🟢 已确认销售 · 等待 Import 处理库存":allNonInventory?"✅ 已确认销售 · 一次性产品无需处理库存":done?"✅ 已确认销售 · Import 已处理库存":"🟡 草稿已保存 · 尚未确认销售";
     updateSalesCardDeleteLockV322(card);
     setTimeout(()=>refreshConfirmSaleButtonV322(type),0);
   };
@@ -5063,7 +5064,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3370",
+    version:"3380",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5091,7 +5092,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    downloadFile(`Lover_Legend_Sales_V33_7_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+    downloadFile(`Lover_Legend_Sales_V33_8_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSync("Backup 已完成",true);
     alert(`Backup 成功。\n\n营业记录：${payload.rows.length} 笔\n销售卡：${payload.productLinks.length} 笔\n新增/修改历史：${payload.salesChangeLogs.length} 笔\n\nBackup 文件已经生成。`);
@@ -5423,7 +5424,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleSa
 setTimeout(()=>scheduleSalesDraftRetryV314(1200),0);
 
 
-/* ================= V33.7 Sales stock oversell guard =================
+/* ================= V33.8 Sales stock oversell guard =================
    Before Save Draft / Confirm, re-read Import current stock.  New/unprocessed
    cards must fit the full requested quantity.  A card already confirmed AND
    fully inventory-confirmed only needs enough stock for its positive net
@@ -5547,7 +5548,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
     if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,ctx.date,ctx.location,final);
     refreshProfitAggregateCachesV321(saved,[...dirtyIds]);
     const savedByLink=new Map(saved.map(x=>[String(x.linkId||''),x]));
-    dirty.forEach(card=>{clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;let cardStatus='';card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';const rec=savedByLink.get(String(i.dataset.linkId||''));if(rec){i.dataset.inventoryStatus=String(rec.importSyncStatus||'');cardStatus=cardStatus||i.dataset.inventoryStatus;}});if(cardStatus)card.dataset.inventoryStatus=cardStatus;if(card._renderSalesStateV317)card._renderSalesStateV317();});
+    dirty.forEach(card=>{clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;let cardStatus='';card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';const rec=savedByLink.get(String(i.dataset.linkId||''));if(rec){i.dataset.inventoryStatus=String(rec.importSyncStatus||'');i.dataset.productId=String(rec.productId||'');const cost=i.querySelector('.product-link-avg-cost');if(cost&&rec.averageCost!==undefined)cost.value=formatAmount(Number(rec.averageCost||0));cardStatus=cardStatus||i.dataset.inventoryStatus;}});if(cardStatus)card.dataset.inventoryStatus=cardStatus;if(card._renderSalesStateV317)card._renderSalesStateV317();recalcSalesCardTransactionV239(card);});
     renumberSavedSalesCardsV241(type);dirty.forEach(updateSalesCardDeleteLockV322);refreshConfirmSaleButtonV322(type);if(typeof refreshInventoryPendingV250==='function')setTimeout(()=>refreshInventoryPendingV250(true),0);setSync('销售已确认',true);alert('销售确认成功。\n\n如有库存变动，请到 Import Cost System 处理。');if(result?.warning)alert(result.warning);return result;
   }catch(e){setSync('销售确认失败',false,true);alert('销售确认失败：'+(e.message||e)+'\n\n草稿仍保留，请稍后重试确认销售。');return null}
   finally{releaseButton()}
@@ -5728,8 +5729,8 @@ productProfitMobileCardsV216=function(list){
 
 
 
-/* ================= V33.7 labelled profit rollup + true overall margin ================= */
-// V33.7: the displayed cost uses inventory cost + product delivery + extra fee.
+/* ================= V33.8 labelled profit rollup + true overall margin ================= */
+// V33.8: the displayed cost uses inventory cost + product delivery + extra fee.
 // Commission remains a separate card-level deduction and is not added here.
 function productOperatingCostV335(x){
   const q=Math.max(1,Number(x&&x.quantity||1));
