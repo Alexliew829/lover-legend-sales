@@ -112,7 +112,22 @@ function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.locatio
 function dedupeRows(list){const m=new Map();list.forEach(r=>{const k=rowKey(r),old=m.get(k);if(!old||String(r.updatedAt||"")>=String(old.updatedAt||""))m.set(k,r)});return [...m.values()]}
 function upsertLocalRow(n){rows=dedupeRows([...rows,n])}
 function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&r.company===c);return f?Number(f.amount||0):0}
-function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c);document.getElementById("dailySales").value=formatAmount(a);document.getElementById("salesDateResult").textContent=`${companyNames[c]}｜${d}｜${money(a)}`;renderSalesMonthlyList();if(typeof refreshSalesActionLocksV270==="function")refreshSalesActionLocksV270();if(c==="belimbing"&&typeof loadProductLinksIntoEditorV206==="function")Promise.resolve(loadProductLinksIntoEditorV206("daily")).catch(()=>{});}
+const DAILY_TURNOVER_DRAFT_KEY_V332="lover_daily_turnover_drafts_v332";
+function dailyTurnoverDraftContextV332(){const date=String(document.getElementById("saleDate")?.value||""),company=String(document.getElementById("company")?.value||"");return date&&company?date+"|"+company:""}
+function readDailyTurnoverDraftsV332(){try{const value=JSON.parse(localStorage.getItem(DAILY_TURNOVER_DRAFT_KEY_V332)||"{}");return value&&typeof value==="object"?value:{}}catch(_){return{}}}
+function getDailyTurnoverDraftV332(){const key=dailyTurnoverDraftContextV332();return key?readDailyTurnoverDraftsV332()[key]||null:null}
+function saveDailyTurnoverDraftV332(value){const key=dailyTurnoverDraftContextV332();if(!key)return;const drafts=readDailyTurnoverDraftsV332();drafts[key]={value:String(value??""),updatedAt:Date.now()};try{localStorage.setItem(DAILY_TURNOVER_DRAFT_KEY_V332,JSON.stringify(drafts))}catch(_){}}
+function clearDailyTurnoverDraftV332(){const key=dailyTurnoverDraftContextV332();if(!key)return;const drafts=readDailyTurnoverDraftsV332();delete drafts[key];try{localStorage.setItem(DAILY_TURNOVER_DRAFT_KEY_V332,JSON.stringify(drafts))}catch(_){}}
+function installDailyTurnoverDraftGuardV332(){const input=document.getElementById("dailySales");if(!input||input.dataset.draftGuardV332==="1")return;input.dataset.draftGuardV332="1";input.addEventListener("input",()=>saveDailyTurnoverDraftV332(input.value));input.addEventListener("change",()=>saveDailyTurnoverDraftV332(input.value));}
+function renderSavedTurnoverSummaryV333(element,name,date,amount){
+  if(!element)return;
+  const title=document.createElement("span"),detail=document.createElement("span");
+  title.className="saved-turnover-name-v333";detail.className="saved-turnover-detail-v333";
+  title.textContent=String(name||"未选择");
+  detail.textContent=amount===null?String(date||""):`${String(date||"")} · 已保存 RM${money(amount)}`;
+  element.replaceChildren(title,detail);
+}
+function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c),input=document.getElementById("dailySales"),draft=getDailyTurnoverDraftV332();input.value=draft?String(draft.value):formatAmount(a);renderSavedTurnoverSummaryV333(document.getElementById("salesDateResult"),companyNames[c],d,a);renderSalesMonthlyList();if(typeof refreshSalesActionLocksV270==="function")refreshSalesActionLocksV270();if(c==="belimbing"&&typeof loadProductLinksIntoEditorV206==="function")Promise.resolve(loadProductLinksIntoEditorV206("daily")).catch(()=>{});}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
 
 // V29.9: Top 5 business performance. Uses rows already loaded in memory only;
@@ -130,7 +145,7 @@ let historicalHighsMemory=null;
 let historicalHighsPromise=null;
 
 function readHistoricalHighsCache(){
-  // V33.1: an all-time record does not become invalid merely because normal
+  // V33.3: an all-time record does not become invalid merely because normal
   // turnover revision changes. Keep the last confirmed local record available
   // immediately and let a low-priority cloud check improve it in background.
   if(historicalHighsMemory)return historicalHighsMemory;
@@ -322,7 +337,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V33.1: Top 5 and its last confirmed local record paint immediately.
+    // V33.3: Top 5 and its last confirmed local record paint immediately.
     // Cloud comparison waits for browser idle time and never blocks page sync.
     scheduleHistoricalHighsCheckV331();
   }
@@ -1132,6 +1147,7 @@ async function saveDailySales(){
 
   upsertLocalRow(localRow);
   addPendingRow(localRow);
+  clearDailyTurnoverDraftV332();
   document.getElementById("dailySales").value=formatAmount(a);
   renderAll();
   showTempMsg("saveMsg");
@@ -1380,6 +1396,7 @@ if(dailyTotalsMonthPicker){
   });
 }
 setDateControl("saleDate",todayISO());
+installDailyTurnoverDraftGuardV332();
 
 const fairSessionRestored=restoreFairSession();
 
@@ -1646,6 +1663,38 @@ function getLiveAmount(date,host){
   const found=rows.find(r=>r.type==="live"&&r.date===date&&normalizeLiveHostKey(r.location)===key);
   return found?Number(found.amount||0):0;
 }
+const LIVE_TURNOVER_DRAFT_KEY_V332="lover_live_turnover_drafts_v332";
+function liveTurnoverDraftContextV332(){
+  const dateISO=String(document.getElementById("liveDate")?.value||"");
+  const host=selectedLiveHost();
+  return dateISO&&host?dateISO+"|"+normalizeLiveHostKey(host):"";
+}
+function readLiveTurnoverDraftsV332(){
+  try{const value=JSON.parse(localStorage.getItem(LIVE_TURNOVER_DRAFT_KEY_V332)||"{}");return value&&typeof value==="object"?value:{}}catch(_){return{}}
+}
+function getLiveTurnoverDraftV332(){
+  const key=liveTurnoverDraftContextV332();
+  return key?readLiveTurnoverDraftsV332()[key]||null:null;
+}
+function saveLiveTurnoverDraftV332(value){
+  const key=liveTurnoverDraftContextV332();if(!key)return;
+  const drafts=readLiveTurnoverDraftsV332();
+  drafts[key]={value:String(value??""),updatedAt:Date.now()};
+  try{localStorage.setItem(LIVE_TURNOVER_DRAFT_KEY_V332,JSON.stringify(drafts))}catch(_){}
+}
+function clearLiveTurnoverDraftV332(dateDisplay,host){
+  const iso=displayToISO(String(dateDisplay||""));
+  const key=iso&&host?iso+"|"+normalizeLiveHostKey(host):liveTurnoverDraftContextV332();
+  if(!key)return;
+  const drafts=readLiveTurnoverDraftsV332();delete drafts[key];
+  try{localStorage.setItem(LIVE_TURNOVER_DRAFT_KEY_V332,JSON.stringify(drafts))}catch(_){}
+}
+function installLiveTurnoverDraftGuardV332(){
+  const input=document.getElementById("liveSales");if(!input||input.dataset.draftGuardV332==="1")return;
+  input.dataset.draftGuardV332="1";
+  input.addEventListener("input",()=>saveLiveTurnoverDraftV332(input.value));
+  input.addEventListener("change",()=>saveLiveTurnoverDraftV332(input.value));
+}
 function updateLiveInputFromSelectedDate(){
   const dateEl=document.getElementById("liveDate");
   const amountEl=document.getElementById("liveSales");
@@ -1654,8 +1703,11 @@ function updateLiveInputFromSelectedDate(){
   const d=isoToDisplay(dateEl.value);
   const host=selectedLiveHost();
   const amount=host?getLiveAmount(d,host):0;
-  amountEl.value=formatAmount(amount);
-  resultEl.textContent=host?`${host}｜${d}｜${money(amount)}`:`请选择或输入主播｜${d}`;
+  // V33.3: background render/sync must never overwrite an unsaved amount.
+  // Drafts are isolated by exact host + date and survive mobile page suspension.
+  const draft=getLiveTurnoverDraftV332();
+  amountEl.value=draft?String(draft.value):formatAmount(amount);
+  renderSavedTurnoverSummaryV333(resultEl,host||"请选择或输入主播",d,host?amount:null);
   renderLiveDailySummary();
   renderLiveMonthlyList();
   if(typeof refreshSalesActionLocksV270==="function")refreshSalesActionLocksV270();
@@ -3111,7 +3163,7 @@ function recalcSalesCardTransactionV239(card){
   const rate=totalPrice>0?totalProfit/totalPrice*100:0;
   const set=(sel,val)=>{const el=card.querySelector(sel);if(el)el.textContent=val};
   set(".sales-card-price-total-v239","RM"+formatAmount(totalPrice));
-  // V33.1: displayed total cost uses the same complete cost basis as profit.
+  // V33.3: displayed total cost uses the same complete cost basis as profit.
   // Profit itself is intentionally unchanged to avoid double-deducting fees.
   set(".sales-card-cost-total-v239","RM"+formatAmount(totalCost+totalDelivery+totalExtra+totalCommission));
   set(".sales-card-commission-amount-v239","RM"+formatAmount(totalCommission));
@@ -4720,6 +4772,7 @@ if(document.getElementById("liveHost")){
   });
 }
 
+installLiveTurnoverDraftGuardV332();
 restoreLastLiveSession();
 
 ["commissionRate1","commissionRate2","commissionRate3"].forEach(id=>{
@@ -4992,7 +5045,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3310",
+    version:"3330",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5020,7 +5073,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    downloadFile(`Lover_Legend_Sales_V33_1_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+    downloadFile(`Lover_Legend_Sales_V33_3_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSync("Backup 已完成",true);
     alert(`Backup 成功。\n\n营业记录：${payload.rows.length} 笔\n销售卡：${payload.productLinks.length} 笔\n新增/修改历史：${payload.salesChangeLogs.length} 笔\n\nBackup 文件已经生成。`);
@@ -5352,7 +5405,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleSa
 setTimeout(()=>scheduleSalesDraftRetryV314(1200),0);
 
 
-/* ================= V33.1 Sales stock oversell guard =================
+/* ================= V33.3 Sales stock oversell guard =================
    Before Save Draft / Confirm, re-read Import current stock.  New/unprocessed
    cards must fit the full requested quantity.  A card already confirmed AND
    fully inventory-confirmed only needs enough stock for its positive net
@@ -5541,6 +5594,7 @@ saveLiveSales=async function(){
     if(amount+0.005<cardAmount){
       alert(`⚠️ 无法修改营业额\n\n当天已有销售卡合计 RM${formatAmount(cardAmount)}。\nLive 营业额不能低于销售卡总额。\n请先修改或删除相关销售卡。`);
       amountEl.value=formatAmount(salesCardsOfficialAmountV241("live"));
+      clearLiveTurnoverDraftV332(d,host);
       return;
     }
   }catch(e){
@@ -5581,6 +5635,7 @@ saveLiveSales=async function(){
     if(finalAmount<=0)rows=rows.filter(r=>rowKey(r)!==rowKey(localRow)); else upsertLocalRow(finalRow);
     if(typeof markLocalRowMutation==="function")markLocalRowMutation(finalRow,Date.now()+1);
     clearPendingRow(localRow);
+    clearLiveTurnoverDraftV332(d,host);
 
     renderAll();
     amountEl.value=formatAmount(finalAmount);
