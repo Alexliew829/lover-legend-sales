@@ -1163,7 +1163,7 @@ async function sendFairBatchToSheetV343(location, records, foregroundSave=false)
   if (!json.ok) throw new Error(json.message || "Fair 储存失败");
   applyLocalDataRevision(json.dataRevision);
   if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
-  // V35.2 foreground Fair saves send OneSignal inside the same server request.
+  // V35.3 foreground Fair saves send OneSignal inside the same server request.
   // Background retry still uses the signed async envelope after cloud success.
   if(!(json.inlineNotification&&json.inlineNotification.inline))dispatchSalesNotificationAsync(json.notificationEnvelope);
   (Array.isArray(records)?records:[]).forEach(r=>{

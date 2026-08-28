@@ -1285,7 +1285,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     return{date,amount,clientUpdatedAt:now,...mutationV344,baseCloudUpdatedAt:String(previous?.updatedAt||"")};
   }).filter(Boolean);
 
-  // V35.2 DATA-SAFETY: queue the exact mutation first, but do NOT mutate the
+  // V35.3 DATA-SAFETY: queue the exact mutation first, but do NOT mutate the
   // authoritative local rows/Home until Google Sheet confirms the write.
   // This prevents the dangerous half-success state where this device shows
   // RM1350 while every other device/cloud still has RM1200.
@@ -1360,7 +1360,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
       }
     }else setSync("已同步",true);
   }catch(e){
-    // V35.2: never report a failed cloud save as stored.  The exact edited
+    // V35.3: never report a failed cloud save as stored.  The exact edited
     // amount remains durable in pendingRows and will retry automatically.
     if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();
     else setSync("同步暂未完成",false,true);
@@ -1370,7 +1370,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3520",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3530",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1388,7 +1388,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3520";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3530";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3037,7 +3037,7 @@ function renderProductLinksLoadingV231(type){
   wrap.innerHTML='<div class="product-link-loading-v231">正在读取已保存销售卡…</div>';
 }
 const SALES_CARD_LOAD_SEQ_V245={live:0,fair:0};
-// V35.2: invalidate any cloud read that began before a local delete/save acknowledgement.
+// V35.3: invalidate any cloud read that began before a local delete/save acknowledgement.
 function invalidateSalesCardLoadRequestsV351(type){
   const t=String(type||'');if(!t)return;
   SALES_CARD_LOAD_SEQ_V245[t]=(SALES_CARD_LOAD_SEQ_V245[t]||0)+1;
@@ -5151,7 +5151,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3520",
+    version:"3530",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6477,3 +6477,167 @@ removeProductFromTransactionV239=async function(type,card,item){
   setSync('产品已从本机草稿删除 · 请点击保存草稿同步云端',false,true);
 };
 window.removeProductFromTransactionV239=removeProductFromTransactionV239;
+
+
+/* ================= V35.3 Fair = Live single-day workflow =================
+   Fair keeps its V35.3 monthly report cards/commission display, but the edit
+   workflow is intentionally identical to Live: entity + one date + turnover.
+   Date Range and visible Sales Card associated-date selection are retired.
+*/
+function fairSelectedDateV353(){
+  return isoToDisplay(String(document.getElementById('fairStart')?.value||''));
+}
+function fairSelectedLocationV353(){
+  return canonicalLocation(String(document.getElementById('fairLocation')?.value||'').trim());
+}
+function updateFairSingleAmountV353(){
+  const el=document.getElementById('fairSales');if(!el)return;
+  const date=fairSelectedDateV353(),loc=fairSelectedLocationV353();
+  const saved=rows.find(r=>r.type==='fair'&&r.date===date&&normalizeFairLocationKey(r.location)===normalizeFairLocationKey(loc));
+  el.value=formatAmount(saved?Number(saved.amount||0):0);
+  const hidden=document.getElementById('fairInputs');
+  if(hidden)hidden.innerHTML=`<input class="fairAmount" data-date="${date}" value="${el.value}">`;
+  const sel=document.getElementById('fairProductDate');
+  if(sel){sel.innerHTML=date?`<option value="${date}">${date}</option>`:'';sel.value=date||'';}
+  if(typeof refreshSalesActionLocksV270==='function')refreshSalesActionLocksV270();
+}
+window.updateFairSingleAmountV353=updateFairSingleAmountV353;
+
+updateFairPageMode=function(){
+  const hasLocation=Boolean(fairSelectedLocationV353());
+  document.getElementById('fairEditArea')?.classList.toggle('hidden',!hasLocation);
+  document.getElementById('fairViewOnlyHint')?.classList.toggle('hidden',hasLocation);
+  const label=document.getElementById('fairStartLabel');if(label)label.textContent='日期';
+  const end=document.getElementById('fairEnd'),start=document.getElementById('fairStart');if(end&&start)end.value=start.value||'';
+  if(hasLocation)updateFairSingleAmountV353();
+};
+
+syncFairInputs=function(){
+  const start=document.getElementById('fairStart'),end=document.getElementById('fairEnd');
+  if(end&&start)end.value=start.value||'';
+  updateFairSingleAmountV353();
+};
+refreshFairInputsFromRows=function(force=false){updateFairSingleAmountV353();return true};
+fairInputsHaveUnsavedChanges=function(){
+  const el=document.getElementById('fairSales'),loc=fairSelectedLocationV353(),date=fairSelectedDateV353();
+  if(!el||!loc||!date)return false;
+  const saved=rows.find(r=>r.type==='fair'&&r.date===date&&normalizeFairLocationKey(r.location)===normalizeFairLocationKey(loc));
+  return Math.abs(toAmount(el.value)-Number(saved?.amount||0))>0.005;
+};
+
+syncFairProductDatesV203=function(){
+  const date=fairSelectedDateV353(),sel=document.getElementById('fairProductDate');
+  if(sel){sel.innerHTML=date?`<option value="${date}">${date}</option>`:'';sel.value=date||'';}
+  if(typeof refreshSalesActionLocksV270==='function')refreshSalesActionLocksV270();
+};
+handleFairProductDateChangeV342=function(){refreshFairExactContextV346();return true};
+window.handleFairProductDateChangeV342=handleFairProductDateChangeV342;
+
+const _productLinkContextV353=productLinkContextV206;
+productLinkContextV206=function(type){
+  if(type!=='fair')return _productLinkContextV353(type);
+  return{pre:'fair',date:fairSelectedDateV353(),location:fairSelectedLocationV353()};
+};
+const _selectedChangeLogDateV353=selectedChangeLogDateV200;
+selectedChangeLogDateV200=function(type){return type==='fair'?fairSelectedDateV353():_selectedChangeLogDateV353(type)};
+const _productProfitSelectedDateV353=productProfitSelectedDateV216;
+productProfitSelectedDateV216=function(type){return type==='fair'?fairSelectedDateV353():_productProfitSelectedDateV353(type)};
+
+// Date Range sessions are retained only as legacy data for Backup/old history.
+// They no longer control Fair editing or Sales Card context.
+switchFairLocationV320=function(location){
+  const loc=canonicalLocation(location);if(!loc)return false;
+  const input=document.getElementById('fairLocation');if(input)input.value=loc;
+  saveFairLocation(loc);updateFairPageMode();updateFairSingleAmountV353();renderFairMonthlyList();refreshProductLinkContextV210('fair');return true;
+};
+applyFairSessionV281=function(){return false};
+refreshFairSessionsV281=async function(){return Array.isArray(fairSessionsCloudV281)?fairSessionsCloudV281:[]};
+
+// Same user-visible save lifecycle as Live: local authoritative draft + pending,
+// render immediately, one cloud write, authoritative response, clear pending.
+saveFairSales=async function(){
+  if(!ensureWritableSelection())return;
+  const dateEl=document.getElementById('fairStart'),locationInput=document.getElementById('fairLocation'),amountEl=document.getElementById('fairSales');
+  const d=isoToDisplay(dateEl?.value||''),loc=fairSelectedLocationV353(),amount=toAmount(amountEl?.value||0);
+  if(!loc){alert('请输入 Fair 地点');return}
+  if(!d){alert('请选择日期');return}
+  locationInput.value=loc;saveFairLocation(loc);
+  const end=document.getElementById('fairEnd');if(end)end.value=dateEl.value||'';
+  const now=new Date().toISOString(),mutation=nextClientMutationV344();
+  const previous=rows.find(r=>r.type==='fair'&&r.date===d&&normalizeFairLocationKey(r.location)===normalizeFairLocationKey(loc));
+  const localRow={type:'fair',date:d,company:'fair',location:loc,amount,updatedAt:now,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:String(previous?.updatedAt||'')};
+  const key=turnoverRevKeyV346('fair',d,loc),rev=nextTurnoverRevV346(FAIR_TURNOVER_SAVE_REV_V346,key);
+  if(amount<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));else upsertLocalRow(localRow);
+  addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);saveLocalDataCache();renderAll();updateFairSingleAmountV353();setSync('Fair 已保存到本机 · 正在同步云端...');
+  try{
+    const result=await saveFairBatchToSheet(loc,[{date:d,amount,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:localRow.baseCloudUpdatedAt}],true);
+    if(FAIR_TURNOVER_SAVE_REV_V346.get(key)!==rev)return;
+    const saved=Array.isArray(result?.rows)?result.rows.find(r=>String(r.date||'')===d):null;
+    if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);else if(amount<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));
+    clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();updateFairSingleAmountV353();showTempMsg('fairSaveMsg');setSync('Fair 已储存 · 云端已同步',true);
+  }catch(e){if(FAIR_TURNOVER_SAVE_REV_V346.get(key)===rev)setPendingRetrySyncStatus()}
+};
+window.saveFairSales=saveFairSales;
+
+// Keep Fair context synchronized exactly like Live when location/date changes.
+document.getElementById('fairLocation')?.addEventListener('input',()=>{updateFairPageMode();updateFairSingleAmountV353();});
+document.getElementById('fairLocation')?.addEventListener('change',()=>{updateFairPageMode();updateFairSingleAmountV353();refreshFairExactContextV346();});
+document.getElementById('fairStart')?.addEventListener('change',()=>{const e=document.getElementById('fairEnd');if(e)e.value=document.getElementById('fairStart').value||'';updateFairSingleAmountV353();refreshFairExactContextV346();renderFairDailySummary();renderFairMonthlyList();});
+document.getElementById('fairSales')?.addEventListener('input',()=>{const h=document.querySelector('#fairInputs .fairAmount');if(h)h.value=document.getElementById('fairSales').value;});
+setTimeout(()=>{const e=document.getElementById('fairEnd'),s=document.getElementById('fairStart');if(e&&s)e.value=s.value||todayISO();updateFairPageMode();updateFairSingleAmountV353();},0);
+
+/* V35.3 final alignment: Live and Fair call one single-day turnover engine. */
+async function saveLiveFairSingleDayV353(type){
+  if(!ensureWritableSelection())return;
+  const isLive=type==='live';
+  const dateEl=document.getElementById(isLive?'liveDate':'fairStart');
+  const entityEl=document.getElementById(isLive?'liveHost':'fairLocation');
+  const amountEl=document.getElementById(isLive?'liveSales':'fairSales');
+  const d=isoToDisplay(dateEl?.value||'');
+  let entity=isLive?selectedLiveHost():fairSelectedLocationV353();
+  const amount=toAmount(amountEl?.value||0);
+  if(!entity){alert(isLive?'请输入主播名字':'请输入 Fair 地点');return}
+  if(!d){alert('请选择日期');return}
+
+  if(isLive){
+    entity=reactivateLiveHostIfNeeded(entity).host;
+    entityEl.value=entity;saveLiveHost(entity);saveLastLiveSession(entity,dateEl.value);
+  }else{
+    entity=canonicalLocation(entity);entityEl.value=entity;saveFairLocation(entity);
+    const fairEnd=document.getElementById('fairEnd');if(fairEnd)fairEnd.value=dateEl.value||'';
+  }
+
+  const now=new Date().toISOString(),mutation=nextClientMutationV344();
+  const normalizer=isLive?normalizeLiveHostKey:normalizeFairLocationKey;
+  const previous=rows.find(r=>r.type===type&&r.date===d&&normalizer(r.location)===normalizer(entity));
+  const localRow={type,date:d,company:type,location:entity,amount,updatedAt:now,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:String(previous?.updatedAt||'')};
+  const revMap=isLive?LIVE_TURNOVER_SAVE_REV_V346:FAIR_TURNOVER_SAVE_REV_V346;
+  const key=turnoverRevKeyV346(type,d,entity),rev=nextTurnoverRevV346(revMap,key);
+
+  if(amount<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));else upsertLocalRow(localRow);
+  addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);
+  saveLocalDataCache();renderAll();
+  if(!isLive)updateFairSingleAmountV353();
+  setSync(`${isLive?'Live':'Fair'} 已保存到本机 · 正在同步云端...`);
+
+  try{
+    let saved=null;
+    if(isLive){
+      saved=await saveLiveToSheet(d,entity,amount,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true);
+    }else{
+      const result=await saveFairBatchToSheet(entity,[{date:d,amount,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:localRow.baseCloudUpdatedAt}],true);
+      saved=Array.isArray(result?.rows)?result.rows.find(r=>String(r.date||'')===d):null;
+    }
+    if(revMap.get(key)!==rev)return;
+    if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);else rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));
+    clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();
+    if(!isLive)updateFairSingleAmountV353();
+    showTempMsg(isLive?'liveSaveMsg':'fairSaveMsg');
+    setSync(`${isLive?'Live':'Fair'} 已储存 · 云端已同步`,true);
+  }catch(e){
+    if(revMap.get(key)===rev)setPendingRetrySyncStatus();
+  }
+}
+saveLiveSales=function(){return saveLiveFairSingleDayV353('live')};
+saveFairSales=function(){return saveLiveFairSingleDayV353('fair')};
+window.saveLiveSales=saveLiveSales;window.saveFairSales=saveFairSales;
