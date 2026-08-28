@@ -145,7 +145,7 @@ let historicalHighsMemory=null;
 let historicalHighsPromise=null;
 
 function readHistoricalHighsCache(){
-  // V34.3: an all-time record does not become invalid merely because normal
+  // V34.4: an all-time record does not become invalid merely because normal
   // turnover revision changes. Keep the last confirmed local record available
   // immediately and let a low-priority cloud check improve it in background.
   if(historicalHighsMemory)return historicalHighsMemory;
@@ -337,7 +337,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V34.3: Top 5 and its last confirmed local record paint immediately.
+    // V34.4: Top 5 and its last confirmed local record paint immediately.
     // Cloud comparison waits for browser idle time and never blocks page sync.
     scheduleHistoricalHighsCheckV331();
   }
@@ -1135,14 +1135,19 @@ async function saveDailySales(){
     if(a+0.005<used){alert(`⚠️ 无法修改营业额\n\n当天已有销售卡合计 RM${formatAmount(used)}。\nBelimbing 营业额不能低于销售卡总额。\n请先修改或删除相关销售卡。`);return;}
   }
 
+  const previousCloudRow=rows.find(r=>r.type==="daily"&&r.date===d&&r.company===c);
+  const mutationV344=nextClientMutationV344();
+  const nowV344=new Date().toISOString();
   const localRow={
     type:"daily",
     date:d,
     company:c,
     location:"",
     amount:a,
-    updatedAt:new Date().toISOString(),
-    clientUpdatedAt:new Date().toISOString()
+    updatedAt:nowV344,
+    clientUpdatedAt:nowV344,
+    ...mutationV344,
+    baseCloudUpdatedAt:String(previousCloudRow?.updatedAt||"")
   };
 
   upsertLocalRow(localRow);
@@ -1163,9 +1168,9 @@ async function saveDailySales(){
 
   Promise.resolve().then(async()=>{
     try{
-      const saved=await saveDailyToSheet(d,c,a,localRow.clientUpdatedAt);
+      const saved=await saveDailyToSheet(d,c,a,localRow.clientUpdatedAt,localRow.clientDeviceId,localRow.clientSequence,localRow.baseCloudUpdatedAt,true);
       if(saved)upsertLocalRow(saved);
-      clearPendingRow(localRow);
+      clearPendingRowIfVersionV343(localRow);
       renderAll();
       if(typeof saveLocalDataCache==="function")saveLocalDataCache();
       setSync("已同步",true);
@@ -1268,11 +1273,17 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 
   const now=new Date().toISOString();
-  const records=[...inputs].map(i=>({
-    date:i.dataset.date,
-    amount:toAmount(i.value),
-    clientUpdatedAt:now
-  }));
+  const mutationV344=nextClientMutationV344();
+  // V34.4: send only real changes.  Unchanged Date Range days (especially
+  // untouched 0.00 days) are not pending work and must never reappear as ten
+  // "未同步" records on the next open.
+  const records=[...inputs].map(i=>{
+    const date=String(i.dataset.date||""),amount=toAmount(i.value);
+    const previous=rows.find(r=>r.type==="fair"&&r.date===date&&normalizeFairLocationKey(r.location)===normalizeFairLocationKey(loc));
+    const previousAmount=previous?Number(previous.amount||0):0;
+    if(Math.abs(amount-previousAmount)<=0.005)return null;
+    return{date,amount,clientUpdatedAt:now,...mutationV344,baseCloudUpdatedAt:String(previous?.updatedAt||"")};
+  }).filter(Boolean);
 
   records.forEach(i=>{
     const row={
@@ -1318,7 +1329,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     fairSessionDraftDirtyV282=false;
     saveFairSession();
     await refreshFairSessionsV281();
-    const result=await saveFairBatchToSheet(loc,records);
+    const result=records.length?await saveFairBatchToSheet(loc,records,true):{ok:true,rows:[]};
     if(result&&Array.isArray(result.rows)){
       result.rows.forEach(r=>{
         if(Number(r.amount||0)<=0)rows=rows.filter(x=>syncKey(x)!==syncKey(r));
@@ -1713,7 +1724,7 @@ function updateLiveInputFromSelectedDate(){
   const d=isoToDisplay(dateEl.value);
   const host=selectedLiveHost();
   const amount=host?getLiveAmount(d,host):0;
-  // V34.3: background render/sync must never overwrite an unsaved amount.
+  // V34.4: background render/sync must never overwrite an unsaved amount.
   // Drafts are isolated by exact host + date and survive mobile page suspension.
   const draft=getLiveTurnoverDraftV332();
   amountEl.value=draft?String(draft.value):formatAmount(amount);
@@ -3183,7 +3194,7 @@ function recalcSalesCardTransactionV239(card){
   const rate=totalPrice>0?totalProfit/totalPrice*100:0;
   const set=(sel,val)=>{const el=card.querySelector(sel);if(el)el.textContent=val};
   set(".sales-card-price-total-v239","RM"+formatAmount(totalPrice));
-  // V34.3: displayed total cost uses the same complete cost basis as profit.
+  // V34.4: displayed total cost uses the same complete cost basis as profit.
   // Profit itself is intentionally unchanged to avoid double-deducting fees.
   set(".sales-card-cost-total-v239","RM"+formatAmount(totalCost+totalDelivery+totalExtra+totalCommission));
   set(".sales-card-commission-amount-v239","RM"+formatAmount(totalCommission));
@@ -3819,7 +3830,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     const crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"]];
-    // V34.3: localDelivery remains the saved product-delivery TOTAL for full
+    // V34.4: localDelivery remains the saved product-delivery TOTAL for full
     // backward compatibility. Infer the per-tree crate rate from either the
     // new total/quantity value or the old one-charge legacy value.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
@@ -4077,7 +4088,7 @@ async function saveLiveSales(){
       if(lock.amount<=0)rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));else upsertLocalRow(finalRow);
       amountEl.value=formatAmount(lock.amount);
     }else if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);
-    clearPendingRow(localRow);renderAll();
+    clearPendingRowIfVersionV343(localRow);renderAll();
     const lock2=getLiveOptimisticLockV240(d,host);if(lock2)amountEl.value=formatAmount(lock2.amount);
     clearLiveOptimisticLockV240(d,host);setSync("已同步",true);
   }catch(e){
@@ -4344,7 +4355,7 @@ async function saveLiveSales(){
     const saved=await saveLiveToSheet(d,host,amount,now);
     if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);
     else rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));
-    clearPendingRow(localRow);
+    clearPendingRowIfVersionV343(localRow);
     renderAll();
     setSync("已同步",true);
   }catch(e){
@@ -5084,7 +5095,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3430",
+    version:"3440",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5112,7 +5123,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    downloadFile(`Lover_Legend_Sales_V34_3_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+    downloadFile(`Lover_Legend_Sales_V34_4_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSync("Backup 已完成",true);
     alert(`Backup 成功。\n\n营业记录：${payload.rows.length} 笔\n销售卡：${payload.productLinks.length} 笔\n新增/修改历史：${payload.salesChangeLogs.length} 笔\n\nBackup 文件已经生成。`);
@@ -5444,7 +5455,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleSa
 setTimeout(()=>scheduleSalesDraftRetryV314(1200),0);
 
 
-/* ================= V34.3 Sales stock oversell guard =================
+/* ================= V34.4 Sales stock oversell guard =================
    Before Save Draft / Confirm, re-read Import current stock.  New/unprocessed
    cards must fit the full requested quantity.  A card already confirmed AND
    fully inventory-confirmed only needs enough stock for its positive net
@@ -5649,7 +5660,9 @@ saveLiveSales=async function(){
 
   const rev=nextLiveSaveRevV243(d,host);
   const now=new Date().toISOString();
-  const localRow={type:"live",date:d,company:"live",location:host,amount,updatedAt:now,clientUpdatedAt:now};
+  const previousCloudRow=rows.find(r=>r.type==="live"&&r.date===d&&canonicalLiveHost(r.location)===canonicalLiveHost(host));
+  const mutationV344=nextClientMutationV344();
+  const localRow={type:"live",date:d,company:"live",location:host,amount,updatedAt:now,clientUpdatedAt:now,...mutationV344,baseCloudUpdatedAt:String(previousCloudRow?.updatedAt||"")};
 
   // Critical V29.9 guard: any cloud request started before this local mutation
   // is not allowed to overwrite this newer value.
@@ -5666,14 +5679,14 @@ saveLiveSales=async function(){
 
   try{
     setSync("已储存，正在后台同步...");
-    const saved=await saveLiveToSheet(d,host,amount,now);
+    const saved=await saveLiveToSheet(d,host,amount,now,localRow.clientDeviceId,localRow.clientSequence,localRow.baseCloudUpdatedAt,true);
     if(!isCurrentLiveSaveRevV243(d,host,rev))return;
 
     const finalAmount=amount;
     const finalRow=saved?{...saved,amount:finalAmount}:localRow;
     if(finalAmount<=0)rows=rows.filter(r=>rowKey(r)!==rowKey(localRow)); else upsertLocalRow(finalRow);
     if(typeof markLocalRowMutation==="function")markLocalRowMutation(finalRow,Date.now()+1);
-    clearPendingRow(localRow);
+    clearPendingRowIfVersionV343(localRow);
     clearLiveTurnoverDraftV332(d,host);
 
     renderAll();
@@ -5749,8 +5762,8 @@ productProfitMobileCardsV216=function(list){
 
 
 
-/* ================= V34.3 labelled profit rollup + true overall margin ================= */
-// V34.3: the displayed cost uses inventory cost + product delivery + extra fee.
+/* ================= V34.4 labelled profit rollup + true overall margin ================= */
+// V34.4: the displayed cost uses inventory cost + product delivery + extra fee.
 // Commission remains a separate card-level deduction and is not added here.
 function productOperatingCostV335(x){
   const q=Math.max(1,Number(x&&x.quantity||1));

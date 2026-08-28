@@ -2531,7 +2531,7 @@ body{overflow-x:hidden;}
   .live-profit-head-v297{font-size:11.5px}
 }
 
-/* V34.3: separate each host visually and keep the natural reading order:
+/* V34.4: separate each host visually and keep the natural reading order:
    date, turnover, commission, profit, margin. */
 .live-sales-group.month-profit-group-v294{margin:12px 0 18px;padding:14px;border:1px solid #d8e5da;border-radius:14px;background:#fff}
 .live-sales-group.month-profit-group-v294+.live-sales-group.month-profit-group-v294{margin-top:20px}
@@ -2674,10 +2674,10 @@ body{overflow-x:hidden;}
   background:#e7e7e7!important;color:#777!important;border-color:#ccc!important;
 }
 
-/* ================= V34.3 restored Fair turnover layout ================= */
+/* ================= V34.4 restored Fair turnover layout ================= */
 #fairInputs .fair-amount-v341{width:100%;box-sizing:border-box;font-variant-numeric:tabular-nums}
 
-/* ================= V34.3 always-visible Fair sales-card date ================= */
+/* ================= V34.4 always-visible Fair sales-card date ================= */
 .fair-product-date-picker-v342{margin:14px 0 10px;padding:12px;border:1px solid #d7dfd7;border-radius:14px;background:#f8fbf8}
 .fair-product-date-picker-v342 label{display:block;margin:0 0 7px;font-weight:800;color:#245b2d}
 .fair-product-date-picker-v342 select{width:100%;margin:0;box-sizing:border-box;background:#fff}
