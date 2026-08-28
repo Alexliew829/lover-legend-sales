@@ -663,7 +663,7 @@ async function loadFromSheet(options = {}) {
             const localTurn=Number(localPr.turnoverRevision||0), localCard=Number(localPr.salesCardRevision||0);
             if(cloudCard!==localCard){ invalidateSalesCardCachesV315(); }
             setPrioritySyncLocalV315({turnoverRevision:cloudTurn,salesCardRevision:cloudCard,at:Date.now()});
-            if(cloudTurn===localTurn){
+            if(cloudTurn===localTurn && pendingCountAtStart===0){
               setSync("已同步", true);
               completedSuccessfully = true;
               return {ok:true,month,priorityOnly:true,turnoverRevision:cloudTurn,salesCardRevision:cloudCard};
@@ -927,11 +927,11 @@ function getDailyProfitCacheV237(type,date){
   const all=readViewCacheMapV237(PROFIT_CACHE_KEY_V237),rec=all[viewCacheKeyV237(type,date)];
   if(!rec||!Array.isArray(rec.links))return null;
   if(rec.at&&Date.now()-Number(rec.at)>VIEW_CACHE_MAX_AGE_V237)return null;
-  return rec.links;
+  return typeof dedupeAuthoritativeSalesLinksV354==="function"?dedupeAuthoritativeSalesLinksV354(rec.links):rec.links;
 }
 function setDailyProfitCacheV237(type,date,links){
   const all=readViewCacheMapV237(PROFIT_CACHE_KEY_V237);
-  all[viewCacheKeyV237(type,date)]={at:Date.now(),links:Array.isArray(links)?links:[]};
+  all[viewCacheKeyV237(type,date)]={at:Date.now(),links:typeof dedupeAuthoritativeSalesLinksV354==="function"?dedupeAuthoritativeSalesLinksV354(links):Array.isArray(links)?links:[]};
   writeViewCacheMapV237(PROFIT_CACHE_KEY_V237,all);
 }
 function mergeDailyProfitContextCacheV237(type,date,location,links){
@@ -1000,6 +1000,27 @@ function clearSalesCardPersistentCacheV232(type,date,location){
   writeSalesCardPersistentCacheV232(all);
 }
 
+// V35.4: one authoritative active row per Sales Card product slot.
+// Cloud/Restore history can contain legacy active duplicates with different Link IDs;
+// the latest transactionId + productOrder row wins so Sales Card and Profit use
+// exactly the same authoritative set and can never count one product twice.
+function dedupeAuthoritativeSalesLinksV354(links){
+  const map=new Map();
+  (Array.isArray(links)?links:[]).forEach((x,index)=>{
+    if(!x||["deleted","cancelled"].includes(String(x.status||"active").toLowerCase()))return;
+    const tx=String(x.transactionId||x.saleId||"").trim();
+    const order=Math.max(1,Number(x.productOrder||1));
+    const loc=String(x.location||"").trim().toLowerCase();
+    const key=tx?[String(x.type||""),String(x.date||""),loc,tx,String(order)].join("|"):(String(x.linkId||"").trim()||[String(x.type||""),String(x.date||""),loc,String(x.productId||x.productName||""),String(order)].join("|"));
+    const prev=map.get(key);
+    if(!prev){map.set(key,{x,index});return}
+    const a=Date.parse(String(prev.x.updatedAt||prev.x.createdAt||""))||0,b=Date.parse(String(x.updatedAt||x.createdAt||""))||0;
+    if(b>a||(b===a&&index>prev.index))map.set(key,{x,index});
+  });
+  return [...map.values()].sort((a,b)=>a.index-b.index).map(v=>v.x);
+}
+window.dedupeAuthoritativeSalesLinksV354=dedupeAuthoritativeSalesLinksV354;
+
 const salesProductLinksCacheV216 = new Map();
 const salesProductLinksPendingV216 = new Map();
 function salesProductLinksCacheKeyV216(type,date,location){
@@ -1022,7 +1043,7 @@ function getSessionSalesProductLinksCacheV244(type,date,location){
   return Array.isArray(rec.links)?rec.links:null;
 }
 function setCachedSalesProductLinksV216(type,date,location,links){
-  const safe=Array.isArray(links)?links:[];
+  const safe=typeof dedupeAuthoritativeSalesLinksV354==="function"?dedupeAuthoritativeSalesLinksV354(links):(Array.isArray(links)?links:[]);
   salesProductLinksCacheV216.set(salesProductLinksCacheKeyV216(type,date,location),{links:safe,at:Date.now(),source:"session"});
   setSalesCardPersistentCacheV232(type,date,location,safe);
   return safe;
@@ -1090,7 +1111,7 @@ async function loadAllSalesProductLinksV203(options={}) {
   allSalesProductLinksPendingV216=(async()=>{
     const json=await jsonp({action:"getAllSalesProductLinks"},{timeoutMs:12000});
     if(!json.ok)throw new Error(json.message||"读取盆栽关联资料失败");
-    const links=Array.isArray(json.links)?json.links:[];
+    const links=typeof dedupeAuthoritativeSalesLinksV354==="function"?dedupeAuthoritativeSalesLinksV354(json.links):(Array.isArray(json.links)?json.links:[]);
     allSalesProductLinksCacheV216={links,at:Date.now()};
     return links;
   })().finally(()=>{allSalesProductLinksPendingV216=null;});
@@ -1156,14 +1177,14 @@ async function sendFairBatchToSheetV343(location, records, foregroundSave=false)
     records: JSON.stringify(records),
     foregroundSave:foregroundSave?"1":"",restoreGeneration,
     notifyInline:foregroundSave?"1":"",
-    clientVersion:"35.2",
+    clientVersion:"35.4",
     launchUrl:getSalesLaunchUrlV194()
   });
 
   if (!json.ok) throw new Error(json.message || "Fair 储存失败");
   applyLocalDataRevision(json.dataRevision);
   if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
-  // V35.3 foreground Fair saves send OneSignal inside the same server request.
+  // V35.4 foreground Fair saves send OneSignal inside the same server request.
   // Background retry still uses the signed async envelope after cloud success.
   if(!(json.inlineNotification&&json.inlineNotification.inline))dispatchSalesNotificationAsync(json.notificationEnvelope);
   (Array.isArray(records)?records:[]).forEach(r=>{
