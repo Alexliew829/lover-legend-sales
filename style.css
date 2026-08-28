@@ -2531,7 +2531,7 @@ body{overflow-x:hidden;}
   .live-profit-head-v297{font-size:11.5px}
 }
 
-/* V33.9: separate each host visually and keep the natural reading order:
+/* V34.0: separate each host visually and keep the natural reading order:
    date, turnover, commission, profit, margin. */
 .live-sales-group.month-profit-group-v294{margin:12px 0 18px;padding:14px;border:1px solid #d8e5da;border-radius:14px;background:#fff}
 .live-sales-group.month-profit-group-v294+.live-sales-group.month-profit-group-v294{margin-top:20px}
@@ -2674,13 +2674,15 @@ body{overflow-x:hidden;}
   background:#e7e7e7!important;color:#777!important;border-color:#ccc!important;
 }
 
-/* ================= V33.9 Fair date navigation ================= */
-.fair-day-entry-v339{margin:12px 0 16px;padding:10px;border:1.5px solid #d8ddd8;border-radius:16px;background:#fff;transition:border-color .16s ease,background-color .16s ease,box-shadow .16s ease}
-.fair-day-open-v339{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;margin:0 0 9px;padding:11px 13px;border:1.5px solid #d8b34d;border-radius:12px;background:#fff7d9;color:#624800;font:inherit;font-weight:900;text-align:left;cursor:pointer;touch-action:manipulation;transform:translateY(0) scale(1);box-shadow:0 3px 0 #cfa238;transition:transform .08s ease,box-shadow .08s ease,background-color .12s ease,color .12s ease}
-.fair-day-open-v339 small{font-size:.78rem;font-weight:750;color:#806b35;text-align:right}
-.fair-day-open-v339:active{transform:translateY(3px) scale(.985);box-shadow:0 0 0 #cfa238;background:#f1dfa1;color:#3f2d00}
-.fair-day-open-v339.was-activated-v339{background:#dff3e6;color:#0b6f31}
-.fair-day-entry-v339.is-selected-v339{border-color:#23915a;background:#f4fbf6;box-shadow:0 0 0 2px rgba(35,145,90,.09)}
-.fair-day-entry-v339.is-selected-v339 .fair-day-open-v339{border-color:#23915a;background:#e3f5e8;color:#0b6f31;box-shadow:0 3px 0 #178044}
-.fair-day-entry-v339 .fairAmount{margin:0!important;width:100%;box-sizing:border-box}
-@media(max-width:600px){.fair-day-open-v339{padding:12px 11px;font-size:1rem}.fair-day-open-v339 small{font-size:.72rem;max-width:45%}}
+/* ================= V34.0 compact Fair date navigation ================= */
+.fair-day-entry-v339{display:grid;grid-template-columns:minmax(0,1fr) minmax(118px,34%);align-items:stretch;gap:9px;margin:9px 0;padding:8px;border:1px solid #d8ddd8;border-radius:14px;background:#fff;transition:border-color .14s ease,box-shadow .14s ease}
+.fair-day-open-v339,.fair-day-static-v340{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:7px;padding:11px 12px;border:1px solid #d8ddd8;border-radius:11px;background:#fff;color:#202820;font:inherit;font-weight:850;text-align:left}
+.fair-day-open-v339{cursor:pointer;touch-action:manipulation;transform:translateY(0) scale(1);box-shadow:0 2px 0 #cfd5cf;transition:transform .08s ease,box-shadow .08s ease,background-color .12s ease,color .12s ease}
+.fair-day-open-v339 small,.fair-day-static-v340 small{font-size:.72rem;font-weight:700;color:#777;white-space:nowrap;text-align:right}
+.fair-day-open-v339:active{transform:translateY(2px) scale(.988);box-shadow:0 0 0 #cfd5cf;background:#f3f7f4}
+.fair-day-open-v339.was-activated-v339{background:#e7f5eb;color:#0b6f31}
+.fair-day-entry-v339.is-selected-v339{border-color:#23915a;box-shadow:0 0 0 2px rgba(35,145,90,.08)}
+.fair-day-entry-v339.is-selected-v339 .fair-day-open-v339{border-color:#23915a;background:#edf8f0;color:#0b6f31;box-shadow:0 2px 0 #178044}
+.fair-day-entry-v339 .fairAmount{margin:0!important;width:100%;min-width:0;box-sizing:border-box;text-align:right}
+@media(max-width:600px){.fair-day-entry-v339{grid-template-columns:minmax(0,1fr) minmax(112px,34%);gap:7px;padding:7px}.fair-day-open-v339,.fair-day-static-v340{padding:11px 9px;font-size:.94rem}.fair-day-open-v339 small,.fair-day-static-v340 small{font-size:.66rem}}
+@media(max-width:370px){.fair-day-entry-v339{grid-template-columns:1fr 108px}.fair-day-open-v339 small,.fair-day-static-v340 small{display:none}}
