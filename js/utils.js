@@ -301,7 +301,7 @@ function monthAfter(m){
 }
 
 
-// V34.7: Fair 地点键值跨设备统一：忽略大小写、所有空格、标点和符号。
+// V34.8: Fair 地点键值跨设备统一：忽略大小写、所有空格、标点和符号。
 // Sunway Mall / sunwaymall / Sunway-Mall / SUNWAY_MALL 均视为同一地点。
 function normalizeFairLocationKey(value){
   return String(value||"")

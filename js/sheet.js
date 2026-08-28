@@ -310,7 +310,7 @@ function addPendingRow(row) {
   savePendingRows();
 }
 
-// V34.7: a completed older request may only acknowledge the exact pending
+// V34.8: a completed older request may only acknowledge the exact pending
 // version it sent.  It must not remove a newer edit for the same Fair date.
 function clearPendingRowIfVersionV343(row) {
   loadPendingRows();
@@ -324,7 +324,7 @@ function clearPendingRowIfVersionV343(row) {
   savePendingRows();
 }
 
-// V34.7: a pagehide keepalive request can reach Google Sheet even though the
+// V34.8: a pagehide keepalive request can reach Google Sheet even though the
 // browser cannot read its no-cors response.  On the next cloud load, treat an
 // identical authoritative row as the acknowledgement and permanently remove
 // the stale local retry item.  This prevents the same successful save from
@@ -337,7 +337,7 @@ function reconcilePendingRowsFromCloudV329(cloudRows) {
   const before = pendingRows.length;
   pendingRows = pendingRows.filter(pending => {
     const cloud = cloudByKey.get(syncKey(pending));
-    // V34.7: a zero-amount pending row means deletion.  When the authoritative
+    // V34.8: a zero-amount pending row means deletion.  When the authoritative
     // cloud read no longer contains that key, the deletion is already complete.
     if (!cloud) return Number(pending.amount || 0) > 0.005;
     return Math.abs(Number(cloud.amount || 0) - Number(pending.amount || 0)) > 0.005;
@@ -1041,6 +1041,9 @@ async function loadSalesProductLinksV206(type,date,location,options={}) {
 async function deleteSalesProductLinkV206(linkId) {
   const json = await jsonp({ action:"deleteSalesProductLink", linkId }, { timeoutMs:20000 });
   if (!json.ok) throw new Error(json.message || "删除盆栽关联失败");
+  if(typeof window.purgeDeletedSalesLinkV348==='function')window.purgeDeletedSalesLinkV348(linkId);
+  if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
+  if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
   salesProductLinksCacheV216.clear();
   allSalesProductLinksCacheV216={links:null,at:0};
   clearDailyProfitCacheV237();

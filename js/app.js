@@ -145,7 +145,7 @@ let historicalHighsMemory=null;
 let historicalHighsPromise=null;
 
 function readHistoricalHighsCache(){
-  // V34.7: an all-time record does not become invalid merely because normal
+  // V34.8: an all-time record does not become invalid merely because normal
   // turnover revision changes. Keep the last confirmed local record available
   // immediately and let a low-priority cloud check improve it in background.
   if(historicalHighsMemory)return historicalHighsMemory;
@@ -337,7 +337,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V34.7: Top 5 and its last confirmed local record paint immediately.
+    // V34.8: Top 5 and its last confirmed local record paint immediately.
     // Cloud comparison waits for browser idle time and never blocks page sync.
     scheduleHistoricalHighsCheckV331();
   }
@@ -1274,7 +1274,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 
   const now=new Date().toISOString();
   const mutationV344=nextClientMutationV344();
-  // V34.7: send only real changes.  Unchanged Date Range days (especially
+  // V34.8: send only real changes.  Unchanged Date Range days (especially
   // untouched 0.00 days) are not pending work and must never reappear as ten
   // "未同步" records on the next open.
   const records=[...inputs].map(i=>{
@@ -1360,7 +1360,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3470",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3480",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1378,7 +1378,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3470";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3480";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1724,7 +1724,7 @@ function updateLiveInputFromSelectedDate(){
   const d=isoToDisplay(dateEl.value);
   const host=selectedLiveHost();
   const amount=host?getLiveAmount(d,host):0;
-  // V34.7: background render/sync must never overwrite an unsaved amount.
+  // V34.8: background render/sync must never overwrite an unsaved amount.
   // Drafts are isolated by exact host + date and survive mobile page suspension.
   const draft=getLiveTurnoverDraftV332();
   amountEl.value=draft?String(draft.value):formatAmount(amount);
@@ -2764,7 +2764,7 @@ function ensureProductLinkFirstCardV208(type){
 function toggleProductLinkBoxV206(type){
   const pre=productLinkPreV208(type),box=document.getElementById(pre+"ProductLinkBox"),body=document.getElementById(pre+"ProductLinkBody");
   if(!box||!body)return;
-  // V34.7: opening the Fair sales card is a view action, not a Date Range
+  // V34.8: opening the Fair sales card is a view action, not a Date Range
   // reset. Preserve the user's selected associated date so the editor loads
   // that exact day's cards instead of silently jumping back to today.
   const selectedFairDate=type==="fair"?String(document.getElementById("fairProductDate")?.value||""):"";
@@ -3064,7 +3064,7 @@ async function loadProductLinksIntoEditorV206(type){
 
   try{
     const cloudLinks=await loadSalesProductLinksV206(type,date,location,{force:true,maxAgeMs:0});
-    // V34.7: an acknowledged older cloud response must never resurrect a
+    // V34.8: an acknowledged older cloud response must never resurrect a
     // product removed by a newer local draft which is still queued.
     const pendingKey=salesDraftPendingKeyV314(type,date,location);
     const pendingDraft=readSalesDraftPendingV314()[pendingKey];
@@ -3211,7 +3211,7 @@ function recalcSalesCardTransactionV239(card){
   const rate=totalPrice>0?totalProfit/totalPrice*100:0;
   const set=(sel,val)=>{const el=card.querySelector(sel);if(el)el.textContent=val};
   set(".sales-card-price-total-v239","RM"+formatAmount(totalPrice));
-  // V34.7: displayed total cost uses the same complete cost basis as profit.
+  // V34.8: displayed total cost uses the same complete cost basis as profit.
   // Profit itself is intentionally unchanged to avoid double-deducting fees.
   set(".sales-card-cost-total-v239","RM"+formatAmount(totalCost+totalDelivery+totalExtra+totalCommission));
   set(".sales-card-commission-amount-v239","RM"+formatAmount(totalCommission));
@@ -3847,7 +3847,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     const crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"]];
-    // V34.7: localDelivery remains the saved product-delivery TOTAL for full
+    // V34.8: localDelivery remains the saved product-delivery TOTAL for full
     // backward compatibility. Infer the per-tree crate rate from either the
     // new total/quantity value or the old one-charge legacy value.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
@@ -5133,7 +5133,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3470",
+    version:"3480",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5161,7 +5161,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    downloadFile(`Lover_Legend_Sales_V34_7_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+    downloadFile(`Lover_Legend_Sales_V34_8_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSync("Backup 已完成",true);
     alert(`Backup 成功。\n\n营业记录：${payload.rows.length} 笔\n销售卡：${payload.productLinks.length} 笔\n新增/修改历史：${payload.salesChangeLogs.length} 笔\n\nBackup 文件已经生成。`);
@@ -5393,6 +5393,27 @@ function refreshProfitAggregateCachesV321(savedLinks,replaceTxnIds=[]){
 }
 window.refreshProfitAggregateCachesV321=refreshProfitAggregateCachesV321;
 
+function purgeDeletedSalesLinkV348(linkId){
+  const target=String(linkId||'').trim();if(!target)return;
+  const pending=readSalesDraftPendingV314();let pendingChanged=false;
+  Object.keys(pending).forEach(key=>{
+    const entry=pending[key],before=Array.isArray(entry?.items)?entry.items:[];
+    const after=before.filter(x=>String(x?.linkId||'').trim()!==target);
+    if(after.length===before.length)return;
+    pendingChanged=true;
+    if(after.length)pending[key]={...entry,items:after,token:Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),savedAt:Date.now()};
+    else delete pending[key];
+  });
+  if(pendingChanged)writeSalesDraftPendingV314(pending);
+  if(Array.isArray(monthGrandProfitLinksV295))monthGrandProfitLinksV295=monthGrandProfitLinksV295.filter(x=>String(x?.linkId||'').trim()!==target);
+  if(Array.isArray(yearBreakdownLinksV286))yearBreakdownLinksV286=yearBreakdownLinksV286.filter(x=>String(x?.linkId||'').trim()!==target);
+  if(typeof clearDailyProfitCacheV237==='function')clearDailyProfitCacheV237();
+  if(typeof clearSalesCardPersistentCacheV232==='function')clearSalesCardPersistentCacheV232();
+  if(monthGrandHistoryOpenV223)renderMonthGrandHistoryV223();
+  if(Object.values(yearBreakdownOpenV224||{}).some(Boolean))renderAllYearBreakdownsV224();
+}
+window.purgeDeletedSalesLinkV348=purgeDeletedSalesLinkV348;
+
 const SALES_DRAFT_PENDING_KEY_V314='lover_sales_draft_pending_v314';
 const SALES_DRAFT_INFLIGHT_V314=new Map();
 let SALES_DRAFT_RETRY_TIMER_V314=null;
@@ -5496,7 +5517,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleSa
 setTimeout(()=>scheduleSalesDraftRetryV314(1200),0);
 
 
-/* ================= V34.7 Sales stock oversell guard =================
+/* ================= V34.8 Sales stock oversell guard =================
    Before Save Draft / Confirm, re-read Import current stock.  New/unprocessed
    cards must fit the full requested quantity.  A card already confirmed AND
    fully inventory-confirmed only needs enough stock for its positive net
@@ -5803,8 +5824,8 @@ productProfitMobileCardsV216=function(list){
 
 
 
-/* ================= V34.7 labelled profit rollup + true overall margin ================= */
-// V34.7: the displayed cost uses inventory cost + product delivery + extra fee.
+/* ================= V34.8 labelled profit rollup + true overall margin ================= */
+// V34.8: the displayed cost uses inventory cost + product delivery + extra fee.
 // Commission remains a separate card-level deduction and is not added here.
 function productOperatingCostV335(x){
   const q=Math.max(1,Number(x&&x.quantity||1));
@@ -6257,7 +6278,7 @@ renderLiveMonthlyList=function(){
   }).catch(e=>console.warn('V29.9 Live 利润读取失败',e));
 };
 
-/* ================= V34.7 authoritative save/context fixes ================= */
+/* ================= V34.8 authoritative save/context fixes ================= */
 const FAIR_TURNOVER_SAVE_REV_V346=new Map(),LIVE_TURNOVER_SAVE_REV_V346=new Map();
 function turnoverRevKeyV346(type,date,location){return `${type}|${date}|${type==='fair'?normalizeFairLocationKey(location):normalizeLiveHostKey(location)}`}
 function nextTurnoverRevV346(map,key){const n=Number(map.get(key)||0)+1;map.set(key,n);return n}
