@@ -145,7 +145,7 @@ let historicalHighsMemory=null;
 let historicalHighsPromise=null;
 
 function readHistoricalHighsCache(){
-  // V33.6: an all-time record does not become invalid merely because normal
+  // V33.7: an all-time record does not become invalid merely because normal
   // turnover revision changes. Keep the last confirmed local record available
   // immediately and let a low-priority cloud check improve it in background.
   if(historicalHighsMemory)return historicalHighsMemory;
@@ -337,7 +337,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V33.6: Top 5 and its last confirmed local record paint immediately.
+    // V33.7: Top 5 and its last confirmed local record paint immediately.
     // Cloud comparison waits for browser idle time and never blocks page sync.
     scheduleHistoricalHighsCheckV331();
   }
@@ -1703,7 +1703,7 @@ function updateLiveInputFromSelectedDate(){
   const d=isoToDisplay(dateEl.value);
   const host=selectedLiveHost();
   const amount=host?getLiveAmount(d,host):0;
-  // V33.6: background render/sync must never overwrite an unsaved amount.
+  // V33.7: background render/sync must never overwrite an unsaved amount.
   // Drafts are isolated by exact host + date and survive mobile page suspension.
   const draft=getLiveTurnoverDraftV332();
   amountEl.value=draft?String(draft.value):formatAmount(amount);
@@ -3163,7 +3163,7 @@ function recalcSalesCardTransactionV239(card){
   const rate=totalPrice>0?totalProfit/totalPrice*100:0;
   const set=(sel,val)=>{const el=card.querySelector(sel);if(el)el.textContent=val};
   set(".sales-card-price-total-v239","RM"+formatAmount(totalPrice));
-  // V33.6: displayed total cost uses the same complete cost basis as profit.
+  // V33.7: displayed total cost uses the same complete cost basis as profit.
   // Profit itself is intentionally unchanged to avoid double-deducting fees.
   set(".sales-card-cost-total-v239","RM"+formatAmount(totalCost+totalDelivery+totalExtra+totalCommission));
   set(".sales-card-commission-amount-v239","RM"+formatAmount(totalCommission));
@@ -3799,7 +3799,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     const crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"]];
-    // V33.6: localDelivery remains the saved product-delivery TOTAL for full
+    // V33.7: localDelivery remains the saved product-delivery TOTAL for full
     // backward compatibility. Infer the per-tree crate rate from either the
     // new total/quantity value or the old one-charge legacy value.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
@@ -5063,7 +5063,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3360",
+    version:"3370",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5091,7 +5091,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    downloadFile(`Lover_Legend_Sales_V33_6_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+    downloadFile(`Lover_Legend_Sales_V33_7_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSync("Backup 已完成",true);
     alert(`Backup 成功。\n\n营业记录：${payload.rows.length} 笔\n销售卡：${payload.productLinks.length} 笔\n新增/修改历史：${payload.salesChangeLogs.length} 笔\n\nBackup 文件已经生成。`);
@@ -5423,7 +5423,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleSa
 setTimeout(()=>scheduleSalesDraftRetryV314(1200),0);
 
 
-/* ================= V33.6 Sales stock oversell guard =================
+/* ================= V33.7 Sales stock oversell guard =================
    Before Save Draft / Confirm, re-read Import current stock.  New/unprocessed
    cards must fit the full requested quantity.  A card already confirmed AND
    fully inventory-confirmed only needs enough stock for its positive net
@@ -5728,8 +5728,8 @@ productProfitMobileCardsV216=function(list){
 
 
 
-/* ================= V33.6 labelled profit rollup + true overall margin ================= */
-// V33.6: the displayed cost uses inventory cost + product delivery + extra fee.
+/* ================= V33.7 labelled profit rollup + true overall margin ================= */
+// V33.7: the displayed cost uses inventory cost + product delivery + extra fee.
 // Commission remains a separate card-level deduction and is not added here.
 function productOperatingCostV335(x){
   const q=Math.max(1,Number(x&&x.quantity||1));
@@ -5764,7 +5764,7 @@ renderProductProfitSummaryV216=function(type,allLinks){
       <div><span>总利润</span><b>${formatAmount(t.profit)}</b></div>
       <div><span>整体利润率</span><b>${overallRate.toFixed(2)}%</b></div>
     </div>`:'';
-    return `<section class="product-profit-group"><div class="product-profit-group-title">${type==='live'?'主播':'地点'}：${escapeChangeLogHtmlV200(group.name)}</div><div class="product-profit-table-wrap"><table class="product-profit-table"><thead><tr><th>产品名</th><th>成本（含运费/附加）</th><th>售价</th><th>利润</th><th>利润率</th></tr></thead><tbody>${group.links.length?productProfitDesktopRowsV216(group.links):`<tr><td colspan="5" class="product-profit-empty">没有已保存的销售卡资料</td></tr>`}</tbody></table></div><div class="product-profit-mobile-list">${group.links.length?productProfitMobileCardsV216(group.links):`<div class="product-profit-empty">没有已保存的销售卡资料</div>`}</div>${totals}<div class="product-profit-total profit-highlight product-profit-grand-v246"><span>总利润</span><b>RM${formatAmount(s.totalProfit)}</b></div></section>`;
+    return `<section class="product-profit-group"><div class="product-profit-group-title">${type==='live'?'主播':'地点'}：${escapeChangeLogHtmlV200(group.name)}</div><div class="product-profit-table-wrap"><table class="product-profit-table"><thead><tr><th>产品名</th><th>成本（含运费/附加）</th><th>售价</th><th>利润</th><th>利润率</th></tr></thead><tbody>${group.links.length?productProfitDesktopRowsV216(group.links):`<tr><td colspan="5" class="product-profit-empty">没有已保存的销售卡资料</td></tr>`}</tbody></table></div><div class="product-profit-mobile-list">${group.links.length?productProfitMobileCardsV216(group.links):`<div class="product-profit-empty">没有已保存的销售卡资料</div>`}</div>${totals}</section>`;
   }).join('');
   const dayRate=daySales>0?dayProfit/daySales*100:0;
   panel.innerHTML=`<div class="product-profit-summary-head"><div><b>${date} · ${type==='live'?'全部主播':'全部地点'}</b></div><button type="button" class="secondary-btn product-profit-export-btn" onclick="exportProductProfitExcelV216('${type}')">📈 导出 Excel</button></div>${sections||`<div class="product-profit-empty">当天还没有销售卡资料</div>`}<div class="product-profit-day-summary"><div class="product-profit-total profit-highlight"><span>当天总利润</span><b>RM${formatAmount(dayProfit)}</b></div><div class="product-profit-total profit-highlight"><span>当天整体利润率</span><b>${dayRate.toFixed(2)}%</b></div></div>`;
