@@ -310,7 +310,7 @@ function addPendingRow(row) {
   savePendingRows();
 }
 
-// V34.8: a completed older request may only acknowledge the exact pending
+// V34.9: a completed older request may only acknowledge the exact pending
 // version it sent.  It must not remove a newer edit for the same Fair date.
 function clearPendingRowIfVersionV343(row) {
   loadPendingRows();
@@ -324,7 +324,7 @@ function clearPendingRowIfVersionV343(row) {
   savePendingRows();
 }
 
-// V34.8: a pagehide keepalive request can reach Google Sheet even though the
+// V34.9: a pagehide keepalive request can reach Google Sheet even though the
 // browser cannot read its no-cors response.  On the next cloud load, treat an
 // identical authoritative row as the acknowledgement and permanently remove
 // the stale local retry item.  This prevents the same successful save from
@@ -337,7 +337,7 @@ function reconcilePendingRowsFromCloudV329(cloudRows) {
   const before = pendingRows.length;
   pendingRows = pendingRows.filter(pending => {
     const cloud = cloudByKey.get(syncKey(pending));
-    // V34.8: a zero-amount pending row means deletion.  When the authoritative
+    // V34.9: a zero-amount pending row means deletion.  When the authoritative
     // cloud read no longer contains that key, the deletion is already complete.
     if (!cloud) return Number(pending.amount || 0) > 0.005;
     return Math.abs(Number(cloud.amount || 0) - Number(pending.amount || 0)) > 0.005;
@@ -888,8 +888,8 @@ async function confirmSalesCardInventoryV249(payload) {
   return json;
 }
 
-async function saveSalesProductLinksV206(items, saveMode="confirm", restoreGeneration=getLocalRestoreGenerationV347()) {
-  const json = await jsonp({ action:"saveSalesProductLinks", itemsJson:JSON.stringify(items||[]), saveMode:String(saveMode||"confirm"), restoreGeneration }, { timeoutMs:30000 });
+async function saveSalesProductLinksV206(items, saveMode="confirm", restoreGeneration=getLocalRestoreGenerationV347(), clientDeviceId="", clientSequence=0) {
+  const json = await jsonp({ action:"saveSalesProductLinks", itemsJson:JSON.stringify(items||[]), saveMode:String(saveMode||"confirm"), restoreGeneration, clientDeviceId, clientSequence }, { timeoutMs:30000 });
   if (!json.ok) throw new Error(json.message || "盆栽资料保存失败");
   if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
   const first=Array.isArray(items)&&items.length?items[0]:null;
