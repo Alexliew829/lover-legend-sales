@@ -286,7 +286,7 @@ function clearPendingRow(row) {
   savePendingRows();
 }
 
-// V32.9: a pagehide keepalive request can reach Google Sheet even though the
+// V33.0: a pagehide keepalive request can reach Google Sheet even though the
 // browser cannot read its no-cors response.  On the next cloud load, treat an
 // identical authoritative row as the acknowledgement and permanently remove
 // the stale local retry item.  This prevents the same successful save from
