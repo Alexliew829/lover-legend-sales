@@ -145,7 +145,7 @@ let historicalHighsMemory=null;
 let historicalHighsPromise=null;
 
 function readHistoricalHighsCache(){
-  // V34.5: an all-time record does not become invalid merely because normal
+  // V34.6: an all-time record does not become invalid merely because normal
   // turnover revision changes. Keep the last confirmed local record available
   // immediately and let a low-priority cloud check improve it in background.
   if(historicalHighsMemory)return historicalHighsMemory;
@@ -337,7 +337,7 @@ function toggleTop3(id,btn){
     else if(id==="livePageTop3")renderLivePageTop3();
     else renderBusinessTop3();
 
-    // V34.5: Top 5 and its last confirmed local record paint immediately.
+    // V34.6: Top 5 and its last confirmed local record paint immediately.
     // Cloud comparison waits for browser idle time and never blocks page sync.
     scheduleHistoricalHighsCheckV331();
   }
@@ -1274,7 +1274,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 
   const now=new Date().toISOString();
   const mutationV344=nextClientMutationV344();
-  // V34.5: send only real changes.  Unchanged Date Range days (especially
+  // V34.6: send only real changes.  Unchanged Date Range days (especially
   // untouched 0.00 days) are not pending work and must never reappear as ten
   // "未同步" records on the next open.
   const records=[...inputs].map(i=>{
@@ -1724,7 +1724,7 @@ function updateLiveInputFromSelectedDate(){
   const d=isoToDisplay(dateEl.value);
   const host=selectedLiveHost();
   const amount=host?getLiveAmount(d,host):0;
-  // V34.5: background render/sync must never overwrite an unsaved amount.
+  // V34.6: background render/sync must never overwrite an unsaved amount.
   // Drafts are isolated by exact host + date and survive mobile page suspension.
   const draft=getLiveTurnoverDraftV332();
   amountEl.value=draft?String(draft.value):formatAmount(amount);
@@ -1772,9 +1772,9 @@ function changeLogPanelIdV200(type){
   return type==="daily"?"salesChangeLogPanel":type==="fair"?"fairChangeLogPanel":"liveChangeLogPanel";
 }
 function selectedChangeLogDateV200(type){
-  const id=type==="daily"?"saleDate":type==="fair"?"fairStart":"liveDate";
-  const iso=String(document.getElementById(id)?.value||"");
-  return isoToDisplay(iso);
+  if(type==="fair")return String(document.getElementById("fairProductDate")?.value||"");
+  const id=type==="daily"?"saleDate":"liveDate";
+  return isoToDisplay(String(document.getElementById(id)?.value||""));
 }
 function escapeChangeLogHtmlV200(value){
   return String(value==null?"":value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
@@ -1868,12 +1868,14 @@ async function toggleSalesChangeLogV200(type,button){
   panel.dataset.logDate=date;
   panel.classList.remove("hidden");
   const pendingForDate=(typeof pendingRows!=="undefined")&&pendingRows.some(r=>String(r.type||"")===type&&String(r.date||"")===date);
-  const cachedLogs=!pendingForDate&&typeof getSalesChangeLogCacheV237==="function"?getSalesChangeLogCacheV237(type,date):null;
+  // Fair audit data is location-specific. The legacy cache is date-only, so
+  // never paint another Fair location while the exact cloud query is running.
+  const cachedLogs=type!=="fair"&&!pendingForDate&&typeof getSalesChangeLogCacheV237==="function"?getSalesChangeLogCacheV237(type,date):null;
   if(Array.isArray(cachedLogs))renderChangeLogTimelineV200(type,date,cachedLogs);
   else panel.innerHTML=`<div class="change-log-loading">正在读取 ${escapeChangeLogHtmlV200(date)} 最新记录...</div>`;
   if(button)button.classList.add("active");
   try{
-    const data=await loadSalesChangeLogFromSheetV200(type,date,{force:true});
+    const data=await loadSalesChangeLogFromSheetV200(type,date,{force:true,location:type==="fair"?canonicalLocation(document.getElementById("fairLocation")?.value||""):""});
     if(!salesChangeLogOpenV200[type]||String(panel.dataset.logDate||"")!==date)return;
     const fresh=Array.isArray(data&&data.logs)?data.logs:[];
     if(!Array.isArray(cachedLogs)||JSON.stringify(cachedLogs)!==JSON.stringify(fresh)){
@@ -2762,7 +2764,7 @@ function ensureProductLinkFirstCardV208(type){
 function toggleProductLinkBoxV206(type){
   const pre=productLinkPreV208(type),box=document.getElementById(pre+"ProductLinkBox"),body=document.getElementById(pre+"ProductLinkBody");
   if(!box||!body)return;
-  // V34.5: opening the Fair sales card is a view action, not a Date Range
+  // V34.6: opening the Fair sales card is a view action, not a Date Range
   // reset. Preserve the user's selected associated date so the editor loads
   // that exact day's cards instead of silently jumping back to today.
   const selectedFairDate=type==="fair"?String(document.getElementById("fairProductDate")?.value||""):"";
@@ -3061,7 +3063,12 @@ async function loadProductLinksIntoEditorV206(type){
   }
 
   try{
-    const links=await loadSalesProductLinksV206(type,date,location,{force:true,maxAgeMs:0});
+    const cloudLinks=await loadSalesProductLinksV206(type,date,location,{force:true,maxAgeMs:0});
+    // V34.6: an acknowledged older cloud response must never resurrect a
+    // product removed by a newer local draft which is still queued.
+    const pendingKey=salesDraftPendingKeyV314(type,date,location);
+    const pendingDraft=readSalesDraftPendingV314()[pendingKey];
+    const links=pendingDraft&&Array.isArray(pendingDraft.items)?pendingDraft.items:cloudLinks;
     const current=productLinkContextV206(type);
     const currentKey=salesCardContextKeyV245(type,current.date,current.location);
 
@@ -3204,7 +3211,7 @@ function recalcSalesCardTransactionV239(card){
   const rate=totalPrice>0?totalProfit/totalPrice*100:0;
   const set=(sel,val)=>{const el=card.querySelector(sel);if(el)el.textContent=val};
   set(".sales-card-price-total-v239","RM"+formatAmount(totalPrice));
-  // V34.5: displayed total cost uses the same complete cost basis as profit.
+  // V34.6: displayed total cost uses the same complete cost basis as profit.
   // Profit itself is intentionally unchanged to avoid double-deducting fees.
   set(".sales-card-cost-total-v239","RM"+formatAmount(totalCost+totalDelivery+totalExtra+totalCommission));
   set(".sales-card-commission-amount-v239","RM"+formatAmount(totalCommission));
@@ -3840,7 +3847,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     const crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"]];
-    // V34.5: localDelivery remains the saved product-delivery TOTAL for full
+    // V34.6: localDelivery remains the saved product-delivery TOTAL for full
     // backward compatibility. Infer the per-tree crate rate from either the
     // new total/quantity value or the old one-charge legacy value.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
@@ -5125,7 +5132,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3450",
+    version:"3460",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5487,7 +5494,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleSa
 setTimeout(()=>scheduleSalesDraftRetryV314(1200),0);
 
 
-/* ================= V34.5 Sales stock oversell guard =================
+/* ================= V34.6 Sales stock oversell guard =================
    Before Save Draft / Confirm, re-read Import current stock.  New/unprocessed
    cards must fit the full requested quantity.  A card already confirmed AND
    fully inventory-confirmed only needs enough stock for its positive net
@@ -5794,8 +5801,8 @@ productProfitMobileCardsV216=function(list){
 
 
 
-/* ================= V34.5 labelled profit rollup + true overall margin ================= */
-// V34.5: the displayed cost uses inventory cost + product delivery + extra fee.
+/* ================= V34.6 labelled profit rollup + true overall margin ================= */
+// V34.6: the displayed cost uses inventory cost + product delivery + extra fee.
 // Commission remains a separate card-level deduction and is not added here.
 function productOperatingCostV335(x){
   const q=Math.max(1,Number(x&&x.quantity||1));
@@ -6247,3 +6254,86 @@ renderLiveMonthlyList=function(){
     container.insertAdjacentHTML('beforeend',`<div class="profit-grand-v294"><strong>Live 全部主播总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>${money(totalProfit)}</b></div><div><span>整体利润率</span><b>${marginTextV294(totalProfit,total)}</b></div></div>`);
   }).catch(e=>console.warn('V29.9 Live 利润读取失败',e));
 };
+
+/* ================= V34.6 authoritative save/context fixes ================= */
+const FAIR_TURNOVER_SAVE_REV_V346=new Map(),LIVE_TURNOVER_SAVE_REV_V346=new Map();
+function turnoverRevKeyV346(type,date,location){return `${type}|${date}|${type==='fair'?normalizeFairLocationKey(location):normalizeLiveHostKey(location)}`}
+function nextTurnoverRevV346(map,key){const n=Number(map.get(key)||0)+1;map.set(key,n);return n}
+
+saveLiveSales=async function(){
+  if(!ensureWritableSelection())return;
+  const dateEl=document.getElementById('liveDate'),hostInput=document.getElementById('liveHost'),amountEl=document.getElementById('liveSales');
+  const d=isoToDisplay(dateEl?.value||'');let host=selectedLiveHost();const amount=toAmount(amountEl?.value||0);
+  if(!host){alert('请输入主播名字');return}if(!d){alert('请选择日期');return}
+  host=reactivateLiveHostIfNeeded(host).host;hostInput.value=host;saveLiveHost(host);saveLastLiveSession(host,dateEl.value);
+  const now=new Date().toISOString(),mutation=nextClientMutationV344();
+  const previous=rows.find(r=>r.type==='live'&&r.date===d&&normalizeLiveHostKey(r.location)===normalizeLiveHostKey(host));
+  const localRow={type:'live',date:d,company:'live',location:host,amount,updatedAt:now,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:String(previous?.updatedAt||'')};
+  const key=turnoverRevKeyV346('live',d,host),rev=nextTurnoverRevV346(LIVE_TURNOVER_SAVE_REV_V346,key);
+  if(amount<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));else upsertLocalRow(localRow);
+  addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);saveLocalDataCache();renderAll();showTempMsg('liveSaveMsg');setSync('Live 已储存 · 正在同步云端...');
+  try{
+    const saved=await saveLiveToSheet(d,host,amount,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true);
+    if(LIVE_TURNOVER_SAVE_REV_V346.get(key)!==rev)return;
+    if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);else rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));
+    clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync('Live 已储存 · 云端已同步',true);
+  }catch(e){if(LIVE_TURNOVER_SAVE_REV_V346.get(key)===rev)setPendingRetrySyncStatus()}
+};
+window.saveLiveSales=saveLiveSales;
+
+saveFairSales=async function(){
+  const raw=String(document.getElementById('fairLocation')?.value||'').trim();if(!raw){alert('请先输入 Fair 地点');return}if(!ensureWritableSelection())return;
+  const loc=canonicalLocation(raw),inputs=[...document.querySelectorAll('.fairAmount[data-date]')];if(!inputs.length){alert('请选择 Fair 日期');return}
+  document.getElementById('fairLocation').value=loc;
+  const now=new Date().toISOString(),mutation=nextClientMutationV344(),records=[];
+  inputs.forEach(input=>{
+    const date=String(input.dataset.date||''),amount=toAmount(input.value),previous=rows.find(r=>r.type==='fair'&&r.date===date&&normalizeFairLocationKey(r.location)===normalizeFairLocationKey(loc));
+    if(Math.abs(amount-Number(previous?.amount||0))<=0.005)return;
+    const rec={date,amount,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:String(previous?.updatedAt||'')};records.push(rec);
+    const row={type:'fair',date,company:'fair',location:loc,amount,updatedAt:now,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:rec.baseCloudUpdatedAt};
+    if(amount<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(row));else upsertLocalRow(row);
+    addPendingRow(row);if(typeof markLocalRowMutation==='function')markLocalRowMutation(row);
+  });
+  const start=document.getElementById('fairStart').value,end=document.getElementById('fairEnd').value;
+  saveLocalFairSessionV320(loc,start,end,now);saveFairLocation(loc);fairSessionDraftDirtyV282=false;saveLocalDataCache();renderAll();syncFairInputs();syncFairProductDatesV203(false);showTempMsg('fairSaveMsg');
+  if(!records.length){setSync('Fair 日期范围已储存 · 正在同步云端...');try{await saveFairSessionToSheetV281(loc,start,end);setSync('Fair 已储存 · 云端已同步',true)}catch(_){setSync('Fair 日期范围已储存 · 云端待同步',false,true)}return}
+  const contextKey=normalizeFairLocationKey(loc),rev=nextTurnoverRevV346(FAIR_TURNOVER_SAVE_REV_V346,contextKey);setSync('Fair 已储存 · 正在同步云端...');
+  try{
+    const result=await saveFairBatchToSheet(loc,records,true);if(FAIR_TURNOVER_SAVE_REV_V346.get(contextKey)!==rev)return;
+    (result?.rows||[]).forEach(r=>{if(Number(r.amount||0)<=0)rows=rows.filter(x=>syncKey(x)!==syncKey(r));else upsertLocalRow(r)});
+    records.forEach(i=>clearPendingRowIfVersionV343({type:'fair',date:i.date,company:'fair',location:loc,clientUpdatedAt:i.clientUpdatedAt}));
+    saveLocalDataCache();renderAll();syncFairInputs();syncFairProductDatesV203(false);setSync('Fair 已储存 · 云端已同步',true);
+    Promise.resolve(saveFairSessionToSheetV281(loc,start,end)).then(()=>refreshFairSessionsV281()).catch(()=>{});
+  }catch(e){if(FAIR_TURNOVER_SAVE_REV_V346.get(contextKey)===rev)setPendingRetrySyncStatus()}
+};
+window.saveFairSales=saveFairSales;
+
+syncQueuedSalesDraftV314=async function(key,expectedToken=''){
+  const older=SALES_DRAFT_INFLIGHT_V314.get(key);
+  if(older){try{await older}catch(_){}const latest=readSalesDraftPendingV314()[key];if(!latest)return{ok:true,skipped:true};if(expectedToken&&String(latest.token)!==String(expectedToken))return{ok:true,stale:true};return syncQueuedSalesDraftV314(key,latest.token)}
+  const entry=readSalesDraftPendingV314()[key];if(!entry)return{ok:true,skipped:true};if(expectedToken&&String(entry.token)!==String(expectedToken))return{ok:true,stale:true};
+  const task=(async()=>{try{
+    const result=await window.saveSalesProductLinksApiV241(entry.items,'draft'),latest=readSalesDraftPendingV314()[key];
+    if(latest&&String(latest.token)===String(entry.token)){
+      removeSalesDraftPendingV314(key,entry.token);const saved=Array.isArray(result?.links)?result.links:entry.items;
+      setCachedSalesProductLinksV216(entry.type,entry.date,entry.location,saved);setSalesCardPersistentCacheV232(entry.type,entry.date,entry.location,saved);mergeDailyProfitContextCacheV237(entry.type,entry.date,entry.location,saved);
+      refreshProfitAggregateCachesV321(saved,[...new Set(entry.items.map(x=>String(x.transactionId||'')).filter(Boolean))]);applyCloudDraftStatusesV322(entry.type,saved);setSync('草稿已保存 · 云端已同步',true);
+    }return result;
+  }catch(err){setSync('草稿已安全保存 · 云端待同步',false,true);scheduleSalesDraftRetryV314(5000);throw err}finally{SALES_DRAFT_INFLIGHT_V314.delete(key)}})();
+  SALES_DRAFT_INFLIGHT_V314.set(key,task);return task;
+};
+
+const _productProfitSalesByGroupV346=productProfitSalesByGroupV216;
+productProfitSalesByGroupV216=function(type,date){const map=_productProfitSalesByGroupV346(type,date);if(type!=='fair')return map;const wanted=normalizeFairLocationKey(document.getElementById('fairLocation')?.value||'');[...map.keys()].forEach(key=>{if(key!==wanted)map.delete(key)});return map};
+const _productProfitGroupLinksV346=productProfitGroupLinksV216;
+productProfitGroupLinksV216=function(type,date,links){const groups=_productProfitGroupLinksV346(type,date,links);if(type!=='fair')return groups;const wanted=normalizeFairLocationKey(document.getElementById('fairLocation')?.value||'');[...groups.keys()].forEach(key=>{if(key!==wanted)groups.delete(key)});return groups};
+
+function refreshFairExactContextV346(){
+  syncFairProductDatesV203(false);const amount=selectedActionAmountV270('fair');
+  const panel=productProfitSummaryPanelV216('fair');if(panel){panel.classList.add('hidden');panel.innerHTML=''}productProfitSummaryOpenV216.fair=false;
+  const log=document.getElementById(changeLogPanelIdV200('fair'));if(log){log.classList.add('hidden');log.innerHTML=''}salesChangeLogOpenV200.fair=false;
+  if(amount<=0.005)closeZeroSalesPanelsV271('fair');else if(productLinkBoxIsOpenV210('fair'))loadProductLinksIntoEditorV206('fair').catch(()=>{});
+  refreshSalesActionLocksV270();
+}
+handleFairProductDateChangeV342=function(){refreshFairExactContextV346();return true};window.handleFairProductDateChangeV342=handleFairProductDateChangeV342;
+['fairLocation','fairStart','fairEnd'].forEach(id=>document.getElementById(id)?.addEventListener('change',()=>setTimeout(refreshFairExactContextV346,0)));

@@ -295,7 +295,7 @@ function addPendingRow(row) {
   savePendingRows();
 }
 
-// V34.5: a completed older request may only acknowledge the exact pending
+// V34.6: a completed older request may only acknowledge the exact pending
 // version it sent.  It must not remove a newer edit for the same Fair date.
 function clearPendingRowIfVersionV343(row) {
   loadPendingRows();
@@ -309,7 +309,7 @@ function clearPendingRowIfVersionV343(row) {
   savePendingRows();
 }
 
-// V34.5: a pagehide keepalive request can reach Google Sheet even though the
+// V34.6: a pagehide keepalive request can reach Google Sheet even though the
 // browser cannot read its no-cors response.  On the next cloud load, treat an
 // identical authoritative row as the acknowledgement and permanently remove
 // the stale local retry item.  This prevents the same successful save from
@@ -322,7 +322,9 @@ function reconcilePendingRowsFromCloudV329(cloudRows) {
   const before = pendingRows.length;
   pendingRows = pendingRows.filter(pending => {
     const cloud = cloudByKey.get(syncKey(pending));
-    if (!cloud) return true;
+    // V34.6: a zero-amount pending row means deletion.  When the authoritative
+    // cloud read no longer contains that key, the deletion is already complete.
+    if (!cloud) return Number(pending.amount || 0) > 0.005;
     return Math.abs(Number(cloud.amount || 0) - Number(pending.amount || 0)) > 0.005;
   });
   if (pendingRows.length !== before) savePendingRows();
@@ -1076,7 +1078,8 @@ async function loadSalesChangeLogFromSheetV200(type, date, options={}) {
   const json = await jsonp({
     action: "getSalesChangeLog",
     type,
-    date
+    date,
+    location: options.location || ""
   }, { timeoutMs: 15000 });
   if (!json.ok) throw new Error(json.message || "读取新增 / 修改记录失败");
   setSalesChangeLogCacheV237(type,date,Array.isArray(json.logs)?json.logs:[]);
