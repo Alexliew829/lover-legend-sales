@@ -6870,38 +6870,103 @@ setTimeout(()=>{bindFairLocationDropdownV358();refreshFairLocationHistoryCloudV3
 /* ================= V36.0 Fair normalized location + reliable dropdown ================= */
 setTimeout(()=>{const input=document.getElementById('fairLocation');input?.removeAttribute('list');bindFairLocationDropdownV358();},50);
 
-/* ================= V36.0 selected-date Fair / Live day total ================= */
-const dayTotalFetchV360=new Map();
-function selectedDayTotalDateV360(type){return type==='fair'?fairSelectedDateV353():isoToDisplay(String(document.getElementById('liveDate')?.value||''))}
-function selectedDayTotalSalesV360(type,date){return dedupeRows(rows).filter(r=>r.type===type&&r.date===date).reduce((s,r)=>s+Number(r.amount||0),0)}
-function selectedDayTotalProfitV360(type,date,links){
-  const list=(Array.isArray(links)?links:[]).filter(x=>String(x.type||'')===type&&String(x.date||'')===date);
-  const clean=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(list):list;
-  return clean.reduce((s,x)=>s+Number(x.profit||0),0);
+
+/* ================= V36.0 selected-day Fair / Live totals =================
+   The yellow box is no longer an entity-specific "saved amount" badge.
+   It is the authoritative selected-date total across ALL Fair locations or
+   ALL Live hosts: turnover + sales-card profit + overall profit rate.
+*/
+let selectedDayTotalTokenV360={fair:0,live:0};
+function selectedDayDateV360(type){
+  return type==='fair'?fairSelectedDateV353():isoToDisplay(String(document.getElementById('liveDate')?.value||''));
 }
-function paintSelectedDayTotalV360(type,links){
-  const date=selectedDayTotalDateV360(type),el=document.getElementById(type==='fair'?'fairDateResult':'liveDateResult');if(!el||!date)return;
-  const sales=selectedDayTotalSalesV360(type,date),profit=selectedDayTotalProfitV360(type,date,links),rate=sales>0?profit/sales*100:0;
+function selectedDayTurnoverV360(type,date){
+  return dedupeRows(rows).filter(r=>String(r.type||'')===type&&String(r.date||'')===String(date||'')).reduce((sum,r)=>sum+Number(r.amount||0),0);
+}
+function dedupeProfitLinksV360(links){
+  const map=new Map();
+  (Array.isArray(links)?links:[]).forEach((x,i)=>{
+    if(!x)return;
+    const status=String(x.status||x.linkStatus||'').toLowerCase();
+    if(status==='deleted'||status==='cancelled'||status==='canceled')return;
+    const id=String(x.linkId||x.id||'').trim();
+    const slot=[String(x.type||''),String(x.date||''),String(x.transactionId||x.transactionID||''),String(x.productOrder??x.productIndex??''),String(x.productName||'')].join('|');
+    const key=id||slot||('row|'+i);
+    const old=map.get(key);
+    const fresh=String(x.updatedAt||x.clientUpdatedAt||x.changedAt||'');
+    const oldFresh=String(old?.updatedAt||old?.clientUpdatedAt||old?.changedAt||'');
+    if(!old||fresh>=oldFresh)map.set(key,x);
+  });
+  return [...map.values()];
+}
+function selectedDayProfitV360(type,date,links){
+  return dedupeProfitLinksV360(links).filter(x=>String(x.type||'')===type&&String(x.date||'')===String(date||'')).reduce((sum,x)=>sum+Number(x.profit||0),0);
+}
+function paintSelectedDayTotalV360(type,date,sales,profit,loading=false,error=false){
+  const el=document.getElementById(type==='fair'?'fairDateResult':'liveDateResult');if(!el)return;
+  const label=type==='fair'?'Fair':'Live';
+  const rate=sales>0?profit/sales*100:0;
   el.classList.add('selected-day-total-v360');
-  el.innerHTML=`<span class="day-total-title-v360">${type==='fair'?'Fair':'Live'} 当日总计 <small>${date}</small></span><span class="day-total-metrics-v360"><span>营业额 <b>RM${formatAmount(sales)}</b></span><span>利润 <b>RM${formatAmount(profit)}</b></span><span>利润率 <b>${rate.toFixed(2)}%</b></span></span>`;
+  el.innerHTML=`<span class="selected-day-total-title-v360">${label} 当日总计</span><span class="selected-day-total-date-v360">${escapeChangeLogHtmlV200(date||'-')} · 全部${type==='fair'?'地点':'主播'}</span><span class="selected-day-total-metrics-v360"><b>营业额 RM${money(sales)}</b><b>利润 ${loading?'读取中…':error?'读取失败':'RM'+money(profit)}</b><b>利润率 ${loading||error?'—':rate.toFixed(2)+'%'}</b></span>`;
 }
-function refreshSelectedDayTotalV360(type){
-  const date=selectedDayTotalDateV360(type);if(!date)return;
-  const cached=typeof getDailyProfitCacheV237==='function'?getDailyProfitCacheV237(type,date):null;
-  paintSelectedDayTotalV360(type,Array.isArray(cached)?cached:[]);
-  if(typeof navigator!=='undefined'&&navigator.onLine===false)return;
-  const key=type+'|'+date;if(dayTotalFetchV360.has(key))return;
-  const p=Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000})).then(all=>{
-    const fresh=(all||[]).filter(x=>String(x.type||'')===type&&String(x.date||'')===date);
-    if(typeof setDailyProfitCacheV237==='function')setDailyProfitCacheV237(type,date,fresh);
-    if(selectedDayTotalDateV360(type)===date)paintSelectedDayTotalV360(type,fresh);
-  }).catch(()=>{}).finally(()=>dayTotalFetchV360.delete(key));dayTotalFetchV360.set(key,p);
+async function renderSelectedDayTotalV360(type){
+  const date=selectedDayDateV360(type),token=++selectedDayTotalTokenV360[type];
+  const sales=selectedDayTurnoverV360(type,date);
+  paintSelectedDayTotalV360(type,date,sales,0,true,false);
+  try{
+    const links=await loadAllSalesProductLinksV203({force:false,maxAgeMs:120000});
+    if(token!==selectedDayTotalTokenV360[type]||date!==selectedDayDateV360(type))return;
+    const profit=selectedDayProfitV360(type,date,links);
+    paintSelectedDayTotalV360(type,date,sales,profit,false,false);
+  }catch(e){
+    if(token!==selectedDayTotalTokenV360[type]||date!==selectedDayDateV360(type))return;
+    paintSelectedDayTotalV360(type,date,sales,0,false,true);
+  }
 }
+window.renderSelectedDayTotalV360=renderSelectedDayTotalV360;
+
 const _updateLiveInputFromSelectedDateV360=updateLiveInputFromSelectedDate;
-updateLiveInputFromSelectedDate=function(){_updateLiveInputFromSelectedDateV360();refreshSelectedDayTotalV360('live')};
+updateLiveInputFromSelectedDate=function(){
+  _updateLiveInputFromSelectedDateV360();
+  const input=document.getElementById('liveSales'),draft=getLiveTurnoverDraftV332();
+  if(input&&draft&&document.activeElement!==input)input.value=formatAmount(toAmount(draft.value));
+  renderSelectedDayTotalV360('live');
+};
+window.updateLiveInputFromSelectedDate=updateLiveInputFromSelectedDate;
+
 const _updateFairSingleAmountV360=updateFairSingleAmountV353;
-updateFairSingleAmountV353=function(){_updateFairSingleAmountV360();refreshSelectedDayTotalV360('fair')};
+updateFairSingleAmountV353=function(){
+  _updateFairSingleAmountV360();
+  renderSelectedDayTotalV360('fair');
+};
 window.updateFairSingleAmountV353=updateFairSingleAmountV353;
-// Live money display: preserve easy typing while focused; normalize to 0,000.00 on change/blur.
-function installLiveMoneyFormatV360(){const el=document.getElementById('liveSales');if(!el||el.dataset.moneyV360==='1')return;el.dataset.moneyV360='1';const f=()=>{el.value=formatAmount(toAmount(el.value));saveLiveTurnoverDraftV332(el.value)};el.addEventListener('change',f);el.addEventListener('blur',f)}
-setTimeout(()=>{installLiveMoneyFormatV360();refreshSelectedDayTotalV360('fair');refreshSelectedDayTotalV360('live')},0);
+
+function bindLiveAmountFormatV360(){
+  const input=document.getElementById('liveSales');if(!input||input.dataset.v360Money==='1')return;
+  input.dataset.v360Money='1';
+  input.addEventListener('blur',()=>{
+    input.value=formatAmount(toAmount(input.value));
+    saveLiveTurnoverDraftV332(input.value);
+  });
+  input.addEventListener('change',()=>{
+    if(document.activeElement!==input){input.value=formatAmount(toAmount(input.value));saveLiveTurnoverDraftV332(input.value)}
+  });
+}
+const _showPageV360=showPage;
+showPage=function(name,el){
+  const r=_showPageV360(name,el);if(r===false)return false;
+  if(name==='fair')renderSelectedDayTotalV360('fair');
+  if(name==='live'){bindLiveAmountFormatV360();renderSelectedDayTotalV360('live')}
+  return r;
+};
+window.showPage=showPage;
+
+// Refresh the selected-day total immediately after authoritative turnover saves.
+const _saveLiveSalesV360=saveLiveSales;
+saveLiveSales=async function(){const r=await _saveLiveSalesV360();bindLiveAmountFormatV360();renderSelectedDayTotalV360('live');return r};
+window.saveLiveSales=saveLiveSales;
+const _saveFairSalesV360=saveFairSales;
+saveFairSales=async function(){const r=await _saveFairSalesV360();renderSelectedDayTotalV360('fair');return r};
+window.saveFairSales=saveFairSales;
+
+setTimeout(()=>{bindLiveAmountFormatV360();renderSelectedDayTotalV360('fair');renderSelectedDayTotalV360('live')},80);
