@@ -2682,8 +2682,17 @@ body{overflow-x:hidden;}
 .fair-product-date-picker-v342 label{display:block;margin:0 0 7px;font-weight:800;color:#245b2d}
 .fair-product-date-picker-v342 select{width:100%;margin:0;box-sizing:border-box;background:#fff}
 
-/* V35.8: Fair history dropdown restored; real in-page list, not iOS datalist suggestions. */
+/* V35.9: Fair history dropdown restored; real in-page list, not iOS datalist suggestions. */
 #page-fair .card{overflow:visible}
 #fairLocationHistoryV309{position:relative;z-index:40;max-height:260px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 #fairLocationHistoryV309.hidden{display:none!important}
 @media(max-width:600px){#fairLocationHistoryV309{max-height:220px}.fair-location-history-row-v309{grid-template-columns:minmax(0,1fr) 52px}.fair-location-history-choose-v309{min-height:50px}}
+
+
+/* ================= V35.9 Fair location picker + normalized grouping ================= */
+.fair-location-picker-v359{display:grid;grid-template-columns:minmax(0,1fr) 54px;gap:8px;align-items:stretch;position:relative}
+.fair-location-picker-v359 #fairLocation{width:100%;min-width:0;margin:0;box-sizing:border-box}
+.fair-location-dropdown-btn-v359{margin:0;border:1px solid #cfd7cf;border-radius:12px;background:#fff;color:#176f39;font-size:1.15rem;font-weight:900;cursor:pointer;min-height:48px}
+.fair-location-dropdown-btn-v359:active{background:#eef7f0}
+#fairLocationHistoryV309{position:relative;z-index:80;width:100%;box-sizing:border-box}
+@media(max-width:600px){.fair-location-picker-v359{grid-template-columns:minmax(0,1fr) 52px;gap:7px}.fair-location-dropdown-btn-v359{min-height:50px;font-size:1.2rem}}
