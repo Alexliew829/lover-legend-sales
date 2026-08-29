@@ -2697,9 +2697,11 @@ body{overflow-x:hidden;}
 #fairLocationHistoryV309{position:relative;z-index:80;width:100%;box-sizing:border-box}
 @media(max-width:600px){.fair-location-picker-v359{grid-template-columns:minmax(0,1fr) 52px;gap:7px}.fair-location-dropdown-btn-v359{min-height:50px;font-size:1.2rem}}
 
-/* V36.0 Fair / Live selected-date day total */
-.selected-day-total-v360{display:flex!important;flex-direction:column;gap:8px}
-.day-total-title-v360{font-weight:800}.day-total-title-v360 small{font-weight:700;margin-left:8px}
-.day-total-metrics-v360{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}
-.day-total-metrics-v360>span{display:flex;flex-direction:column;font-size:.82em}.day-total-metrics-v360 b{font-size:1.08em;white-space:nowrap}
-@media(max-width:520px){.day-total-metrics-v360{gap:5px}.day-total-metrics-v360>span{font-size:.74em}.day-total-metrics-v360 b{font-size:1em}}
+
+/* V36.0: selected-date Fair / Live total in the yellow summary box */
+.sales-date-result.selected-day-total-v360{gap:6px;padding:12px 14px}
+.selected-day-total-title-v360{font-size:17px;font-weight:900;color:#5b4200}
+.selected-day-total-date-v360{font-size:13px;font-weight:800;color:#785f18}
+.selected-day-total-metrics-v360{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%;font-size:13px}
+.selected-day-total-metrics-v360 b{display:block;padding:7px 6px;border-radius:9px;background:rgba(255,255,255,.45);text-align:center;white-space:nowrap}
+@media(max-width:520px){.selected-day-total-metrics-v360{grid-template-columns:1fr}.selected-day-total-metrics-v360 b{text-align:left}}
