@@ -2730,3 +2730,22 @@ body{overflow-x:hidden;}
   .sales-date-result.selected-day-total-v361 span{font-size:10.8px;letter-spacing:-.35px}
   .sales-date-result.selected-day-total-v361 b{font-size:13.5px;letter-spacing:-.45px}
 }
+
+
+/* V36.2: true one-line selected-day grand total, matching monthly grand totals. */
+.sales-date-result.selected-day-grand-v362{
+  display:grid !important;
+  grid-template-columns:minmax(142px,1.55fr) minmax(66px,.72fr) minmax(62px,.68fr) minmax(68px,.72fr) !important;
+  gap:4px !important;align-items:center !important;width:100%;box-sizing:border-box;
+  padding:10px 8px !important;margin-top:10px;border:1px solid #dfb13d;border-radius:12px;background:#fff8df;line-height:1.1;
+}
+.sales-date-result.selected-day-grand-v362>strong{min-width:0;white-space:nowrap;color:#7b5400;font-size:14px;font-weight:900;letter-spacing:-.45px}
+.sales-date-result.selected-day-grand-v362>div{display:flex !important;min-width:0;flex-direction:column !important;text-align:right;white-space:nowrap;background:transparent !important;padding:0 !important}
+.sales-date-result.selected-day-grand-v362 span{font-size:10.5px;color:#666;white-space:nowrap}
+.sales-date-result.selected-day-grand-v362 b{font-size:14px;color:#b40000;white-space:nowrap;font-weight:900}
+@media(max-width:430px){
+ .sales-date-result.selected-day-grand-v362{grid-template-columns:minmax(132px,1.5fr) minmax(62px,.72fr) minmax(57px,.66fr) minmax(62px,.72fr) !important;gap:2px !important;padding:9px 5px !important}
+ .sales-date-result.selected-day-grand-v362>strong{font-size:12.5px;letter-spacing:-.65px}
+ .sales-date-result.selected-day-grand-v362 span{font-size:9.7px;letter-spacing:-.4px}
+ .sales-date-result.selected-day-grand-v362 b{font-size:12.5px;letter-spacing:-.55px}
+}
