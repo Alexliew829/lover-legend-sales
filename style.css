@@ -2765,3 +2765,25 @@ body{overflow-x:hidden;}
  .sales-date-result.selected-day-grand-v362 span{font-size:10px;letter-spacing:-.35px}
  .sales-date-result.selected-day-grand-v362 b{font-size:13.5px;letter-spacing:-.5px}
 }
+
+
+/* ================= V36.5 Fair/Live monthly two-line summary ================= */
+/* Fair history remains click/focus dropdown; the visible green arrow button is removed. */
+.fair-location-picker-v359{display:block!important;grid-template-columns:none!important}
+.fair-location-picker-v359 #fairLocation{width:100%!important}
+.fair-location-dropdown-btn-v359{display:none!important}
+/* Remove the old duplicate all-location/all-host grand-total block. */
+#fairMonthlyList>.profit-grand-v294,#liveMonthlyList>.profit-grand-v294{display:none!important}
+.monthly-rollup-v365{margin-top:12px;border:1px solid #dfb13d;border-radius:12px;background:#fff8df;padding:10px 12px;display:grid;gap:8px}
+.monthly-rollup-row-v365{display:grid;grid-template-columns:minmax(112px,1.28fr) minmax(84px,.9fr) minmax(78px,.82fr) minmax(84px,.9fr);align-items:center;gap:7px;border-bottom:1px dashed #e1c66b;padding-bottom:8px;white-space:nowrap}
+.monthly-rollup-row-v365:last-child{border-bottom:0;padding-bottom:0}
+.monthly-rollup-row-v365 span{font-size:13px;font-weight:800;color:#444;min-width:0}
+.monthly-rollup-row-v365 b{font-size:17px;font-weight:900;color:#b00000;text-align:right;font-variant-numeric:tabular-nums;min-width:0;white-space:nowrap}
+.monthly-rollup-profit-v365{grid-template-columns:minmax(70px,.72fr) minmax(105px,1.08fr) minmax(98px,1fr) minmax(72px,.74fr)}
+@media(max-width:430px){
+ .monthly-rollup-v365{padding:9px 7px;gap:7px}
+ .monthly-rollup-row-v365{grid-template-columns:minmax(100px,1.2fr) minmax(76px,.86fr) minmax(64px,.7fr) minmax(76px,.84fr);gap:4px}
+ .monthly-rollup-profit-v365{grid-template-columns:minmax(48px,.55fr) minmax(92px,1.05fr) minmax(82px,.92fr) minmax(62px,.7fr)}
+ .monthly-rollup-row-v365 span{font-size:11.5px;letter-spacing:-.25px}
+ .monthly-rollup-row-v365 b{font-size:14.5px;letter-spacing:-.25px}
+}
