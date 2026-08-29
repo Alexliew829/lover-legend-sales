@@ -2732,7 +2732,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* V36.2: true one-line selected-day grand total, matching monthly grand totals. */
+/* V36.3: true one-line selected-day grand total, matching monthly grand totals. */
 .sales-date-result.selected-day-grand-v362{
   display:grid !important;
   grid-template-columns:minmax(142px,1.55fr) minmax(66px,.72fr) minmax(62px,.68fr) minmax(68px,.72fr) !important;
@@ -2748,4 +2748,20 @@ body{overflow-x:hidden;}
  .sales-date-result.selected-day-grand-v362>strong{font-size:12.5px;letter-spacing:-.65px}
  .sales-date-result.selected-day-grand-v362 span{font-size:9.7px;letter-spacing:-.4px}
  .sales-date-result.selected-day-grand-v362 b{font-size:12.5px;letter-spacing:-.55px}
+}
+
+
+/* V36.3: shorter Chinese labels; reserve width for turnover up to 9,999,999.00. */
+.sales-date-result.selected-day-grand-v362{
+  grid-template-columns:minmax(112px,1.15fr) minmax(112px,1.15fr) minmax(76px,.78fr) minmax(72px,.74fr) !important;
+  gap:5px !important;padding:10px 9px !important;
+}
+.sales-date-result.selected-day-grand-v362>strong{font-size:16px;letter-spacing:-.25px}
+.sales-date-result.selected-day-grand-v362 span{font-size:11px}
+.sales-date-result.selected-day-grand-v362 b{font-size:15.5px;letter-spacing:-.25px}
+@media(max-width:430px){
+ .sales-date-result.selected-day-grand-v362{grid-template-columns:minmax(103px,1.05fr) minmax(105px,1.08fr) minmax(67px,.69fr) minmax(65px,.67fr) !important;gap:2px !important;padding:9px 5px !important}
+ .sales-date-result.selected-day-grand-v362>strong{font-size:14px;letter-spacing:-.55px}
+ .sales-date-result.selected-day-grand-v362 span{font-size:10px;letter-spacing:-.35px}
+ .sales-date-result.selected-day-grand-v362 b{font-size:13.5px;letter-spacing:-.5px}
 }
