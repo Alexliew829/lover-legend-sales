@@ -1370,7 +1370,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3640",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3650",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1388,7 +1388,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3640";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3650";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -4274,7 +4274,7 @@ async function toggleProductProfitSummaryV216(type,button){
       if(button)button.textContent="📊 收起利润";
     }else if(button){button.disabled=true;button.textContent="读取中..."}
 
-    const allLinks=await loadAllSalesProductLinksV203({force:true,maxAgeMs:0});
+    const allLinks=await loadAllSalesProductLinksV203({force:false,maxAgeMs:180000});
     const freshRaw=(allLinks||[]).filter(x=>String(x.type||"")===type&&String(x.date||"")===date);
     const fresh=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(freshRaw):freshRaw;
     if(typeof setDailyProfitCacheV237==="function")setDailyProfitCacheV237(type,date,fresh);
@@ -5165,7 +5165,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3640",
+    version:"3650",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6317,7 +6317,7 @@ renderFairMonthlyList=function(){
   if(!list.length){container.innerHTML='<div class="sub">这个月份还没有 Fair 记录</div>';if(monthlyCommissionEl)monthlyCommissionEl.textContent="0.00";renderFairPageTop3();return;}
   const locations=[];list.forEach(r=>{const key=normalizeFairLocationKey(r.displayLocation);let g=locations.find(x=>x.key===key);if(!g){g={key,name:r.displayLocation,latestDate:r.date,rows:[]};locations.push(g)}else if(displayToISO(r.date)>=displayToISO(g.latestDate)){g.name=r.displayLocation;g.latestDate=r.date}g.rows.push(r)});
   const token=++monthlyProfitRenderTokenV294.fair;
-  container.innerHTML=locations.map(group=>{const sales=group.rows.reduce((s,r)=>s+Number(r.amount||0),0),commission=sales*fairRate;return `<div class="month-record-group month-profit-group-v294" data-profit-group="${escapeChangeLogHtmlV200(group.name)}"><div class="month-record-group-title fair-location-title-v298"><span>${escapeChangeLogHtmlV200(group.name)}</span><b>佣金 ${money(commission)}</b></div>${profitHeadV294()}${group.rows.map(r=>fairProfitRowV294(r,0)).join('')}<div class="month-profit-row-v294 month-profit-total-v294"><span>这场 Fair 总数</span><strong>${money(sales)}</strong><strong class="profit-value-v294">0.00</strong><strong class="profit-rate-v294">0.00%</strong></div></div>`}).join('')+`<div id="fairProfitGrandV294" class="profit-grand-v294"><strong>全部地点总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>0.00</b></div><div><span>整体利润率</span><b>0.00%</b></div></div>`;
+  container.innerHTML=locations.map(group=>{const sales=group.rows.reduce((s,r)=>s+Number(r.amount||0),0),commission=sales*fairRate;return `<div class="month-record-group month-profit-group-v294" data-profit-group="${escapeChangeLogHtmlV200(group.name)}"><div class="month-record-group-title fair-location-title-v298"><span>${escapeChangeLogHtmlV200(group.name)}</span><b>佣金 ${money(commission)}</b></div>${profitHeadV294()}${group.rows.map(r=>`<div class="month-profit-row-v294"><span>${r.date}</span><strong>${money(Number(r.amount||0))}</strong><strong class="profit-value-v294">--</strong><strong class="profit-rate-v294">--</strong></div>`).join('')}<div class="month-profit-row-v294 month-profit-total-v294"><span>这场 Fair 总数</span><strong>${money(sales)}</strong><strong class="profit-value-v294">--</strong><strong class="profit-rate-v294">--</strong></div></div>`}).join('')+`<div id="fairProfitGrandV294" class="profit-grand-v294"><strong>全部地点总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>0.00</b></div><div><span>整体利润率</span><b>0.00%</b></div></div>`;
   renderFairPageTop3();
   Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000})).then(links=>{
     if(token!==monthlyProfitRenderTokenV294.fair)return;
@@ -6342,7 +6342,7 @@ renderLiveMonthlyList=function(){
   if(!list.length){container.innerHTML='<div class="sub">这个月份还没有 Live 记录</div>';renderLivePageTop3();return;}
   const groups=[];list.forEach(r=>{const key=normalizeLiveHostKey(r.displayHost);let g=groups.find(x=>x.key===key);if(!g){g={key,name:r.displayHost,rows:[]};groups.push(g)}g.rows.push(r)});
   const token=++monthlyProfitRenderTokenV294.live;
-  container.innerHTML=groups.map(group=>{const sales=group.rows.reduce((s,r)=>s+Number(r.amount||0),0),comm=group.rows.reduce((s,r)=>s+Number(r.commissionAmount||0),0);return `<div class="live-sales-group month-profit-group-v294"><div class="live-sales-group-title"><span>${escapeChangeLogHtmlV200(group.name)}</span></div>${liveProfitHeadV297(group)}${group.rows.map(r=>liveProfitRowV294(r,0)).join('')}<div class="month-profit-row-v294 live-profit-row-v294 month-profit-total-v294"><span>总数</span><strong>${money(sales)}</strong><strong class="live-commission-value-v297">${money(comm)}</strong><strong class="profit-value-v294">0.00</strong><strong class="profit-rate-v294">0.00%</strong></div></div>`}).join('')+`<div class="profit-grand-v294"><strong>全部主播总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>0.00</b></div><div><span>整体利润率</span><b>0.00%</b></div></div>`;
+  container.innerHTML=groups.map(group=>{const sales=group.rows.reduce((s,r)=>s+Number(r.amount||0),0),comm=group.rows.reduce((s,r)=>s+Number(r.commissionAmount||0),0);return `<div class="live-sales-group month-profit-group-v294"><div class="live-sales-group-title"><span>${escapeChangeLogHtmlV200(group.name)}</span></div>${liveProfitHeadV297(group)}${group.rows.map(r=>`<div class="month-profit-row-v294 live-profit-row-v294"><span>${shortDayMonthV297(r.date)}</span><strong>${money(Number(r.amount||0))}</strong><strong class="live-commission-value-v297">${money(Number(r.commissionAmount||0))}</strong><strong class="profit-value-v294">--</strong><strong class="profit-rate-v294">--</strong></div>`).join('')}<div class="month-profit-row-v294 live-profit-row-v294 month-profit-total-v294"><span>总数</span><strong>${money(sales)}</strong><strong class="live-commission-value-v297">${money(comm)}</strong><strong class="profit-value-v294">--</strong><strong class="profit-rate-v294">--</strong></div></div>`}).join('')+`<div class="profit-grand-v294"><strong>全部主播总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>0.00</b></div><div><span>整体利润率</span><b>0.00%</b></div></div>`;
   renderLivePageTop3();
   Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000})).then(links=>{
     if(token!==monthlyProfitRenderTokenV294.live)return;
@@ -6974,7 +6974,7 @@ window.saveFairSales=saveFairSales;
 setTimeout(()=>{bindLiveAmountFormatV360();renderSelectedDayTotalV360('fair');renderSelectedDayTotalV360('live')},80);
 
 
-/* ================= V36.4 selected-day Sales / Fair / Live grand totals =================
+/* ================= V36.5 selected-day Sales / Fair / Live grand totals =================
    Sales = both nurseries; Fair = all locations; Live = all hosts.
    The summary is date-scoped only and intentionally ignores the currently selected entity.
 */
@@ -7015,7 +7015,7 @@ async function renderSelectedDayGrandV362(type){
 }
 window.renderSelectedDayGrandV362=renderSelectedDayGrandV362;
 
-// Override V36.0 renderer so all existing Fair/Live refresh hooks use the V36.4 compact grand-total renderer.
+// Override V36.0 renderer so all existing Fair/Live refresh hooks use the V36.5 compact grand-total renderer.
 renderSelectedDayTotalV360=function(type){return renderSelectedDayGrandV362(type)};
 window.renderSelectedDayTotalV360=renderSelectedDayTotalV360;
 
@@ -7040,3 +7040,115 @@ showPage=function(name,el){
 };
 window.showPage=showPage;
 setTimeout(()=>{renderSelectedDayGrandV362('daily');renderSelectedDayGrandV362('fair');renderSelectedDayGrandV362('live')},120);
+
+
+/* ================= V36.5 data/read performance + monthly rollup =================
+   - Sales keeps its existing monthly design.
+   - Fair/Live monthly summary is exactly two rows: month total+commission, then profit+overall margin.
+   - Profit pending is "--" (never false 0.00).
+   - Selected-day grand total is re-applied after every historical-date refresh so legacy saved-amount text cannot win.
+   - Change-log exact context cache/prefetch reduces repeated cloud reads.
+*/
+let monthlyRollupTokenV365={fair:0,live:0};
+function monthInfoV365(type){
+  const month=type==='fair'?monthFromDateControl('fairStart'):getLiveSelectedMonth();
+  const label=/^\d{4}-\d{2}$/.test(month)?`${month.slice(5,7)}-${month.slice(0,4)}`:'-';
+  return{month,label};
+}
+function monthlySalesV365(type,month){
+  return dedupeRows(rows).filter(r=>String(r.type||'')===type&&displayToISO(String(r.date||'')).slice(0,7)===month&&Number(r.amount||0)>0).reduce((s,r)=>s+Number(r.amount||0),0);
+}
+function monthlyProfitV365(type,month,links){
+  const clean=typeof dedupeProfitLinksV360==='function'?dedupeProfitLinksV360(links):(Array.isArray(links)?links:[]);
+  return clean.filter(x=>String(x.type||'')===type&&displayToISO(String(x.date||'')).slice(0,7)===month).reduce((s,x)=>s+Number(x.profit||0),0);
+}
+function paintMonthlyRollupV365(type,state='loading',links=null){
+  const info=monthInfoV365(type),sales=monthlySalesV365(type,info.month);
+  const prefix=type==='fair'?'fair':'live';
+  const totalLabel=document.getElementById(prefix==='fair'?'fairMonthlyTotalLabel':'liveMonthlyTotalLabel');
+  const totalEl=document.getElementById(prefix==='fair'?'fairMonthlySalesTotal':'liveSelectedHostTotal');
+  const commLabel=document.getElementById(prefix==='fair'?'fairMonthlyCommissionLabel':'liveMonthlyCommissionLabel');
+  const commEl=document.getElementById(prefix==='fair'?'fairMonthlyCommissionTotal':'liveSelectedCommissionTotal');
+  const profitEl=document.getElementById(prefix+'MonthlyProfitV365'),rateEl=document.getElementById(prefix+'MonthlyProfitRateV365');
+  if(totalLabel)totalLabel.textContent=`${info.label} 总销售`;
+  if(totalEl)totalEl.textContent=money(sales);
+  if(type==='fair'){
+    const rate=getFairCommissionRate(sales),pct=Number((rate*100).toFixed(2));
+    if(commLabel)commLabel.textContent=`总佣金 ${pct}%`;
+    if(commEl)commEl.textContent=money(sales*rate);
+  }else{
+    const monthRows=dedupeRows(rows).filter(r=>r.type==='live'&&displayToISO(String(r.date||'')).slice(0,7)===info.month&&Number(r.amount||0)>0);
+    const comm=monthRows.reduce((sum,r)=>sum+Number(r.amount||0)*Number(getLiveHostRate(r.location,r.date)||0)/100,0);
+    if(commLabel)commLabel.textContent='总佣金';
+    if(commEl)commEl.textContent=money(comm);
+  }
+  if(!profitEl||!rateEl)return;
+  if(state!=='ready'||!Array.isArray(links)){profitEl.textContent='--';rateEl.textContent='--';return}
+  const profit=monthlyProfitV365(type,info.month,links),rate=sales>0?profit/sales*100:0;
+  profitEl.textContent=money(profit);rateEl.textContent=rate.toFixed(2)+'%';
+}
+function refreshMonthlyRollupV365(type){
+  const token=++monthlyRollupTokenV365[type];paintMonthlyRollupV365(type,'loading');
+  Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:180000})).then(links=>{
+    if(token!==monthlyRollupTokenV365[type])return;paintMonthlyRollupV365(type,'ready',links);
+  }).catch(()=>{if(token===monthlyRollupTokenV365[type])paintMonthlyRollupV365(type,'error')});
+}
+const _renderFairMonthlyListV365=renderFairMonthlyList;
+renderFairMonthlyList=function(){const r=_renderFairMonthlyListV365();paintMonthlyRollupV365('fair','loading');refreshMonthlyRollupV365('fair');return r};
+window.renderFairMonthlyList=renderFairMonthlyList;
+const _renderLiveMonthlyListV365=renderLiveMonthlyList;
+renderLiveMonthlyList=function(){const r=_renderLiveMonthlyListV365();paintMonthlyRollupV365('live','loading');refreshMonthlyRollupV365('live');return r};
+window.renderLiveMonthlyList=renderLiveMonthlyList;
+
+// Exact-context Change Log cache. Fair includes normalized location; Sales/Live are date-wide like the existing UI.
+const salesChangeLogExactCacheV365=new Map();
+const salesChangeLogPendingV365=new Map();
+function changeLogExactKeyV365(type,date){
+  const loc=type==='fair'?normalizeFairLocationKey(canonicalLocation(document.getElementById('fairLocation')?.value||'')):'';
+  return`${type}|${date}|${loc}`;
+}
+async function loadExactChangeLogV365(type,date,{force=false}={}){
+  const key=changeLogExactKeyV365(type,date),hit=salesChangeLogExactCacheV365.get(key),now=Date.now();
+  if(!force&&hit&&now-hit.at<60000)return hit.logs;
+  if(salesChangeLogPendingV365.has(key))return salesChangeLogPendingV365.get(key);
+  const location=type==='fair'?canonicalLocation(document.getElementById('fairLocation')?.value||''):'';
+  if(type==='fair'&&!location)return[];
+  const p=Promise.resolve(loadSalesChangeLogFromSheetV200(type,date,{force:true,location})).then(data=>{
+    const logs=Array.isArray(data?.logs)?data.logs:[];salesChangeLogExactCacheV365.set(key,{logs,at:Date.now()});return logs;
+  }).finally(()=>salesChangeLogPendingV365.delete(key));
+  salesChangeLogPendingV365.set(key,p);return p;
+}
+async function toggleSalesChangeLogV365(type,button){
+  const panel=document.getElementById(changeLogPanelIdV200(type));if(!panel)return;
+  const date=selectedChangeLogDateV200(type);if(!date){alert('请先选择日期');return}
+  if(salesChangeLogOpenV200[type]&&String(panel.dataset.logDate||'')===date){salesChangeLogOpenV200[type]=false;panel.classList.add('hidden');panel.innerHTML='';panel.dataset.logDate='';button?.classList.remove('active');return}
+  salesChangeLogOpenV200[type]=true;panel.dataset.logDate=date;panel.classList.remove('hidden');button?.classList.add('active');
+  const key=changeLogExactKeyV365(type,date),cached=salesChangeLogExactCacheV365.get(key);
+  if(cached&&Array.isArray(cached.logs))renderChangeLogTimelineV200(type,date,cached.logs);else panel.innerHTML=`<div class="change-log-loading">正在读取 ${escapeChangeLogHtmlV200(date)} 最新记录...</div>`;
+  try{
+    const logs=await loadExactChangeLogV365(type,date,{force:!cached||Date.now()-cached.at>=60000});
+    if(!salesChangeLogOpenV200[type]||String(panel.dataset.logDate||'')!==date)return;renderChangeLogTimelineV200(type,date,logs);
+  }catch(e){if(!salesChangeLogOpenV200[type]||String(panel.dataset.logDate||'')!==date)return;if(!(cached&&Array.isArray(cached.logs)))panel.innerHTML='<div class="change-log-empty">读取失败，请稍后再试</div>'}
+}
+toggleSalesChangeLogV200=toggleSalesChangeLogV365;window.toggleSalesChangeLogV200=toggleSalesChangeLogV365;
+function prefetchChangeLogV365(type){
+  const date=selectedChangeLogDateV200(type);if(!date)return;const key=changeLogExactKeyV365(type,date),hit=salesChangeLogExactCacheV365.get(key);if(hit&&Date.now()-hit.at<60000)return;
+  setTimeout(()=>loadExactChangeLogV365(type,date,{force:false}).catch(()=>{}),120);
+}
+
+// Historical-date protection: any legacy "已保存 RM..." paint is immediately replaced by the date-wide grand total.
+function ensureSelectedDayGrandV365(type){
+  const el=selectedDaySummaryElV362(type);if(!el)return;
+  const expected=selectedDayLabelV362(type),title=el.querySelector('strong')?.textContent||'';
+  if(!el.classList.contains('selected-day-grand-v362')||title!==expected){setTimeout(()=>renderSelectedDayGrandV362(type),0)}
+}
+function installSelectedDayGuardV365(){
+  [['daily','saleDate'],['fair','fairStart'],['live','liveDate']].forEach(([type,id])=>{
+    const el=selectedDaySummaryElV362(type);if(el&&!el.dataset.v365Guard){el.dataset.v365Guard='1';new MutationObserver(()=>ensureSelectedDayGrandV365(type)).observe(el,{childList:true,subtree:true,attributes:true,attributeFilter:['class']})}
+    const input=document.getElementById(id);if(input&&!input.dataset.v365Grand){input.dataset.v365Grand='1';input.addEventListener('change',()=>{[0,60,280].forEach(ms=>setTimeout(()=>renderSelectedDayGrandV362(type),ms));prefetchChangeLogV365(type)})}
+  });
+}
+const _showPageV365=showPage;
+showPage=function(name,el){const r=_showPageV365(name,el);if(r===false)return false;const type=name==='sales'?'daily':name==='fair'?'fair':name==='live'?'live':'';if(type){setTimeout(()=>{renderSelectedDayGrandV362(type);prefetchChangeLogV365(type);if(type==='fair'||type==='live')refreshMonthlyRollupV365(type)},40)}return r};
+window.showPage=showPage;
+setTimeout(()=>{installSelectedDayGuardV365();['daily','fair','live'].forEach(prefetchChangeLogV365);refreshMonthlyRollupV365('fair');refreshMonthlyRollupV365('live')},180);
