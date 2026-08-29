@@ -725,14 +725,20 @@ async function loadFromSheet(options = {}) {
       }
       saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
       if(typeof refreshFairSessionsV281==="function"){try{await refreshFairSessionsV281({applyLatest:true,forceApply:false})}catch(_){}}
-      setSync("已同步", true);
-      completedSuccessfully = true;
 
-      // Initial read has priority. Retry pending writes only after the latest
-      // cloud month is visible, avoiding two simultaneous Apps Script calls.
-      if (pendingCountAtStart > 0) {
-        setTimeout(() => syncPendingRows().catch(() => {}), 50);
+      // V37.3: never announce "已同步" before the durable local retry queue
+      // has been reconciled/processed. A successful cloud read and a clean
+      // write queue are two different conditions; the final status must reflect
+      // both so startup cannot flash green and then immediately turn red.
+      loadPendingRows();
+      if (pendingRows.length > 0) {
+        setSync(`正在自动同步 ${pendingRows.length} 笔资料...`);
+        await syncPendingRows();
+        loadPendingRows();
       }
+      if (pendingRows.length > 0) setPendingRetrySyncStatus();
+      else setSync("已同步", true);
+      completedSuccessfully = true;
 
       const year = month.slice(0, 4);
 
