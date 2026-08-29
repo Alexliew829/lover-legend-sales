@@ -2767,7 +2767,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V36.7 Fair/Live monthly two-line summary ================= */
+/* ================= V36.8 Fair/Live monthly two-line summary ================= */
 /* Fair history remains click/focus dropdown; the visible green arrow button is removed. */
 .fair-location-picker-v359{display:block!important;grid-template-columns:none!important}
 .fair-location-picker-v359 #fairLocation{width:100%!important}
@@ -2788,7 +2788,7 @@ body{overflow-x:hidden;}
  .monthly-rollup-row-v365 b{font-size:14.5px;letter-spacing:-.25px}
 }
 
-/* ================= V36.7 mobile monthly rollup fit ================= */
+/* ================= V36.8 mobile monthly rollup fit ================= */
 @media(max-width:430px){
  .monthly-rollup-v365{padding:9px 8px;overflow:hidden}
  .monthly-rollup-row-v365,.monthly-rollup-profit-v365{
@@ -2802,4 +2802,36 @@ body{overflow-x:hidden;}
  .monthly-rollup-row-v365,.monthly-rollup-profit-v365{grid-template-columns:29% 23% 27% 21%}
  .monthly-rollup-row-v365 span{font-size:10.5px}
  .monthly-rollup-row-v365 b{font-size:12.5px}
+}
+
+
+/* ================= V36.8 Fair/Live monthly rollup: two safe equal halves ================= */
+.monthly-rollup-v365.monthly-rollup-v368{overflow:hidden;padding:10px 10px;box-sizing:border-box}
+.monthly-rollup-v368 .monthly-rollup-row-v368{
+  display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+  gap:12px!important;width:100%!important;min-width:0!important;box-sizing:border-box;
+}
+.monthly-rollup-v368 .monthly-rollup-item-v368{
+  display:grid;grid-template-columns:minmax(0,.92fr) minmax(88px,1.08fr);align-items:center;
+  gap:5px;min-width:0;width:100%;box-sizing:border-box;
+}
+.monthly-rollup-v368 .monthly-rollup-item-v368 span{
+  min-width:0;white-space:nowrap;overflow:visible;text-overflow:clip;font-size:12px;letter-spacing:-.35px;
+}
+.monthly-rollup-v368 .monthly-rollup-item-v368 b{
+  min-width:0;max-width:100%;white-space:nowrap;text-align:right;overflow:visible;
+  font-size:clamp(13px,3.5vw,17px);letter-spacing:-.55px;font-variant-numeric:tabular-nums;
+}
+@media(max-width:430px){
+ .monthly-rollup-v365.monthly-rollup-v368{padding:9px 7px}
+ .monthly-rollup-v368 .monthly-rollup-row-v368{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:7px!important}
+ .monthly-rollup-v368 .monthly-rollup-item-v368{grid-template-columns:minmax(0,.8fr) minmax(78px,1.2fr);gap:3px}
+ .monthly-rollup-v368 .monthly-rollup-item-v368 span{font-size:10.5px;letter-spacing:-.55px}
+ .monthly-rollup-v368 .monthly-rollup-item-v368 b{font-size:clamp(12px,3.35vw,15px);letter-spacing:-.7px}
+}
+@media(max-width:370px){
+ .monthly-rollup-v368 .monthly-rollup-row-v368{gap:5px!important}
+ .monthly-rollup-v368 .monthly-rollup-item-v368{grid-template-columns:minmax(0,.72fr) minmax(72px,1.28fr);gap:2px}
+ .monthly-rollup-v368 .monthly-rollup-item-v368 span{font-size:9.8px}
+ .monthly-rollup-v368 .monthly-rollup-item-v368 b{font-size:11.7px;letter-spacing:-.8px}
 }
