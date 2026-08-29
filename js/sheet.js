@@ -1429,10 +1429,13 @@ window.deleteSalesTransactionV256=deleteSalesTransactionV256;
 
 window.saveSalesProductLinksApiV241=saveSalesProductLinksV206;
 
-/* V36.7: expose already-authoritative in-memory profit links for instant same-page reuse. */
+/* V36.8: expose already-authoritative in-memory profit links for instant same-page reuse. */
 function peekAllSalesProductLinksCacheV367(maxAgeMs=180000){
   if(!Array.isArray(allSalesProductLinksCacheV216.links))return null;
   if(Date.now()-Number(allSalesProductLinksCacheV216.at||0)>Number(maxAgeMs||0))return null;
   return allSalesProductLinksCacheV216.links;
 }
 window.peekAllSalesProductLinksCacheV367=peekAllSalesProductLinksCacheV367;
+
+// V36.8 build alias
+window.peekAllSalesProductLinksCacheV368=peekAllSalesProductLinksCacheV367;
