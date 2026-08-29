@@ -1066,7 +1066,7 @@ function renderFairCommission(total){
   const message=document.getElementById("fairCommissionMessage");
 
   if(label){
-    label.textContent=`Fair 本月总佣金 ${percent}%`;
+    label.textContent=`本月总佣金 ${percent}%`;
   }
 
   if(value){
@@ -1370,7 +1370,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3630",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3640",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1388,7 +1388,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3630";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3640";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1907,8 +1907,8 @@ function renderSalesMonthlyList(){
 
   const month=monthFromDateControl("saleDate");
   const monthLabel=/^\d{4}-\d{2}$/.test(month)?`${month.slice(5,7)}-${month.slice(0,4)}`:"-";
-  if(titleEl)titleEl.textContent=`Sales ${monthLabel} 销售记录`;
-  if(labelEl)labelEl.textContent=`Sales ${monthLabel} 总销售额`;
+  if(titleEl)titleEl.textContent=`${monthLabel} 销售记录`;
+  if(labelEl)labelEl.textContent=`${monthLabel} 总销售额`;
 
   const list=rows
     .filter(r=>r.type==="daily"&&displayToISO(r.date).slice(0,7)===month&&Number(r.amount)>0)
@@ -1992,8 +1992,8 @@ function renderFairMonthlyList(){
 
   const month=monthFromDateControl("fairStart");
   const monthLabel=/^\d{4}-\d{2}$/.test(month)?`${month.slice(5,7)}-${month.slice(0,4)}`:"-";
-  if(titleEl)titleEl.textContent=`Fair ${monthLabel} 销售记录`;
-  if(labelEl)labelEl.textContent=`Fair ${monthLabel} 总销售额`;
+  if(titleEl)titleEl.textContent=`${monthLabel} 销售记录`;
+  if(labelEl)labelEl.textContent=`${monthLabel} 总销售额`;
 
   const list=rows
     .filter(r=>r.type==="fair"&&displayToISO(r.date).slice(0,7)===month&&Number(r.amount)>0)
@@ -2049,9 +2049,9 @@ function renderLiveMonthlyList(){
 
   const liveMonth=getLiveSelectedMonth();
   const monthLabel=/^\d{4}-\d{2}$/.test(liveMonth)?`${liveMonth.slice(5,7)}-${liveMonth.slice(0,4)}`:"-";
-  if(titleEl)titleEl.textContent=`Live ${monthLabel} 销售记录`;
-  if(totalLabelEl)totalLabelEl.textContent=`Live ${monthLabel} 总销售额`;
-  if(commissionLabelEl)commissionLabelEl.textContent=`Live ${monthLabel} 总佣金`;
+  if(titleEl)titleEl.textContent=`${monthLabel} 销售记录`;
+  if(totalLabelEl)totalLabelEl.textContent=`${monthLabel} 总销售额`;
+  if(commissionLabelEl)commissionLabelEl.textContent=`${monthLabel} 总佣金`;
 
   const list=rows
     .filter(r=>r.type==="live"&&displayToISO(r.date).slice(0,7)===liveMonth&&Number(r.amount)>0)
@@ -4573,7 +4573,7 @@ function renderDashboard(){
   renderLiveHostSummary();
   document.getElementById("liveMonthTotal").textContent=money(lm);
   const liveCommission=liveByHostThisMonth().reduce((sum,item)=>sum+item.commission,0);
-  document.getElementById("liveCommissionLabel").textContent="Live 本月总佣金";
+  document.getElementById("liveCommissionLabel").textContent="本月总佣金";
   document.getElementById("liveCommissionTotal").textContent=money(liveCommission);
   document.getElementById("monthGrandTotal").textContent=money(bm+blm+fm+lm); 
   renderMonthGrandHistoryV223();
@@ -5165,7 +5165,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3630",
+    version:"3640",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6306,18 +6306,18 @@ renderFairMonthlyList=function(){
   const container=document.getElementById("fairMonthlyList"),totalEl=document.getElementById("fairMonthlySalesTotal"),titleEl=document.getElementById("fairMonthlyTitle"),labelEl=document.getElementById("fairMonthlyTotalLabel");
   if(!container||!totalEl)return;
   const month=monthFromDateControl("fairStart"),monthLabel=/^\d{4}-\d{2}$/.test(month)?`${month.slice(5,7)}-${month.slice(0,4)}`:"-";
-  if(titleEl)titleEl.textContent=`Fair ${monthLabel} 销售记录`;
-  if(labelEl)labelEl.textContent=`Fair ${monthLabel} 总销售额`;
+  if(titleEl)titleEl.textContent=`${monthLabel} 销售记录`;
+  if(labelEl)labelEl.textContent=`${monthLabel} 总销售额`;
   const list=rows.filter(r=>r.type==="fair"&&displayToISO(r.date).slice(0,7)===month&&Number(r.amount)>0).map(r=>({...r,displayLocation:canonicalLocation(r.location||"Fair")})).sort((a,b)=>a.displayLocation.localeCompare(b.displayLocation,"en",{sensitivity:"base"})||displayToISO(a.date).localeCompare(displayToISO(b.date)));
   const total=list.reduce((sum,r)=>sum+Number(r.amount||0),0); totalEl.textContent=money(total);
   const fairRate=getFairCommissionRate(total),fairRatePct=Number((fairRate*100).toFixed(2)),fairCommissionTotal=total*fairRate;
   const monthlyCommissionEl=document.getElementById("fairMonthlyCommissionTotal"),monthlyCommissionLabel=document.getElementById("fairMonthlyCommissionLabel");
   if(monthlyCommissionEl)monthlyCommissionEl.textContent=money(fairCommissionTotal);
-  if(monthlyCommissionLabel)monthlyCommissionLabel.textContent=`Fair ${monthLabel} 总佣金 ${fairRatePct}%`;
+  if(monthlyCommissionLabel)monthlyCommissionLabel.textContent=`${monthLabel} 总佣金 ${fairRatePct}%`;
   if(!list.length){container.innerHTML='<div class="sub">这个月份还没有 Fair 记录</div>';if(monthlyCommissionEl)monthlyCommissionEl.textContent="0.00";renderFairPageTop3();return;}
   const locations=[];list.forEach(r=>{const key=normalizeFairLocationKey(r.displayLocation);let g=locations.find(x=>x.key===key);if(!g){g={key,name:r.displayLocation,latestDate:r.date,rows:[]};locations.push(g)}else if(displayToISO(r.date)>=displayToISO(g.latestDate)){g.name=r.displayLocation;g.latestDate=r.date}g.rows.push(r)});
   const token=++monthlyProfitRenderTokenV294.fair;
-  container.innerHTML=locations.map(group=>{const sales=group.rows.reduce((s,r)=>s+Number(r.amount||0),0),commission=sales*fairRate;return `<div class="month-record-group month-profit-group-v294" data-profit-group="${escapeChangeLogHtmlV200(group.name)}"><div class="month-record-group-title fair-location-title-v298"><span>${escapeChangeLogHtmlV200(group.name)}</span><b>佣金 ${money(commission)}</b></div>${profitHeadV294()}${group.rows.map(r=>fairProfitRowV294(r,0)).join('')}<div class="month-profit-row-v294 month-profit-total-v294"><span>这场 Fair 总数</span><strong>${money(sales)}</strong><strong class="profit-value-v294">0.00</strong><strong class="profit-rate-v294">0.00%</strong></div></div>`}).join('')+`<div id="fairProfitGrandV294" class="profit-grand-v294"><strong>Fair 全部地点总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>0.00</b></div><div><span>整体利润率</span><b>0.00%</b></div></div>`;
+  container.innerHTML=locations.map(group=>{const sales=group.rows.reduce((s,r)=>s+Number(r.amount||0),0),commission=sales*fairRate;return `<div class="month-record-group month-profit-group-v294" data-profit-group="${escapeChangeLogHtmlV200(group.name)}"><div class="month-record-group-title fair-location-title-v298"><span>${escapeChangeLogHtmlV200(group.name)}</span><b>佣金 ${money(commission)}</b></div>${profitHeadV294()}${group.rows.map(r=>fairProfitRowV294(r,0)).join('')}<div class="month-profit-row-v294 month-profit-total-v294"><span>这场 Fair 总数</span><strong>${money(sales)}</strong><strong class="profit-value-v294">0.00</strong><strong class="profit-rate-v294">0.00%</strong></div></div>`}).join('')+`<div id="fairProfitGrandV294" class="profit-grand-v294"><strong>全部地点总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>0.00</b></div><div><span>整体利润率</span><b>0.00%</b></div></div>`;
   renderFairPageTop3();
   Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000})).then(links=>{
     if(token!==monthlyProfitRenderTokenV294.fair)return;
@@ -6328,7 +6328,7 @@ renderFairMonthlyList=function(){
       return `<div class="month-record-group month-profit-group-v294"><div class="month-record-group-title fair-location-title-v298"><span>${escapeChangeLogHtmlV200(group.name)}</span><b>佣金 ${money(groupCommission)}</b></div>${profitHeadV294()}${rowsHtml}<div class="month-profit-row-v294 month-profit-total-v294"><span>这场 Fair 总数</span><strong>${money(groupSales)}</strong><strong class="profit-value-v294">${money(groupProfit)}</strong><strong class="profit-rate-v294">${marginTextV294(groupProfit,groupSales)}</strong></div></div>`;
     }).join('');
     const totalProfit=locations.reduce((sum,g)=>sum+g.rows.reduce((s,r)=>s+profitByDayV294(links,'fair',g.name,r.date),0),0);
-    container.insertAdjacentHTML('beforeend',`<div id="fairProfitGrandV294" class="profit-grand-v294"><strong>Fair 全部地点总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>${money(totalProfit)}</b></div><div><span>整体利润率</span><b>${marginTextV294(totalProfit,total)}</b></div></div>`);
+    container.insertAdjacentHTML('beforeend',`<div id="fairProfitGrandV294" class="profit-grand-v294"><strong>全部地点总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>${money(totalProfit)}</b></div><div><span>整体利润率</span><b>${marginTextV294(totalProfit,total)}</b></div></div>`);
   }).catch(e=>console.warn('V29.9 Fair 利润读取失败',e));
 };
 
@@ -6336,19 +6336,19 @@ renderLiveMonthlyList=function(){
   const container=document.getElementById("liveMonthlyList"),totalEl=document.getElementById("liveSelectedHostTotal"),commissionTotalEl=document.getElementById("liveSelectedCommissionTotal"),titleEl=document.getElementById("liveMonthlyTitle"),totalLabelEl=document.getElementById("liveMonthlyTotalLabel"),commissionLabelEl=document.getElementById("liveMonthlyCommissionLabel");
   if(!container||!totalEl)return;
   const liveMonth=getLiveSelectedMonth(),monthLabel=/^\d{4}-\d{2}$/.test(liveMonth)?`${liveMonth.slice(5,7)}-${liveMonth.slice(0,4)}`:"-";
-  if(titleEl)titleEl.textContent=`Live ${monthLabel} 销售记录`;if(totalLabelEl)totalLabelEl.textContent=`Live ${monthLabel} 总销售额`;if(commissionLabelEl)commissionLabelEl.textContent=`Live ${monthLabel} 总佣金`;
+  if(titleEl)titleEl.textContent=`${monthLabel} 销售记录`;if(totalLabelEl)totalLabelEl.textContent=`${monthLabel} 总销售额`;if(commissionLabelEl)commissionLabelEl.textContent=`${monthLabel} 总佣金`;
   const list=rows.filter(r=>r.type==="live"&&displayToISO(r.date).slice(0,7)===liveMonth&&Number(r.amount)>0).map(r=>{const rate=getLiveHostRate(r.location,r.date),amount=Number(r.amount||0);return{...r,displayHost:canonicalLiveHost(r.location),commissionRate:rate,commissionAmount:amount*rate/100}}).sort((a,b)=>a.displayHost.localeCompare(b.displayHost,"en",{sensitivity:"base"})||displayToISO(a.date).localeCompare(displayToISO(b.date)));
   const total=list.reduce((s,r)=>s+Number(r.amount||0),0),commissionTotal=list.reduce((s,r)=>s+Number(r.commissionAmount||0),0);totalEl.textContent=money(total);if(commissionTotalEl)commissionTotalEl.textContent=money(commissionTotal);
   if(!list.length){container.innerHTML='<div class="sub">这个月份还没有 Live 记录</div>';renderLivePageTop3();return;}
   const groups=[];list.forEach(r=>{const key=normalizeLiveHostKey(r.displayHost);let g=groups.find(x=>x.key===key);if(!g){g={key,name:r.displayHost,rows:[]};groups.push(g)}g.rows.push(r)});
   const token=++monthlyProfitRenderTokenV294.live;
-  container.innerHTML=groups.map(group=>{const sales=group.rows.reduce((s,r)=>s+Number(r.amount||0),0),comm=group.rows.reduce((s,r)=>s+Number(r.commissionAmount||0),0);return `<div class="live-sales-group month-profit-group-v294"><div class="live-sales-group-title"><span>${escapeChangeLogHtmlV200(group.name)}</span></div>${liveProfitHeadV297(group)}${group.rows.map(r=>liveProfitRowV294(r,0)).join('')}<div class="month-profit-row-v294 live-profit-row-v294 month-profit-total-v294"><span>总数</span><strong>${money(sales)}</strong><strong class="live-commission-value-v297">${money(comm)}</strong><strong class="profit-value-v294">0.00</strong><strong class="profit-rate-v294">0.00%</strong></div></div>`}).join('')+`<div class="profit-grand-v294"><strong>Live 全部主播总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>0.00</b></div><div><span>整体利润率</span><b>0.00%</b></div></div>`;
+  container.innerHTML=groups.map(group=>{const sales=group.rows.reduce((s,r)=>s+Number(r.amount||0),0),comm=group.rows.reduce((s,r)=>s+Number(r.commissionAmount||0),0);return `<div class="live-sales-group month-profit-group-v294"><div class="live-sales-group-title"><span>${escapeChangeLogHtmlV200(group.name)}</span></div>${liveProfitHeadV297(group)}${group.rows.map(r=>liveProfitRowV294(r,0)).join('')}<div class="month-profit-row-v294 live-profit-row-v294 month-profit-total-v294"><span>总数</span><strong>${money(sales)}</strong><strong class="live-commission-value-v297">${money(comm)}</strong><strong class="profit-value-v294">0.00</strong><strong class="profit-rate-v294">0.00%</strong></div></div>`}).join('')+`<div class="profit-grand-v294"><strong>全部主播总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>0.00</b></div><div><span>整体利润率</span><b>0.00%</b></div></div>`;
   renderLivePageTop3();
   Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000})).then(links=>{
     if(token!==monthlyProfitRenderTokenV294.live)return;
     container.innerHTML=groups.map(group=>{let gp=0,gs=0;const comm=group.rows.reduce((s,r)=>s+Number(r.commissionAmount||0),0);const html=group.rows.map(r=>{const p=profitByDayV294(links,'live',group.name,r.date);gp+=p;gs+=Number(r.amount||0);return liveProfitRowV294(r,p)}).join('');return `<div class="live-sales-group month-profit-group-v294"><div class="live-sales-group-title"><span>${escapeChangeLogHtmlV200(group.name)}</span></div>${liveProfitHeadV297(group)}${html}<div class="month-profit-row-v294 live-profit-row-v294 month-profit-total-v294"><span>总数</span><strong>${money(gs)}</strong><strong class="live-commission-value-v297">${money(comm)}</strong><strong class="profit-value-v294">${money(gp)}</strong><strong class="profit-rate-v294">${marginTextV294(gp,gs)}</strong></div></div>`}).join('');
     const totalProfit=groups.reduce((sum,g)=>sum+g.rows.reduce((s,r)=>s+profitByDayV294(links,'live',g.name,r.date),0),0);
-    container.insertAdjacentHTML('beforeend',`<div class="profit-grand-v294"><strong>Live 全部主播总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>${money(totalProfit)}</b></div><div><span>整体利润率</span><b>${marginTextV294(totalProfit,total)}</b></div></div>`);
+    container.insertAdjacentHTML('beforeend',`<div class="profit-grand-v294"><strong>全部主播总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>${money(totalProfit)}</b></div><div><span>整体利润率</span><b>${marginTextV294(totalProfit,total)}</b></div></div>`);
   }).catch(e=>console.warn('V29.9 Live 利润读取失败',e));
 };
 
@@ -6974,7 +6974,7 @@ window.saveFairSales=saveFairSales;
 setTimeout(()=>{bindLiveAmountFormatV360();renderSelectedDayTotalV360('fair');renderSelectedDayTotalV360('live')},80);
 
 
-/* ================= V36.3 selected-day Sales / Fair / Live grand totals =================
+/* ================= V36.4 selected-day Sales / Fair / Live grand totals =================
    Sales = both nurseries; Fair = all locations; Live = all hosts.
    The summary is date-scoped only and intentionally ignores the currently selected entity.
 */
@@ -7015,7 +7015,7 @@ async function renderSelectedDayGrandV362(type){
 }
 window.renderSelectedDayGrandV362=renderSelectedDayGrandV362;
 
-// Override V36.0 renderer so all existing Fair/Live refresh hooks use the V36.3 compact grand-total renderer.
+// Override V36.0 renderer so all existing Fair/Live refresh hooks use the V36.4 compact grand-total renderer.
 renderSelectedDayTotalV360=function(type){return renderSelectedDayGrandV362(type)};
 window.renderSelectedDayTotalV360=renderSelectedDayTotalV360;
 
