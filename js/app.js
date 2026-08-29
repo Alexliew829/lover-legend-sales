@@ -1370,7 +1370,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3690",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3700",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1388,7 +1388,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3690";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3700";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5165,7 +5165,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3690",
+    version:"3700",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -7364,3 +7364,81 @@ window.checkUnconfirmedDraftReminderV369=checkUnconfirmedDraftReminderV369;
 setTimeout(()=>checkUnconfirmedDraftReminderV369().catch(()=>{}),1800);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>checkUnconfirmedDraftReminderV369().catch(()=>{}),300)});
 window.addEventListener('focus',()=>setTimeout(()=>checkUnconfirmedDraftReminderV369().catch(()=>{}),300));
+
+
+/* ================= V37.0 Import -> associated Sales card deep link =================
+   Import Cost System can return to the exact Sales/Fair/Live context without
+   confirming a sale or touching inventory. The transactionId is used only to
+   scroll/highlight the matching saved card after that day's cards are loaded. */
+function getImportSalesCardDeepLinkV370(){
+  try{
+    const p=new URLSearchParams(window.location.search||'');
+    if(p.get('openSalesCard')!=='1')return null;
+    return {
+      type:String(p.get('salesType')||'').trim().toLowerCase(),
+      date:String(p.get('salesDate')||'').trim(),
+      location:String(p.get('salesLocation')||'').trim(),
+      transactionId:String(p.get('salesTxn')||'').trim(),
+      linkId:String(p.get('salesLink')||'').trim()
+    };
+  }catch(_){return null}
+}
+function salesDeepLinkPageV370(type){return type==='live'?'live':type==='fair'?'fair':'sales'}
+function highlightAssociatedSalesCardV370(type,target){
+  const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
+  if(!wrap)return false;
+  const cards=[...wrap.querySelectorAll('.sales-card-transaction-v239')];
+  let card=null;
+  if(target.transactionId)card=cards.find(c=>String(c.dataset.transactionId||'')===target.transactionId)||null;
+  if(!card&&target.linkId){
+    card=cards.find(c=>[...c.querySelectorAll('.product-link-item')].some(i=>String(i.dataset.linkId||'')===target.linkId))||null;
+  }
+  if(!card)return false;
+  card.classList.add('associated-sales-card-v370');
+  card.scrollIntoView({behavior:'smooth',block:'center'});
+  setTimeout(()=>card.classList.remove('associated-sales-card-v370'),5000);
+  return true;
+}
+async function openAssociatedSalesCardFromImportV370(){
+  const target=getImportSalesCardDeepLinkV370();if(!target)return;
+  let type=target.type;
+  if(type==='sales')type='daily';
+  if(!['daily','fair','live'].includes(type))return;
+  const page=salesDeepLinkPageV370(type);
+  const nav=document.querySelector(`.nav-item[data-page="${page}"]`);
+  showPage(page,nav);
+  const iso=/^\d{2}-\d{2}-\d{4}$/.test(target.date)?displayToISO(target.date):target.date;
+  if(type==='live'){
+    const host=document.getElementById('liveHost');if(host&&target.location)host.value=target.location;
+    if(iso)setDateControl('liveDate',iso);
+    updateLiveInputFromSelectedDate();renderLiveDailySummary();renderLiveMonthlyList();
+  }else if(type==='fair'){
+    const loc=document.getElementById('fairLocation');if(loc&&target.location)loc.value=canonicalLocation(target.location);
+    if(iso){setDateControl('fairStart',iso);setDateControl('fairEnd',iso)}
+    if(target.location&&iso)saveLocalFairSessionV320(target.location,iso,iso);
+    updateFairPageMode();syncFairInputs();syncFairProductDatesV203(true);
+    const fairProductDate=document.getElementById('fairProductDate');if(fairProductDate&&target.date)fairProductDate.value=target.date;
+    refreshFairInputsFromRows(false);renderFairDailySummary();renderFairMonthlyList();
+  }else{
+    const company=document.getElementById('company');
+    const loc=String(target.location||'').toLowerCase();
+    if(company){company.value=loc.includes('balakong')?'balakong':'belimbing'}
+    if(iso)setDateControl('saleDate',iso);
+    updateDailyInputFromSelectedDate();
+  }
+  const pre=productLinkPreV208(type),body=document.getElementById(pre+'ProductLinkBody'),box=document.getElementById(pre+'ProductLinkBox');
+  if(body&&body.classList.contains('hidden')){
+    body.classList.remove('hidden');box?.classList.remove('product-link-collapsed');
+    box?.querySelector('.product-link-toggle')?.setAttribute('aria-expanded','true');
+  }
+  try{await loadProductLinksIntoEditorV206(type)}catch(e){console.warn('V37.0 associated card load failed',e)}
+  if(!highlightAssociatedSalesCardV370(type,target)){
+    setTimeout(()=>highlightAssociatedSalesCardV370(type,target),600);
+  }
+  try{
+    const clean=new URL(window.location.href);['openSalesCard','salesType','salesDate','salesLocation','salesTxn','salesLink'].forEach(k=>clean.searchParams.delete(k));
+    history.replaceState(null,'',clean.pathname+(clean.search||'')+clean.hash);
+  }catch(_){}
+}
+window.openAssociatedSalesCardFromImportV370=openAssociatedSalesCardFromImportV370;
+window.addEventListener('load',()=>setTimeout(()=>openAssociatedSalesCardFromImportV370(),500));
