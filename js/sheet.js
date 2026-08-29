@@ -1000,7 +1000,7 @@ function clearSalesCardPersistentCacheV232(type,date,location){
   writeSalesCardPersistentCacheV232(all);
 }
 
-// V35.9: one authoritative active row per Sales Card product slot.
+// V36.0: one authoritative active row per Sales Card product slot.
 // Cloud/Restore history can contain legacy active duplicates with different Link IDs;
 // the latest transactionId + productOrder row wins so Sales Card and Profit use
 // exactly the same authoritative set and can never count one product twice.
@@ -1191,7 +1191,7 @@ async function sendFairBatchToSheetV343(location, records, foregroundSave=false)
   if (!json.ok) throw new Error(json.message || "Fair 储存失败");
   applyLocalDataRevision(json.dataRevision);
   if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
-  // V35.9 foreground Fair saves send OneSignal inside the same server request.
+  // V36.0 foreground Fair saves send OneSignal inside the same server request.
   // Background retry still uses the signed async envelope after cloud success.
   if(!(json.inlineNotification&&json.inlineNotification.inline))dispatchSalesNotificationAsync(json.notificationEnvelope);
   (Array.isArray(records)?records:[]).forEach(r=>{

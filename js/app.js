@@ -1285,7 +1285,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     return{date,amount,clientUpdatedAt:now,...mutationV344,baseCloudUpdatedAt:String(previous?.updatedAt||"")};
   }).filter(Boolean);
 
-  // V35.9 DATA-SAFETY: queue the exact mutation first, but do NOT mutate the
+  // V36.0 DATA-SAFETY: queue the exact mutation first, but do NOT mutate the
   // authoritative local rows/Home until Google Sheet confirms the write.
   // This prevents the dangerous half-success state where this device shows
   // RM1350 while every other device/cloud still has RM1200.
@@ -1360,7 +1360,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
       }
     }else setSync("已同步",true);
   }catch(e){
-    // V35.9: never report a failed cloud save as stored.  The exact edited
+    // V36.0: never report a failed cloud save as stored.  The exact edited
     // amount remains durable in pendingRows and will retry automatically.
     if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();
     else setSync("同步暂未完成",false,true);
@@ -1370,7 +1370,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3590",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3600",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1388,7 +1388,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3590";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3600";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3037,7 +3037,7 @@ function renderProductLinksLoadingV231(type){
   wrap.innerHTML='<div class="product-link-loading-v231">正在读取已保存销售卡…</div>';
 }
 const SALES_CARD_LOAD_SEQ_V245={live:0,fair:0};
-// V35.9: invalidate any cloud read that began before a local delete/save acknowledgement.
+// V36.0: invalidate any cloud read that began before a local delete/save acknowledgement.
 function invalidateSalesCardLoadRequestsV351(type){
   const t=String(type||'');if(!t)return;
   SALES_CARD_LOAD_SEQ_V245[t]=(SALES_CARD_LOAD_SEQ_V245[t]||0)+1;
@@ -3080,7 +3080,7 @@ async function loadProductLinksIntoEditorV206(type){
   }
 
   try{
-    // V35.9: resolve any durable local draft BEFORE accepting a cloud repaint.
+    // V36.0: resolve any durable local draft BEFORE accepting a cloud repaint.
     // Pending is a retry instruction, never a second data source allowed to overwrite
     // an already verified cloud Sales Card. If retry is still impossible, keep the
     // locally displayed draft and do not alternate between cloud/pending snapshots.
@@ -4264,7 +4264,7 @@ async function toggleProductProfitSummaryV216(type,button){
 
     const cachedLinks=typeof getDailyProfitCacheV237==="function"?getDailyProfitCacheV237(type,date):null;
     const offline=typeof navigator!=="undefined"&&navigator.onLine===false;
-    // V35.9: while online, never flash an old independent Profit cache before the
+    // V36.0: while online, never flash an old independent Profit cache before the
     // authoritative Sales Card list arrives. This removes the 2-profit -> 1-profit
     // oscillation. Cache is only a true offline fallback.
     if(offline&&Array.isArray(cachedLinks)){
@@ -5165,7 +5165,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3590",
+    version:"3600",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6498,8 +6498,8 @@ removeProductFromTransactionV239=async function(type,card,item){
 window.removeProductFromTransactionV239=removeProductFromTransactionV239;
 
 
-/* ================= V35.9 Fair = Live single-day workflow =================
-   Fair keeps its V35.9 monthly report cards/commission display, but the edit
+/* ================= V36.0 Fair = Live single-day workflow =================
+   Fair keeps its V36.0 monthly report cards/commission display, but the edit
    workflow is intentionally identical to Live: entity + one date + turnover.
    Date Range and visible Sales Card associated-date selection are retired.
 */
@@ -6605,7 +6605,7 @@ document.getElementById('fairStart')?.addEventListener('change',()=>{const e=doc
 document.getElementById('fairSales')?.addEventListener('input',()=>{const h=document.querySelector('#fairInputs .fairAmount');if(h)h.value=document.getElementById('fairSales').value;});
 setTimeout(()=>{const e=document.getElementById('fairEnd'),s=document.getElementById('fairStart');if(e&&s)e.value=s.value||todayISO();updateFairPageMode();updateFairSingleAmountV353();},0);
 
-/* V35.9 final alignment: Live and Fair call one single-day turnover engine. */
+/* V36.0 final alignment: Live and Fair call one single-day turnover engine. */
 async function saveLiveFairSingleDayV353(type){
   if(!ensureWritableSelection())return;
   const isLive=type==='live';
@@ -6662,7 +6662,7 @@ saveFairSales=function(){return saveLiveFairSingleDayV353('fair')};
 window.saveLiveSales=saveLiveSales;window.saveFairSales=saveFairSales;
 
 
-/* ================= V35.9 Fair/Live UI + read-path parity =================
+/* ================= V36.0 Fair/Live UI + read-path parity =================
    Fair keeps its monthly Fair report cards, but the top editor now uses the
    same one-date interaction model as Live. Legacy Fair Session/Date Range data
    remains readable for Backup/history only and is not consulted here.
@@ -6718,7 +6718,7 @@ function installFairLiveParityV356(){
     const date=document.getElementById('fairStart');
     const display=document.getElementById('fairStartDisplay');
     if(date){delete date.dataset.guardV273;delete date.dataset.fairDraftV282;}
-    // V35.9 desktop fix: cloneNode copies dataset flags but not event listeners.
+    // V36.0 desktop fix: cloneNode copies dataset flags but not event listeners.
     // Clear the stale picker-bound marker and rebind the same native picker used by Live.
     if(display)delete display.dataset.pickerBound;
     bindDateControl('fairStart',async()=>{
@@ -6782,7 +6782,7 @@ refreshFairSessionsV281=async function(){return Array.isArray(fairSessionsCloudV
 setTimeout(()=>{installFairLiveParityV356();if(document.getElementById('page-fair')?.classList.contains('active')){setDateControl('fairStart',todayISO());updateFairSingleAmountV353();}},0);
 
 
-/* ================= V35.9 Fair shared location dropdown =================
+/* ================= V36.0 Fair shared location dropdown =================
    Restore the pre-V35.6 location UX: a real in-page history dropdown with
    selectable rows and delete buttons. iOS datalist/keyboard suggestions are
    disabled. History is shared through the existing hidden Fair Session sheet;
@@ -6867,5 +6867,41 @@ window.saveFairSales=saveFairSales;
 setTimeout(()=>{bindFairLocationDropdownV358();refreshFairLocationHistoryCloudV358()},0);
 
 
-/* ================= V35.9 Fair normalized location + reliable dropdown ================= */
+/* ================= V36.0 Fair normalized location + reliable dropdown ================= */
 setTimeout(()=>{const input=document.getElementById('fairLocation');input?.removeAttribute('list');bindFairLocationDropdownV358();},50);
+
+/* ================= V36.0 selected-date Fair / Live day total ================= */
+const dayTotalFetchV360=new Map();
+function selectedDayTotalDateV360(type){return type==='fair'?fairSelectedDateV353():isoToDisplay(String(document.getElementById('liveDate')?.value||''))}
+function selectedDayTotalSalesV360(type,date){return dedupeRows(rows).filter(r=>r.type===type&&r.date===date).reduce((s,r)=>s+Number(r.amount||0),0)}
+function selectedDayTotalProfitV360(type,date,links){
+  const list=(Array.isArray(links)?links:[]).filter(x=>String(x.type||'')===type&&String(x.date||'')===date);
+  const clean=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(list):list;
+  return clean.reduce((s,x)=>s+Number(x.profit||0),0);
+}
+function paintSelectedDayTotalV360(type,links){
+  const date=selectedDayTotalDateV360(type),el=document.getElementById(type==='fair'?'fairDateResult':'liveDateResult');if(!el||!date)return;
+  const sales=selectedDayTotalSalesV360(type,date),profit=selectedDayTotalProfitV360(type,date,links),rate=sales>0?profit/sales*100:0;
+  el.classList.add('selected-day-total-v360');
+  el.innerHTML=`<span class="day-total-title-v360">${type==='fair'?'Fair':'Live'} 当日总计 <small>${date}</small></span><span class="day-total-metrics-v360"><span>营业额 <b>RM${formatAmount(sales)}</b></span><span>利润 <b>RM${formatAmount(profit)}</b></span><span>利润率 <b>${rate.toFixed(2)}%</b></span></span>`;
+}
+function refreshSelectedDayTotalV360(type){
+  const date=selectedDayTotalDateV360(type);if(!date)return;
+  const cached=typeof getDailyProfitCacheV237==='function'?getDailyProfitCacheV237(type,date):null;
+  paintSelectedDayTotalV360(type,Array.isArray(cached)?cached:[]);
+  if(typeof navigator!=='undefined'&&navigator.onLine===false)return;
+  const key=type+'|'+date;if(dayTotalFetchV360.has(key))return;
+  const p=Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000})).then(all=>{
+    const fresh=(all||[]).filter(x=>String(x.type||'')===type&&String(x.date||'')===date);
+    if(typeof setDailyProfitCacheV237==='function')setDailyProfitCacheV237(type,date,fresh);
+    if(selectedDayTotalDateV360(type)===date)paintSelectedDayTotalV360(type,fresh);
+  }).catch(()=>{}).finally(()=>dayTotalFetchV360.delete(key));dayTotalFetchV360.set(key,p);
+}
+const _updateLiveInputFromSelectedDateV360=updateLiveInputFromSelectedDate;
+updateLiveInputFromSelectedDate=function(){_updateLiveInputFromSelectedDateV360();refreshSelectedDayTotalV360('live')};
+const _updateFairSingleAmountV360=updateFairSingleAmountV353;
+updateFairSingleAmountV353=function(){_updateFairSingleAmountV360();refreshSelectedDayTotalV360('fair')};
+window.updateFairSingleAmountV353=updateFairSingleAmountV353;
+// Live money display: preserve easy typing while focused; normalize to 0,000.00 on change/blur.
+function installLiveMoneyFormatV360(){const el=document.getElementById('liveSales');if(!el||el.dataset.moneyV360==='1')return;el.dataset.moneyV360='1';const f=()=>{el.value=formatAmount(toAmount(el.value));saveLiveTurnoverDraftV332(el.value)};el.addEventListener('change',f);el.addEventListener('blur',f)}
+setTimeout(()=>{installLiveMoneyFormatV360();refreshSelectedDayTotalV360('fair');refreshSelectedDayTotalV360('live')},0);
