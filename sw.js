@@ -1,4 +1,4 @@
-// Lover Legend Sales PWA Service Worker V37.3
+// Lover Legend Sales PWA Service Worker V37.4
 // OneSignal uses its own worker:
 // /push/onesignal/OneSignalSDKWorker.js
 

@@ -346,6 +346,58 @@ function reconcilePendingRowsFromCloudV329(cloudRows) {
   return before - pendingRows.length;
 }
 
+// V37.4: pending rows are durable retry instructions, not proof that the cloud
+// is missing data. Before retrying any write, verify every pending row against
+// the authoritative month that owns that row. This removes "ghost pending"
+// entries left behind when the original write reached Apps Script but the
+// browser missed/aborted the acknowledgement.
+function pendingRowMonthV374(row){
+  const iso=typeof displayToISO==="function"?displayToISO(String(row?.date||"")):"";
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso)?iso.slice(0,7):"";
+}
+function pendingRowMatchesCloudV374(pending,cloud){
+  if(!pending)return false;
+  const amount=Number(pending.amount||0);
+  // A 0.00 pending mutation is a deletion. Missing authoritative row means the
+  // deletion is already complete and the retry item can be discarded safely.
+  if(!cloud)return amount<=0.005;
+  return Math.abs(Number(cloud.amount||0)-amount)<=0.005;
+}
+async function reconcileAllPendingRowsFromCloudV374(options={}){
+  loadPendingRows();
+  if(!pendingRows.length)return {ok:true,cleared:0,remaining:0,checkedMonths:0};
+
+  const before=pendingRows.length;
+  const pendingSnapshot=[...pendingRows];
+  const months=[...new Set(pendingSnapshot.map(pendingRowMonthV374).filter(Boolean))];
+  const cloudMaps=new Map();
+  let checkedMonths=0;
+
+  for(const month of months){
+    try{
+      const json=await loadMonthCloudShared(month,Number(options.timeoutMs||12000));
+      if(!json||!json.ok)continue;
+      const map=new Map();
+      (Array.isArray(json.rows)?json.rows:[]).forEach(row=>map.set(syncKey(row),row));
+      cloudMaps.set(month,map);
+      checkedMonths++;
+    }catch(_){
+      // Keep the pending row when the authoritative check itself is unavailable.
+      // We never delete unverified local work merely to make the status green.
+    }
+  }
+
+  pendingRows=pendingSnapshot.filter(pending=>{
+    const month=pendingRowMonthV374(pending);
+    const map=cloudMaps.get(month);
+    if(!map)return true;
+    return !pendingRowMatchesCloudV374(pending,map.get(syncKey(pending)));
+  });
+
+  if(pendingRows.length!==before)savePendingRows();
+  return {ok:true,cleared:before-pendingRows.length,remaining:pendingRows.length,checkedMonths};
+}
+
 function setSync(text, good = false, error = false) {
   const el = document.getElementById("syncStatus");
   if (!el) return;
@@ -726,11 +778,17 @@ async function loadFromSheet(options = {}) {
       saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
       if(typeof refreshFairSessionsV281==="function"){try{await refreshFairSessionsV281({applyLatest:true,forceApply:false})}catch(_){}}
 
-      // V37.3: never announce "已同步" before the durable local retry queue
-      // has been reconciled/processed. A successful cloud read and a clean
-      // write queue are two different conditions; the final status must reflect
-      // both so startup cannot flash green and then immediately turn red.
+      // V37.4: verify durable pending rows against their own authoritative
+      // month BEFORE retrying writes. If the cloud already contains the exact
+      // amount (or a requested deletion is already absent), the pending item is
+      // an acknowledgement residue and is permanently removed without another
+      // upload. Only genuinely unmatched work proceeds to syncPendingRows().
       loadPendingRows();
+      if (pendingRows.length > 0) {
+        setSync(`正在确认 ${pendingRows.length} 笔待同步资料...`);
+        await reconcileAllPendingRowsFromCloudV374({timeoutMs:12000});
+        loadPendingRows();
+      }
       if (pendingRows.length > 0) {
         setSync(`正在自动同步 ${pendingRows.length} 笔资料...`);
         await syncPendingRows();
@@ -785,6 +843,17 @@ async function syncPendingRows() {
       if (initialCloudSyncFinished && !cloudLoadPromise) {
         setSync("已同步", true);
       }
+      return;
+    }
+
+    // V37.4: every retry path (startup, timer, focus, manual recovery) first
+    // checks whether another request/device already committed this mutation.
+    // This keeps successful writes from being uploaded again on every open.
+    setSync(`正在确认 ${pendingRows.length} 笔待同步资料...`);
+    await reconcileAllPendingRowsFromCloudV374({timeoutMs:12000});
+    loadPendingRows();
+    if (pendingRows.length === 0) {
+      setSync("已同步", true);
       return;
     }
 
