@@ -2681,3 +2681,9 @@ body{overflow-x:hidden;}
 .fair-product-date-picker-v342{margin:14px 0 10px;padding:12px;border:1px solid #d7dfd7;border-radius:14px;background:#f8fbf8}
 .fair-product-date-picker-v342 label{display:block;margin:0 0 7px;font-weight:800;color:#245b2d}
 .fair-product-date-picker-v342 select{width:100%;margin:0;box-sizing:border-box;background:#fff}
+
+/* V35.8: Fair history dropdown restored; real in-page list, not iOS datalist suggestions. */
+#page-fair .card{overflow:visible}
+#fairLocationHistoryV309{position:relative;z-index:40;max-height:260px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#fairLocationHistoryV309.hidden{display:none!important}
+@media(max-width:600px){#fairLocationHistoryV309{max-height:220px}.fair-location-history-row-v309{grid-template-columns:minmax(0,1fr) 52px}.fair-location-history-choose-v309{min-height:50px}}
