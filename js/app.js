@@ -1370,7 +1370,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3680",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3690",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1388,7 +1388,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3680";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3690";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5165,7 +5165,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3680",
+    version:"3690",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -7292,3 +7292,75 @@ window.toggleProductProfitSummaryV216=toggleProductProfitSummaryV368;
 // V36.8: seed the exact date cache proactively after page/date changes.
 function seedVisibleDayProfitV368(type){setTimeout(()=>renderSelectedDayGrandV362(type),0)}
 setTimeout(()=>{['daily','fair','live'].forEach(seedVisibleDayProfitV368)},220);
+
+/* ================= V36.9 once-per-day unconfirmed draft reminder =================
+   Remind once per calendar day when one or more Sales/Fair/Live sales-card drafts
+   are still unconfirmed. Same-day newly saved drafts are not nagged immediately;
+   the reminder begins on the next calendar day and stops automatically once the
+   draft status is no longer DRAFT / DRAFT_INVENTORY_CHANGED. */
+const SALES_DRAFT_REMINDER_KEY_V369='lover_sales_draft_reminder_v369';
+function localDayISO369(d=new Date()){
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function parseSalesDraftTimestampV369(value){
+  const s=String(value||'').trim();if(!s)return 0;
+  let t=Date.parse(s);if(Number.isFinite(t))return t;
+  const m=s.match(/^(\d{2})-(\d{2})-(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if(!m)return 0;
+  const d=new Date(Number(m[3]),Number(m[2])-1,Number(m[1]),Number(m[4]||0),Number(m[5]||0),Number(m[6]||0));
+  return d.getTime();
+}
+function salesDraftReminderTypeLabelV369(type){
+  return type==='live'?'Live':type==='fair'?'Fair':'Sales';
+}
+function collectUnconfirmedDraftsV369(allLinks){
+  const today=localDayISO369(),groups=new Map();
+  const add=(x,localSavedAt=0)=>{
+    const status=String(x?.importSyncStatus||'').trim();
+    if(status!=='DRAFT'&&status!=='DRAFT_INVENTORY_CHANGED')return;
+    if(String(x?.status||'active').toLowerCase()==='deleted')return;
+    const type=String(x?.type||''),date=String(x?.date||''),location=String(x?.location||'').trim();
+    const txn=String(x?.transactionId||x?.saleId||x?.linkId||'').trim()||[type,date,location].join('|');
+    const key=[type,date,location.toLowerCase(),txn].join('|');
+    let g=groups.get(key);if(!g){g={key,type,date,location,txn,total:0,updatedMs:0};groups.set(key,g)}
+    g.total+=Number(x?.actualPrice||0);
+    g.updatedMs=Math.max(g.updatedMs,Number(localSavedAt||0),parseSalesDraftTimestampV369(x?.updatedAt||x?.createdAt));
+  };
+  (Array.isArray(allLinks)?allLinks:[]).forEach(x=>add(x));
+  // Include durable local drafts that have not reached cloud yet.
+  try{
+    const pending=typeof readSalesDraftPendingV314==='function'?readSalesDraftPendingV314():{};
+    Object.values(pending||{}).forEach(entry=>(Array.isArray(entry?.items)?entry.items:[]).forEach(x=>{const st=String(x?.importSyncStatus||'').trim();add({...x,importSyncStatus:st||'DRAFT'},Number(entry?.savedAt||0));}));
+  }catch(_){}
+  return [...groups.values()].filter(g=>{
+    if(g.updatedMs){const d=new Date(g.updatedMs);return localDayISO369(d)<today;}
+    const iso=typeof displayToISO==='function'?displayToISO(g.date):'';
+    return iso&&iso<today;
+  }).sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.type).localeCompare(String(b.type))||String(a.location).localeCompare(String(b.location)));
+}
+function readDraftReminderStateV369(){
+  try{const x=JSON.parse(localStorage.getItem(SALES_DRAFT_REMINDER_KEY_V369)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}
+}
+function writeDraftReminderStateV369(state){try{localStorage.setItem(SALES_DRAFT_REMINDER_KEY_V369,JSON.stringify(state||{}))}catch(_){}
+}
+async function checkUnconfirmedDraftReminderV369(){
+  const today=localDayISO369(),state=readDraftReminderStateV369();
+  if(String(state.lastReminderDay||'')===today)return;
+  let links=null;
+  try{
+    if(typeof peekAllSalesProductLinksCacheV367==='function')links=peekAllSalesProductLinksCacheV367(180000);
+    if(!Array.isArray(links)&&typeof loadAllSalesProductLinksV203==='function')links=await loadAllSalesProductLinksV203({force:false,maxAgeMs:180000});
+  }catch(_){links=[]}
+  const drafts=collectUnconfirmedDraftsV369(links);
+  if(!drafts.length)return;
+  // Mark before showing the alert so rerenders/focus events cannot duplicate it today.
+  writeDraftReminderStateV369({lastReminderDay:today,lastCount:drafts.length,updatedAt:Date.now()});
+  const lines=drafts.slice(0,8).map((g,i)=>`${i+1}. ${g.date} · ${salesDraftReminderTypeLabelV369(g.type)}${g.location?' · '+g.location:''} · RM${formatAmount(g.total)}`);
+  const more=drafts.length>8?`\n…另外 ${drafts.length-8} 张草稿`:'';
+  alert(`⚠️ 有 ${drafts.length} 张销售卡草稿尚未确认\n\n${lines.join('\n')}${more}\n\n系统每天只提醒一次，确认销售后会自动停止提醒。`);
+}
+window.checkUnconfirmedDraftReminderV369=checkUnconfirmedDraftReminderV369;
+setTimeout(()=>checkUnconfirmedDraftReminderV369().catch(()=>{}),1800);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>checkUnconfirmedDraftReminderV369().catch(()=>{}),300)});
+window.addEventListener('focus',()=>setTimeout(()=>checkUnconfirmedDraftReminderV369().catch(()=>{}),300));
