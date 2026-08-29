@@ -2767,7 +2767,7 @@ body{overflow-x:hidden;}
 }
 
 
-/* ================= V36.6 Fair/Live monthly two-line summary ================= */
+/* ================= V36.7 Fair/Live monthly two-line summary ================= */
 /* Fair history remains click/focus dropdown; the visible green arrow button is removed. */
 .fair-location-picker-v359{display:block!important;grid-template-columns:none!important}
 .fair-location-picker-v359 #fairLocation{width:100%!important}
@@ -2786,4 +2786,20 @@ body{overflow-x:hidden;}
  .monthly-rollup-profit-v365{grid-template-columns:minmax(100px,1.15fr) minmax(82px,.95fr) minmax(82px,.92fr) minmax(68px,.78fr)}
  .monthly-rollup-row-v365 span{font-size:11.5px;letter-spacing:-.25px}
  .monthly-rollup-row-v365 b{font-size:14.5px;letter-spacing:-.25px}
+}
+
+/* ================= V36.7 mobile monthly rollup fit ================= */
+@media(max-width:430px){
+ .monthly-rollup-v365{padding:9px 8px;overflow:hidden}
+ .monthly-rollup-row-v365,.monthly-rollup-profit-v365{
+   grid-template-columns:30% 22% 27% 21%;gap:0;width:100%;min-width:0
+ }
+ .monthly-rollup-row-v365 span{font-size:11px;letter-spacing:-.45px;overflow:hidden;text-overflow:clip}
+ .monthly-rollup-row-v365 b{font-size:13.5px;letter-spacing:-.45px;padding-left:2px;overflow:visible}
+ .monthly-rollup-row-v365 span:nth-child(3){padding-left:7px}
+}
+@media(max-width:370px){
+ .monthly-rollup-row-v365,.monthly-rollup-profit-v365{grid-template-columns:29% 23% 27% 21%}
+ .monthly-rollup-row-v365 span{font-size:10.5px}
+ .monthly-rollup-row-v365 b{font-size:12.5px}
 }
