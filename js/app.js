@@ -1370,7 +1370,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3600",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3610",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1388,7 +1388,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3600";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3610";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5165,7 +5165,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3600",
+    version:"3610",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6906,8 +6906,10 @@ function paintSelectedDayTotalV360(type,date,sales,profit,loading=false,error=fa
   const el=document.getElementById(type==='fair'?'fairDateResult':'liveDateResult');if(!el)return;
   const label=type==='fair'?'Fair':'Live';
   const rate=sales>0?profit/sales*100:0;
-  el.classList.add('selected-day-total-v360');
-  el.innerHTML=`<span class="selected-day-total-title-v360">${label} 当日总计</span><span class="selected-day-total-date-v360">${escapeChangeLogHtmlV200(date||'-')} · 全部${type==='fair'?'地点':'主播'}</span><span class="selected-day-total-metrics-v360"><b>营业额 RM${money(sales)}</b><b>利润 ${loading?'读取中…':error?'读取失败':'RM'+money(profit)}</b><b>利润率 ${loading||error?'—':rate.toFixed(2)+'%'}</b></span>`;
+  el.classList.remove('selected-day-total-v360');
+  el.classList.add('selected-day-total-v361');
+  el.setAttribute('data-selected-date',String(date||''));
+  el.innerHTML=`<strong class="selected-day-total-title-v361">${label} 当日总计</strong><div><span>营业额</span><b>${money(sales)}</b></div><div><span>利润</span><b>${loading?'读取中…':error?'读取失败':money(profit)}</b></div><div><span>利润率</span><b>${loading||error?'—':rate.toFixed(2)+'%'}</b></div>`;
 }
 async function renderSelectedDayTotalV360(type){
   const date=selectedDayDateV360(type),token=++selectedDayTotalTokenV360[type];
