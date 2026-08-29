@@ -1370,7 +1370,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3700",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3720",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1388,7 +1388,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3700";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3720";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3095,7 +3095,15 @@ async function loadProductLinksIntoEditorV206(type){
         return;
       }
     }
-    const cloudLinksRaw=await loadSalesProductLinksV206(type,date,location,{force:true,maxAgeMs:0});
+    // V37.2: a temporary JSONP/network miss must not immediately turn a valid
+    // Sales Card panel into "读取失败". Retry the exact same context once.
+    let cloudLinksRaw;
+    try{
+      cloudLinksRaw=await loadSalesProductLinksV206(type,date,location,{force:true,maxAgeMs:0});
+    }catch(firstError){
+      await new Promise(resolve=>setTimeout(resolve,700));
+      cloudLinksRaw=await loadSalesProductLinksV206(type,date,location,{force:true,maxAgeMs:0});
+    }
     const cloudLinks=filterDeletedSalesLinksV350(type,date,location,cloudLinksRaw);
     const links=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(cloudLinks):cloudLinks;
     const current=productLinkContextV206(type);
@@ -5165,7 +5173,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3700",
+    version:"3720",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6317,7 +6325,7 @@ renderFairMonthlyList=function(){
   if(!list.length){container.innerHTML='<div class="sub">这个月份还没有 Fair 记录</div>';if(monthlyCommissionEl)monthlyCommissionEl.textContent="0.00";renderFairPageTop3();return;}
   const locations=[];list.forEach(r=>{const key=normalizeFairLocationKey(r.displayLocation);let g=locations.find(x=>x.key===key);if(!g){g={key,name:r.displayLocation,latestDate:r.date,rows:[]};locations.push(g)}else if(displayToISO(r.date)>=displayToISO(g.latestDate)){g.name=r.displayLocation;g.latestDate=r.date}g.rows.push(r)});
   const token=++monthlyProfitRenderTokenV294.fair;
-  container.innerHTML=locations.map(group=>{const sales=group.rows.reduce((s,r)=>s+Number(r.amount||0),0),commission=sales*fairRate;return `<div class="month-record-group month-profit-group-v294" data-profit-group="${escapeChangeLogHtmlV200(group.name)}"><div class="month-record-group-title fair-location-title-v298"><span>${escapeChangeLogHtmlV200(group.name)}</span><b>佣金 ${money(commission)}</b></div>${profitHeadV294()}${group.rows.map(r=>`<div class="month-profit-row-v294"><span>${r.date}</span><strong>${money(Number(r.amount||0))}</strong><strong class="profit-value-v294">--</strong><strong class="profit-rate-v294">--</strong></div>`).join('')}<div class="month-profit-row-v294 month-profit-total-v294"><span>这场 Fair 总数</span><strong>${money(sales)}</strong><strong class="profit-value-v294">--</strong><strong class="profit-rate-v294">--</strong></div></div>`}).join('')+`<div id="fairProfitGrandV294" class="profit-grand-v294"><strong>全部地点总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>0.00</b></div><div><span>整体利润率</span><b>0.00%</b></div></div>`;
+  container.innerHTML=locations.map(group=>{const sales=group.rows.reduce((s,r)=>s+Number(r.amount||0),0),commission=sales*fairRate;return `<div class="month-record-group month-profit-group-v294" data-profit-group="${escapeChangeLogHtmlV200(group.name)}"><div class="month-record-group-title fair-location-title-v298"><span>${escapeChangeLogHtmlV200(group.name)}</span><b>佣金 ${money(commission)}</b></div>${profitHeadV294()}${group.rows.map(r=>`<div class="month-profit-row-v294"><span>${r.date}</span><strong>${money(Number(r.amount||0))}</strong><strong class="profit-value-v294">--</strong><strong class="profit-rate-v294">--</strong></div>`).join('')}<div class="month-profit-row-v294 month-profit-total-v294"><span>总数</span><strong>${money(sales)}</strong><strong class="profit-value-v294">--</strong><strong class="profit-rate-v294">--</strong></div></div>`}).join('')+`<div id="fairProfitGrandV294" class="profit-grand-v294"><strong>全部地点总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>0.00</b></div><div><span>整体利润率</span><b>0.00%</b></div></div>`;
   renderFairPageTop3();
   Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000})).then(links=>{
     if(token!==monthlyProfitRenderTokenV294.fair)return;
@@ -6325,7 +6333,7 @@ renderFairMonthlyList=function(){
       let groupProfit=0,groupSales=0;
       const rowsHtml=group.rows.map(r=>{const p=profitByDayV294(links,'fair',group.name,r.date);groupProfit+=p;groupSales+=Number(r.amount||0);return fairProfitRowV294(r,p)}).join('');
       const groupCommission=groupSales*fairRate;
-      return `<div class="month-record-group month-profit-group-v294"><div class="month-record-group-title fair-location-title-v298"><span>${escapeChangeLogHtmlV200(group.name)}</span><b>佣金 ${money(groupCommission)}</b></div>${profitHeadV294()}${rowsHtml}<div class="month-profit-row-v294 month-profit-total-v294"><span>这场 Fair 总数</span><strong>${money(groupSales)}</strong><strong class="profit-value-v294">${money(groupProfit)}</strong><strong class="profit-rate-v294">${marginTextV294(groupProfit,groupSales)}</strong></div></div>`;
+      return `<div class="month-record-group month-profit-group-v294"><div class="month-record-group-title fair-location-title-v298"><span>${escapeChangeLogHtmlV200(group.name)}</span><b>佣金 ${money(groupCommission)}</b></div>${profitHeadV294()}${rowsHtml}<div class="month-profit-row-v294 month-profit-total-v294"><span>总数</span><strong>${money(groupSales)}</strong><strong class="profit-value-v294">${money(groupProfit)}</strong><strong class="profit-rate-v294">${marginTextV294(groupProfit,groupSales)}</strong></div></div>`;
     }).join('');
     const totalProfit=locations.reduce((sum,g)=>sum+g.rows.reduce((s,r)=>s+profitByDayV294(links,'fair',g.name,r.date),0),0);
     container.insertAdjacentHTML('beforeend',`<div id="fairProfitGrandV294" class="profit-grand-v294"><strong>全部地点总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>${money(totalProfit)}</b></div><div><span>整体利润率</span><b>${marginTextV294(totalProfit,total)}</b></div></div>`);
@@ -7366,7 +7374,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout
 window.addEventListener('focus',()=>setTimeout(()=>checkUnconfirmedDraftReminderV369().catch(()=>{}),300));
 
 
-/* ================= V37.0 Import -> associated Sales card deep link =================
+/* ================= V37.2 Import -> associated Sales card deep link =================
    Import Cost System can return to the exact Sales/Fair/Live context without
    confirming a sale or touching inventory. The transactionId is used only to
    scroll/highlight the matching saved card after that day's cards are loaded. */
@@ -7431,7 +7439,7 @@ async function openAssociatedSalesCardFromImportV370(){
     body.classList.remove('hidden');box?.classList.remove('product-link-collapsed');
     box?.querySelector('.product-link-toggle')?.setAttribute('aria-expanded','true');
   }
-  try{await loadProductLinksIntoEditorV206(type)}catch(e){console.warn('V37.0 associated card load failed',e)}
+  try{await loadProductLinksIntoEditorV206(type)}catch(e){console.warn('V37.2 associated card load failed',e)}
   if(!highlightAssociatedSalesCardV370(type,target)){
     setTimeout(()=>highlightAssociatedSalesCardV370(type,target),600);
   }
