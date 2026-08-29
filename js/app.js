@@ -1370,7 +1370,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3660",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3670",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1388,7 +1388,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3660";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3670";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5165,7 +5165,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3660",
+    version:"3670",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6974,7 +6974,7 @@ window.saveFairSales=saveFairSales;
 setTimeout(()=>{bindLiveAmountFormatV360();renderSelectedDayTotalV360('fair');renderSelectedDayTotalV360('live')},80);
 
 
-/* ================= V36.6 selected-day Sales / Fair / Live grand totals =================
+/* ================= V36.7 selected-day Sales / Fair / Live grand totals =================
    Sales = both nurseries; Fair = all locations; Live = all hosts.
    The summary is date-scoped only and intentionally ignores the currently selected entity.
 */
@@ -7015,7 +7015,7 @@ async function renderSelectedDayGrandV362(type){
 }
 window.renderSelectedDayGrandV362=renderSelectedDayGrandV362;
 
-// Override V36.0 renderer so all existing Fair/Live refresh hooks use the V36.6 compact grand-total renderer.
+// Override V36.0 renderer so all existing Fair/Live refresh hooks use the V36.7 compact grand-total renderer.
 renderSelectedDayTotalV360=function(type){return renderSelectedDayGrandV362(type)};
 window.renderSelectedDayTotalV360=renderSelectedDayTotalV360;
 
@@ -7042,7 +7042,7 @@ window.showPage=showPage;
 setTimeout(()=>{renderSelectedDayGrandV362('daily');renderSelectedDayGrandV362('fair');renderSelectedDayGrandV362('live')},120);
 
 
-/* ================= V36.6 data/read performance + monthly rollup =================
+/* ================= V36.7 data/read performance + monthly rollup =================
    - Sales keeps its existing monthly design.
    - Fair/Live monthly summary is exactly two rows: month total+commission, then profit+overall margin.
    - Profit pending is "--" (never false 0.00).
@@ -7152,3 +7152,41 @@ const _showPageV365=showPage;
 showPage=function(name,el){const r=_showPageV365(name,el);if(r===false)return false;const type=name==='sales'?'daily':name==='fair'?'fair':name==='live'?'live':'';if(type){setTimeout(()=>{renderSelectedDayGrandV362(type);prefetchChangeLogV365(type);if(type==='fair'||type==='live')refreshMonthlyRollupV365(type)},40)}return r};
 window.showPage=showPage;
 setTimeout(()=>{installSelectedDayGuardV365();['daily','fair','live'].forEach(prefetchChangeLogV365);refreshMonthlyRollupV365('fair');refreshMonthlyRollupV365('live')},180);
+
+/* ================= V36.7 instant Daily Profit reuse =================
+   The selected-day grand total already loads the authoritative all-links cache.
+   Reuse that exact data immediately when Daily Profit opens instead of waiting for
+   another full-table read. A cloud refresh is only needed when no fresh memory/cache exists.
+*/
+async function toggleProductProfitSummaryV367(type,button){
+  const panel=productProfitSummaryPanelV216(type);if(!panel)return;
+  if(productLinkBoxIsOpenV210(type)&&hasUnsavedSalesCardChangesV238(type)&&!confirmDiscardSalesCardChangesV238(type))return;
+  const date=productProfitSelectedDateV216(type);if(!date){alert('请先选择日期');return}
+  if(productProfitSummaryOpenV216[type]&&!panel.classList.contains('hidden')){
+    productProfitSummaryOpenV216[type]=false;panel.classList.add('hidden');panel.innerHTML='';if(button)button.textContent='📊 当天利润';return;
+  }
+  const pre=productLinkPreV208(type),box=document.getElementById(pre+'ProductLinkBox'),body=document.getElementById(pre+'ProductLinkBody');
+  if(body)body.classList.add('hidden');if(box)box.classList.add('product-link-collapsed');box?.querySelector('.product-link-toggle')?.setAttribute('aria-expanded','false');
+  const allCached=typeof peekAllSalesProductLinksCacheV367==='function'?peekAllSalesProductLinksCacheV367(180000):null;
+  const dailyCached=typeof getDailyProfitCacheV237==='function'?getDailyProfitCacheV237(type,date):null;
+  const source=Array.isArray(allCached)?allCached:(Array.isArray(dailyCached)?dailyCached:null);
+  if(Array.isArray(source)){
+    const raw=source.filter(x=>String(x.type||'')===type&&String(x.date||'')===date);
+    const fresh=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(raw):raw;
+    if(typeof setDailyProfitCacheV237==='function')setDailyProfitCacheV237(type,date,fresh);
+    renderProductProfitSummaryV216(type,fresh);panel.classList.remove('hidden');productProfitSummaryOpenV216[type]=true;if(button)button.textContent='📊 收起利润';
+    // If this came from the authoritative all-links cache, no second read is useful.
+    if(Array.isArray(allCached))return;
+  }else if(button){button.disabled=true;button.textContent='读取中...'}
+  try{
+    const allLinks=await loadAllSalesProductLinksV203({force:false,maxAgeMs:180000});
+    const raw=(allLinks||[]).filter(x=>String(x.type||'')===type&&String(x.date||'')===date);
+    const fresh=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(raw):raw;
+    if(typeof setDailyProfitCacheV237==='function')setDailyProfitCacheV237(type,date,fresh);
+    renderProductProfitSummaryV216(type,fresh);panel.classList.remove('hidden');productProfitSummaryOpenV216[type]=true;if(button)button.textContent='📊 收起利润';
+  }catch(e){
+    if(!Array.isArray(source))alert('读取当天利润失败：'+(e.message||e));
+  }finally{if(button)button.disabled=false}
+}
+toggleProductProfitSummaryV216=toggleProductProfitSummaryV367;
+window.toggleProductProfitSummaryV216=toggleProductProfitSummaryV367;
