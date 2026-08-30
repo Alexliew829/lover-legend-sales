@@ -377,6 +377,14 @@ function dashboardDateLabel(){
 }
 
 function renderTodayCompanyStatus(){
+  // V37.5: this card follows the explicit "查看日期" selector. Keep the
+  // heading honest when a historical date is selected instead of always
+  // calling the values "本日".
+  const dailyTitle=document.getElementById("dashboardDailyTitleV375");
+  if(dailyTitle){
+    const selected=selectedDashboardDateISO();
+    dailyTitle.textContent=selected===todayISO()?"本日营业额":`${selectedDashboardDateDisplay()} 营业额`;
+  }
   const balakongRecorded=hasDashboardDateDailyRecord("balakong");
   const belimbingRecorded=hasDashboardDateDailyRecord("belimbing");
   const fairRecorded=hasDashboardDateTypeRecord("fair");
@@ -1370,7 +1378,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3740",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3750",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1388,7 +1396,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3740";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3750";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3095,7 +3103,7 @@ async function loadProductLinksIntoEditorV206(type){
         return;
       }
     }
-    // V37.4: a temporary JSONP/network miss must not immediately turn a valid
+    // V37.5: a temporary JSONP/network miss must not immediately turn a valid
     // Sales Card panel into "读取失败". Retry the exact same context once.
     let cloudLinksRaw;
     try{
@@ -5173,7 +5181,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3740",
+    version:"3750",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -7097,9 +7105,26 @@ function paintMonthlyRollupV365(type,state='loading',links=null){
 }
 function refreshMonthlyRollupV365(type){
   const token=++monthlyRollupTokenV365[type];paintMonthlyRollupV365(type,'loading');
-  Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:180000})).then(links=>{
-    if(token!==monthlyRollupTokenV365[type])return;paintMonthlyRollupV365(type,'ready',links);
-  }).catch(()=>{if(token===monthlyRollupTokenV365[type])paintMonthlyRollupV365(type,'error')});
+  // V37.5: profit data is a second cloud source. A transient timeout used to
+  // leave Fair/Live permanently at "--" until the user left and reopened the
+  // page. Retry once with a forced read, but only let the newest render token
+  // paint the result so an older request can never overwrite a newer page.
+  const paintIfCurrent=(links)=>{
+    if(token!==monthlyRollupTokenV365[type])return false;
+    paintMonthlyRollupV365(type,'ready',links);
+    return true;
+  };
+  Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:180000}))
+    .then(paintIfCurrent)
+    .catch(async()=>{
+      if(token!==monthlyRollupTokenV365[type])return;
+      try{
+        const links=await loadAllSalesProductLinksV203({force:true,maxAgeMs:0});
+        paintIfCurrent(links);
+      }catch(_){
+        if(token===monthlyRollupTokenV365[type])paintMonthlyRollupV365(type,'error');
+      }
+    });
 }
 const _renderFairMonthlyListV365=renderFairMonthlyList;
 renderFairMonthlyList=function(){const r=_renderFairMonthlyListV365();paintMonthlyRollupV365('fair','loading');refreshMonthlyRollupV365('fair');return r};
@@ -7374,7 +7399,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout
 window.addEventListener('focus',()=>setTimeout(()=>checkUnconfirmedDraftReminderV369().catch(()=>{}),300));
 
 
-/* ================= V37.4 Import -> associated Sales card deep link =================
+/* ================= V37.5 Import -> associated Sales card deep link =================
    Import Cost System can return to the exact Sales/Fair/Live context without
    confirming a sale or touching inventory. The transactionId is used only to
    scroll/highlight the matching saved card after that day's cards are loaded. */
@@ -7439,7 +7464,7 @@ async function openAssociatedSalesCardFromImportV370(){
     body.classList.remove('hidden');box?.classList.remove('product-link-collapsed');
     box?.querySelector('.product-link-toggle')?.setAttribute('aria-expanded','true');
   }
-  try{await loadProductLinksIntoEditorV206(type)}catch(e){console.warn('V37.4 associated card load failed',e)}
+  try{await loadProductLinksIntoEditorV206(type)}catch(e){console.warn('V37.5 associated card load failed',e)}
   if(!highlightAssociatedSalesCardV370(type,target)){
     setTimeout(()=>highlightAssociatedSalesCardV370(type,target),600);
   }
