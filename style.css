@@ -2836,11 +2836,11 @@ body{overflow-x:hidden;}
  .monthly-rollup-v368 .monthly-rollup-item-v368 b{font-size:11.7px;letter-spacing:-.8px}
 }
 
-/* V37.8 associated Sales card opened from Import */
+/* V37.9 associated Sales card opened from Import */
 .associated-sales-card-v370{outline:3px solid #1f8a4c;outline-offset:3px;box-shadow:0 0 0 7px rgba(31,138,76,.12);transition:box-shadow .2s ease,outline-color .2s ease}
 
 
-/* V37.8 Fair/Live incremental turnover composer */
+/* V37.9 Fair/Live incremental turnover composer */
 .turnover-hidden-total-v376{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important}
 .turnover-composer-v376{border:1px solid #d7e4da;border-radius:14px;padding:12px;background:#fff;margin:6px 0 10px}
 .turnover-history-v376{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-height:34px;margin-bottom:8px;padding:2px 0}
@@ -2859,7 +2859,7 @@ body{overflow-x:hidden;}
 .turnover-piece-v376.turnover-saving-v376{opacity:.55;pointer-events:none}
 @media(max-width:420px){.turnover-piece-v376{font-size:15px;padding:6px 9px}.turnover-readonly-row-v376 b{font-size:28px}.turnover-composer-v376{padding:10px}.turnover-new-v376{font-size:16px!important}}
 
-/* V37.8 Fair/Live turnover history: compact left-aligned inline equation */
+/* V37.9 Fair/Live turnover history: compact left-aligned inline equation */
 .turnover-history-v376{
   display:flex!important;
   flex-flow:row wrap!important;
@@ -2889,3 +2889,17 @@ body{overflow-x:hidden;}
   margin:0 1px!important;
   white-space:nowrap!important;
 }
+
+
+/* V37.9 Fair/Live compact turnover layout: read-only total + new entry on one row */
+.turnover-composer-v379{padding:12px 12px 10px}
+.turnover-main-row-v379{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:12px;align-items:end}
+.turnover-total-box-v379,.turnover-entry-box-v379{min-width:0}
+.turnover-total-box-v379 span,.turnover-entry-box-v379>span{display:block;font-size:12px;color:#68716b;font-weight:750;margin-bottom:5px}
+.turnover-total-box-v379 b{display:block;font-size:30px;line-height:50px;color:#111;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.turnover-entry-box-v379 .turnover-new-v376{min-height:50px;margin:0}
+.turnover-history-label-v379{font-size:12px;color:#68716b;font-weight:750;margin-top:12px;margin-bottom:4px;padding-top:9px;border-top:1px solid #e9eeea}
+.turnover-history-v379{margin:0!important;padding:0!important;min-height:30px!important;gap:3px!important}
+.turnover-history-v379 .turnover-piece-v376{background:transparent;border:0;border-radius:5px;padding:3px 2px;min-height:28px;color:#176b35;font-size:15px}
+.turnover-history-v379 .turnover-plus-v376{padding:0 1px;font-size:15px}
+@media(max-width:420px){.turnover-main-row-v379{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:9px}.turnover-total-box-v379 b{font-size:25px;line-height:48px}.turnover-entry-box-v379 .turnover-new-v376{font-size:14px!important;padding:9px 10px}.turnover-composer-v379{padding:10px}}
