@@ -346,7 +346,7 @@ function reconcilePendingRowsFromCloudV329(cloudRows) {
   return before - pendingRows.length;
 }
 
-// V37.5: pending rows are durable retry instructions, not proof that the cloud
+// V37.6: pending rows are durable retry instructions, not proof that the cloud
 // is missing data. Before retrying any write, verify every pending row against
 // the authoritative month that owns that row. This removes "ghost pending"
 // entries left behind when the original write reached Apps Script but the
@@ -706,7 +706,7 @@ async function loadFromSheet(options = {}) {
 
       // V32.6: foreground priority sync checks ONLY turnover and sales-card revisions.
       // Profit/Top5/Report/old-month changes never delay normal Sales/Fair/Live work.
-      // V37.5: never let the startup sync terminate at the lightweight revision
+      // V37.6: never let the startup sync terminate at the lightweight revision
       // check. Cached rows can be incomplete/stale even when revision numbers match
       // (especially after a prior interrupted load). The first sync must hydrate the
       // authoritative selected month; later resume/interval checks keep the fast path.
@@ -782,7 +782,7 @@ async function loadFromSheet(options = {}) {
       saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
       if(typeof refreshFairSessionsV281==="function"){try{await refreshFairSessionsV281({applyLatest:true,forceApply:false})}catch(_){}}
 
-      // V37.5: verify durable pending rows against their own authoritative
+      // V37.6: verify durable pending rows against their own authoritative
       // month BEFORE retrying writes. If the cloud already contains the exact
       // amount (or a requested deletion is already absent), the pending item is
       // an acknowledgement residue and is permanently removed without another
@@ -850,7 +850,7 @@ async function syncPendingRows() {
       return;
     }
 
-    // V37.5: every retry path (startup, timer, focus, manual recovery) first
+    // V37.6: every retry path (startup, timer, focus, manual recovery) first
     // checks whether another request/device already committed this mutation.
     // This keeps successful writes from being uploaded again on every open.
     setSync(`正在确认 ${pendingRows.length} 笔待同步资料...`);
@@ -1518,3 +1518,29 @@ window.peekAllSalesProductLinksCacheV367=peekAllSalesProductLinksCacheV367;
 
 // V36.8 build alias
 window.peekAllSalesProductLinksCacheV368=peekAllSalesProductLinksCacheV367;
+
+
+/* ================= V37.6 Fair/Live turnover entry details ================= */
+async function loadTurnoverEntriesFromSheetV376(type,date,location){
+  const json=await jsonp({action:'getTurnoverEntriesV376',type,date,location},{timeoutMs:15000});
+  if(!json.ok)throw new Error(json.message||'读取营业额明细失败');
+  return json.record||null;
+}
+async function loadAllTurnoverEntriesV376(){
+  const json=await jsonp({action:'getAllTurnoverEntriesV376'},{timeoutMs:30000});
+  if(!json.ok)throw new Error(json.message||'读取营业额明细失败');
+  return Array.isArray(json.records)?json.records:[];
+}
+async function saveTurnoverEntriesToSheetV376(type,date,location,entries,total,clientUpdatedAt=''){
+  const json=await jsonp({
+    action:'saveTurnoverEntriesV376',type,date,location,
+    entries:JSON.stringify(Array.isArray(entries)?entries:[]),total:Number(total||0),
+    clientUpdatedAt:String(clientUpdatedAt||new Date().toISOString()),
+    restoreGeneration:getLocalRestoreGenerationV347()
+  },{timeoutMs:20000});
+  if(!json.ok)throw new Error(json.message||'营业额明细同步失败');
+  return json.record||null;
+}
+window.loadTurnoverEntriesFromSheetV376=loadTurnoverEntriesFromSheetV376;
+window.loadAllTurnoverEntriesV376=loadAllTurnoverEntriesV376;
+window.saveTurnoverEntriesToSheetV376=saveTurnoverEntriesToSheetV376;
