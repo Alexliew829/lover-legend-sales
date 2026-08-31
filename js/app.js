@@ -68,7 +68,7 @@ function selectedDashboardDateDisplay(){return isoToDisplay(selectedDashboardDat
 function sameMonth(date){return sameMonthDisplay(date,selectedMonth())}
 function sameYear(date){return sameYearDisplay(date,selectedYear())}
 const LAST_PAGE_KEY_V238="lover_last_active_page_v238";
-// V39.4: turnover writes are real transactions. Keep navigation guarded until cloud confirmation.
+// V39.5: turnover writes are real transactions. Keep navigation guarded until cloud confirmation.
 const turnoverWriteStateV382={daily:false,fair:false,live:false};
 function turnoverNewDraftDirtyV382(type){
   if(type==='fair'||type==='live'){
@@ -395,7 +395,7 @@ function dashboardDateLabel(){
 }
 
 function renderTodayCompanyStatus(){
-  // V39.4: this card follows the explicit "查看日期" selector. Keep the
+  // V39.5: this card follows the explicit "查看日期" selector. Keep the
   // heading honest when a historical date is selected instead of always
   // calling the values "本日".
   const dailyTitle=document.getElementById("dashboardDailyTitleV375");
@@ -1402,7 +1402,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3940",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3950",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1420,7 +1420,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3940";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3950";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2436,6 +2436,23 @@ function hydrateImportProductsCacheV224(){
   return importProductsV214;
 }
 
+async function fetchImportProductsFreshV395(timeoutMs=12000){
+  const controller=typeof AbortController!=="undefined"?new AbortController():null;
+  const timer=controller?setTimeout(()=>controller.abort(),Math.max(3000,Number(timeoutMs||12000))):0;
+  try{
+    const response=await fetch(IMPORT_SYSTEM_CLOUD_URL_V214,{
+      method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({action:"pull",knownRevision:0,hasLocalData:false,forceFull:true,_ts:Date.now()}),
+      cache:"no-store",signal:controller?controller.signal:undefined
+    });
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const data=await response.json();
+    if(!data?.ok||!Array.isArray(data.products)||!Array.isArray(data.imports)||!Array.isArray(data.batches))throw new Error(data?.error||"进口系统资料不完整");
+    importProductsV214=buildCloudImportProductRecordsV214(data);saveImportProductsCacheV224(importProductsV214);return importProductsV214;
+  }catch(e){if(e&&e.name==='AbortError')throw new Error('库存云端核对超时');throw e}
+  finally{if(timer)clearTimeout(timer)}
+}
+
 async function loadImportProductsV214(force=false){
   hydrateImportProductsCacheV224();
   if(importProductsV214.length&&!force)return importProductsV214;
@@ -3127,7 +3144,7 @@ async function loadProductLinksIntoEditorV206(type){
         return;
       }
     }
-    // V39.4: a temporary JSONP/network miss must not immediately turn a valid
+    // V39.5: a temporary JSONP/network miss must not immediately turn a valid
     // Sales Card panel into "读取失败". Retry the exact same context once.
     let cloudLinksRaw;
     try{
@@ -5205,7 +5222,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3940",
+    version:"3950",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5636,12 +5653,12 @@ async function validateSalesInventoryAvailabilityV325(type,items,saveMode='draft
   if(!mapped.length)return true;
   let records=[];
   let lastInventoryError=null;
-  for(let attempt=1;attempt<=2;attempt++){
+  // V39.5: each validation attempt is a truly fresh Import cloud request.
+  // Do not reuse the startup prefetch promise: a stalled prefetch previously made
+  // Sales fail until the user manually refreshed the Import System.
+  for(let attempt=1;attempt<=3;attempt++){
     try{
-      records=await Promise.race([
-        loadImportProductsV214(true),
-        new Promise((_,reject)=>setTimeout(()=>reject(new Error('库存云端核对超时')),attempt===1?7000:10000))
-      ]);
+      records=await fetchImportProductsFreshV395(attempt===1?9000:(attempt===2?12000:15000));
       lastInventoryError=null;break;
     }catch(err){
       lastInventoryError=err;
@@ -7131,7 +7148,7 @@ function paintMonthlyRollupV365(type,state='loading',links=null){
 }
 function refreshMonthlyRollupV365(type){
   const token=++monthlyRollupTokenV365[type];paintMonthlyRollupV365(type,'loading');
-  // V39.4: profit data is a second cloud source. A transient timeout used to
+  // V39.5: profit data is a second cloud source. A transient timeout used to
   // leave Fair/Live permanently at "--" until the user left and reopened the
   // page. Retry once with a forced read, but only let the newest render token
   // paint the result so an older request can never overwrite a newer page.
@@ -7425,7 +7442,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout
 window.addEventListener('focus',()=>setTimeout(()=>checkUnconfirmedDraftReminderV369().catch(()=>{}),300));
 
 
-/* ================= V39.4 Import -> associated Sales card deep link =================
+/* ================= V39.5 Import -> associated Sales card deep link =================
    Import Cost System can return to the exact Sales/Fair/Live context without
    confirming a sale or touching inventory. The transactionId is used only to
    scroll/highlight the matching saved card after that day's cards are loaded. */
@@ -7490,7 +7507,7 @@ async function openAssociatedSalesCardFromImportV370(){
     body.classList.remove('hidden');box?.classList.remove('product-link-collapsed');
     box?.querySelector('.product-link-toggle')?.setAttribute('aria-expanded','true');
   }
-  try{await loadProductLinksIntoEditorV206(type)}catch(e){console.warn('V39.4 associated card load failed',e)}
+  try{await loadProductLinksIntoEditorV206(type)}catch(e){console.warn('V39.5 associated card load failed',e)}
   if(!highlightAssociatedSalesCardV370(type,target)){
     setTimeout(()=>highlightAssociatedSalesCardV370(type,target),600);
   }
@@ -7503,7 +7520,7 @@ window.openAssociatedSalesCardFromImportV370=openAssociatedSalesCardFromImportV3
 window.addEventListener('load',()=>setTimeout(()=>openAssociatedSalesCardFromImportV370(),500));
 
 
-/* ================= V39.4 Fair/Live incremental turnover composer =================
+/* ================= V39.5 Fair/Live incremental turnover composer =================
    Accounting compatibility rule: existing Fair/Live row.amount remains the only
    amount consumed by commission, profit, Home and monthly reports. The entry
    breakdown is auxiliary. Old rows are shown as one legacy component until the
@@ -7567,7 +7584,7 @@ async function refreshTurnoverAuditDerivedV380(type,ctx){
     const derived=deriveTurnoverEntriesFromAuditV380(type,ctx.date,ctx.location,data?.logs||[]);
     if(derived.length||officialTurnoverV376(type,ctx.date,ctx.location)===0)turnoverAuditDerivedV380.set(turnoverAuditKeyV380(type,ctx.date,ctx.location),derived);
     return derived;
-  }catch(e){console.warn('V39.4 turnover audit reconstruction',e);return[]}
+  }catch(e){console.warn('V39.5 turnover audit reconstruction',e);return[]}
 }
 function fallbackTurnoverEntriesV376(type,date,location){
   const audit=turnoverAuditDerivedV380.get(turnoverAuditKeyV380(type,date,location));if(Array.isArray(audit)&&audit.length)return normalizeTurnoverEntriesClientV376(audit);
@@ -7617,10 +7634,22 @@ async function refreshTurnoverEntriesV376(type,{force=false}={}){
       else if(Array.isArray(derived)&&derived.length&&Math.abs(entriesSumV376(derived)-official)<=0.005)setTurnoverEntryCacheV376(type,ctx.date,ctx.location,derived,'audit-v380');
       else if(Math.abs(sum-official)<=0.005)setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');
     }else if(Array.isArray(derived)&&derived.length)setTurnoverEntryCacheV376(type,ctx.date,ctx.location,derived,'audit-v380');
-  }catch(e){console.warn('V39.4 turnover entry read',e);try{const derived=await refreshTurnoverAuditDerivedV380(type,ctx);if(derived.length)setTurnoverEntryCacheV376(type,ctx.date,ctx.location,derived,'audit-v380')}catch(_){}}
+  }catch(e){console.warn('V39.5 turnover entry read',e);try{const derived=await refreshTurnoverAuditDerivedV380(type,ctx);if(derived.length)setTurnoverEntryCacheV376(type,ctx.date,ctx.location,derived,'audit-v380')}catch(_){}}
   renderTurnoverComposerV376(type);return getTurnoverEntryCacheV376(type,ctx.date,ctx.location);
 }
 function proposedEntriesV376(type){const ctx=turnoverContextV376(type),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location),official=officialTurnoverV376(type,ctx.date,ctx.location);const validCached=cached&&Math.abs(entriesSumV376(cached.entries)-official)<=0.005?cached.entries:null;return normalizeTurnoverEntriesClientV376(validCached||fallbackTurnoverEntriesV376(type,ctx.date,ctx.location))}
+async function confirmTurnoverCloudAfterTimeoutV395(localRow){
+  try{
+    const month=pendingRowMonthV374(localRow);if(!month)return null;
+    const json=await loadMonthCloudShared(month,15000);if(!json||!json.ok)return null;
+    const cloud=(Array.isArray(json.rows)?json.rows:[]).find(r=>syncKey(r)===syncKey(localRow));
+    if(!pendingRowMatchesCloudV374(localRow,cloud))return null;
+    clearPendingRowIfVersionV343(localRow);
+    if(cloud&&Number(cloud.amount||0)>0)upsertLocalRow(cloud);else if(Number(localRow.amount||0)<=0.005)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));
+    saveLocalDataCache();renderAll();
+    return cloud||{...localRow,amount:0};
+  }catch(_){return null}
+}
 async function saveTurnoverTotalV376(type,total){
   if(!ensureWritableSelection())return false;const isLive=type==='live',ctx=turnoverContextV376(type),dateEl=document.getElementById(isLive?'liveDate':'fairStart'),entityEl=document.getElementById(isLive?'liveHost':'fairLocation'),hidden=document.getElementById(isLive?'liveSales':'fairSales');
   if(!ctx.location){alert(isLive?'请输入主播名字':'请输入 Fair 地点');return false}if(!ctx.date){alert('请选择日期');return false}
@@ -7634,7 +7663,14 @@ async function saveTurnoverTotalV376(type,total){
     else{const result=await saveFairBatchToSheet(entity,[{date:ctx.date,amount:total,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:localRow.baseCloudUpdatedAt}],true);saved=Array.isArray(result?.rows)?result.rows.find(r=>String(r.date||'')===ctx.date):null}
     if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);else if(total<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));else upsertLocalRow({...localRow,amount:total});
     clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync(`${isLive?'Live':'Fair'} 营业额已同步`,true);return true;
-  }catch(e){setPendingRetrySyncStatus();alert(`${isLive?'Live':'Fair'} 营业额保存失败：${e.message||e}`);return false}
+  }catch(e){
+    // V39.5: a browser timeout is not proof that the write failed. Read the
+    // authoritative month first. If the exact requested total is already there,
+    // acknowledge it locally and NEVER ask the user to save the same entry again.
+    const confirmed=await confirmTurnoverCloudAfterTimeoutV395(localRow);
+    if(confirmed){setSync(`${isLive?'Live':'Fair'} 营业额已同步`,true);return true}
+    setPendingRetrySyncStatus();alert(`${isLive?'Live':'Fair'} 营业额保存失败：${e.message||e}`);return false
+  }
 }
 async function commitTurnoverEntriesV376(type,entries,actionText){
   setTurnoverWriteStateV382(type,true);renderTurnoverComposerV376(type);
@@ -7642,7 +7678,7 @@ async function commitTurnoverEntriesV376(type,entries,actionText){
   const ok=await saveTurnoverTotalV376(type,total);if(!ok){setTurnoverWriteStateV382(type,false);renderTurnoverComposerV376(type);return false}
   setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'local');renderTurnoverComposerV376(type);
   try{await saveTurnoverEntriesToSheetV376(type,ctx.date,ctx.location,clean,total,new Date().toISOString());clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');renderTurnoverComposerV376(type);showTempMsg(type==='live'?'liveSaveMsg':'fairSaveMsg');}
-  catch(e){rememberTurnoverEntryPendingV376(type,ctx.date,ctx.location,clean,total);console.warn('V39.4 entry detail sync failed',e);setSync(`${type==='live'?'Live':'Fair'} 总营业额已同步；明细稍后自动重试`,true)}
+  catch(e){rememberTurnoverEntryPendingV376(type,ctx.date,ctx.location,clean,total);console.warn('V39.5 entry detail sync failed',e);setSync(`${type==='live'?'Live':'Fair'} 总营业额已同步；明细稍后自动重试`,true)}
   // Saving turnover changes the same authoritative total used by every old calculation.
   if(typeof renderSelectedDayGrandV362==='function')renderSelectedDayGrandV362(type);
   if(type==='fair'){renderFairDailySummary();renderFairMonthlyList()}else{renderLiveDailySummary();renderLiveMonthlyList()}
@@ -7658,10 +7694,11 @@ function setTurnoverSaveButtonV382(type,state){
   btn.disabled=false;btn.textContent=btn.dataset.idleText||'储存';
 }
 async function addTurnoverEntryV376(type){
+  if(turnoverWriteStateV382[type])return false;
   const ids=turnoverIdsV376(type),input=document.getElementById(ids.input),value=Math.round(toAmount(input?.value||0)*100)/100;if(!value||value<0){alert('请输入新一笔营业额');return false}
   const entries=proposedEntriesV376(type);
   entries.push({id:'v382_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),amount:value,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
-  // V39.4: show the new component/total immediately while the authoritative cloud write runs.
+  // V39.5: show the new component/total immediately while the authoritative cloud write runs.
   const ctx=turnoverContextV376(type);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,entries,'optimistic-v382');
   const ids2=turnoverIdsV376(type),totalEl=document.getElementById(ids2.total),hidden=document.getElementById(ids2.hidden),optimisticTotal=entriesSumV376(entries);
   if(totalEl)totalEl.textContent=formatAmount(optimisticTotal);if(hidden)hidden.value=formatAmount(optimisticTotal);
@@ -7671,11 +7708,13 @@ async function addTurnoverEntryV376(type){
   return ok;
 }
 async function editTurnoverEntryV376(type,id){
+  if(turnoverWriteStateV382[type])return false;
   const entries=proposedEntriesV376(type),index=entries.findIndex(x=>x.id===id);if(index<0)return;const old=Number(entries[index].amount||0),raw=prompt(`修改这笔营业额\n\n原金额 RM${formatAmount(old)}`,formatAmount(old));if(raw===null)return;const next=Math.round(toAmount(raw)*100)/100;if(!Number.isFinite(next)||next<0){alert('请输入有效营业额');return}if(Math.abs(next-old)<=0.005)return;
   const before=entriesSumV376(entries),after=Math.round((before-old+next)*100)/100;if(!confirm(`确认把 RM${formatAmount(old)} 修改为 RM${formatAmount(next)}？\n\n营业额总数：RM${formatAmount(before)} → RM${formatAmount(after)}`))return;
   entries[index]={...entries[index],amount:next,updatedAt:new Date().toISOString()};setTurnoverSaveButtonV382(type,'saving');const ok=await commitTurnoverEntriesV376(type,entries,'修改');if(ok)setTurnoverSaveButtonV382(type,'saved');else setTurnoverSaveButtonV382(type,'idle');
 }
 async function deleteTurnoverEntryV376(type,id){
+  if(turnoverWriteStateV382[type])return false;
   const entries=proposedEntriesV376(type),index=entries.findIndex(x=>x.id===id);if(index<0)return;const old=Number(entries[index].amount||0),before=entriesSumV376(entries),after=Math.round((before-old)*100)/100;if(!confirm(`确认删除这笔 RM${formatAmount(old)} 营业额？\n\n营业额总数：RM${formatAmount(before)} → RM${formatAmount(after)}\n\n删除后才会保存。`))return;
   entries.splice(index,1);setTurnoverSaveButtonV382(type,'saving');const ok=await commitTurnoverEntriesV376(type,entries,'删除');if(ok)setTurnoverSaveButtonV382(type,'saved');else setTurnoverSaveButtonV382(type,'idle');
 }
@@ -7694,7 +7733,7 @@ updateLiveInputFromSelectedDate=function(){_updateLiveInputFromSelectedDateV376(
 try{localStorage.removeItem('lover_live_turnover_drafts_v332');localStorage.removeItem('lover_fair_turnover_drafts_v356')}catch(_){}
 ['fairTurnoverNewV376','liveTurnoverNewV376'].forEach(id=>{const el=document.getElementById(id);if(el){const type=id.startsWith('fair')?'fair':'live';el.addEventListener('input',()=>saveTurnoverNewDraftV376(type,el.value));el.addEventListener('change',()=>saveTurnoverNewDraftV376(type,el.value));el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();(type==='fair'?saveFairSales():saveLiveSales())}})}});
 
-// V39.4 save-card handoff: immediately repaint the selected day's profit from the saved result/cache.
+// V39.5 save-card handoff: immediately repaint the selected day's profit from the saved result/cache.
 const _saveProductLinksV376=saveProductLinksV206;
 saveProductLinksV206=async function(type,...args){
   const result=await _saveProductLinksV376(type,...args);if(!result)return result;
@@ -7703,10 +7742,10 @@ saveProductLinksV206=async function(type,...args){
     if(Array.isArray(links)){if(typeof seedSelectedDayProfitV368==='function')seedSelectedDayProfitV368(type,ctx.date,links);if(productProfitSummaryOpenV216?.[type]&&productProfitSelectedDateV216(type)===ctx.date)renderProductProfitSummaryV216(type,links)}
     if(typeof renderSelectedDayGrandV362==='function')renderSelectedDayGrandV362(type);
     if(type==='fair')renderFairMonthlyList();if(type==='live')renderLiveMonthlyList();
-  }catch(e){console.warn('V39.4 immediate profit repaint',e)}return result;
+  }catch(e){console.warn('V39.5 immediate profit repaint',e)}return result;
 };window.saveProductLinksV206=saveProductLinksV206;
 
-// V39.4 deep-link fast path: handle target as soon as scripts are ready instead of waiting for full load + 500ms.
+// V39.5 deep-link fast path: handle target as soon as scripts are ready instead of waiting for full load + 500ms.
 const _openAssociatedSalesCardFromImportV376=openAssociatedSalesCardFromImportV370;
 let associatedSalesCardOpeningV376=false;
 openAssociatedSalesCardFromImportV370=async function(){
@@ -7729,7 +7768,7 @@ async function retryTurnoverEntryPendingV376(){
       setTurnoverEntryCacheV376(item.type,item.date,item.location,item.entries,'cloud');
     }catch(e){
       if(String(e&&e.message||e).includes('云端营业额已经改变'))delete pending[key];
-      else console.warn('V39.4 turnover detail retry',e);
+      else console.warn('V39.5 turnover detail retry',e);
     }
   }
   writeTurnoverEntryPendingV376(pending);
@@ -7739,15 +7778,15 @@ setTimeout(()=>{renderTurnoverComposerV376('fair');renderTurnoverComposerV376('l
 window.addEventListener('focus',()=>setTimeout(()=>retryTurnoverEntryPendingV376(),250));
 
 
-/* ================= V39.4 turnover UI + legacy-date compatibility =================
+/* ================= V39.5 turnover UI + legacy-date compatibility =================
    Important: turnover total remains read-only. Only history chips are editable;
    the new-entry field is never generic money-formatted to 0.00. Existing official
    Fair/Live rows remain authoritative and are never rewritten merely by viewing.
 */
 function refreshTurnoverContextV377(type,{cloud=true}={}){
-  try{renderTurnoverComposerV376(type)}catch(e){console.warn('V39.4 turnover render',e)}
+  try{renderTurnoverComposerV376(type)}catch(e){console.warn('V39.5 turnover render',e)}
   if(cloud){
-    setTimeout(()=>{try{refreshTurnoverEntriesV376(type,{force:true})}catch(e){console.warn('V39.4 turnover cloud refresh',e)}},0);
+    setTimeout(()=>{try{refreshTurnoverEntriesV376(type,{force:true})}catch(e){console.warn('V39.5 turnover cloud refresh',e)}},0);
   }
 }
 function bindTurnoverContextRefreshV377(){
@@ -7761,12 +7800,12 @@ function bindTurnoverContextRefreshV377(){
 }
 bindTurnoverContextRefreshV377();
 
-// Earlier date controls captured the old update function before V39.4 replaced it.
+// Earlier date controls captured the old update function before V39.5 replaced it.
 // Repaint composers after every authoritative render so legacy rows appear immediately.
 const _renderAllV377=renderAll;
 renderAll=function(){
   const result=_renderAllV377.apply(this,arguments);
-  try{renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live')}catch(e){console.warn('V39.4 post-render turnover',e)}
+  try{renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live')}catch(e){console.warn('V39.5 post-render turnover',e)}
   return result;
 };
 window.renderAll=renderAll;
