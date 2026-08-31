@@ -80,26 +80,44 @@ function setLastNotificationDispatchStatus(result){
   }catch(e){}
 }
 
-function dispatchSalesNotificationAsync(envelope){
-  if(!envelope||!envelope.payload||!envelope.signature){
-    setLastNotificationDispatchStatus({ok:true,skipped:true,message:"没有新的营业额变化，无需重复通知"});
-    return;
-  }
-
-  const submitted=dispatchKeepalive({
-    action:"dispatchSalesNotification",
-    payload:envelope.payload,
-    signature:envelope.signature,
-    clientVersion:"24.1",
-    launchUrl:getSalesLaunchUrlV194()
-  });
-
-  if(submitted){
-    setLastNotificationDispatchStatus({ok:true,queued:true,attempted:1,sent:1,message:"通知已提交后台发送"});
-  }else{
-    setLastNotificationDispatchStatus({ok:false,message:"通知后台提交失败"});
+const SALES_NOTIFICATION_QUEUE_KEY_V396="lover_sales_notification_queue_v396";
+let salesNotificationWorkerV396=null;
+function readSalesNotificationQueueV396(){try{const x=JSON.parse(localStorage.getItem(SALES_NOTIFICATION_QUEUE_KEY_V396)||"[]");return Array.isArray(x)?x:[]}catch(_){return[]}}
+function writeSalesNotificationQueueV396(list){try{localStorage.setItem(SALES_NOTIFICATION_QUEUE_KEY_V396,JSON.stringify(Array.isArray(list)?list:[]))}catch(_){}}
+function notificationQueueIdV396(envelope){return String(envelope?.notificationId||envelope?.payload||"").slice(0,180)}
+function queueSalesNotificationV396(envelope){
+  const id=notificationQueueIdV396(envelope);if(!id)return false;
+  const q=readSalesNotificationQueueV396();
+  if(!q.some(x=>x.id===id))q.push({id,envelope,attempts:0,nextAt:0,createdAt:Date.now()});
+  writeSalesNotificationQueueV396(q);return true;
+}
+function scheduleSalesNotificationWorkerV396(delay=0){
+  if(salesNotificationWorkerV396)clearTimeout(salesNotificationWorkerV396);
+  salesNotificationWorkerV396=setTimeout(()=>{salesNotificationWorkerV396=null;runSalesNotificationWorkerV396().catch(()=>{})},Math.max(0,delay));
+}
+async function runSalesNotificationWorkerV396(){
+  const q=readSalesNotificationQueueV396();if(!q.length)return;
+  const now=Date.now(),item=q.find(x=>Number(x.nextAt||0)<=now);if(!item){scheduleSalesNotificationWorkerV396(Math.min(30000,Math.max(1000,Math.min(...q.map(x=>Number(x.nextAt||now+1000)))-now)));return}
+  try{
+    const env=item.envelope||{};
+    const result=await jsonp({action:"dispatchSalesNotification",payload:env.payload,signature:env.signature,notificationId:String(env.notificationId||""),clientVersion:"39.6",launchUrl:getSalesLaunchUrlV194()},{timeoutMs:12000});
+    if(!result?.ok)throw new Error(result?.message||"通知发送失败");
+    const next=readSalesNotificationQueueV396().filter(x=>x.id!==item.id);writeSalesNotificationQueueV396(next);
+    setLastNotificationDispatchStatus({...result,ok:true,queued:false,message:result.alreadySent?"通知已确认发送（去重）":"通知已确认发送"});
+    if(next.length)scheduleSalesNotificationWorkerV396(250);
+  }catch(e){
+    const next=readSalesNotificationQueueV396();const rec=next.find(x=>x.id===item.id);if(rec){rec.attempts=Number(rec.attempts||0)+1;const waits=[5000,15000,30000,60000,120000,300000];rec.nextAt=Date.now()+waits[Math.min(rec.attempts-1,waits.length-1)];writeSalesNotificationQueueV396(next);setLastNotificationDispatchStatus({ok:false,queued:true,retrying:true,attempted:rec.attempts,message:"通知发送失败，后台自动重试："+String(e?.message||e)});scheduleSalesNotificationWorkerV396(Math.min(30000,waits[Math.min(rec.attempts-1,waits.length-1)]));}
   }
 }
+function dispatchSalesNotificationAsync(envelope){
+  if(!envelope||!envelope.payload||!envelope.signature){setLastNotificationDispatchStatus({ok:true,skipped:true,message:"没有新的营业额变化，无需重复通知"});return}
+  queueSalesNotificationV396(envelope);
+  setLastNotificationDispatchStatus({ok:true,queued:true,attempted:0,sent:0,message:"资料已保存；通知后台发送中"});
+  scheduleSalesNotificationWorkerV396(0);
+}
+window.addEventListener("online",()=>scheduleSalesNotificationWorkerV396(100));
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)scheduleSalesNotificationWorkerV396(150)});
+setTimeout(()=>scheduleSalesNotificationWorkerV396(1200),0);
 
 
 
@@ -346,7 +364,7 @@ function reconcilePendingRowsFromCloudV329(cloudRows) {
   return before - pendingRows.length;
 }
 
-// V39.5: pending rows are durable retry instructions, not proof that the cloud
+// V39.6: pending rows are durable retry instructions, not proof that the cloud
 // is missing data. Before retrying any write, verify every pending row against
 // the authoritative month that owns that row. This removes "ghost pending"
 // entries left behind when the original write reached Apps Script but the
@@ -706,7 +724,7 @@ async function loadFromSheet(options = {}) {
 
       // V32.6: foreground priority sync checks ONLY turnover and sales-card revisions.
       // Profit/Top5/Report/old-month changes never delay normal Sales/Fair/Live work.
-      // V39.5: never let the startup sync terminate at the lightweight revision
+      // V39.6: never let the startup sync terminate at the lightweight revision
       // check. Cached rows can be incomplete/stale even when revision numbers match
       // (especially after a prior interrupted load). The first sync must hydrate the
       // authoritative selected month; later resume/interval checks keep the fast path.
@@ -782,7 +800,7 @@ async function loadFromSheet(options = {}) {
       saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
       if(typeof refreshFairSessionsV281==="function"){try{await refreshFairSessionsV281({applyLatest:true,forceApply:false})}catch(_){}}
 
-      // V39.5: verify durable pending rows against their own authoritative
+      // V39.6: verify durable pending rows against their own authoritative
       // month BEFORE retrying writes. If the cloud already contains the exact
       // amount (or a requested deletion is already absent), the pending item is
       // an acknowledgement residue and is permanently removed without another
@@ -850,7 +868,7 @@ async function syncPendingRows() {
       return;
     }
 
-    // V39.5: every retry path (startup, timer, focus, manual recovery) first
+    // V39.6: every retry path (startup, timer, focus, manual recovery) first
     // checks whether another request/device already committed this mutation.
     // This keeps successful writes from being uploaded again on every open.
     setSync(`正在确认 ${pendingRows.length} 笔待同步资料...`);
@@ -1262,17 +1280,21 @@ async function sendFairBatchToSheetV343(location, records, foregroundSave=false)
     location,
     records: JSON.stringify(records),
     foregroundSave:foregroundSave?"1":"",restoreGeneration,
-    // V39.5: interactive Fair saves must return the cloud ACK before any push work.
+    notificationAction:String((records&&records[0]&&records[0].notificationAction)||""),
+    notificationAmount:Number((records&&records[0]&&records[0].notificationAmount)||0),
+    notificationOldAmount:Number((records&&records[0]&&records[0].notificationOldAmount)||0),
+    notificationNewAmount:Number((records&&records[0]&&records[0].notificationNewAmount)||0),
+    // V39.6: interactive Fair saves must return the cloud ACK before any push work.
     // Inline notification is reserved for pagehide/keepalive requests only.
     notifyInline:"",
-    clientVersion:"39.5",
+    clientVersion:"39.6",
     launchUrl:getSalesLaunchUrlV194()
   }, { timeoutMs: 30000 });
 
   if (!json.ok) throw new Error(json.message || "Fair 储存失败");
   applyLocalDataRevision(json.dataRevision);
   if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
-  // V39.5 foreground Fair saves return the cloud ACK first; push is dispatched asynchronously afterward.
+  // V39.6 foreground Fair saves return the cloud ACK first; push is dispatched asynchronously afterward.
   // Pagehide keepalive remains the only path allowed to request inline notification.
   if(!(json.inlineNotification&&json.inlineNotification.inline))dispatchSalesNotificationAsync(json.notificationEnvelope);
   (Array.isArray(records)?records:[]).forEach(r=>{
@@ -1308,13 +1330,17 @@ async function saveFairToSheet(location, records) {
 }
 
 
-async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347()) {
+async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347(), notificationMeta={}) {
   const json = await jsonp({
     action: "saveLive",
     date,
     host,
     amount,
-    clientUpdatedAt,clientDeviceId,clientSequence,baseCloudUpdatedAt,foregroundSave:foregroundSave?"1":"",restoreGeneration
+    clientUpdatedAt,clientDeviceId,clientSequence,baseCloudUpdatedAt,foregroundSave:foregroundSave?"1":"",restoreGeneration,
+    notificationAction:String(notificationMeta?.action||""),
+    notificationAmount:Number(notificationMeta?.amount||0),
+    notificationOldAmount:Number(notificationMeta?.oldAmount||0),
+    notificationNewAmount:Number(notificationMeta?.newAmount||0)
   }, { timeoutMs: 30000 });
   if (!json.ok) throw new Error(json.message || "Live 储存失败");
   applyLocalDataRevision(json.dataRevision);
@@ -1522,7 +1548,7 @@ window.peekAllSalesProductLinksCacheV367=peekAllSalesProductLinksCacheV367;
 window.peekAllSalesProductLinksCacheV368=peekAllSalesProductLinksCacheV367;
 
 
-/* ================= V39.5 Fair/Live turnover entry details ================= */
+/* ================= V39.6 Fair/Live turnover entry details ================= */
 async function loadTurnoverEntriesFromSheetV376(type,date,location){
   const json=await jsonp({action:'getTurnoverEntriesV376',type,date,location},{timeoutMs:15000});
   if(!json.ok)throw new Error(json.message||'读取营业额明细失败');
