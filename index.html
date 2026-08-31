@@ -359,7 +359,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V39.5</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V39.6</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -645,7 +645,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
           <button type="button" class="secondary-btn product-link-save-btn" onclick="saveProductLinksV206('fair','draft',this)">💾 保存草稿</button>
           <button type="button" class="secondary-btn product-link-save-btn confirm-sale-btn-v285" onclick="saveProductLinksV206('fair','confirm',this)">✅ 确认销售</button>
           <div id="fairProductLinkMsg" class="save-msg hidden">✅ 销售卡资料已保存</div>
-          <p class="note">可连续新增多棵盆栽；数量默认 1。当天关联盆栽实际售价合计可少过或等于 Fair 营业额，但不能超过。销售卡张数不限；所有销售卡售价总数可以低于或等于当天营业额，但不能超过。V39.5 Sales System 不直接扣库存；库存变动由 Import Cost System 确认处理。平均成本仍可手动修改。</p>
+          <p class="note">可连续新增多棵盆栽；数量默认 1。当天关联盆栽实际售价合计可少过或等于 Fair 营业额，但不能超过。销售卡张数不限；所有销售卡售价总数可以低于或等于当天营业额，但不能超过。V39.6 Sales System 不直接扣库存；库存变动由 Import Cost System 确认处理。平均成本仍可手动修改。</p>
         </div>
       </div>
     </div>
@@ -723,7 +723,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
         <button type="button" class="secondary-btn product-link-save-btn" onclick="saveProductLinksV206('live','draft',this)">💾 保存草稿</button>
         <button type="button" class="secondary-btn product-link-save-btn confirm-sale-btn-v285" onclick="saveProductLinksV206('live','confirm',this)">✅ 确认销售</button>
         <div id="liveProductLinkMsg" class="save-msg hidden">✅ 销售卡资料已保存</div>
-        <p class="note">可连续新增多棵盆栽；数量默认 1。Live 木架等级默认 C80，可改为 自取0 / A20 / B50 / C80 / D120 / E150；自动运费总数＝木架等级金额 × 产品数量，手动输入则视为该产品运费总数；附加费用 花盆/苔藓默认 0。当天关联盆栽售价合计不能超过 Live 营业额；销售卡张数不限；所有销售卡售价总数可以低于或等于当天营业额，但不能超过。V39.5 Sales System 不直接扣库存；库存变动由 Import Cost System 确认处理。平均成本仍可手动修改。</p>
+        <p class="note">可连续新增多棵盆栽；数量默认 1。Live 木架等级默认 C80，可改为 自取0 / A20 / B50 / C80 / D120 / E150；自动运费总数＝木架等级金额 × 产品数量，手动输入则视为该产品运费总数；附加费用 花盆/苔藓默认 0。当天关联盆栽售价合计不能超过 Live 营业额；销售卡张数不限；所有销售卡售价总数可以低于或等于当天营业额，但不能超过。V39.6 Sales System 不直接扣库存；库存变动由 Import Cost System 确认处理。平均成本仍可手动修改。</p>
       </div>
     </div>
     <p class="note">主播名字忽略大小写及空格；选择旧日期会自动带出该主播当天销售额。</p>
@@ -788,7 +788,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
 
     <div id="backupRestoreStatusV234" class="backup-restore-status-v234 hidden"></div>
-    <p class="note">V39.5：Fair 地点历史统一保存至 Google Sheet，电脑与手机共享；地点匹配忽略大小写、空格和常用符号。月底结算只关账、不删除全年资料；年底结算才允许在强确认后清除当年资料。Backup/Restore 已覆盖关联盆栽、库存同步状态、成本、利润、最低售价和备注。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致。</p>
+    <p class="note">V39.6：Fair 地点历史统一保存至 Google Sheet，电脑与手机共享；地点匹配忽略大小写、空格和常用符号。月底结算只关账、不删除全年资料；年底结算才允许在强确认后清除当年资料。Backup/Restore 已覆盖关联盆栽、库存同步状态、成本、利润、最低售价和备注。Live 主播名单及独立佣金统一保存到 Google Sheet，手机与电脑显示一致。</p>
   </div>
 
   
@@ -805,7 +805,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V39.5 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V39.6 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
