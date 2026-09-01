@@ -1402,7 +1402,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"3990",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4000",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1420,7 +1420,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"3990";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4000";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2436,6 +2436,7 @@ function hydrateImportProductsCacheV224(){
   return importProductsV214;
 }
 
+let importProductsFreshPromiseV400=null;
 async function fetchImportProductsFreshV395(timeoutMs=12000){
   const controller=typeof AbortController!=="undefined"?new AbortController():null;
   const timer=controller?setTimeout(()=>controller.abort(),Math.max(3000,Number(timeoutMs||12000))):0;
@@ -5222,7 +5223,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"3990",
+    version:"4000",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5653,16 +5654,22 @@ async function validateSalesInventoryAvailabilityV325(type,items,saveMode='draft
   if(!mapped.length)return true;
   let records=[];
   let lastInventoryError=null;
-  // V39.9: race two independent read-only Import checks instead of waiting for
-  // three long sequential timeouts. The first valid fresh cloud snapshot wins.
+  // V40.0: keep the same authoritative Import oversell guard, but avoid the old
+  // third sequential cloud read. Concurrent saves share one fresh preflight; a
+  // delayed independent backup still protects against a single slow Apps Script
+  // request. No cached stock is allowed to approve a sale.
   try{
-    const primary=fetchImportProductsFreshV395(8500);
-    const backup=new Promise(resolve=>setTimeout(resolve,650)).then(()=>fetchImportProductsFreshV395(10500));
-    records=await Promise.any([primary,backup]);
-  }catch(err){
-    lastInventoryError=err;
-    try{records=await fetchImportProductsFreshV395(12000);lastInventoryError=null}catch(lastErr){lastInventoryError=lastErr}
-  }
+    if(!importProductsFreshPromiseV400){
+      importProductsFreshPromiseV400=(async()=>{
+        const primary=fetchImportProductsFreshV395(7000);
+        const backup=new Promise(resolve=>setTimeout(resolve,450)).then(()=>fetchImportProductsFreshV395(8500));
+        try{return await Promise.any([primary,backup])}
+        finally{importProductsFreshPromiseV400=null}
+      })();
+    }
+    records=await importProductsFreshPromiseV400;
+  }catch(err){lastInventoryError=err}
+  if(!lastInventoryError&&(!Array.isArray(records)||!records.length))lastInventoryError=new Error('进口系统资料不完整');
   if(lastInventoryError){
     const err=lastInventoryError;
     alert('⚠️ 无法核对 Import 最新库存，销售卡未保存。\n\n'+String(err?.message||err)+'\n\n请稍后再试，避免超卖。');
