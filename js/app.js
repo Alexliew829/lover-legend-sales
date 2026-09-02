@@ -1402,7 +1402,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4040",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4050",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1420,7 +1420,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4040";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4050";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3224,11 +3224,13 @@ function markSalesCardTransactionDirtyV239(card){
   if(!card)return;
   card.dataset.dirty="1";
   card.querySelectorAll(".product-link-item").forEach(x=>x.dataset.dirty="1");
+  if(typeof refreshSingleCardActionsV405==='function')refreshSingleCardActionsV405(card);
 }
 function clearSalesCardTransactionDirtyV239(card){
   if(!card)return;
   card.dataset.dirty="0";
   card.querySelectorAll(".product-link-item").forEach(x=>x.dataset.dirty="0");
+  if(typeof refreshSingleCardActionsV405==='function')refreshSingleCardActionsV405(card);
 }
 function salesCardProductsV239(card){
   return [...(card?.querySelectorAll(".product-link-item")||[])];
@@ -3411,6 +3413,7 @@ function addProductToTransactionV239(type,txnId,data={}){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
   const card=[...(wrap?.querySelectorAll(".sales-card-transaction-v239")||[])].find(x=>x.dataset.transactionId===txnId);
   if(!card)return false;
+  if(salesCardIsConfirmedV322(card)){alert('这张销售卡已经确认并永久锁定，只能阅读。顾客加购请新增销售卡。');return false}
   const list=card.querySelector(".sales-card-products-v239");
   const item=buildProductSubItemV239(type,card,data,salesCardProductsV239(card).length+1);
   list.appendChild(item);
@@ -3459,6 +3462,7 @@ function bindSingleTapDeleteProductV254(button,handler){
 
 async function removeProductFromTransactionV239(type,card,item){
   if(!item||item.dataset.deletingV253==="1")return;
+  if(salesCardIsConfirmedV322(card)){alert('这张销售卡已经确认并永久锁定，不能修改产品。');return}
   const products=salesCardProductsV239(card);
   if(products.length<=1){alert("一张销售卡至少需要保留一个产品。");return}
 
@@ -3471,7 +3475,7 @@ async function removeProductFromTransactionV239(type,card,item){
   // We only remove it from the editor and mark the whole card dirty.
   // On the FIRST press of "Save", the backend compares the original active Link IDs
   // against the submitted Link IDs and writes Sale Status=deleted + Deleted At.
-  if(isSaved&&!confirm("确定从这张销售卡删除这个产品？\n\n删除会在点击「保存全部销售卡资料」后正式生效。")){
+  if(isSaved&&!confirm("确定从这张草稿销售卡删除这个产品？\n\n删除会在点击这张卡的「更新草稿」后正式生效。")){
     item.dataset.deletingV253="0";
     return;
   }
@@ -3487,6 +3491,7 @@ async function deleteSalesCardTransactionV239(type,txnId){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
   const card=[...(wrap?.querySelectorAll(".sales-card-transaction-v239")||[])].find(x=>x.dataset.transactionId===txnId);
   if(!card)return;
+  if(salesCardIsConfirmedV322(card)){alert('这张销售卡已经确认并永久锁定，不能删除。');return}
   const saved=salesCardProductsV239(card).filter(x=>x.dataset.saved==="1"&&String(x.dataset.linkId||""));
   if(saved.length&&!confirm(`确定删除这张销售卡？
 
@@ -3524,16 +3529,41 @@ function salesCardIsConfirmedV322(card){
   if(confirmed)card.dataset.confirmedOnceV401='1';
   return confirmed;
 }
+function applyConfirmedCardReadOnlyV405(card){
+  if(!card)return false;
+  const locked=salesCardIsConfirmedV322(card);
+  card.classList.toggle('sales-card-confirmed-readonly-v405',locked);
+  card.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=locked;el.setAttribute('aria-readonly',locked?'true':'false')});
+  card.querySelectorAll('.sales-card-add-product-v239,.product-subitem-remove-v239,.product-link-remove-bottom,.sales-card-draft-btn-v405,.sales-card-confirm-btn-v405').forEach(btn=>{btn.hidden=locked;btn.disabled=locked});
+  return locked;
+}
+function refreshSingleCardActionsV405(card){
+  if(!card)return;
+  if(applyConfirmedCardReadOnlyV405(card))return;
+  const saved=salesCardIsSavedV241(card),dirty=card.dataset.dirty==='1';
+  const save=card.querySelector('.sales-card-draft-btn-v405'),confirmBtn=card.querySelector('.sales-card-confirm-btn-v405');
+  if(save){save.hidden=false;save.disabled=!dirty&&saved;save.textContent=saved?'💾 更新草稿':'💾 保存草稿'}
+  if(confirmBtn){confirmBtn.hidden=false;confirmBtn.disabled=!saved||dirty;confirmBtn.title=!saved?'请先保存草稿':dirty?'修改后请先更新草稿':'确认后永久锁定'}
+}
 function updateSalesCardDeleteLockV322(card){
   if(!card)return;
   const btn=card.querySelector('.product-link-remove-bottom');
-  if(!btn)return;
   const locked=salesCardIsConfirmedV322(card);
-  btn.disabled=locked;
-  btn.setAttribute('aria-disabled',locked?'true':'false');
-  btn.classList.toggle('is-confirmed-locked-v322',locked);
-  btn.textContent=locked?'删除销售卡（已确认，不能删除）':'删除销售卡';
+  if(btn){btn.disabled=locked;btn.setAttribute('aria-disabled',locked?'true':'false');btn.classList.toggle('is-confirmed-locked-v322',locked);btn.textContent=locked?'删除销售卡（已确认，不能删除）':'删除销售卡'}
+  applyConfirmedCardReadOnlyV405(card);refreshSingleCardActionsV405(card);
 }
+let SALES_TARGET_TXN_V405='';
+async function saveSingleSalesCardV405(type,txnId,mode,button){
+  const card=salesCardWrappersV239(type).find(c=>String(c.dataset.transactionId||'')===String(txnId||''));if(!card)return null;
+  if(salesCardIsConfirmedV322(card)){alert('这张销售卡已经确认并永久锁定，只能阅读。');return null}
+  if(mode==='confirm'){
+    if(!salesCardIsSavedV241(card)||card.dataset.dirty==='1'){alert('请先保存这张销售卡草稿，再确认销售。');return null}
+    if(!confirm('确认销售后，这张销售卡将永久锁定，不能修改或删除。\n\n顾客加购请新增销售卡；取消或换货请到 Import 手动调整库存并备注。\n\n确定确认销售？'))return null;
+  }
+  SALES_TARGET_TXN_V405=String(txnId||'');
+  try{return await saveProductLinksV206(type,mode,button)}finally{SALES_TARGET_TXN_V405='';refreshSingleCardActionsV405(card)}
+}
+window.saveSingleSalesCardV405=saveSingleSalesCardV405;
 function refreshConfirmSaleButtonV322(type){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
   if(!wrap)return;
@@ -3621,6 +3651,11 @@ function buildSalesCardTransactionV239(type,dataList=[]){
 
   const rlab=document.createElement("label");rlab.textContent="备注（顾客网络名字或电话号码）";card.appendChild(rlab);
   const remark=document.createElement("input");remark.className="sales-card-remark-v239";remark.maxLength=100;remark.placeholder="顾客名字、电话或其他讯息";remark.value=String(list.find(x=>String(x.remark||"").trim())?.remark||"");card.appendChild(remark);
+
+  const actions=document.createElement("div");actions.className="sales-card-actions-v405";
+  const saveDraft=document.createElement("button");saveDraft.type="button";saveDraft.className="secondary-btn sales-card-draft-btn-v405";saveDraft.textContent="💾 保存草稿";saveDraft.addEventListener("click",()=>saveSingleSalesCardV405(type,txnId,"draft",saveDraft));
+  const confirmSale=document.createElement("button");confirmSale.type="button";confirmSale.className="secondary-btn sales-card-confirm-btn-v405";confirmSale.textContent="✅ 确认销售";confirmSale.addEventListener("click",()=>saveSingleSalesCardV405(type,txnId,"confirm",confirmSale));
+  actions.append(saveDraft,confirmSale);card.appendChild(actions);
 
   const remove=document.createElement("button");remove.type="button";remove.className="product-link-remove-btn product-link-remove-bottom";remove.textContent="删除销售卡";
   remove.addEventListener("click",()=>deleteSalesCardTransactionV239(type,txnId));card.appendChild(remove);
@@ -4030,7 +4065,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const hasDraftV317=savedStatusesV317.some(s=>s==="DRAFT"||s==="DRAFT_INVENTORY_CHANGED");
   const hasPendingV317=savedStatusesV317.some(s=>s==="PENDING_IMPORT_LINK");
   const hasConfirmedV317=savedStatusesV317.length>0&&savedStatusesV317.every(s=>s==="INVENTORY_CONFIRMED");
-  // V40.4: confirmation belongs to the sales-card transaction, not only to the
+  // V40.5: confirmation belongs to the sales-card transaction, not only to the
   // current product rows. Once any row was confirmed/non-inventory, later draft
   // edits must never turn the card back into an unconfirmed draft.
   card.dataset.confirmedOnceV401=(list.some(x=>x&&x.confirmedOnce===true)||savedStatusesV317.some(s=>salesCardStatusIsConfirmedV322(s)))?"1":"0";
@@ -5235,7 +5270,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4040",
+    version:"4050",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5573,7 +5608,7 @@ function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
     const prior=prev.find(r=>String(r.linkId||'')&&String(r.linkId||'')===String(x.linkId||''));
     let status='DRAFT';
     if(wasConfirmed){
-      // V40.4: preserve each already-confirmed row, but a NEW product added to an
+      // V40.5: preserve each already-confirmed row, but a NEW product added to an
       // already-confirmed card is immediately shown as pending Import inventory.
       // This prevents the whole card from visually falling back to "尚未确认销售".
       if(!prior)status='PENDING_IMPORT_LINK';
@@ -5688,7 +5723,7 @@ async function validateSalesInventoryAvailabilityV325(type,items,saveMode='draft
   if(!mapped.length)return true;
   let records=[];
   let lastInventoryError=null;
-  // V40.4: keep the same authoritative Import oversell guard, but avoid the old
+  // V40.5: keep the same authoritative Import oversell guard, but avoid the old
   // third sequential cloud read. Concurrent saves share one fresh preflight; a
   // delayed independent backup still protects against a single slow Apps Script
   // request. No cached stock is allowed to approve a sale.
@@ -5753,17 +5788,18 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   if(button){button.dataset.busyV285='1';button.disabled=true;button.textContent=saveMode==='draft'?'保存中…':'确认中…';}
   const releaseButton=()=>{if(button){button.disabled=false;button.dataset.busyV285='0';button.textContent=originalButtonText;}};
   const cards=salesCardWrappersV239(type),dirty=cards.filter(c=>{
+    if(SALES_TARGET_TXN_V405&&String(c.dataset.transactionId||'')!==SALES_TARGET_TXN_V405)return false;
+    if(salesCardIsConfirmedV322(c))return false;
     const needsSave=c.dataset.dirty==='1'||c.dataset.productRemovedV259==='1'||!salesCardIsSavedV241(c)||(saveMode==='confirm'&&String(c.dataset.inventoryStatus||'').startsWith('DRAFT'));
     if(!needsSave)return false;
-    // V32.6: a confirmed sale can never be confirmed a second time. Any later
-    // correction must use 保存草稿 so the server can create only the inventory diff.
-    if(saveMode==='confirm'&&salesCardIsConfirmedV322(c))return false;
     return true;
   });
-  if(!dirty.length){alert(saveMode==='confirm'?'这张销售卡已经确认销售。后续修改请使用「保存草稿」。':'销售卡没有需要保存的修改。');releaseButton();refreshConfirmSaleButtonV322(type);return null;}
+  if(!dirty.length){alert(saveMode==='confirm'?'这张销售卡已经确认销售，或尚未先保存草稿。':'销售卡没有需要保存的修改。');releaseButton();refreshConfirmSaleButtonV322(type);return null;}
   const all=collectProductLinksV206(type),dirtyIds=new Set(dirty.map(c=>String(c.dataset.transactionId||''))),items=all.filter(x=>dirtyIds.has(String(x.transactionId||'')));
   if(!items.length){alert('请填写销售卡产品资料。');releaseButton();return null;}
-  if(!(await validateSalesInventoryAvailabilityV325(type,items,saveMode))){releaseButton();return null;}
+  // V40.5: a draft is local/cloud sales-card data only. Import availability is
+  // checked at final confirmation, never while saving or editing a draft.
+  if(saveMode==='confirm'&&!(await validateSalesInventoryAvailabilityV325(type,items,saveMode))){releaseButton();return null;}
   const official=salesCardsOfficialAmountV241(type),allTotal=all.reduce((s,x)=>s+Number(x.actualPrice||0),0);
   if(official>0&&allTotal>official+0.005){alert(`所有销售卡售价总数 RM${formatAmount(allTotal)} 已超过当天营业额 RM${formatAmount(official)}。`);releaseButton();return null;}
   for(const x of items){
