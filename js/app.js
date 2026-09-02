@@ -1402,7 +1402,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4000",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4010",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1420,7 +1420,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4000";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4010";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3518,8 +3518,11 @@ function salesCardStatusIsConfirmedV322(status){
 }
 function salesCardIsConfirmedV322(card){
   if(!card)return false;
-  if(salesCardStatusIsConfirmedV322(card.dataset.inventoryStatus))return true;
-  return [...card.querySelectorAll('.product-link-item')].some(i=>salesCardStatusIsConfirmedV322(i.dataset.inventoryStatus));
+  if(String(card.dataset.confirmedOnceV401||'')==='1')return true;
+  if(salesCardStatusIsConfirmedV322(card.dataset.inventoryStatus)){card.dataset.confirmedOnceV401='1';return true;}
+  const confirmed=[...card.querySelectorAll('.product-link-item')].some(i=>salesCardStatusIsConfirmedV322(i.dataset.inventoryStatus));
+  if(confirmed)card.dataset.confirmedOnceV401='1';
+  return confirmed;
 }
 function updateSalesCardDeleteLockV322(card){
   if(!card)return;
@@ -3556,7 +3559,11 @@ function applyCloudDraftStatusesV322(type,savedLinks){
       item.dataset.inventoryStatus=String(rec.importSyncStatus||'');
       status=status||item.dataset.inventoryStatus;
     });
-    if(status)card.dataset.inventoryStatus=status;
+    if(recs.some(r=>salesCardStatusIsConfirmedV322(r.importSyncStatus)))card.dataset.confirmedOnceV401='1';
+    const recStatuses=recs.map(r=>String(r.importSyncStatus||''));
+    if(recStatuses.some(st=>st==='PENDING_IMPORT_LINK'))card.dataset.inventoryStatus='PENDING_IMPORT_LINK';
+    else if(recStatuses.length&&recStatuses.every(st=>st==='INVENTORY_CONFIRMED'||st==='NON_INVENTORY'))card.dataset.inventoryStatus='INVENTORY_CONFIRMED';
+    else if(status)card.dataset.inventoryStatus=status;
     if(card._renderSalesStateV317)card._renderSalesStateV317();
     updateSalesCardDeleteLockV322(card);
   });
@@ -4023,6 +4030,10 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const hasDraftV317=savedStatusesV317.some(s=>s==="DRAFT"||s==="DRAFT_INVENTORY_CHANGED");
   const hasPendingV317=savedStatusesV317.some(s=>s==="PENDING_IMPORT_LINK");
   const hasConfirmedV317=savedStatusesV317.length>0&&savedStatusesV317.every(s=>s==="INVENTORY_CONFIRMED");
+  // V40.1: confirmation belongs to the sales-card transaction, not only to the
+  // current product rows. Once any row was confirmed/non-inventory, later draft
+  // edits must never turn the card back into an unconfirmed draft.
+  card.dataset.confirmedOnceV401=savedStatusesV317.some(s=>salesCardStatusIsConfirmedV322(s))?"1":"0";
   card.dataset.inventoryStatus=hasDraftV317?"DRAFT":hasPendingV317?"PENDING_IMPORT_LINK":hasConfirmedV317?"INVENTORY_CONFIRMED":"";
 
   const header=document.createElement("div");header.className="sales-card-header-v239";
@@ -4039,8 +4050,9 @@ function buildSalesCardTransactionV239(type,dataList=[]){
     const savedItems=[...card.querySelectorAll(".product-link-item")].filter(i=>i.dataset.saved==="1"&&String(i.dataset.linkId||""));
     if(!savedItems.length){stateBoxV317.hidden=true;stateBoxV317.textContent="";return;}
     const sts=savedItems.map(i=>String(i.dataset.inventoryStatus||card.dataset.inventoryStatus||"").trim()).filter(Boolean);
-    const draft=sts.some(st=>st==="DRAFT"||st==="DRAFT_INVENTORY_CHANGED")||String(card.dataset.inventoryStatus||"").startsWith("DRAFT");
-    const pending=!draft&&(sts.some(st=>st==="PENDING_IMPORT_LINK")||String(card.dataset.inventoryStatus||"")==="PENDING_IMPORT_LINK");
+    const confirmedOnceV401=salesCardIsConfirmedV322(card);
+    const draft=!confirmedOnceV401&&(sts.some(st=>st==="DRAFT"||st==="DRAFT_INVENTORY_CHANGED")||String(card.dataset.inventoryStatus||"").startsWith("DRAFT"));
+    const pending=!draft&&(sts.some(st=>st==="PENDING_IMPORT_LINK"||st==="DRAFT"||st==="DRAFT_INVENTORY_CHANGED")||String(card.dataset.inventoryStatus||"")==="PENDING_IMPORT_LINK");
     const done=!draft&&!pending&&sts.length>0&&sts.every(st=>st==="INVENTORY_CONFIRMED"||st==="NON_INVENTORY");
     const allNonInventory=done&&sts.every(st=>st==="NON_INVENTORY");
     stateBoxV317.hidden=false;
@@ -5223,7 +5235,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4000",
+    version:"4010",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5557,12 +5569,23 @@ function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
   const local=items.map(x=>{
     const tx=String(x.transactionId||''),card=cardByTxn.get(tx),prev=oldByTxn.get(tx)||[];
     const wasConfirmed=salesCardIsConfirmedV322(card)||prev.some(r=>salesCardStatusIsConfirmedV322(r.importSyncStatus));
+    if(wasConfirmed&&card)card.dataset.confirmedOnceV401='1';
+    const prior=prev.find(r=>String(r.linkId||'')&&String(r.linkId||'')===String(x.linkId||''));
     let status='DRAFT';
     if(wasConfirmed){
-      // Do not ever downgrade a confirmed sale to Draft while the cloud write runs.
-      // Keep its last confirmed/pending state until the server returns the exact
-      // inventory-difference status for this edit.
-      status=prev.some(r=>String(r.importSyncStatus||'')==='PENDING_IMPORT_LINK')||String(card?.dataset.inventoryStatus||'')==='PENDING_IMPORT_LINK'?'PENDING_IMPORT_LINK':'INVENTORY_CONFIRMED';
+      // V40.1: preserve each already-confirmed row, but a NEW product added to an
+      // already-confirmed card is immediately shown as pending Import inventory.
+      // This prevents the whole card from visually falling back to "尚未确认销售".
+      if(!prior)status='PENDING_IMPORT_LINK';
+      else{
+        const oldStatus=String(prior.importSyncStatus||'');
+        const sameProduct=String(prior.productId||'')===String(x.productId||'')&&String(prior.productName||'')===String(x.productName||'');
+        const qtyChanged=Number(prior.quantity||0)!==Number(x.quantity||0);
+        if(oldStatus==='NON_INVENTORY'&&!x.productId)status='NON_INVENTORY';
+        else if(oldStatus==='PENDING_IMPORT_LINK')status='PENDING_IMPORT_LINK';
+        else if(oldStatus==='INVENTORY_CONFIRMED'&&sameProduct&&!qtyChanged)status='INVENTORY_CONFIRMED';
+        else status='PENDING_IMPORT_LINK';
+      }
     }
     return {...x,importSyncStatus:status};
   });
@@ -5571,17 +5594,28 @@ function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
   if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,merged);
   if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,ctx.date,ctx.location,merged);
   refreshProfitAggregateCachesV321(local,[...dirtyIds]);
-  const statusByTxn=new Map();local.forEach(x=>{const tx=String(x.transactionId||'');if(tx&&!statusByTxn.has(tx))statusByTxn.set(tx,String(x.importSyncStatus||''))});
+  const byTxn=new Map();local.forEach(x=>{const tx=String(x.transactionId||'');if(!byTxn.has(tx))byTxn.set(tx,[]);byTxn.get(tx).push(x)});
   dirty.forEach(card=>{
     clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;
-    const tx=String(card.dataset.transactionId||''),st=statusByTxn.get(tx)||'DRAFT';card.dataset.inventoryStatus=st;
-    card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';i.dataset.inventoryStatus=st;});
+    const tx=String(card.dataset.transactionId||''),rows=byTxn.get(tx)||[];
+    if(rows.some(r=>salesCardStatusIsConfirmedV322(r.importSyncStatus)))card.dataset.confirmedOnceV401='1';
+    const hasPending=rows.some(r=>String(r.importSyncStatus||'')==='PENDING_IMPORT_LINK');
+    const allDone=rows.length&&rows.every(r=>['INVENTORY_CONFIRMED','NON_INVENTORY'].includes(String(r.importSyncStatus||'')));
+    card.dataset.inventoryStatus=hasPending?'PENDING_IMPORT_LINK':allDone?'INVENTORY_CONFIRMED':(salesCardIsConfirmedV322(card)?'PENDING_IMPORT_LINK':'DRAFT');
+    const rowByLink=new Map(rows.map(r=>[String(r.linkId||''),r]));
+    card.querySelectorAll('.product-link-item').forEach(i=>{
+      i.dataset.saved='1';i.dataset.dirty='0';
+      const rec=rowByLink.get(String(i.dataset.linkId||''));
+      if(rec)i.dataset.inventoryStatus=String(rec.importSyncStatus||'');
+      else if(salesCardIsConfirmedV322(card))i.dataset.inventoryStatus='PENDING_IMPORT_LINK';
+    });
     const tag=card.querySelector('.sales-card-header-v239 b:first-child');if(tag)tag.textContent='已保存销售卡';
     if(card._renderSalesStateV317)card._renderSalesStateV317();updateSalesCardDeleteLockV322(card);
   });
   renumberSavedSalesCardsV241(type);refreshConfirmSaleButtonV322(type);
   return merged;
 }
+
 async function syncQueuedSalesDraftV314(key,expectedToken=''){
   if(SALES_DRAFT_INFLIGHT_V314.has(key))return SALES_DRAFT_INFLIGHT_V314.get(key);
   const all=readSalesDraftPendingV314(),entry=all[key];
@@ -5654,7 +5688,7 @@ async function validateSalesInventoryAvailabilityV325(type,items,saveMode='draft
   if(!mapped.length)return true;
   let records=[];
   let lastInventoryError=null;
-  // V40.0: keep the same authoritative Import oversell guard, but avoid the old
+  // V40.1: keep the same authoritative Import oversell guard, but avoid the old
   // third sequential cloud read. Concurrent saves share one fresh preflight; a
   // delayed independent backup still protects against a single slow Apps Script
   // request. No cached stock is allowed to approve a sale.
