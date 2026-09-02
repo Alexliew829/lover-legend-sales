@@ -1402,7 +1402,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4050",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4060",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1420,7 +1420,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4050";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4060";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -4065,7 +4065,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const hasDraftV317=savedStatusesV317.some(s=>s==="DRAFT"||s==="DRAFT_INVENTORY_CHANGED");
   const hasPendingV317=savedStatusesV317.some(s=>s==="PENDING_IMPORT_LINK");
   const hasConfirmedV317=savedStatusesV317.length>0&&savedStatusesV317.every(s=>s==="INVENTORY_CONFIRMED");
-  // V40.5: confirmation belongs to the sales-card transaction, not only to the
+  // V40.6: confirmation belongs to the sales-card transaction, not only to the
   // current product rows. Once any row was confirmed/non-inventory, later draft
   // edits must never turn the card back into an unconfirmed draft.
   card.dataset.confirmedOnceV401=(list.some(x=>x&&x.confirmedOnce===true)||savedStatusesV317.some(s=>salesCardStatusIsConfirmedV322(s)))?"1":"0";
@@ -4129,6 +4129,14 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const warn=document.createElement("div");warn.className="sales-card-total-warning-v239";warn.hidden=true;card.appendChild(warn);
   const rlab=document.createElement("label");rlab.textContent="备注（顾客网络名字或电话号码）";card.appendChild(rlab);
   const remark=document.createElement("input");remark.className="sales-card-remark-v239";remark.maxLength=100;remark.placeholder="顾客名字、电话或其他讯息";remark.value=String(list.find(x=>String(x.remark||"").trim())?.remark||"");card.appendChild(remark);
+
+  // V40.6: this is the active Sales / Fair / Live card builder. Keep each
+  // card's draft and confirmation actions beside that card instead of relying
+  // on the obsolete page-level controls.
+  const actions=document.createElement("div");actions.className="sales-card-actions-v405";
+  const saveDraft=document.createElement("button");saveDraft.type="button";saveDraft.className="secondary-btn sales-card-draft-btn-v405";saveDraft.textContent="💾 保存草稿";saveDraft.addEventListener("click",()=>saveSingleSalesCardV405(type,txnId,"draft",saveDraft));
+  const confirmSale=document.createElement("button");confirmSale.type="button";confirmSale.className="secondary-btn sales-card-confirm-btn-v405";confirmSale.textContent="✅ 确认销售";confirmSale.addEventListener("click",()=>saveSingleSalesCardV405(type,txnId,"confirm",confirmSale));
+  actions.append(saveDraft,confirmSale);card.appendChild(actions);
 
   const remove=document.createElement("button");remove.type="button";remove.className="product-link-remove-btn product-link-remove-bottom";remove.textContent="删除销售卡";
   remove.addEventListener("click",()=>deleteSalesCardTransactionV239(type,txnId));card.appendChild(remove);
@@ -5270,7 +5278,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4050",
+    version:"4060",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5608,7 +5616,7 @@ function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
     const prior=prev.find(r=>String(r.linkId||'')&&String(r.linkId||'')===String(x.linkId||''));
     let status='DRAFT';
     if(wasConfirmed){
-      // V40.5: preserve each already-confirmed row, but a NEW product added to an
+      // V40.6: preserve each already-confirmed row, but a NEW product added to an
       // already-confirmed card is immediately shown as pending Import inventory.
       // This prevents the whole card from visually falling back to "尚未确认销售".
       if(!prior)status='PENDING_IMPORT_LINK';
@@ -5723,7 +5731,7 @@ async function validateSalesInventoryAvailabilityV325(type,items,saveMode='draft
   if(!mapped.length)return true;
   let records=[];
   let lastInventoryError=null;
-  // V40.5: keep the same authoritative Import oversell guard, but avoid the old
+  // V40.6: keep the same authoritative Import oversell guard, but avoid the old
   // third sequential cloud read. Concurrent saves share one fresh preflight; a
   // delayed independent backup still protects against a single slow Apps Script
   // request. No cached stock is allowed to approve a sale.
@@ -5797,7 +5805,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   if(!dirty.length){alert(saveMode==='confirm'?'这张销售卡已经确认销售，或尚未先保存草稿。':'销售卡没有需要保存的修改。');releaseButton();refreshConfirmSaleButtonV322(type);return null;}
   const all=collectProductLinksV206(type),dirtyIds=new Set(dirty.map(c=>String(c.dataset.transactionId||''))),items=all.filter(x=>dirtyIds.has(String(x.transactionId||'')));
   if(!items.length){alert('请填写销售卡产品资料。');releaseButton();return null;}
-  // V40.5: a draft is local/cloud sales-card data only. Import availability is
+  // V40.6: a draft is local/cloud sales-card data only. Import availability is
   // checked at final confirmation, never while saving or editing a draft.
   if(saveMode==='confirm'&&!(await validateSalesInventoryAvailabilityV325(type,items,saveMode))){releaseButton();return null;}
   const official=salesCardsOfficialAmountV241(type),allTotal=all.reduce((s,x)=>s+Number(x.actualPrice||0),0);
