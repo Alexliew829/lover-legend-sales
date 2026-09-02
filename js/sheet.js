@@ -978,10 +978,19 @@ async function saveSalesProductLinkV203(payload) {
 }
 
 async function loadPendingInventorySalesCardsV250() {
-  const json = await jsonp({ action:"getPendingInventorySalesCardsV250" }, { timeoutMs:20000 });
+  const json = await jsonp({ action:"getPendingInventorySalesCardsV250", _:Date.now() }, { timeoutMs:10000 });
   if (!json.ok) throw new Error(json.message || "读取库存待处理记录失败");
   return Array.isArray(json.items) ? json.items : [];
 }
+
+async function loadSalesInventoryAckStatusV408(linkIds){
+  const ids=[...new Set((Array.isArray(linkIds)?linkIds:[]).map(String).filter(Boolean))];
+  if(!ids.length)return [];
+  const json=await jsonp({action:"getSalesInventoryAckStatusV408",linkIdsJson:JSON.stringify(ids),_:Date.now()},{timeoutMs:10000});
+  if(!json.ok)throw new Error(json.message||"ACK 状态读取失败");
+  return Array.isArray(json.items)?json.items:[];
+}
+window.loadSalesInventoryAckStatusV408=loadSalesInventoryAckStatusV408;
 
 async function confirmSalesCardInventoryV249(payload) {
   const json = await jsonp({ action:"confirmSalesCardInventoryV249", ...payload }, { timeoutMs:20000 });
