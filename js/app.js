@@ -362,20 +362,43 @@ function toggleTop3(id,btn){
 }
 function fairLocationsThisMonth(){const map=new Map();rows.filter(r=>r.type==="fair"&&sameMonth(r.date)&&Number(r.amount)>0).forEach(r=>{const name=canonicalLocation(r.location||"Fair"),key=normalizeFairLocationKey(name);if(!key)return;const prev=map.get(key);if(!prev||displayToISO(r.date)>=displayToISO(prev.date))map.set(key,{name,date:r.date})});return [...map.values()].map(x=>x.name).sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"}))}
 function fairByLocation(){const map=new Map();rows.filter(r=>r.type==="fair"&&sameMonth(r.date)&&Number(r.amount)>0).forEach(r=>{const name=canonicalLocation(r.location||"Fair"),key=normalizeFairLocationKey(name);if(!key)return;const prev=map.get(key)||{name,date:"",amount:0};prev.amount+=Number(r.amount||0);if(!prev.date||displayToISO(r.date)>=displayToISO(prev.date)){prev.name=name;prev.date=r.date}map.set(key,prev)});const out={};map.forEach(v=>out[v.name]=v.amount);return out}
-// V41.6: click a Home Fair location to expand its newest month, plus the
+// V41.7: click a Home Fair location to expand its newest month, plus the
 // immediately preceding month only when that location has records in it.
 // Each day's commission follows that historical month's saved Fair mechanism.
-const fairHomeHistoryOpenV416=new Set();
-let fairHomeProfitLinksV416=null;
-let fairHomeProfitPromiseV416=null;
-function fairCommissionRateForMonthV416(month){
+const fairHomeHistoryOpenV417=new Set();
+const FAIR_HOME_PROFIT_CACHE_KEY_V417='loverLegendSales.fairHomeProfitLinks.v417';
+function readFairHomeProfitCacheV417(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(FAIR_HOME_PROFIT_CACHE_KEY_V417)||'null');
+    return saved&&Array.isArray(saved.links)?saved:null;
+  }catch(_e){return null}
+}
+function fairHomeProfitSignatureV417(links){
+  return JSON.stringify((Array.isArray(links)?links:[]).map(x=>[
+    String(x.linkId||''),String(x.transactionId||''),String(x.type||''),String(x.date||''),
+    normalizeFairLocationKey(x.location),Number(x.profit||0),String(x.updatedAt||'')
+  ]).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))));
+}
+function saveFairHomeProfitCacheV417(links,checkedAt=Date.now()){
+  try{
+    localStorage.setItem(FAIR_HOME_PROFIT_CACHE_KEY_V417,JSON.stringify({
+      links:Array.isArray(links)?links:[],signature:fairHomeProfitSignatureV417(links),checkedAt
+    }));
+  }catch(e){console.warn('V41.7 Fair 利润缓存保存失败',e)}
+}
+const fairHomeProfitSavedV417=readFairHomeProfitCacheV417();
+let fairHomeProfitLinksV417=fairHomeProfitSavedV417?fairHomeProfitSavedV417.links:null;
+let fairHomeProfitCheckedAtV417=Number(fairHomeProfitSavedV417?.checkedAt||0);
+let fairHomeProfitPromiseV417=null;
+let fairHomeProfitVerifiedThisSessionV417=false;
+function fairCommissionRateForMonthV417(month){
   const monthTotal=dedupeRows(rows).filter(r=>r.type==="fair"&&displayToISO(r.date).slice(0,7)===month).reduce((sum,r)=>sum+Number(r.amount||0),0);
   const settings=getCommissionSettingsForMonth(month);
   if(monthTotal>=100000)return Number(settings.rate3||0)/100;
   if(monthTotal>=50000)return Number(settings.rate2||0)/100;
   return Number(settings.rate1||0)/100;
 }
-function fairLocationHistoryRowsV416(locationKey){
+function fairLocationHistoryRowsV417(locationKey){
   const map=new Map();
   dedupeRows(rows).filter(r=>r.type==="fair"&&normalizeFairLocationKey(r.location||"Fair")===locationKey).forEach(r=>{
     const date=String(r.date||"");if(!date)return;
@@ -391,68 +414,82 @@ function fairLocationHistoryRowsV416(locationKey){
   const allowed=new Set(months.includes(previous)?[previous,latest]:[latest]);
   return list.filter(r=>allowed.has(displayToISO(r.date).slice(0,7)));
 }
-function fairHomeAllLocationKeysV416(){
+function fairHomeAllLocationKeysV417(){
   return Object.keys(fairByLocation()).map(name=>normalizeFairLocationKey(name)).filter(Boolean);
 }
-function fairHomeCombinedCommissionRateV416(locationKeys=fairHomeAllLocationKeysV416()){
+function fairHomeCombinedCommissionRateV417(locationKeys=fairHomeAllLocationKeysV417()){
   const keys=[...new Set(locationKeys)].filter(Boolean);
-  const combinedSales=keys.reduce((sum,key)=>sum+fairLocationHistoryRowsV416(key).reduce((subtotal,r)=>subtotal+Number(r.amount||0),0),0);
+  const combinedSales=keys.reduce((sum,key)=>sum+fairLocationHistoryRowsV417(key).reduce((subtotal,r)=>subtotal+Number(r.amount||0),0),0);
   return getFairCommissionRate(combinedSales);
 }
-function fairHistoryProfitV416(links,locationKey,date){
+function fairHistoryProfitV417(links,locationKey,date){
   const clean=typeof dedupeProfitLinksV360==="function"?dedupeProfitLinksV360(links):(Array.isArray(links)?links:[]);
   return clean.reduce((sum,x)=>String(x.type||"")==="fair"&&String(x.date||"")===date&&normalizeFairLocationKey(x.location)===locationKey?sum+Number(x.profit||0):sum,0);
 }
-function fairHistoryTableV416(locationKey,links){
-  const list=fairLocationHistoryRowsV416(locationKey),ready=Array.isArray(links),rate=fairHomeCombinedCommissionRateV416();
-  if(!list.length)return '<div class="fair-home-history-empty-v416">还没有历史记录</div>';
+function fairHistoryTableV417(locationKey,links){
+  const list=fairLocationHistoryRowsV417(locationKey),ready=Array.isArray(links),rate=fairHomeCombinedCommissionRateV417();
+  if(!list.length)return '<div class="fair-home-history-empty-v417">还没有历史记录</div>';
   let totalSales=0,totalProfit=0,totalCommission=0;
   const body=list.map(r=>{
-    const sales=Number(r.amount||0),commission=sales*rate,profit=ready?fairHistoryProfitV416(links,locationKey,r.date):null,margin=profit===null?null:(sales>0?profit/sales*100:0);
+    const sales=Number(r.amount||0),commission=sales*rate,profit=ready?fairHistoryProfitV417(links,locationKey,r.date):null,margin=profit===null?null:(sales>0?profit/sales*100:0);
     totalSales+=sales;totalCommission+=commission;if(profit!==null)totalProfit+=profit;
-    return `<div class="fair-home-history-row-v416"><span>${shortDayMonthV297(r.date)}</span><b>${money(sales)}</b><b>${profit===null?'--':money(profit)}</b><b>${margin===null?'--':margin.toFixed(2)+'%'}</b><b>${money(commission)}</b></div>`;
+    return `<div class="fair-home-history-row-v417"><span>${shortDayMonthV297(r.date)}</span><b>${money(sales)}</b><b>${profit===null?'--':money(profit)}</b><b>${margin===null?'--':margin.toFixed(2)+'%'}</b><b>${money(commission)}</b></div>`;
   }).join('');
   const totalMargin=ready&&totalSales>0?totalProfit/totalSales*100:0;
-  return `<div class="fair-home-history-table-v416"><div class="fair-home-history-head-v416"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span><span>佣金</span></div>${body}<div class="fair-home-history-row-v416 fair-home-history-total-v416"><span>总数</span><b>${money(totalSales)}</b><b>${ready?money(totalProfit):'--'}</b><b>${ready?totalMargin.toFixed(2)+'%':'--'}</b><b>${money(totalCommission)}</b></div></div>`;
+  return `<div class="fair-home-history-table-v417"><div class="fair-home-history-head-v417"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span><span>佣金</span></div>${body}<div class="fair-home-history-row-v417 fair-home-history-total-v417"><span>总数</span><b>${money(totalSales)}</b><b>${ready?money(totalProfit):'--'}</b><b>${ready?totalMargin.toFixed(2)+'%':'--'}</b><b>${money(totalCommission)}</b></div></div>`;
 }
-function fairOpenLocationsGrandV416(locationKeys,links){
+function fairOpenLocationsGrandV417(locationKeys,links){
   const keys=[...new Set(locationKeys)].filter(Boolean),ready=Array.isArray(links);
   if(keys.length<2)return '';
   let totalSales=0,totalProfit=0;
-  keys.forEach(key=>fairLocationHistoryRowsV416(key).forEach(r=>{
+  keys.forEach(key=>fairLocationHistoryRowsV417(key).forEach(r=>{
     const sales=Number(r.amount||0);
     totalSales+=sales;
-    if(ready)totalProfit+=fairHistoryProfitV416(links,key,r.date);
+    if(ready)totalProfit+=fairHistoryProfitV417(links,key,r.date);
   }));
   const rate=getFairCommissionRate(totalSales),totalCommission=totalSales*rate,margin=ready&&totalSales>0?totalProfit/totalSales*100:0;
-  return `<div class="fair-home-grand-v416"><strong>${keys.length}个地点总数</strong><div class="fair-home-grand-grid-v416 fair-home-grand-head-v416"><span>营业额</span><span>利润</span><span>利润率</span><span>佣金</span></div><div class="fair-home-grand-grid-v416 fair-home-grand-values-v416"><b>${money(totalSales)}</b><b>${ready?money(totalProfit):'--'}</b><b>${ready?margin.toFixed(2)+'%':'--'}</b><b>${money(totalCommission)}</b></div></div>`;
+  return `<div class="fair-home-grand-v417"><strong>${keys.length}个地点总数</strong><div class="fair-home-grand-grid-v417 fair-home-grand-head-v417"><span>营业额</span><span>利润</span><span>利润率</span><span>佣金</span></div><div class="fair-home-grand-grid-v417 fair-home-grand-values-v417"><b>${money(totalSales)}</b><b>${ready?money(totalProfit):'--'}</b><b>${ready?margin.toFixed(2)+'%':'--'}</b><b>${money(totalCommission)}</b></div></div>`;
 }
-function paintFairHomeHistoryV416(){
-  document.querySelectorAll('.fair-home-history-panel-v416[data-location-key]').forEach(panel=>{const key=decodeURIComponent(panel.dataset.locationKey||'');panel.innerHTML=fairHistoryTableV416(key,fairHomeProfitLinksV416)});
-  const grand=document.getElementById('fairHomeGrandV416');if(grand){const keys=String(grand.dataset.locationKeys||'').split(',').filter(Boolean).map(decodeURIComponent);grand.outerHTML=fairOpenLocationsGrandV416(keys,fairHomeProfitLinksV416).replace('<div class="fair-home-grand-v416"',`<div id="fairHomeGrandV416" data-location-keys="${keys.map(encodeURIComponent).join(',')}" class="fair-home-grand-v416"`)}
+function paintFairHomeHistoryV417(){
+  document.querySelectorAll('.fair-home-history-panel-v417[data-location-key]').forEach(panel=>{const key=decodeURIComponent(panel.dataset.locationKey||'');panel.innerHTML=fairHistoryTableV417(key,fairHomeProfitLinksV417)});
+  const grand=document.getElementById('fairHomeGrandV417');if(grand){const keys=String(grand.dataset.locationKeys||'').split(',').filter(Boolean).map(decodeURIComponent);grand.outerHTML=fairOpenLocationsGrandV417(keys,fairHomeProfitLinksV417).replace('<div class="fair-home-grand-v417"',`<div id="fairHomeGrandV417" data-location-keys="${keys.map(encodeURIComponent).join(',')}" class="fair-home-grand-v417"`)}
 }
-function ensureFairHomeProfitLinksV416(){
-  if(Array.isArray(fairHomeProfitLinksV416)){paintFairHomeHistoryV416();return Promise.resolve(fairHomeProfitLinksV416)}
-  if(fairHomeProfitPromiseV416)return fairHomeProfitPromiseV416;
-  fairHomeProfitPromiseV416=Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:180000})).then(links=>{fairHomeProfitLinksV416=Array.isArray(links)?links:[];paintFairHomeHistoryV416();return fairHomeProfitLinksV416}).catch(e=>{console.warn('V41.6 Fair 全部历史利润读取失败',e);return[]}).finally(()=>{fairHomeProfitPromiseV416=null});
-  return fairHomeProfitPromiseV416;
+function ensureFairHomeProfitLinksV417(){
+  // V41.7: paint the last successful result immediately. Cloud verification is
+  // silent and only repaints when the authoritative rows actually changed.
+  if(Array.isArray(fairHomeProfitLinksV417))paintFairHomeHistoryV417();
+  if(fairHomeProfitPromiseV417)return fairHomeProfitPromiseV417;
+  if(fairHomeProfitVerifiedThisSessionV417)return Promise.resolve(Array.isArray(fairHomeProfitLinksV417)?fairHomeProfitLinksV417:[]);
+  const oldSignature=fairHomeProfitSignatureV417(fairHomeProfitLinksV417);
+  fairHomeProfitPromiseV417=Promise.resolve(loadAllSalesProductLinksV203({force:true,maxAgeMs:0})).then(links=>{
+    const fresh=Array.isArray(links)?links:[],freshSignature=fairHomeProfitSignatureV417(fresh);
+    fairHomeProfitCheckedAtV417=Date.now();
+    fairHomeProfitVerifiedThisSessionV417=true;
+    if(!Array.isArray(fairHomeProfitLinksV417)||freshSignature!==oldSignature){
+      fairHomeProfitLinksV417=fresh;
+      paintFairHomeHistoryV417();
+    }
+    saveFairHomeProfitCacheV417(fresh,fairHomeProfitCheckedAtV417);
+    return fresh;
+  }).catch(e=>{console.warn('V41.7 Fair 全部历史利润静默检查失败，继续显示上次资料',e);return Array.isArray(fairHomeProfitLinksV417)?fairHomeProfitLinksV417:[]}).finally(()=>{fairHomeProfitPromiseV417=null});
+  return fairHomeProfitPromiseV417;
 }
-function toggleFairHomeHistoryV416(encodedKey){
+function toggleFairHomeHistoryV417(encodedKey){
   const key=decodeURIComponent(String(encodedKey||''));if(!key)return;
-  if(fairHomeHistoryOpenV416.has(key))fairHomeHistoryOpenV416.delete(key);else fairHomeHistoryOpenV416.add(key);
+  if(fairHomeHistoryOpenV417.has(key))fairHomeHistoryOpenV417.delete(key);else fairHomeHistoryOpenV417.add(key);
   renderFairLocationList();
-  if(fairHomeHistoryOpenV416.has(key))ensureFairHomeProfitLinksV416();
+  if(fairHomeHistoryOpenV417.has(key))ensureFairHomeProfitLinksV417();
 }
-window.toggleFairHomeHistoryV416=toggleFairHomeHistoryV416;
+window.toggleFairHomeHistoryV417=toggleFairHomeHistoryV417;
 function renderFairLocationList(){
   const g=fairByLocation(),locs=Object.keys(g).sort(),c=document.getElementById("fairLocationList");
   if(!locs.length){c.innerHTML='<div class="sub">这个月份还没有 Fair 记录</div>';return}
   const fairTotal=Object.values(g).reduce((sum,value)=>sum+Number(value||0),0),rate=getFairCommissionRate(fairTotal)*100;
   const allLocationKeys=locs.map(l=>normalizeFairLocationKey(l)).filter(Boolean);
-  const hasOpenLocation=allLocationKeys.some(key=>fairHomeHistoryOpenV416.has(key));
-  const grand=hasOpenLocation?fairOpenLocationsGrandV416(allLocationKeys,fairHomeProfitLinksV416):'';
-  const grandHtml=grand?grand.replace('<div class="fair-home-grand-v416"',`<div id="fairHomeGrandV416" data-location-keys="${allLocationKeys.map(encodeURIComponent).join(',')}" class="fair-home-grand-v416"`):'';
-  c.innerHTML='<div class="fair-location-grid">'+locs.map(l=>{const key=normalizeFairLocationKey(l),open=fairHomeHistoryOpenV416.has(key),encoded=encodeURIComponent(key);return `<div class="fair-location-card fair-location-card-v416 ${open?'fair-location-card-open-v416':''}"><button type="button" class="fair-location-title fair-location-toggle-v416" aria-expanded="${open}" onclick="toggleFairHomeHistoryV416('${encoded}')"><span>${escapeChangeLogHtmlV200(l)}</span><b>${open?'▲':'▼'}</b></button><div class="fair-location-row"><span>营业额</span><b>${money(g[l])}</b></div><div class="fair-location-row"><span>佣金 ${Number(rate.toFixed(2))}%</span><b>${money(g[l]*rate/100)}</b></div>${open?`<div class="fair-home-history-panel-v416" data-location-key="${encoded}">${fairHistoryTableV416(key,fairHomeProfitLinksV416)}</div>`:''}</div>`}).join("")+grandHtml+'</div>';
+  const hasOpenLocation=allLocationKeys.some(key=>fairHomeHistoryOpenV417.has(key));
+  const grand=hasOpenLocation?fairOpenLocationsGrandV417(allLocationKeys,fairHomeProfitLinksV417):'';
+  const grandHtml=grand?grand.replace('<div class="fair-home-grand-v417"',`<div id="fairHomeGrandV417" data-location-keys="${allLocationKeys.map(encodeURIComponent).join(',')}" class="fair-home-grand-v417"`):'';
+  c.innerHTML='<div class="fair-location-grid">'+locs.map(l=>{const key=normalizeFairLocationKey(l),open=fairHomeHistoryOpenV417.has(key),encoded=encodeURIComponent(key);return `<div class="fair-location-card fair-location-card-v417 ${open?'fair-location-card-open-v417':''}"><button type="button" class="fair-location-title fair-location-toggle-v417" aria-expanded="${open}" onclick="toggleFairHomeHistoryV417('${encoded}')"><span>${escapeChangeLogHtmlV200(l)}</span><b>${open?'▲':'▼'}</b></button><div class="fair-location-row"><span>营业额</span><b>${money(g[l])}</b></div><div class="fair-location-row"><span>佣金 ${Number(rate.toFixed(2))}%</span><b>${money(g[l]*rate/100)}</b></div>${open?`<div class="fair-home-history-panel-v417" data-location-key="${encoded}">${fairHistoryTableV417(key,fairHomeProfitLinksV417)}</div>`:''}</div>`}).join("")+grandHtml+'</div>';
 }
 function hasDashboardDateDailyRecord(company){
   const date=selectedDashboardDateDisplay();
@@ -1493,7 +1530,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4160",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4170",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1511,7 +1548,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4160";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4170";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -4156,7 +4193,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const hasDraftV317=savedStatusesV317.some(s=>s==="DRAFT"||s==="DRAFT_INVENTORY_CHANGED");
   const hasPendingV317=savedStatusesV317.some(s=>s==="PENDING_IMPORT_LINK");
   const hasConfirmedV317=savedStatusesV317.length>0&&savedStatusesV317.every(s=>s==="INVENTORY_CONFIRMED");
-  // V41.6: confirmation belongs to the sales-card transaction, not only to the
+  // V41.7: confirmation belongs to the sales-card transaction, not only to the
   // current product rows. Once any row was confirmed/non-inventory, later draft
   // edits must never turn the card back into an unconfirmed draft.
   card.dataset.confirmedOnceV401=(list.some(x=>x&&x.confirmedOnce===true)||savedStatusesV317.some(s=>salesCardStatusIsConfirmedV322(s)))?"1":"0";
@@ -4221,7 +4258,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const rlab=document.createElement("label");rlab.textContent="备注（顾客网络名字或电话号码）";card.appendChild(rlab);
   const remark=document.createElement("input");remark.className="sales-card-remark-v239";remark.maxLength=100;remark.placeholder="顾客名字、电话或其他讯息";remark.value=String(list.find(x=>String(x.remark||"").trim())?.remark||"");card.appendChild(remark);
 
-  // V41.6: this is the active Sales / Fair / Live card builder. Keep each
+  // V41.7: this is the active Sales / Fair / Live card builder. Keep each
   // card's draft and confirmation actions beside that card instead of relying
   // on the obsolete page-level controls.
   const actions=document.createElement("div");actions.className="sales-card-actions-v405";
@@ -5322,7 +5359,7 @@ let backupRestoreOperationRunningV234=false;
 let remoteRestoreMaintenanceActiveV345=false;
 
 function renderRemoteRestoreMaintenanceV345(active,message=""){
-  // V41.6: the device that started/resumed this Restore stays on its More
+  // V41.7: the device that started/resumed this Restore stays on its More
   // status panel. Only other devices use the full-screen maintenance overlay.
   remoteRestoreMaintenanceActiveV345=Boolean(active)&&!restoreLeaveProtectionActiveV409();
   let overlay=document.getElementById("restoreMaintenanceOverlayV345");
@@ -5357,7 +5394,7 @@ function clearBackupRestoreStateV234(){
   renderBackupRestoreStatusV234(null);
 }
 
-// V41.6: the persisted Restore job remains authoritative through the final
+// V41.7: the persisted Restore job remains authoritative through the final
 // verification stage. The in-memory flag can briefly be false while polling,
 // so navigation/refresh protection must also inspect this durable state.
 function restoreLeaveProtectionActiveV409(){
@@ -5397,7 +5434,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4160",
+    version:"4170",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5735,7 +5772,7 @@ function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
     const prior=prev.find(r=>String(r.linkId||'')&&String(r.linkId||'')===String(x.linkId||''));
     let status='DRAFT';
     if(wasConfirmed){
-      // V41.6: preserve each already-confirmed row, but a NEW product added to an
+      // V41.7: preserve each already-confirmed row, but a NEW product added to an
       // already-confirmed card is immediately shown as pending Import inventory.
       // This prevents the whole card from visually falling back to "尚未确认销售".
       if(!prior)status='PENDING_IMPORT_LINK';
@@ -5850,7 +5887,7 @@ async function validateSalesInventoryAvailabilityV325(type,items,saveMode='draft
   if(!mapped.length)return true;
   let records=[];
   let lastInventoryError=null;
-  // V41.6: keep the same authoritative Import oversell guard, but avoid the old
+  // V41.7: keep the same authoritative Import oversell guard, but avoid the old
   // third sequential cloud read. Concurrent saves share one fresh preflight; a
   // delayed independent backup still protects against a single slow Apps Script
   // request. No cached stock is allowed to approve a sale.
@@ -5912,7 +5949,7 @@ let SALES_CONFIRMATION_IN_FLIGHT_V407=false;
 saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   saveMode=saveMode==='draft'?'draft':'confirm';
   if(button?.dataset?.busyV285==='1')return null;
-  // V41.6 protects navigation from the instant Confirm is pressed.
+  // V41.7 protects navigation from the instant Confirm is pressed.
   if(saveMode==='confirm')SALES_CONFIRMATION_IN_FLIGHT_V407=true;
   const originalButtonText=button?.textContent||'';
   if(button){button.dataset.busyV285='1';button.disabled=true;button.textContent=saveMode==='draft'?'保存中…':'确认中…';}
@@ -5927,7 +5964,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   if(!dirty.length){alert(saveMode==='confirm'?'这张销售卡已经确认销售，或尚未先保存草稿。':'销售卡没有需要保存的修改。');releaseButton();refreshConfirmSaleButtonV322(type);return null;}
   const all=collectProductLinksV206(type),dirtyIds=new Set(dirty.map(c=>String(c.dataset.transactionId||''))),items=all.filter(x=>dirtyIds.has(String(x.transactionId||'')));
   if(!items.length){alert('请填写销售卡产品资料。');releaseButton();return null;}
-  // V41.6: a draft is local/cloud sales-card data only. Import availability is
+  // V41.7: a draft is local/cloud sales-card data only. Import availability is
   // checked at final confirmation, never while saving or editing a draft.
   if(saveMode==='confirm'&&!(await validateSalesInventoryAvailabilityV325(type,items,saveMode))){releaseButton();return null;}
   const official=salesCardsOfficialAmountV241(type),allTotal=all.reduce((s,x)=>s+Number(x.actualPrice||0),0);
@@ -6380,7 +6417,7 @@ async function refreshInventoryPendingV250(force=false){
 }
 window.refreshInventoryPendingV250=refreshInventoryPendingV250;
 
-// V41.6: the pending endpoint is the smallest authoritative ACK check. When a
+// V41.7: the pending endpoint is the smallest authoritative ACK check. When a
 // confirmed line is no longer pending, update the visible card and its exact
 // context caches immediately instead of waiting for the much larger cloud load.
 function reconcileVisibleSalesCardAckV407(pendingItems=[]){
@@ -6487,7 +6524,7 @@ function scheduleInventoryPendingResumeRefreshV265(){
 // Refresh Import reminders once only after that resume cycle completes, instead
 // of competing with it through visibilitychange + focus + pageshow.
 window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);
-// V41.6: do not wait for the full Sales cloud-resume cycle. Import ACK is a
+// V41.7: do not wait for the full Sales cloud-resume cycle. Import ACK is a
 // separate lightweight request and must refresh as soon as this tab is visible.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleInventoryPendingResumeRefreshV265()});
 window.addEventListener('focus',scheduleInventoryPendingResumeRefreshV265);
@@ -8074,7 +8111,7 @@ window.renderAll=renderAll;
   el.setAttribute('autocomplete','off');
 });
 
-// V41.6 final navigation gate, installed after every legacy showPage wrapper.
+// V41.7 final navigation gate, installed after every legacy showPage wrapper.
 const _showPageV409=showPage;
 showPage=function(name,el){
   const current=String(document.querySelector('.page.active')?.id||'').replace(/^page-/,'');
