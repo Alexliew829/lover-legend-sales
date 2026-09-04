@@ -19,29 +19,29 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .row b,.amount,.fair-total-line b,.fair-location-row b{color:#b00000;font-weight:900}.row b{font-size:28px}.amount{font-size:32px}.fair-total-line b{font-size:22px}.fair-location-row b{font-size:20px}
 .fair-location-grid{display:grid;grid-template-columns:1fr;gap:8px}.fair-location-card{background:#fff;border:1px solid #ddd;border-radius:13px;padding:10px}
 .fair-location-title{font-size:17px;font-weight:900;color:#111;margin-bottom:5px}.fair-total-line{border-top:1px dashed #ccc;padding-top:8px;margin-top:8px}
-/* V41.5 Home Fair location all-history disclosure */
-.fair-location-card-v415{min-width:0}
-.fair-location-card-open-v415{grid-column:1/-1}
-.fair-location-toggle-v415{width:100%;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:0;border:0;background:transparent;text-align:left;font:inherit;cursor:pointer}
-.fair-location-toggle-v415 span{min-width:0;overflow-wrap:anywhere;font-size:17px;font-weight:900}
-.fair-location-toggle-v415 b{flex:0 0 auto;color:#176f39;font-size:13px;padding-top:3px}
-.fair-location-toggle-v415:active{transform:translateY(1px)}
-.fair-home-history-panel-v415{grid-column:1/-1;margin-top:10px;padding-top:10px;border-top:1px dashed #cfd8cf;overflow-x:auto}
-.fair-home-history-table-v415{min-width:340px;font-size:11px;color:#222}
-.fair-home-history-head-v415,.fair-home-history-row-v415{display:grid;grid-template-columns:42px repeat(4,minmax(63px,1fr));gap:3px;align-items:center;text-align:right;padding:7px 2px;border-bottom:1px solid #edf0ed}
-.fair-home-history-head-v415{font-weight:800;color:#555;background:#f6f8f6}
-.fair-home-history-head-v415 span:first-child,.fair-home-history-row-v415 span:first-child{text-align:left;white-space:nowrap}
-.fair-home-history-row-v415 b{font-weight:800;white-space:nowrap}
-.fair-home-history-total-v415{background:#fff4f2;color:#a92319;border-top:1px solid #efc1bb;border-bottom:0;font-weight:900}
-.fair-home-history-empty-v415{padding:10px;color:#777;text-align:center}
-.fair-home-grand-v415{grid-column:1/-1;min-width:0;margin-top:4px;padding:12px 10px;border:2px solid #dc9e95;border-radius:13px;background:#fff4f2;overflow-x:auto}
-.fair-home-grand-v415>strong{display:block;margin-bottom:7px;color:#8f291e;font-size:16px}
-.fair-home-grand-grid-v415{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;align-items:center;text-align:center}
-.fair-home-grand-head-v415{padding:7px 0;border-bottom:1px solid #edc5bf;background:#f6f8f6;color:#555;font-size:11px;font-weight:800}
-.fair-home-grand-values-v415{padding:10px 0 3px;color:#b42318;font-size:13px;font-weight:900;font-variant-numeric:tabular-nums}
-.fair-home-grand-values-v415 b{min-width:0;white-space:nowrap;letter-spacing:-.35px}
-@media(max-width:600px){.fair-home-grand-v415{padding:11px 7px}.fair-home-grand-grid-v415{gap:2px}.fair-home-grand-head-v415{font-size:10px}.fair-home-grand-values-v415{font-size:12px}.fair-home-grand-values-v415 b{letter-spacing:-.5px}}
-@media(max-width:600px){.fair-home-history-table-v415{min-width:320px;font-size:10px}.fair-home-history-head-v415,.fair-home-history-row-v415{grid-template-columns:39px repeat(4,minmax(58px,1fr));gap:2px;padding:7px 1px}}
+/* V41.6 Home Fair location all-history disclosure */
+.fair-location-card-v416{min-width:0}
+.fair-location-card-open-v416{grid-column:1/-1}
+.fair-location-toggle-v416{width:100%;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:0;border:0;background:transparent;text-align:left;font:inherit;cursor:pointer}
+.fair-location-toggle-v416 span{min-width:0;overflow-wrap:anywhere;font-size:17px;font-weight:900}
+.fair-location-toggle-v416 b{flex:0 0 auto;color:#176f39;font-size:13px;padding-top:3px}
+.fair-location-toggle-v416:active{transform:translateY(1px)}
+.fair-home-history-panel-v416{grid-column:1/-1;margin-top:10px;padding-top:10px;border-top:1px dashed #cfd8cf;overflow-x:auto}
+.fair-home-history-table-v416{min-width:340px;font-size:11px;color:#222}
+.fair-home-history-head-v416,.fair-home-history-row-v416{display:grid;grid-template-columns:42px repeat(4,minmax(63px,1fr));gap:3px;align-items:center;text-align:right;padding:7px 2px;border-bottom:1px solid #edf0ed}
+.fair-home-history-head-v416{font-weight:800;color:#555;background:#f6f8f6}
+.fair-home-history-head-v416 span:first-child,.fair-home-history-row-v416 span:first-child{text-align:left;white-space:nowrap}
+.fair-home-history-row-v416 b{font-weight:800;white-space:nowrap}
+.fair-home-history-total-v416{background:#fff4f2;color:#a92319;border-top:1px solid #efc1bb;border-bottom:0;font-weight:900}
+.fair-home-history-empty-v416{padding:10px;color:#777;text-align:center}
+.fair-home-grand-v416{grid-column:1/-1;min-width:0;margin-top:4px;padding:12px 10px;border:2px solid #dc9e95;border-radius:13px;background:#fff4f2;overflow-x:auto}
+.fair-home-grand-v416>strong{display:block;margin-bottom:7px;color:#8f291e;font-size:16px}
+.fair-home-grand-grid-v416{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;align-items:center;text-align:center}
+.fair-home-grand-head-v416{padding:7px 0;border-bottom:1px solid #edc5bf;background:#f6f8f6;color:#555;font-size:11px;font-weight:800}
+.fair-home-grand-values-v416{padding:10px 0 3px;color:#b42318;font-size:13px;font-weight:900;font-variant-numeric:tabular-nums}
+.fair-home-grand-values-v416 b{min-width:0;white-space:nowrap;letter-spacing:-.35px}
+@media(max-width:600px){.fair-home-grand-v416{padding:11px 7px}.fair-home-grand-grid-v416{gap:2px}.fair-home-grand-head-v416{font-size:10px}.fair-home-grand-values-v416{font-size:12px}.fair-home-grand-values-v416 b{letter-spacing:-.5px}}
+@media(max-width:600px){.fair-home-history-table-v416{min-width:320px;font-size:10px}.fair-home-history-head-v416,.fair-home-history-row-v416{grid-template-columns:39px repeat(4,minmax(58px,1fr));gap:2px;padding:7px 1px}}
 .sub,.note{font-size:13px;color:#666;line-height:1.45;margin-top:6px}
 .sales-date-result,.sync-line{margin-top:10px;padding:10px;border-radius:12px;background:#fff7dc;border:1px solid #e4c45f;font-weight:900;color:#5b4200}
 .sales-date-result{display:flex;flex-direction:column;align-items:flex-start;gap:4px;line-height:1.3;overflow-wrap:anywhere}
