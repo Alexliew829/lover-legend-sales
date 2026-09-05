@@ -1612,7 +1612,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4250",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4260",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1630,7 +1630,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4250";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4260";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5516,7 +5516,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4250",
+    version:"4260",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5719,7 +5719,9 @@ function addProductLinkItemV209(type,data={}){
   if(unsaved){alert('请先保存目前这张销售卡，才可以新增第二张销售卡。');unsaved.scrollIntoView({behavior:'smooth',block:'center'});return false;}
   const official=salesCardsOfficialAmountV241(type),used=salesCardsEnteredTotalV241(type);
   if(official>0&&used>=official-0.005){alert(`当天营业额 RM${formatAmount(official)} 已全部分配到销售卡，不能再新增销售卡。`);return false;}
-  wrap.appendChild(buildSalesCardTransactionV239(type,[data||{}]));return true;
+  wrap.appendChild(buildSalesCardTransactionV239(type,[data||{}]));
+  renumberSavedSalesCardsV241(type);
+  return true;
 }
 function addProductLinkItemV206(type,data={}){return addProductLinkItemV209(type,data)}
 window.addProductLinkItemV206=addProductLinkItemV206;window.addProductLinkItemV209=addProductLinkItemV209;
@@ -5737,7 +5739,7 @@ deleteSalesCardTransactionV239=async function(type,txnId){
 window.deleteSalesCardTransactionV239=deleteSalesCardTransactionV239;
 
 function renumberSavedSalesCardsV241(type){
-  let n=0;salesCardWrappersV239(type).forEach(card=>{const title=card.querySelector('.sales-card-header-v239 b:first-child');if(!title)return;if(salesCardIsSavedV241(card)){n++;title.textContent='已保存销售卡 '+n}else title.textContent='新销售卡';});
+  let n=0;salesCardWrappersV239(type).forEach(card=>{const title=card.querySelector('.sales-card-header-v239 b:first-child');if(!title)return;n++;title.textContent=(salesCardIsSavedV241(card)?'已保存销售卡 ':'销售卡 ')+n;});
 }
 const _renderProductLinksEditorV240=renderProductLinksEditorV206;
 renderProductLinksEditorV206=function(type,links){_renderProductLinksEditorV240(type,links);renumberSavedSalesCardsV241(type)};
@@ -5933,7 +5935,7 @@ function mergeSingleCardDraftAckV424(entry,serverLinks){
     :[...kept,...protectedIncoming];
 }
 
-// V42.5: remove V42.3's partial/stale display cache once after upgrade.
+// V42.6: remove V42.3's partial/stale display cache once after upgrade.
 // Durable queued drafts use a separate key and remain protected.
 const SALES_CARD_CACHE_REPAIR_KEY_V425='lover_sales_card_cache_repaired_v425';
 try{
@@ -5964,7 +5966,7 @@ async function reconcileCompleteSalesCardContextV425(type,date,location){
       applyCloudDraftStatusesV322(type,cloud);
     }
     return cloud;
-  }catch(e){console.warn('V42.5 完整销售卡状态后台核对失败',e);return null}
+  }catch(e){console.warn('V42.6 完整销售卡状态后台核对失败',e);return null}
 }
 function scheduleCompleteSalesCardReconcileV425(type,date,location){
   setTimeout(()=>reconcileCompleteSalesCardContextV425(type,date,location),120);
