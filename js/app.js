@@ -1612,7 +1612,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4230",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4240",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1630,7 +1630,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4230";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4240";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5516,7 +5516,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4230",
+    version:"4240",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5897,6 +5897,42 @@ function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
   return merged;
 }
 
+// V42.4: a single-card Draft response contains only the transaction that was
+// saved. Merge that acknowledgement into the exact date/location cache instead
+// of treating it as the complete card list. Confirmed cards are immutable and
+// their status can never be downgraded by a partial/stale draft response.
+function mergeSingleCardDraftAckV424(entry,serverLinks){
+  const incoming=typeof dedupeAuthoritativeSalesLinksV354==='function'
+    ?dedupeAuthoritativeSalesLinksV354(Array.isArray(serverLinks)?serverLinks:[])
+    :(Array.isArray(serverLinks)?serverLinks:[]);
+  const persistent=typeof getSalesCardPersistentCacheV232==='function'
+    ?getSalesCardPersistentCacheV232(entry.type,entry.date,entry.location):null;
+  const memory=typeof getCachedSalesProductLinksV216==='function'
+    ?getCachedSalesProductLinksV216(entry.type,entry.date,entry.location):null;
+  const existing=Array.isArray(persistent)?persistent:(Array.isArray(memory)?memory:[]);
+  const replacedTxns=new Set((Array.isArray(entry.items)?entry.items:[])
+    .map(x=>String(x?.transactionId||'').trim()).filter(Boolean));
+  const deletedIds=new Set((Array.isArray(entry.deletedLinkIds)?entry.deletedLinkIds:[])
+    .map(x=>String(x||'').trim()).filter(Boolean));
+  const oldByLink=new Map(existing.map(x=>[String(x?.linkId||''),x]));
+  const oldByTxn=new Map();
+  existing.forEach(x=>{const tx=String(x?.transactionId||'').trim();if(tx&&!oldByTxn.has(tx))oldByTxn.set(tx,x)});
+  const protectedIncoming=incoming.map(x=>{
+    const prior=oldByLink.get(String(x?.linkId||''))||oldByTxn.get(String(x?.transactionId||'').trim());
+    const priorConfirmed=prior&&(prior.confirmedOnce===true||salesCardStatusIsConfirmedV322(prior.importSyncStatus));
+    const nextConfirmed=x&&(x.confirmedOnce===true||salesCardStatusIsConfirmedV322(x.importSyncStatus));
+    if(priorConfirmed&&!nextConfirmed)return{...x,importSyncStatus:String(prior.importSyncStatus||'INVENTORY_CONFIRMED'),confirmedOnce:true};
+    return x;
+  });
+  const kept=existing.filter(x=>{
+    const tx=String(x?.transactionId||'').trim(),id=String(x?.linkId||'').trim();
+    return !deletedIds.has(id)&&!(tx&&replacedTxns.has(tx));
+  });
+  return typeof dedupeAuthoritativeSalesLinksV354==='function'
+    ?dedupeAuthoritativeSalesLinksV354([...kept,...protectedIncoming])
+    :[...kept,...protectedIncoming];
+}
+
 async function syncQueuedSalesDraftV314(key,expectedToken=''){
   if(SALES_DRAFT_INFLIGHT_V314.has(key))return SALES_DRAFT_INFLIGHT_V314.get(key);
   const all=readSalesDraftPendingV314(),entry=all[key];
@@ -5910,11 +5946,12 @@ async function syncQueuedSalesDraftV314(key,expectedToken=''){
         removeSalesDraftPendingV314(key,entry.token);
         clearDeletedSalesLinkIdsV350(entry.type,entry.date,entry.location,entry.deletedLinkIds||[]);
         const saved=Array.isArray(result?.links)&&result.links.length?result.links:entry.items;
-        if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(entry.type,entry.date,entry.location,saved);
-        if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(entry.type,entry.date,entry.location,saved);
-        if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(entry.type,entry.date,entry.location,saved);
+        const merged=mergeSingleCardDraftAckV424(entry,saved);
+        if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(entry.type,entry.date,entry.location,merged);
+        if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(entry.type,entry.date,entry.location,merged);
+        if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(entry.type,entry.date,entry.location,merged);
         refreshProfitAggregateCachesV321(saved,[...new Set(entry.items.map(x=>String(x.transactionId||'')).filter(Boolean))]);
-        applyCloudDraftStatusesV322(entry.type,saved);
+        applyCloudDraftStatusesV322(entry.type,merged);
         if(typeof refreshInventoryPendingV250==='function')setTimeout(()=>refreshInventoryPendingV250(true),0);
         setSync('草稿已保存 · 云端已同步',true);
       }
@@ -6859,10 +6896,11 @@ syncQueuedSalesDraftV314=async function(key,expectedToken=''){
       }
       removeSalesDraftPendingV314(key,entry.token);
       const authoritativeSaved=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(saved):saved;
-      setCachedSalesProductLinksV216(entry.type,entry.date,entry.location,authoritativeSaved);setSalesCardPersistentCacheV232(entry.type,entry.date,entry.location,authoritativeSaved);mergeDailyProfitContextCacheV237(entry.type,entry.date,entry.location,authoritativeSaved);
-      refreshProfitAggregateCachesV321(authoritativeSaved,[...new Set(entry.items.map(x=>String(x.transactionId||'')).filter(Boolean))]);applyCloudDraftStatusesV322(entry.type,authoritativeSaved);
+      const mergedContextV424=mergeSingleCardDraftAckV424(entry,authoritativeSaved);
+      setCachedSalesProductLinksV216(entry.type,entry.date,entry.location,mergedContextV424);setSalesCardPersistentCacheV232(entry.type,entry.date,entry.location,mergedContextV424);mergeDailyProfitContextCacheV237(entry.type,entry.date,entry.location,mergedContextV424);
+      refreshProfitAggregateCachesV321(authoritativeSaved,[...new Set(entry.items.map(x=>String(x.transactionId||'')).filter(Boolean))]);applyCloudDraftStatusesV322(entry.type,mergedContextV424);
       const ctxNow=productLinkContextV206(entry.type);
-      if(String(ctxNow.date||'')===String(entry.date||'')&&salesCardContextKeyV245(entry.type,ctxNow.date,ctxNow.location)===salesCardContextKeyV245(entry.type,entry.date,entry.location)&&!productImportSearchIsActiveV226(entry.type)){invalidateSalesCardLoadRequestsV351(entry.type);renderProductLinksEditorV206(entry.type,authoritativeSaved)}
+      if(String(ctxNow.date||'')===String(entry.date||'')&&salesCardContextKeyV245(entry.type,ctxNow.date,ctxNow.location)===salesCardContextKeyV245(entry.type,entry.date,entry.location)&&!productImportSearchIsActiveV226(entry.type)){invalidateSalesCardLoadRequestsV351(entry.type);renderProductLinksEditorV206(entry.type,mergedContextV424)}
       setSync('草稿已保存 · 云端已同步',true);
     }return result;
   }catch(err){setSync('草稿已安全保存 · 云端待同步',false,true);scheduleSalesDraftRetryV314(5000);throw err}finally{SALES_DRAFT_INFLIGHT_V314.delete(key)}})();
