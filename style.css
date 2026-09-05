@@ -19,35 +19,35 @@ button{border:none;background:#111;color:#fff;font-weight:900;margin-top:10px;cu
 .row b,.amount,.fair-total-line b,.fair-location-row b{color:#b00000;font-weight:900}.row b{font-size:28px}.amount{font-size:32px}.fair-total-line b{font-size:22px}.fair-location-row b{font-size:20px}
 .fair-location-grid{display:grid;grid-template-columns:1fr;gap:8px}.fair-location-card{background:#fff;border:1px solid #ddd;border-radius:13px;padding:10px}
 .fair-location-title{font-size:17px;font-weight:900;color:#111;margin-bottom:5px}.fair-total-line{border-top:1px dashed #ccc;padding-top:8px;margin-top:8px}
-/* V42.2 Home Fair location all-history disclosure */
-.fair-location-card-v422{min-width:0}
-.fair-location-card-open-v422{grid-column:1/-1}
-.fair-location-summary-v422{display:block;width:100%;padding:0;border:0;background:transparent;text-align:left;font:inherit;color:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(23,111,57,.12)}
-.fair-location-summary-v422:active{transform:translateY(1px)}
-.fair-location-toggle-v422{width:100%;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:0}
-.fair-location-toggle-v422 span{min-width:0;overflow-wrap:anywhere;font-size:17px;font-weight:900}
-.fair-location-toggle-v422 b{flex:0 0 auto;color:#176f39;font-size:13px;padding-top:3px}
-.fair-location-summary-v422>.fair-location-row{width:100%}
-.fair-home-history-panel-v422{grid-column:1/-1;margin-top:10px;padding-top:10px;border-top:1px dashed #cfd8cf;overflow-x:auto}
-.fair-home-history-table-v422{min-width:340px;font-size:11px;color:#222}
-.fair-home-history-head-v422,.fair-home-history-row-v422{display:grid;grid-template-columns:42px repeat(4,minmax(63px,1fr));gap:3px;align-items:center;text-align:right;padding:7px 2px;border-bottom:1px solid #edf0ed}
-.fair-home-history-head-v422{font-weight:800;color:#555;background:#f6f8f6}
-.fair-home-history-head-v422 span:first-child,.fair-home-history-row-v422 span:first-child{text-align:left;white-space:nowrap}
-.fair-home-history-row-v422 b{font-weight:800;white-space:nowrap}
-.fair-home-history-total-v422{background:#fff4f2;color:#a92319;border-top:1px solid #efc1bb;border-bottom:0;font-weight:900}
-.fair-home-history-empty-v422{padding:10px;color:#777;text-align:center}
-.fair-home-grand-v422{grid-column:1/-1;min-width:0;margin-top:4px;padding:12px 10px;border:2px solid #dc9e95;border-radius:13px;background:#fff4f2;overflow-x:auto}
-.fair-home-grand-v422>strong{display:block;margin-bottom:7px;color:#8f291e;font-size:16px}
-.fair-home-grand-grid-v422{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;align-items:center;text-align:center}
-.fair-home-grand-head-v422{padding:7px 0;border-bottom:1px solid #edc5bf;background:#f6f8f6;color:#555;font-size:11px;font-weight:800}
-.fair-home-grand-values-v422{padding:10px 0 3px;color:#b42318;font-size:13px;font-weight:900;font-variant-numeric:tabular-nums}
-.fair-home-grand-values-v422 b{min-width:0;white-space:nowrap;letter-spacing:-.35px}
-@media(max-width:600px){.fair-home-grand-v422{padding:11px 7px}.fair-home-grand-grid-v422{gap:2px}.fair-home-grand-head-v422{font-size:10px}.fair-home-grand-values-v422{font-size:12px}.fair-home-grand-values-v422 b{letter-spacing:-.5px}}
-@media(max-width:600px){.fair-home-history-table-v422{min-width:320px;font-size:10px}.fair-home-history-head-v422,.fair-home-history-row-v422{grid-template-columns:39px repeat(4,minmax(58px,1fr));gap:2px;padding:7px 1px}}
+/* V42.3 Home Fair location all-history disclosure */
+.fair-location-card-v423{min-width:0}
+.fair-location-card-open-v423{grid-column:1/-1}
+.fair-location-summary-v423{display:block;width:100%;padding:0;border:0;background:transparent;text-align:left;font:inherit;color:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(23,111,57,.12)}
+.fair-location-summary-v423:active{transform:translateY(1px)}
+.fair-location-toggle-v423{width:100%;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:0}
+.fair-location-toggle-v423 span{min-width:0;overflow-wrap:anywhere;font-size:17px;font-weight:900}
+.fair-location-toggle-v423 b{flex:0 0 auto;color:#176f39;font-size:13px;padding-top:3px}
+.fair-location-summary-v423>.fair-location-row{width:100%}
+.fair-home-history-panel-v423{grid-column:1/-1;margin-top:10px;padding-top:10px;border-top:1px dashed #cfd8cf;overflow-x:auto}
+.fair-home-history-table-v423{min-width:340px;font-size:11px;color:#222}
+.fair-home-history-head-v423,.fair-home-history-row-v423{display:grid;grid-template-columns:42px repeat(4,minmax(63px,1fr));gap:3px;align-items:center;text-align:right;padding:7px 2px;border-bottom:1px solid #edf0ed}
+.fair-home-history-head-v423{font-weight:800;color:#555;background:#f6f8f6}
+.fair-home-history-head-v423 span:first-child,.fair-home-history-row-v423 span:first-child{text-align:left;white-space:nowrap}
+.fair-home-history-row-v423 b{font-weight:800;white-space:nowrap}
+.fair-home-history-total-v423{background:#fff4f2;color:#a92319;border-top:1px solid #efc1bb;border-bottom:0;font-weight:900}
+.fair-home-history-empty-v423{padding:10px;color:#777;text-align:center}
+.fair-home-grand-v423{grid-column:1/-1;min-width:0;margin-top:4px;padding:12px 10px;border:2px solid #dc9e95;border-radius:13px;background:#fff4f2;overflow-x:auto}
+.fair-home-grand-v423>strong{display:block;margin-bottom:7px;color:#8f291e;font-size:16px}
+.fair-home-grand-grid-v423{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;align-items:center;text-align:center}
+.fair-home-grand-head-v423{padding:7px 0;border-bottom:1px solid #edc5bf;background:#f6f8f6;color:#555;font-size:11px;font-weight:800}
+.fair-home-grand-values-v423{padding:10px 0 3px;color:#b42318;font-size:13px;font-weight:900;font-variant-numeric:tabular-nums}
+.fair-home-grand-values-v423 b{min-width:0;white-space:nowrap;letter-spacing:-.35px}
+@media(max-width:600px){.fair-home-grand-v423{padding:11px 7px}.fair-home-grand-grid-v423{gap:2px}.fair-home-grand-head-v423{font-size:10px}.fair-home-grand-values-v423{font-size:12px}.fair-home-grand-values-v423 b{letter-spacing:-.5px}}
+@media(max-width:600px){.fair-home-history-table-v423{min-width:320px;font-size:10px}.fair-home-history-head-v423,.fair-home-history-row-v423{grid-template-columns:39px repeat(4,minmax(58px,1fr));gap:2px;padding:7px 1px}}
 .sub,.note{font-size:13px;color:#666;line-height:1.45;margin-top:6px}
-.sales-date-result,.sync-line{margin-top:10px;padding:10px;border-radius:12px;background:#fff7dc;border:1px solid #e4c45f;font-weight:900;color:#5b4220}
+.sales-date-result,.sync-line{margin-top:10px;padding:10px;border-radius:12px;background:#fff7dc;border:1px solid #e4c45f;font-weight:900;color:#5b4230}
 .sales-date-result{display:flex;flex-direction:column;align-items:flex-start;gap:4px;line-height:1.3;overflow-wrap:anywhere}
-.saved-turnover-name-v333{font-size:17px;color:#5b4220}
+.saved-turnover-name-v333{font-size:17px;color:#5b4230}
 .saved-turnover-detail-v333{font-size:14px;color:#785f18;font-weight:800}
 .last-sync{margin-top:6px;font-size:12px;color:#666;font-weight:800}.warning{background:#ffe7e7;color:#9b0000;border:1px solid #f2b3b3;border-radius:12px;padding:10px;margin-bottom:10px;font-weight:900}
 .done,.save-msg{background:#e6f7ea;color:#0b6b2b;border:1px solid #9ad6a8;border-radius:12px;padding:10px;margin-top:10px;font-weight:900;text-align:center}.done{margin-bottom:10px;text-align:left}
@@ -2725,7 +2725,7 @@ body{overflow-x:hidden;}
 
 /* V36.0: selected-date Fair / Live total in the yellow summary box */
 .sales-date-result.selected-day-total-v360{gap:6px;padding:12px 14px}
-.selected-day-total-title-v360{font-size:17px;font-weight:900;color:#5b4220}
+.selected-day-total-title-v360{font-size:17px;font-weight:900;color:#5b4230}
 .selected-day-total-date-v360{font-size:13px;font-weight:800;color:#785f18}
 .selected-day-total-metrics-v360{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%;font-size:13px}
 .selected-day-total-metrics-v360 b{display:block;padding:7px 6px;border-radius:9px;background:rgba(255,255,255,.45);text-align:center;white-space:nowrap}
