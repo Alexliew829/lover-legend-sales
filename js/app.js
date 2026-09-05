@@ -148,8 +148,8 @@ function renderSavedTurnoverSummaryV333(element,name,date,amount){
 function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c),input=document.getElementById("dailySales"),draft=getDailyTurnoverDraftV332();input.value=draft?String(draft.value):formatAmount(a);renderSavedTurnoverSummaryV333(document.getElementById("salesDateResult"),companyNames[c],d,a);renderSalesMonthlyList();if(typeof refreshSalesActionLocksV270==="function")refreshSalesActionLocksV270();if(c==="belimbing"&&typeof loadProductLinksIntoEditorV206==="function")Promise.resolve(loadProductLinksIntoEditorV206("daily")).catch(()=>{});}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
 
-// V29.9: Top 5 business performance. Uses rows already loaded in memory only;
-// opening/closing Top 5 never triggers an extra cloud request.
+// V42.3: Top 5 uses the last saved all-history cache immediately. Opening a
+// panel schedules one low-priority cloud check shared with Historical Highs.
 function weekdayZh(displayDate){
   const iso=displayToISO(displayDate);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(iso))return "";
@@ -187,6 +187,7 @@ function mergeHistoricalHighsV331(localData,cloudData){
   return{
     ok:true,
     highs,
+    top5:cloudData&&cloudData.top5?cloudData.top5:(localData&&localData.top5?localData.top5:null),
     dataRevision:Number(cloudData&&cloudData.dataRevision||localData&&localData.dataRevision||0),
     cloudChecked:true,
     checkedAt:new Date().toISOString()
@@ -203,8 +204,8 @@ function saveHistoricalHighsCache(data){
 function historicalKindForPanel(elId){
   if(elId==="balakongTop3")return "balakong";
   if(elId==="belimbingTop3")return "belimbing";
-  if(elId==="fairHomeTop3")return "fair";
-  if(elId==="liveHomeTop3")return "live";
+  if(elId==="fairHomeTop3"||elId==="fairPageTop3")return "fair";
+  if(elId==="liveHomeTop3"||elId==="livePageTop3")return "live";
   return "";
 }
 
@@ -268,6 +269,8 @@ async function ensureHistoricalHighs(){
   if(cached)renderAllVisibleHistoricalRecords();
   if(historicalHighsPromise)return historicalHighsPromise;
   if(typeof jsonp!=="function")return null;
+  const checkedAt=cached&&cached.checkedAt?Date.parse(cached.checkedAt):0;
+  if(cached&&cached.top5&&checkedAt&&Date.now()-checkedAt<300000)return cached;
 
   if(!cached)["balakongTop3","belimbingTop3","fairHomeTop3","liveHomeTop3"]
     .forEach(id=>renderHistoricalRecordForPanel(id,"checking"));
@@ -281,7 +284,9 @@ async function ensureHistoricalHighs(){
       // Only a genuinely higher cloud record changes what the user sees.
       const merged=mergeHistoricalHighsV331(readHistoricalHighsCache(),data);
       saveHistoricalHighsCache(merged);
-      renderAllVisibleHistoricalRecords();
+      renderBusinessTop3();
+      renderFairPageTop3();
+      renderLivePageTop3();
       return merged;
     }
     throw new Error((data&&data.message)||"历史纪录读取失败");
@@ -309,6 +314,16 @@ function top3RowsForMonth(type,month,company=""){
     .filter(r=>Number(r.amount||0)>0)
     .sort((a,b)=>Number(b.amount||0)-Number(a.amount||0)||displayToISO(b.date).localeCompare(displayToISO(a.date))).slice(0,5);
 }
+function top5RowsAllHistoryV423(kind,type,company=""){
+  const cached=readHistoricalHighsCache();
+  const cloudList=cached&&cached.top5&&Array.isArray(cached.top5[kind])?cached.top5[kind]:null;
+  if(cloudList)return cloudList.slice(0,5);
+  return dedupeRows(rows)
+    .filter(r=>r.type===type)
+    .filter(r=>company?r.company===company:true)
+    .filter(r=>Number(r.amount||0)>0)
+    .sort((a,b)=>Number(b.amount||0)-Number(a.amount||0)||displayToISO(b.date).localeCompare(displayToISO(a.date))).slice(0,5);
+}
 function renderTop3List(elId,list,kind){
   const el=document.getElementById(elId);
   if(!el)return;
@@ -324,25 +339,22 @@ function renderTop3List(elId,list,kind){
         <strong>RM${money(r.amount)}</strong>
       </div>`;
     }).join("")
-    :'<div class="top3-empty">这个月份还没有营业额记录</div>';
+    :'<div class="top3-empty">还没有历史营业额记录</div>';
 
   el.innerHTML=`<div id="${elId}History" class="history-record-host"></div>${rowsHtml}`;
   renderHistoricalRecordForPanel(elId);
 }
 function renderBusinessTop3(){
-  const month=selectedMonth();
-  renderTop3List("balakongTop3",top3RowsForMonth("daily",month,"balakong"),"daily");
-  renderTop3List("belimbingTop3",top3RowsForMonth("daily",month,"belimbing"),"daily");
-  renderTop3List("fairHomeTop3",top3RowsForMonth("fair",month),"fair");
-  renderTop3List("liveHomeTop3",top3RowsForMonth("live",month),"live");
+  renderTop3List("balakongTop3",top5RowsAllHistoryV423("balakong","daily","balakong"),"daily");
+  renderTop3List("belimbingTop3",top5RowsAllHistoryV423("belimbing","daily","belimbing"),"daily");
+  renderTop3List("fairHomeTop3",top5RowsAllHistoryV423("fair","fair"),"fair");
+  renderTop3List("liveHomeTop3",top5RowsAllHistoryV423("live","live"),"live");
 }
 function renderFairPageTop3(){
-  const month=monthFromDateControl("fairStart");
-  renderTop3List("fairPageTop3",top3RowsForMonth("fair",month),"fair");
+  renderTop3List("fairPageTop3",top5RowsAllHistoryV423("fair","fair"),"fair");
 }
 function renderLivePageTop3(){
-  const month=getLiveSelectedMonth();
-  renderTop3List("livePageTop3",top3RowsForMonth("live",month),"live");
+  renderTop3List("livePageTop3",top5RowsAllHistoryV423("live","live"),"live");
 }
 function toggleTop3(id,btn){
   const panel=document.getElementById(id);
@@ -362,50 +374,50 @@ function toggleTop3(id,btn){
 }
 function fairLocationsThisMonth(){const map=new Map();rows.filter(r=>r.type==="fair"&&sameMonth(r.date)&&Number(r.amount)>0).forEach(r=>{const name=canonicalLocation(r.location||"Fair"),key=normalizeFairLocationKey(name);if(!key)return;const prev=map.get(key);if(!prev||displayToISO(r.date)>=displayToISO(prev.date))map.set(key,{name,date:r.date})});return [...map.values()].map(x=>x.name).sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"}))}
 function fairByLocation(){const map=new Map();rows.filter(r=>r.type==="fair"&&sameMonth(r.date)&&Number(r.amount)>0).forEach(r=>{const name=canonicalLocation(r.location||"Fair"),key=normalizeFairLocationKey(name);if(!key)return;const prev=map.get(key)||{name,date:"",amount:0};prev.amount+=Number(r.amount||0);if(!prev.date||displayToISO(r.date)>=displayToISO(prev.date)){prev.name=name;prev.date=r.date}map.set(key,prev)});const out={};map.forEach(v=>out[v.name]=v.amount);return out}
-// V42.2: click a Home Fair location to expand its newest month, plus the
+// V42.3: click a Home Fair location to expand its newest month, plus the
 // immediately preceding month only when that location has records in it.
 // Each day's commission follows that historical month's saved Fair mechanism.
-const fairHomeHistoryOpenV422=new Set();
-const FAIR_HOME_PROFIT_CACHE_KEY_V422='loverLegendSales.fairHomeProfitLinks.v1';
-function readFairHomeProfitCacheV422(){
+const fairHomeHistoryOpenV423=new Set();
+const FAIR_HOME_PROFIT_CACHE_KEY_V423='loverLegendSales.fairHomeProfitLinks.v1';
+function readFairHomeProfitCacheV423(){
   try{
-    const raw=localStorage.getItem(FAIR_HOME_PROFIT_CACHE_KEY_V422)||localStorage.getItem('loverLegendSales.fairHomeProfitLinks.v417')||'null';
+    const raw=localStorage.getItem(FAIR_HOME_PROFIT_CACHE_KEY_V423)||localStorage.getItem('loverLegendSales.fairHomeProfitLinks.v417')||'null';
     const saved=JSON.parse(raw);
     return saved&&Array.isArray(saved.links)?saved:null;
   }catch(_e){return null}
 }
-function fairHomeProfitSignatureV422(links){
+function fairHomeProfitSignatureV423(links){
   return JSON.stringify((Array.isArray(links)?links:[]).map(x=>[
     String(x.linkId||''),String(x.transactionId||''),String(x.type||''),String(x.date||''),
     normalizeFairLocationKey(x.location),Number(x.profit||0),String(x.updatedAt||'')
   ]).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))));
 }
-function saveFairHomeProfitCacheV422(links,checkedAt=Date.now()){
+function saveFairHomeProfitCacheV423(links,checkedAt=Date.now()){
   try{
-    localStorage.setItem(FAIR_HOME_PROFIT_CACHE_KEY_V422,JSON.stringify({
-      links:Array.isArray(links)?links:[],signature:fairHomeProfitSignatureV422(links),checkedAt
+    localStorage.setItem(FAIR_HOME_PROFIT_CACHE_KEY_V423,JSON.stringify({
+      links:Array.isArray(links)?links:[],signature:fairHomeProfitSignatureV423(links),checkedAt
     }));
-  }catch(e){console.warn('V42.2 Fair 利润缓存保存失败',e)}
+  }catch(e){console.warn('V42.3 Fair 利润缓存保存失败',e)}
 }
-const fairHomeProfitSavedV422=readFairHomeProfitCacheV422();
-let fairHomeProfitLinksV422=fairHomeProfitSavedV422?fairHomeProfitSavedV422.links:null;
-let fairHomeProfitCheckedAtV422=Number(fairHomeProfitSavedV422?.checkedAt||0);
-let fairHomeProfitPromiseV422=null;
-let fairHomeProfitVerifiedThisSessionV422=false;
-let fairHomeProfitIndexSourceV422=null;
-let fairHomeProfitIndexV422=new Map();
-let fairHomeProfitVerifyTimerV422=null;
-let fairHomeHistoryRowsCacheV422=new Map();
-let fairHomeCombinedRateCacheV422=null;
-function fairCommissionRateForMonthV422(month){
+const fairHomeProfitSavedV423=readFairHomeProfitCacheV423();
+let fairHomeProfitLinksV423=fairHomeProfitSavedV423?fairHomeProfitSavedV423.links:null;
+let fairHomeProfitCheckedAtV423=Number(fairHomeProfitSavedV423?.checkedAt||0);
+let fairHomeProfitPromiseV423=null;
+let fairHomeProfitVerifiedThisSessionV423=false;
+let fairHomeProfitIndexSourceV423=null;
+let fairHomeProfitIndexV423=new Map();
+let fairHomeProfitVerifyTimerV423=null;
+let fairHomeHistoryRowsCacheV423=new Map();
+let fairHomeCombinedRateCacheV423=null;
+function fairCommissionRateForMonthV423(month){
   const monthTotal=dedupeRows(rows).filter(r=>r.type==="fair"&&displayToISO(r.date).slice(0,7)===month).reduce((sum,r)=>sum+Number(r.amount||0),0);
   const settings=getCommissionSettingsForMonth(month);
   if(monthTotal>=100000)return Number(settings.rate3||0)/100;
   if(monthTotal>=50000)return Number(settings.rate2||0)/100;
   return Number(settings.rate1||0)/100;
 }
-function fairLocationHistoryRowsV422(locationKey){
-  if(fairHomeHistoryRowsCacheV422.has(locationKey))return fairHomeHistoryRowsCacheV422.get(locationKey);
+function fairLocationHistoryRowsV423(locationKey){
+  if(fairHomeHistoryRowsCacheV423.has(locationKey))return fairHomeHistoryRowsCacheV423.get(locationKey);
   const map=new Map();
   dedupeRows(rows).filter(r=>r.type==="fair"&&normalizeFairLocationKey(r.location||"Fair")===locationKey).forEach(r=>{
     const date=String(r.date||"");if(!date)return;
@@ -414,152 +426,152 @@ function fairLocationHistoryRowsV422(locationKey){
   const list=[...map.values()].sort((a,b)=>displayToISO(a.date).localeCompare(displayToISO(b.date)));
   const months=[...new Set(list.map(r=>displayToISO(r.date).slice(0,7)).filter(x=>/^\d{4}-\d{2}$/.test(x)))].sort();
   const latest=months[months.length-1];
-  if(!latest){fairHomeHistoryRowsCacheV422.set(locationKey,list);return list}
+  if(!latest){fairHomeHistoryRowsCacheV423.set(locationKey,list);return list}
   const year=Number(latest.slice(0,4)),month=Number(latest.slice(5,7));
   const previousDate=new Date(year,month-2,1);
   const previous=`${previousDate.getFullYear()}-${String(previousDate.getMonth()+1).padStart(2,'0')}`;
   const allowed=new Set(months.includes(previous)?[previous,latest]:[latest]);
   const result=list.filter(r=>allowed.has(displayToISO(r.date).slice(0,7)));
-  fairHomeHistoryRowsCacheV422.set(locationKey,result);
+  fairHomeHistoryRowsCacheV423.set(locationKey,result);
   return result;
 }
-function fairHomeAllLocationKeysV422(){
+function fairHomeAllLocationKeysV423(){
   return Object.keys(fairByLocation()).map(name=>normalizeFairLocationKey(name)).filter(Boolean);
 }
-function fairHomeCombinedCommissionRateV422(locationKeys=fairHomeAllLocationKeysV422()){
-  if(fairHomeCombinedRateCacheV422!==null)return fairHomeCombinedRateCacheV422;
+function fairHomeCombinedCommissionRateV423(locationKeys=fairHomeAllLocationKeysV423()){
+  if(fairHomeCombinedRateCacheV423!==null)return fairHomeCombinedRateCacheV423;
   const keys=[...new Set(locationKeys)].filter(Boolean);
-  const combinedSales=keys.reduce((sum,key)=>sum+fairLocationHistoryRowsV422(key).reduce((subtotal,r)=>subtotal+Number(r.amount||0),0),0);
-  fairHomeCombinedRateCacheV422=getFairCommissionRate(combinedSales);
-  return fairHomeCombinedRateCacheV422;
+  const combinedSales=keys.reduce((sum,key)=>sum+fairLocationHistoryRowsV423(key).reduce((subtotal,r)=>subtotal+Number(r.amount||0),0),0);
+  fairHomeCombinedRateCacheV423=getFairCommissionRate(combinedSales);
+  return fairHomeCombinedRateCacheV423;
 }
-function fairHistoryProfitV422(links,locationKey,date){
-  if(fairHomeProfitIndexSourceV422!==links){
-    fairHomeProfitIndexSourceV422=links;
-    fairHomeProfitIndexV422=new Map();
+function fairHistoryProfitV423(links,locationKey,date){
+  if(fairHomeProfitIndexSourceV423!==links){
+    fairHomeProfitIndexSourceV423=links;
+    fairHomeProfitIndexV423=new Map();
     const clean=typeof dedupeProfitLinksV360==="function"?dedupeProfitLinksV360(links):(Array.isArray(links)?links:[]);
     clean.forEach(x=>{
       if(String(x.type||'')!=='fair')return;
       const key=normalizeFairLocationKey(x.location)+'|'+String(x.date||'');
-      fairHomeProfitIndexV422.set(key,(fairHomeProfitIndexV422.get(key)||0)+Number(x.profit||0));
+      fairHomeProfitIndexV423.set(key,(fairHomeProfitIndexV423.get(key)||0)+Number(x.profit||0));
     });
   }
-  return fairHomeProfitIndexV422.get(locationKey+'|'+date)||0;
+  return fairHomeProfitIndexV423.get(locationKey+'|'+date)||0;
 }
-function fairHistoryTableV422(locationKey,links){
-  const list=fairLocationHistoryRowsV422(locationKey),ready=Array.isArray(links),rate=fairHomeCombinedCommissionRateV422();
-  if(!list.length)return '<div class="fair-home-history-empty-v422">还没有历史记录</div>';
+function fairHistoryTableV423(locationKey,links){
+  const list=fairLocationHistoryRowsV423(locationKey),ready=Array.isArray(links),rate=fairHomeCombinedCommissionRateV423();
+  if(!list.length)return '<div class="fair-home-history-empty-v423">还没有历史记录</div>';
   let totalSales=0,totalProfit=0,totalCommission=0;
   const body=list.map(r=>{
-    const sales=Number(r.amount||0),commission=sales*rate,profit=ready?fairHistoryProfitV422(links,locationKey,r.date):null,margin=profit===null?null:(sales>0?profit/sales*100:0);
+    const sales=Number(r.amount||0),commission=sales*rate,profit=ready?fairHistoryProfitV423(links,locationKey,r.date):null,margin=profit===null?null:(sales>0?profit/sales*100:0);
     totalSales+=sales;totalCommission+=commission;if(profit!==null)totalProfit+=profit;
-    return `<div class="fair-home-history-row-v422"><span>${shortDayMonthV297(r.date)}</span><b>${money(sales)}</b><b>${profit===null?'--':money(profit)}</b><b>${margin===null?'--':margin.toFixed(2)+'%'}</b><b>${money(commission)}</b></div>`;
+    return `<div class="fair-home-history-row-v423"><span>${shortDayMonthV297(r.date)}</span><b>${money(sales)}</b><b>${profit===null?'--':money(profit)}</b><b>${margin===null?'--':margin.toFixed(2)+'%'}</b><b>${money(commission)}</b></div>`;
   }).join('');
   const totalMargin=ready&&totalSales>0?totalProfit/totalSales*100:0;
-  return `<div class="fair-home-history-table-v422"><div class="fair-home-history-head-v422"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span><span>佣金</span></div>${body}<div class="fair-home-history-row-v422 fair-home-history-total-v422"><span>总数</span><b>${money(totalSales)}</b><b>${ready?money(totalProfit):'--'}</b><b>${ready?totalMargin.toFixed(2)+'%':'--'}</b><b>${money(totalCommission)}</b></div></div>`;
+  return `<div class="fair-home-history-table-v423"><div class="fair-home-history-head-v423"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span><span>佣金</span></div>${body}<div class="fair-home-history-row-v423 fair-home-history-total-v423"><span>总数</span><b>${money(totalSales)}</b><b>${ready?money(totalProfit):'--'}</b><b>${ready?totalMargin.toFixed(2)+'%':'--'}</b><b>${money(totalCommission)}</b></div></div>`;
 }
-function fairOpenLocationsGrandV422(locationKeys,links){
+function fairOpenLocationsGrandV423(locationKeys,links){
   const keys=[...new Set(locationKeys)].filter(Boolean),ready=Array.isArray(links);
   if(keys.length<2)return '';
   let totalSales=0,totalProfit=0;
-  keys.forEach(key=>fairLocationHistoryRowsV422(key).forEach(r=>{
+  keys.forEach(key=>fairLocationHistoryRowsV423(key).forEach(r=>{
     const sales=Number(r.amount||0);
     totalSales+=sales;
-    if(ready)totalProfit+=fairHistoryProfitV422(links,key,r.date);
+    if(ready)totalProfit+=fairHistoryProfitV423(links,key,r.date);
   }));
   const rate=getFairCommissionRate(totalSales),totalCommission=totalSales*rate,margin=ready&&totalSales>0?totalProfit/totalSales*100:0;
-  return `<div class="fair-home-grand-v422"><strong>${keys.length}个地点总数</strong><div class="fair-home-grand-grid-v422 fair-home-grand-head-v422"><span>营业额</span><span>利润</span><span>利润率</span><span>佣金</span></div><div class="fair-home-grand-grid-v422 fair-home-grand-values-v422"><b>${money(totalSales)}</b><b>${ready?money(totalProfit):'--'}</b><b>${ready?margin.toFixed(2)+'%':'--'}</b><b>${money(totalCommission)}</b></div></div>`;
+  return `<div class="fair-home-grand-v423"><strong>${keys.length}个地点总数</strong><div class="fair-home-grand-grid-v423 fair-home-grand-head-v423"><span>营业额</span><span>利润</span><span>利润率</span><span>佣金</span></div><div class="fair-home-grand-grid-v423 fair-home-grand-values-v423"><b>${money(totalSales)}</b><b>${ready?money(totalProfit):'--'}</b><b>${ready?margin.toFixed(2)+'%':'--'}</b><b>${money(totalCommission)}</b></div></div>`;
 }
-function paintFairHomeHistoryV422(){
-  document.querySelectorAll('.fair-home-history-panel-v422[data-location-key]').forEach(panel=>{const key=decodeURIComponent(panel.dataset.locationKey||'');panel.innerHTML=fairHistoryTableV422(key,fairHomeProfitLinksV422)});
-  const grand=document.getElementById('fairHomeGrandV422');if(grand){const keys=String(grand.dataset.locationKeys||'').split(',').filter(Boolean).map(decodeURIComponent);grand.outerHTML=fairOpenLocationsGrandV422(keys,fairHomeProfitLinksV422).replace('<div class="fair-home-grand-v422"',`<div id="fairHomeGrandV422" data-location-keys="${keys.map(encodeURIComponent).join(',')}" class="fair-home-grand-v422"`)}
+function paintFairHomeHistoryV423(){
+  document.querySelectorAll('.fair-home-history-panel-v423[data-location-key]').forEach(panel=>{const key=decodeURIComponent(panel.dataset.locationKey||'');panel.innerHTML=fairHistoryTableV423(key,fairHomeProfitLinksV423)});
+  const grand=document.getElementById('fairHomeGrandV423');if(grand){const keys=String(grand.dataset.locationKeys||'').split(',').filter(Boolean).map(decodeURIComponent);grand.outerHTML=fairOpenLocationsGrandV423(keys,fairHomeProfitLinksV423).replace('<div class="fair-home-grand-v423"',`<div id="fairHomeGrandV423" data-location-keys="${keys.map(encodeURIComponent).join(',')}" class="fair-home-grand-v423"`)}
 }
-function ensureFairHomeProfitLinksV422(){
-  // V42.2: this runs after the tap has already painted. Cloud verification is
+function ensureFairHomeProfitLinksV423(){
+  // V42.3: this runs after the tap has already painted. Cloud verification is
   // silent and only repaints when the authoritative rows actually changed.
-  if(fairHomeProfitPromiseV422)return fairHomeProfitPromiseV422;
-  if(fairHomeProfitVerifiedThisSessionV422)return Promise.resolve(Array.isArray(fairHomeProfitLinksV422)?fairHomeProfitLinksV422:[]);
-  const oldSignature=fairHomeProfitSignatureV422(fairHomeProfitLinksV422);
-  fairHomeProfitPromiseV422=Promise.resolve(loadAllSalesProductLinksV203({force:true,maxAgeMs:0})).then(links=>{
-    const fresh=Array.isArray(links)?links:[],freshSignature=fairHomeProfitSignatureV422(fresh);
-    fairHomeProfitCheckedAtV422=Date.now();
-    fairHomeProfitVerifiedThisSessionV422=true;
-    if(!Array.isArray(fairHomeProfitLinksV422)||freshSignature!==oldSignature){
-      fairHomeProfitLinksV422=fresh;
-      paintFairHomeHistoryV422();
+  if(fairHomeProfitPromiseV423)return fairHomeProfitPromiseV423;
+  if(fairHomeProfitVerifiedThisSessionV423)return Promise.resolve(Array.isArray(fairHomeProfitLinksV423)?fairHomeProfitLinksV423:[]);
+  const oldSignature=fairHomeProfitSignatureV423(fairHomeProfitLinksV423);
+  fairHomeProfitPromiseV423=Promise.resolve(loadAllSalesProductLinksV203({force:true,maxAgeMs:0})).then(links=>{
+    const fresh=Array.isArray(links)?links:[],freshSignature=fairHomeProfitSignatureV423(fresh);
+    fairHomeProfitCheckedAtV423=Date.now();
+    fairHomeProfitVerifiedThisSessionV423=true;
+    if(!Array.isArray(fairHomeProfitLinksV423)||freshSignature!==oldSignature){
+      fairHomeProfitLinksV423=fresh;
+      paintFairHomeHistoryV423();
     }
-    saveFairHomeProfitCacheV422(fresh,fairHomeProfitCheckedAtV422);
+    saveFairHomeProfitCacheV423(fresh,fairHomeProfitCheckedAtV423);
     return fresh;
-  }).catch(e=>{console.warn('V42.2 Fair 全部历史利润静默检查失败，继续显示上次资料',e);return Array.isArray(fairHomeProfitLinksV422)?fairHomeProfitLinksV422:[]}).finally(()=>{fairHomeProfitPromiseV422=null});
-  return fairHomeProfitPromiseV422;
+  }).catch(e=>{console.warn('V42.3 Fair 全部历史利润静默检查失败，继续显示上次资料',e);return Array.isArray(fairHomeProfitLinksV423)?fairHomeProfitLinksV423:[]}).finally(()=>{fairHomeProfitPromiseV423=null});
+  return fairHomeProfitPromiseV423;
 }
-function scheduleFairHomeProfitVerifyV422(){
-  if(fairHomeProfitVerifiedThisSessionV422||fairHomeProfitPromiseV422||fairHomeProfitVerifyTimerV422!==null)return;
-  const run=()=>{fairHomeProfitVerifyTimerV422=null;ensureFairHomeProfitLinksV422()};
+function scheduleFairHomeProfitVerifyV423(){
+  if(fairHomeProfitVerifiedThisSessionV423||fairHomeProfitPromiseV423||fairHomeProfitVerifyTimerV423!==null)return;
+  const run=()=>{fairHomeProfitVerifyTimerV423=null;ensureFairHomeProfitLinksV423()};
   if(typeof requestIdleCallback==='function'){
-    fairHomeProfitVerifyTimerV422=requestIdleCallback(run,{timeout:1200});
+    fairHomeProfitVerifyTimerV423=requestIdleCallback(run,{timeout:1200});
   }else{
-    fairHomeProfitVerifyTimerV422=setTimeout(run,350);
+    fairHomeProfitVerifyTimerV423=setTimeout(run,350);
   }
 }
-function refreshFairHomeGrandV422(){
+function refreshFairHomeGrandV423(){
   const grid=document.querySelector('#fairLocationList .fair-location-grid');
   if(!grid)return;
-  const old=document.getElementById('fairHomeGrandV422');
-  if(!fairHomeHistoryOpenV422.size){if(old)old.remove();return}
-  const keys=fairHomeAllLocationKeysV422();
-  const html=fairOpenLocationsGrandV422(keys,fairHomeProfitLinksV422);
+  const old=document.getElementById('fairHomeGrandV423');
+  if(!fairHomeHistoryOpenV423.size){if(old)old.remove();return}
+  const keys=fairHomeAllLocationKeysV423();
+  const html=fairOpenLocationsGrandV423(keys,fairHomeProfitLinksV423);
   if(!html){if(old)old.remove();return}
-  const wrapped=html.replace('<div class="fair-home-grand-v422"',`<div id="fairHomeGrandV422" data-location-keys="${keys.map(encodeURIComponent).join(',')}" class="fair-home-grand-v422"`);
+  const wrapped=html.replace('<div class="fair-home-grand-v423"',`<div id="fairHomeGrandV423" data-location-keys="${keys.map(encodeURIComponent).join(',')}" class="fair-home-grand-v423"`);
   if(old)old.outerHTML=wrapped;else grid.insertAdjacentHTML('beforeend',wrapped);
 }
-function toggleFairHomeHistoryV422(encodedKey,button){
+function toggleFairHomeHistoryV423(encodedKey,button){
   const key=decodeURIComponent(String(encodedKey||''));if(!key)return;
-  const card=button?.closest('.fair-location-card-v422');
-  const opening=!fairHomeHistoryOpenV422.has(key);
-  if(opening)fairHomeHistoryOpenV422.add(key);else fairHomeHistoryOpenV422.delete(key);
+  const card=button?.closest('.fair-location-card-v423');
+  const opening=!fairHomeHistoryOpenV423.has(key);
+  if(opening)fairHomeHistoryOpenV423.add(key);else fairHomeHistoryOpenV423.delete(key);
   if(button){
     button.setAttribute('aria-expanded',String(opening));
     const arrow=button.querySelector('b');if(arrow)arrow.textContent=opening?'▲':'▼';
   }
-  if(card)card.classList.toggle('fair-location-card-open-v422',opening);
-  let panel=card?.querySelector('.fair-home-history-panel-v422');
+  if(card)card.classList.toggle('fair-location-card-open-v423',opening);
+  let panel=card?.querySelector('.fair-home-history-panel-v423');
   if(!opening){
     if(panel)panel.remove();
-    if(!fairHomeHistoryOpenV422.size){
-      const grand=document.getElementById('fairHomeGrandV422');if(grand)grand.remove();
+    if(!fairHomeHistoryOpenV423.size){
+      const grand=document.getElementById('fairHomeGrandV423');if(grand)grand.remove();
     }
     return;
   }
   if(card&&!panel){
     panel=document.createElement('div');
-    panel.className='fair-home-history-panel-v422';
+    panel.className='fair-home-history-panel-v423';
     panel.dataset.locationKey=encodeURIComponent(key);
-    panel.innerHTML='<div class="fair-home-history-empty-v422">正在显示…</div>';
+    panel.innerHTML='<div class="fair-home-history-empty-v423">正在显示…</div>';
     card.appendChild(panel);
   }
   // Let the arrow/card paint first. Heavy history formatting starts on the next
   // frame and updates only this card instead of rebuilding every location.
   requestAnimationFrame(()=>setTimeout(()=>{
-    if(!fairHomeHistoryOpenV422.has(key))return;
-    const current=card?.querySelector('.fair-home-history-panel-v422');
-    if(current)current.innerHTML=fairHistoryTableV422(key,fairHomeProfitLinksV422);
-    refreshFairHomeGrandV422();
-    scheduleFairHomeProfitVerifyV422();
+    if(!fairHomeHistoryOpenV423.has(key))return;
+    const current=card?.querySelector('.fair-home-history-panel-v423');
+    if(current)current.innerHTML=fairHistoryTableV423(key,fairHomeProfitLinksV423);
+    refreshFairHomeGrandV423();
+    scheduleFairHomeProfitVerifyV423();
   },0));
 }
-window.toggleFairHomeHistoryV422=toggleFairHomeHistoryV422;
+window.toggleFairHomeHistoryV423=toggleFairHomeHistoryV423;
 function renderFairLocationList(){
-  fairHomeHistoryRowsCacheV422=new Map();
-  fairHomeCombinedRateCacheV422=null;
+  fairHomeHistoryRowsCacheV423=new Map();
+  fairHomeCombinedRateCacheV423=null;
   const g=fairByLocation(),locs=Object.keys(g).sort(),c=document.getElementById("fairLocationList");
   if(!locs.length){c.innerHTML='<div class="sub">这个月份还没有 Fair 记录</div>';return}
   const fairTotal=Object.values(g).reduce((sum,value)=>sum+Number(value||0),0),rate=getFairCommissionRate(fairTotal)*100;
   const allLocationKeys=locs.map(l=>normalizeFairLocationKey(l)).filter(Boolean);
-  const hasOpenLocation=allLocationKeys.some(key=>fairHomeHistoryOpenV422.has(key));
-  const grand=hasOpenLocation?fairOpenLocationsGrandV422(allLocationKeys,fairHomeProfitLinksV422):'';
-  const grandHtml=grand?grand.replace('<div class="fair-home-grand-v422"',`<div id="fairHomeGrandV422" data-location-keys="${allLocationKeys.map(encodeURIComponent).join(',')}" class="fair-home-grand-v422"`):'';
-  c.innerHTML='<div class="fair-location-grid">'+locs.map(l=>{const key=normalizeFairLocationKey(l),open=fairHomeHistoryOpenV422.has(key),encoded=encodeURIComponent(key);return `<div class="fair-location-card fair-location-card-v422 ${open?'fair-location-card-open-v422':''}"><button type="button" class="fair-location-summary-v422" aria-expanded="${open}" onclick="toggleFairHomeHistoryV422('${encoded}',this)"><span class="fair-location-title fair-location-toggle-v422"><span>${escapeChangeLogHtmlV200(l)}</span><b>${open?'▲':'▼'}</b></span><span class="fair-location-row"><span>营业额</span><b>${money(g[l])}</b></span><span class="fair-location-row"><span>佣金 ${Number(rate.toFixed(2))}%</span><b>${money(g[l]*rate/100)}</b></span></button>${open?`<div class="fair-home-history-panel-v422" data-location-key="${encoded}">${fairHistoryTableV422(key,fairHomeProfitLinksV422)}</div>`:''}</div>`}).join("")+grandHtml+'</div>';
+  const hasOpenLocation=allLocationKeys.some(key=>fairHomeHistoryOpenV423.has(key));
+  const grand=hasOpenLocation?fairOpenLocationsGrandV423(allLocationKeys,fairHomeProfitLinksV423):'';
+  const grandHtml=grand?grand.replace('<div class="fair-home-grand-v423"',`<div id="fairHomeGrandV423" data-location-keys="${allLocationKeys.map(encodeURIComponent).join(',')}" class="fair-home-grand-v423"`):'';
+  c.innerHTML='<div class="fair-location-grid">'+locs.map(l=>{const key=normalizeFairLocationKey(l),open=fairHomeHistoryOpenV423.has(key),encoded=encodeURIComponent(key);return `<div class="fair-location-card fair-location-card-v423 ${open?'fair-location-card-open-v423':''}"><button type="button" class="fair-location-summary-v423" aria-expanded="${open}" onclick="toggleFairHomeHistoryV423('${encoded}',this)"><span class="fair-location-title fair-location-toggle-v423"><span>${escapeChangeLogHtmlV200(l)}</span><b>${open?'▲':'▼'}</b></span><span class="fair-location-row"><span>营业额</span><b>${money(g[l])}</b></span><span class="fair-location-row"><span>佣金 ${Number(rate.toFixed(2))}%</span><b>${money(g[l]*rate/100)}</b></span></button>${open?`<div class="fair-home-history-panel-v423" data-location-key="${encoded}">${fairHistoryTableV423(key,fairHomeProfitLinksV423)}</div>`:''}</div>`}).join("")+grandHtml+'</div>';
 }
 function hasDashboardDateDailyRecord(company){
   const date=selectedDashboardDateDisplay();
@@ -1600,7 +1612,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4220",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4230",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1618,7 +1630,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4220";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4230";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -4263,7 +4275,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const hasDraftV317=savedStatusesV317.some(s=>s==="DRAFT"||s==="DRAFT_INVENTORY_CHANGED");
   const hasPendingV317=savedStatusesV317.some(s=>s==="PENDING_IMPORT_LINK");
   const hasConfirmedV317=savedStatusesV317.length>0&&savedStatusesV317.every(s=>s==="INVENTORY_CONFIRMED");
-  // V42.2: confirmation belongs to the sales-card transaction, not only to the
+  // V42.3: confirmation belongs to the sales-card transaction, not only to the
   // current product rows. Once any row was confirmed/non-inventory, later draft
   // edits must never turn the card back into an unconfirmed draft.
   card.dataset.confirmedOnceV401=(list.some(x=>x&&x.confirmedOnce===true)||savedStatusesV317.some(s=>salesCardStatusIsConfirmedV322(s)))?"1":"0";
@@ -4328,7 +4340,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const rlab=document.createElement("label");rlab.textContent="备注（顾客网络名字或电话号码）";card.appendChild(rlab);
   const remark=document.createElement("input");remark.className="sales-card-remark-v239";remark.maxLength=100;remark.placeholder="顾客名字、电话或其他讯息";remark.value=String(list.find(x=>String(x.remark||"").trim())?.remark||"");card.appendChild(remark);
 
-  // V42.2: this is the active Sales / Fair / Live card builder. Keep each
+  // V42.3: this is the active Sales / Fair / Live card builder. Keep each
   // card's draft and confirmation actions beside that card instead of relying
   // on the obsolete page-level controls.
   const actions=document.createElement("div");actions.className="sales-card-actions-v405";
@@ -5429,7 +5441,7 @@ let backupRestoreOperationRunningV234=false;
 let remoteRestoreMaintenanceActiveV345=false;
 
 function renderRemoteRestoreMaintenanceV345(active,message=""){
-  // V42.2: the device that started/resumed this Restore stays on its More
+  // V42.3: the device that started/resumed this Restore stays on its More
   // status panel. Only other devices use the full-screen maintenance overlay.
   remoteRestoreMaintenanceActiveV345=Boolean(active)&&!restoreLeaveProtectionActiveV409();
   let overlay=document.getElementById("restoreMaintenanceOverlayV345");
@@ -5464,7 +5476,7 @@ function clearBackupRestoreStateV234(){
   renderBackupRestoreStatusV234(null);
 }
 
-// V42.2: the persisted Restore job remains authoritative through the final
+// V42.3: the persisted Restore job remains authoritative through the final
 // verification stage. The in-memory flag can briefly be false while polling,
 // so navigation/refresh protection must also inspect this durable state.
 function restoreLeaveProtectionActiveV409(){
@@ -5504,7 +5516,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4220",
+    version:"4230",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5842,7 +5854,7 @@ function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
     const prior=prev.find(r=>String(r.linkId||'')&&String(r.linkId||'')===String(x.linkId||''));
     let status='DRAFT';
     if(wasConfirmed){
-      // V42.2: preserve each already-confirmed row, but a NEW product added to an
+      // V42.3: preserve each already-confirmed row, but a NEW product added to an
       // already-confirmed card is immediately shown as pending Import inventory.
       // This prevents the whole card from visually falling back to "尚未确认销售".
       if(!prior)status='PENDING_IMPORT_LINK';
@@ -5957,7 +5969,7 @@ async function validateSalesInventoryAvailabilityV325(type,items,saveMode='draft
   if(!mapped.length)return true;
   let records=[];
   let lastInventoryError=null;
-  // V42.2: keep the same authoritative Import oversell guard, but avoid the old
+  // V42.3: keep the same authoritative Import oversell guard, but avoid the old
   // third sequential cloud read. Concurrent saves share one fresh preflight; a
   // delayed independent backup still protects against a single slow Apps Script
   // request. No cached stock is allowed to approve a sale.
@@ -6019,7 +6031,7 @@ let SALES_CONFIRMATION_IN_FLIGHT_V407=false;
 saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   saveMode=saveMode==='draft'?'draft':'confirm';
   if(button?.dataset?.busyV285==='1')return null;
-  // V42.2 protects navigation from the instant Confirm is pressed.
+  // V42.3 protects navigation from the instant Confirm is pressed.
   if(saveMode==='confirm')SALES_CONFIRMATION_IN_FLIGHT_V407=true;
   const originalButtonText=button?.textContent||'';
   if(button){button.dataset.busyV285='1';button.disabled=true;button.textContent=saveMode==='draft'?'保存中…':'确认中…';}
@@ -6034,7 +6046,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   if(!dirty.length){alert(saveMode==='confirm'?'这张销售卡已经确认销售，或尚未先保存草稿。':'销售卡没有需要保存的修改。');releaseButton();refreshConfirmSaleButtonV322(type);return null;}
   const all=collectProductLinksV206(type),dirtyIds=new Set(dirty.map(c=>String(c.dataset.transactionId||''))),items=all.filter(x=>dirtyIds.has(String(x.transactionId||'')));
   if(!items.length){alert('请填写销售卡产品资料。');releaseButton();return null;}
-  // V42.2: a draft is local/cloud sales-card data only. Import availability is
+  // V42.3: a draft is local/cloud sales-card data only. Import availability is
   // checked at final confirmation, never while saving or editing a draft.
   if(saveMode==='confirm'&&!(await validateSalesInventoryAvailabilityV325(type,items,saveMode))){releaseButton();return null;}
   const official=salesCardsOfficialAmountV241(type),allTotal=all.reduce((s,x)=>s+Number(x.actualPrice||0),0);
@@ -6487,7 +6499,7 @@ async function refreshInventoryPendingV250(force=false){
 }
 window.refreshInventoryPendingV250=refreshInventoryPendingV250;
 
-// V42.2: the pending endpoint is the smallest authoritative ACK check. When a
+// V42.3: the pending endpoint is the smallest authoritative ACK check. When a
 // confirmed line is no longer pending, update the visible card and its exact
 // context caches immediately instead of waiting for the much larger cloud load.
 function reconcileVisibleSalesCardAckV407(pendingItems=[]){
@@ -6594,7 +6606,7 @@ function scheduleInventoryPendingResumeRefreshV265(){
 // Refresh Import reminders once only after that resume cycle completes, instead
 // of competing with it through visibilitychange + focus + pageshow.
 window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);
-// V42.2: do not wait for the full Sales cloud-resume cycle. Import ACK is a
+// V42.3: do not wait for the full Sales cloud-resume cycle. Import ACK is a
 // separate lightweight request and must refresh as soon as this tab is visible.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleInventoryPendingResumeRefreshV265()});
 window.addEventListener('focus',scheduleInventoryPendingResumeRefreshV265);
@@ -8181,7 +8193,7 @@ window.renderAll=renderAll;
   el.setAttribute('autocomplete','off');
 });
 
-// V42.2 final navigation gate, installed after every legacy showPage wrapper.
+// V42.3 final navigation gate, installed after every legacy showPage wrapper.
 const _showPageV409=showPage;
 showPage=function(name,el){
   const current=String(document.querySelector('.page.active')?.id||'').replace(/^page-/,'');
