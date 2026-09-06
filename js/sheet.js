@@ -1074,6 +1074,10 @@ function clearSalesChangeLogCacheV237(type,date){
 const SALES_CARD_PERSIST_CACHE_KEY_V232="lover_sales_card_links_cache_v232";
 const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=30*24*60*60*1000;
 const SALES_CARD_FINAL_STATUSES_V432=new Set(["INVENTORY_CONFIRMED","NON_INVENTORY"]);
+const SALES_CARD_FINAL_CACHE_KEY_V433="lover_sales_card_final_cache_v433";
+
+function readFinalSalesCardCacheV433(){try{const x=JSON.parse(localStorage.getItem(SALES_CARD_FINAL_CACHE_KEY_V433)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}}
+function writeFinalSalesCardCacheV433(value){try{localStorage.setItem(SALES_CARD_FINAL_CACHE_KEY_V433,JSON.stringify(value||{}));return true}catch(_){return false}}
 
 function finalSalesCardTxnIdsV432(links){
   const groups=new Map();
@@ -1086,6 +1090,20 @@ function allSalesCardsFinalV432(links){
   const list=Array.isArray(links)?links:[],txns=new Set(list.map(x=>String(x?.transactionId||x?.saleId||'').trim()).filter(Boolean));
   if(!list.length||!txns.size)return false;
   const finalIds=finalSalesCardTxnIdsV432(list);return [...txns].every(tx=>finalIds.has(tx));
+}
+function captureFinalSalesCardsV433(type,date,location,links){
+  const list=Array.isArray(links)?links:[],finalIds=finalSalesCardTxnIdsV432(list);if(!finalIds.size)return list;
+  const context=salesCardPersistentKeyV232(type,date,location),all=readFinalSalesCardCacheV433();if(!all[context]||typeof all[context]!=='object')all[context]={};
+  finalIds.forEach(tx=>{all[context][tx]={at:Date.now(),links:list.filter(x=>String(x?.transactionId||x?.saleId||'').trim()===tx).map(x=>({...x,confirmedOnce:true}))}});
+  writeFinalSalesCardCacheV433(all);
+  if(typeof window!=='undefined'&&typeof window.pruneFinalSalesDraftPendingV433==='function')window.pruneFinalSalesDraftPendingV433(type,date,location,[...finalIds]);
+  return list;
+}
+function overlayFinalSalesCardsV433(type,date,location,links){
+  const incoming=Array.isArray(links)?links:[],context=salesCardPersistentKeyV232(type,date,location),saved=readFinalSalesCardCacheV433()[context];
+  if(!saved||typeof saved!=='object')return incoming;
+  const finalIds=new Set(Object.keys(saved)),finalRows=Object.values(saved).flatMap(rec=>Array.isArray(rec?.links)?rec.links:[]);
+  return [...finalRows,...incoming.filter(x=>!finalIds.has(String(x?.transactionId||x?.saleId||'').trim()))];
 }
 function preserveFinalSalesCardCacheV432(existing,incoming){
   const oldList=Array.isArray(existing)?existing:[],newList=Array.isArray(incoming)?incoming:[];
@@ -1111,17 +1129,20 @@ function salesCardPersistentKeyV232(type,date,location){
 function getSalesCardPersistentCacheV232(type,date,location){
   const all=readSalesCardPersistentCacheV232();
   const rec=all[salesCardPersistentKeyV232(type,date,location)];
-  if(!rec||!Array.isArray(rec.links))return null;
+  if(!rec||!Array.isArray(rec.links)){const finalOnly=overlayFinalSalesCardsV433(type,date,location,[]);return finalOnly.length?finalOnly:null;}
   if(rec.at&&Date.now()-Number(rec.at)>SALES_CARD_PERSIST_CACHE_MAX_AGE_V232){
     const finalIds=finalSalesCardTxnIdsV432(rec.links),finalRows=rec.links.filter(x=>finalIds.has(String(x?.transactionId||x?.saleId||'').trim()));
-    return finalRows.length?finalRows:null;
+    if(!finalRows.length)return null;
+    const merged=overlayFinalSalesCardsV433(type,date,location,finalRows);captureFinalSalesCardsV433(type,date,location,merged);return merged;
   }
-  return rec.links;
+  const merged=overlayFinalSalesCardsV433(type,date,location,rec.links);captureFinalSalesCardsV433(type,date,location,merged);return merged;
 }
 function setSalesCardPersistentCacheV232(type,date,location,links){
   const all=readSalesCardPersistentCacheV232();
   const key=salesCardPersistentKeyV232(type,date,location),existing=all[key]?.links;
-  all[key]={at:Date.now(),links:preserveFinalSalesCardCacheV432(existing,Array.isArray(links)?links:[])};
+  const merged=overlayFinalSalesCardsV433(type,date,location,preserveFinalSalesCardCacheV432(existing,Array.isArray(links)?links:[]));
+  captureFinalSalesCardsV433(type,date,location,merged);
+  all[key]={at:Date.now(),links:merged};
   writeSalesCardPersistentCacheV232(all);
 }
 function clearSalesCardPersistentCacheV232(type,date,location){
@@ -1175,9 +1196,10 @@ function getSessionSalesProductLinksCacheV244(type,date,location){
 }
 function setCachedSalesProductLinksV216(type,date,location,links){
   const key=salesProductLinksCacheKeyV216(type,date,location),memory=salesProductLinksCacheV216.get(key)?.links,persistent=getSalesCardPersistentCacheV232(type,date,location);
-  const protectedLinks=preserveFinalSalesCardCacheV432(Array.isArray(memory)?memory:persistent,Array.isArray(links)?links:[]);
+  const protectedLinks=overlayFinalSalesCardsV433(type,date,location,preserveFinalSalesCardCacheV432(Array.isArray(memory)?memory:persistent,Array.isArray(links)?links:[]));
   const safe=typeof dedupeAuthoritativeSalesLinksV354==="function"?dedupeAuthoritativeSalesLinksV354(protectedLinks):protectedLinks;
   salesProductLinksCacheV216.set(key,{links:safe,at:Date.now(),source:"session"});
+  captureFinalSalesCardsV433(type,date,location,safe);
   setSalesCardPersistentCacheV232(type,date,location,safe);
   return safe;
 }
