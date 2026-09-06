@@ -1612,7 +1612,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4340",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4350",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1630,7 +1630,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4340";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4350";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3306,7 +3306,7 @@ window.invalidateSalesCardLoadRequestsV351=invalidateSalesCardLoadRequestsV351;
 function salesCardContextKeyV245(type,date,location){
   return [String(type||""),String(date||""),String(location||"").trim().toLowerCase()].join("|");
 }
-// V43.4: an old cached DRAFT can actually be a card already acknowledged by
+// V43.5: an old cached DRAFT can actually be a card already acknowledged by
 // Import. Do not paint that ambiguous yellow state before the authoritative
 // cloud response. A durable unsynced local draft remains safe to paint.
 function salesCardCacheSafeToPaintV431(cached,type,date,location){
@@ -3352,7 +3352,7 @@ async function loadProductLinksIntoEditorV206(type){
     renderProductLinksLoadingV231(type);
   }
 
-  // V43.4: a fully confirmed + Import-processed context is final and immutable.
+  // V43.5: a fully confirmed + Import-processed context is final and immutable.
   // Open it entirely from permanent browser cache; no cloud read or repaint.
   if(cachedPainted&&typeof allSalesCardsFinalV432==='function'&&allSalesCardsFinalV432(cached)){
     const pre=productLinkPreV208(type),msg=document.getElementById(pre+"ProductLinkMsg");
@@ -5557,7 +5557,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4340",
+    version:"4350",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5868,8 +5868,12 @@ window.getDeletedSalesLinkIdsV350=getDeletedSalesLinkIdsV350;
 const SALES_DRAFT_PENDING_KEY_V314='lover_sales_draft_pending_v314';
 const SALES_DRAFT_INFLIGHT_V314=new Map();
 let SALES_DRAFT_RETRY_TIMER_V314=null;
-function readSalesDraftPendingV314(){try{const x=JSON.parse(localStorage.getItem(SALES_DRAFT_PENDING_KEY_V314)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}}
-function writeSalesDraftPendingV314(obj){try{localStorage.setItem(SALES_DRAFT_PENDING_KEY_V314,JSON.stringify(obj||{}));return true}catch(_){return false}}
+function sanitizeSalesDraftPendingFinalTxnsV435(value){
+  const obj=value&&typeof value==='object'?value:{},finalIds=typeof readFinalSalesCardTxnIdsV435==='function'?readFinalSalesCardTxnIdsV435():new Set();
+  Object.keys(obj).forEach(key=>{const entry=obj[key],remaining=(Array.isArray(entry?.items)?entry.items:[]).filter(x=>!finalIds.has(String(x?.transactionId||x?.saleId||'')));if(remaining.length)entry.items=remaining;else delete obj[key]});return obj;
+}
+function readSalesDraftPendingV314(){try{const x=JSON.parse(localStorage.getItem(SALES_DRAFT_PENDING_KEY_V314)||'{}');return sanitizeSalesDraftPendingFinalTxnsV435(x)}catch(_){return{}}}
+function writeSalesDraftPendingV314(obj){try{localStorage.setItem(SALES_DRAFT_PENDING_KEY_V314,JSON.stringify(sanitizeSalesDraftPendingFinalTxnsV435(obj||{})));return true}catch(_){return false}}
 function salesDraftPendingKeyV314(type,date,location){return [String(type||''),String(date||''),String(location||'').trim().toLowerCase()].join('|')}
 function queueSalesDraftV314(type,date,location,items){
   const all=readSalesDraftPendingV314(),key=salesDraftPendingKeyV314(type,date,location),token=Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),mutation=nextClientMutationV344();
@@ -5885,7 +5889,7 @@ function removeSalesDraftPendingV314(key,token=''){
   if(token&&String(cur.token||'')!==String(token||''))return;
   delete all[key];writeSalesDraftPendingV314(all);
 }
-// V43.4: a final confirmed card must never be resurrected by an older durable
+// V43.5: a final confirmed card must never be resurrected by an older durable
 // draft queue. Remove only the completed transaction(s), preserving other cards.
 function pruneFinalSalesDraftPendingV433(type,date,location,transactionIds=[]){
   const ids=new Set((Array.isArray(transactionIds)?transactionIds:[]).map(String).filter(Boolean));if(!ids.size)return;
@@ -6659,6 +6663,8 @@ function reconcileVisibleSalesCardAckV407(pendingItems=[]){
       });
       if(!changed)return;
       card.dataset.inventoryStatus=hasPending?'PENDING_IMPORT_LINK':hasSaved?'INVENTORY_CONFIRMED':card.dataset.inventoryStatus;
+      const terminal=[...card.querySelectorAll('.product-link-item[data-saved="1"]')].every(item=>['INVENTORY_CONFIRMED','NON_INVENTORY'].includes(String(item.dataset.inventoryStatus||'')));
+      if(cardWasConfirmed&&hasSaved&&!hasPending&&terminal&&typeof markFinalSalesCardTxnIdsV435==='function')markFinalSalesCardTxnIdsV435([String(card.dataset.transactionId||'')]);
       if(card._renderSalesStateV317)card._renderSalesStateV317();
       updateSalesCardDeleteLockV322(card);
     });
@@ -7882,7 +7888,7 @@ window.toggleProductProfitSummaryV216=toggleProductProfitSummaryV368;
 function seedVisibleDayProfitV368(type){setTimeout(()=>renderSelectedDayGrandV362(type),0)}
 setTimeout(()=>{['daily','fair','live'].forEach(seedVisibleDayProfitV368)},220);
 
-/* ================= V43.4 once-per-day unconfirmed draft reminder =================
+/* ================= V43.5 once-per-day unconfirmed draft reminder =================
    Read the complete fresh cloud list across Sales/Fair/Live and every location.
    Include same-day saved drafts, group by transaction, and stop automatically
    once the card is confirmed. */
