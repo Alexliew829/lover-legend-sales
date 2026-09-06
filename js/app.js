@@ -1612,7 +1612,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4300",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4310",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1630,7 +1630,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4300";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4310";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3306,6 +3306,18 @@ window.invalidateSalesCardLoadRequestsV351=invalidateSalesCardLoadRequestsV351;
 function salesCardContextKeyV245(type,date,location){
   return [String(type||""),String(date||""),String(location||"").trim().toLowerCase()].join("|");
 }
+// V43.1: an old cached DRAFT can actually be a card already acknowledged by
+// Import. Do not paint that ambiguous yellow state before the authoritative
+// cloud response. A durable unsynced local draft remains safe to paint.
+function salesCardCacheSafeToPaintV431(cached,type,date,location){
+  if(!Array.isArray(cached))return false;
+  const ambiguous=cached.some(x=>{const st=String(x?.importSyncStatus||'').trim();return st==='DRAFT'||st==='DRAFT_INVENTORY_CHANGED'});
+  if(!ambiguous)return true;
+  try{
+    const key=salesDraftPendingKeyV314(type,date,location),pending=readSalesDraftPendingV314();
+    return Boolean(pending&&pending[key]);
+  }catch(_){return false}
+}
 async function loadProductLinksIntoEditorV206(type){
   const {date,location}=productLinkContextV206(type);
   const seq=(SALES_CARD_LOAD_SEQ_V245[type]||0)+1;
@@ -3328,7 +3340,8 @@ async function loadProductLinksIntoEditorV206(type){
     : null;
   const cached=Array.isArray(cachedRaw)?filterDeletedSalesLinksV350(type,date,location,cachedRaw):cachedRaw;
 
-  if(Array.isArray(cached)){
+  const cachedPainted=salesCardCacheSafeToPaintV431(cached,type,date,location);
+  if(cachedPainted){
     // V32.6: keep the last-known saved cards visible while the exact cloud
     // context is being verified. Never replace a known draft with a fake blank
     // editor just because priority sync detected a newer card revision.
@@ -3376,7 +3389,7 @@ async function loadProductLinksIntoEditorV206(type){
     ){
       const before=JSON.stringify(Array.isArray(cached)?cached:[]);
       const after=JSON.stringify(Array.isArray(links)?links:[]);
-      if(!Array.isArray(cached)||before!==after){
+      if(!cachedPainted||!Array.isArray(cached)||before!==after){
         renderProductLinksEditorV206(type,links);
       }
       applyCloudDraftStatusesV322(type,links);
@@ -5536,7 +5549,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4300",
+    version:"4310",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -7845,7 +7858,7 @@ window.toggleProductProfitSummaryV216=toggleProductProfitSummaryV368;
 function seedVisibleDayProfitV368(type){setTimeout(()=>renderSelectedDayGrandV362(type),0)}
 setTimeout(()=>{['daily','fair','live'].forEach(seedVisibleDayProfitV368)},220);
 
-/* ================= V43.0 once-per-day unconfirmed draft reminder =================
+/* ================= V43.1 once-per-day unconfirmed draft reminder =================
    Read the complete fresh cloud list across Sales/Fair/Live and every location.
    Include same-day saved drafts, group by transaction, and stop automatically
    once the card is confirmed. */
