@@ -1612,7 +1612,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4290",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4300",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1630,7 +1630,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4290";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4300";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3379,6 +3379,8 @@ async function loadProductLinksIntoEditorV206(type){
       if(!Array.isArray(cached)||before!==after){
         renderProductLinksEditorV206(type,links);
       }
+      applyCloudDraftStatusesV322(type,links);
+      setTimeout(()=>{if(typeof refreshInventoryPendingV250==='function')refreshInventoryPendingV250(true)},0);
       const pre=productLinkPreV208(type),msg=document.getElementById(pre+"ProductLinkMsg");
       if(msg&&msg.textContent.includes("正在同步最新销售卡状态")){msg.classList.add("hidden");msg.textContent="✅ 销售卡资料已保存";}
     }
@@ -3792,15 +3794,17 @@ function applyCloudDraftStatusesV322(type,savedLinks){
   list.forEach(x=>{const tx=String(x.transactionId||'');if(!tx)return;if(!byTxn.has(tx))byTxn.set(tx,[]);byTxn.get(tx).push(x)});
   [...wrap.querySelectorAll('.sales-card-transaction-v239')].forEach(card=>{
     const recs=byTxn.get(String(card.dataset.transactionId||''));if(!recs)return;
-    const byLink=new Map(recs.map(x=>[String(x.linkId||''),x]));
+    const transactionConfirmed=recs.some(r=>r.confirmedOnce===true||salesCardStatusIsConfirmedV322(r.importSyncStatus));
+    const normalized=recs.map(r=>{const x={...r},st=String(r.importSyncStatus||'');if(transactionConfirmed&&(st==='DRAFT'||st==='DRAFT_INVENTORY_CHANGED'))x.importSyncStatus=String(r.productId||'').trim()?'PENDING_IMPORT_LINK':'NON_INVENTORY';return x});
+    const byLink=new Map(normalized.map(x=>[String(x.linkId||''),x]));
     let status='';
     card.querySelectorAll('.product-link-item').forEach(item=>{
       const rec=byLink.get(String(item.dataset.linkId||''));if(!rec)return;
       item.dataset.inventoryStatus=String(rec.importSyncStatus||'');
       status=status||item.dataset.inventoryStatus;
     });
-    if(recs.some(r=>salesCardStatusIsConfirmedV322(r.importSyncStatus)))card.dataset.confirmedOnceV401='1';
-    const recStatuses=recs.map(r=>String(r.importSyncStatus||''));
+    if(transactionConfirmed)card.dataset.confirmedOnceV401='1';
+    const recStatuses=normalized.map(r=>String(r.importSyncStatus||''));
     if(recStatuses.some(st=>st==='PENDING_IMPORT_LINK'))card.dataset.inventoryStatus='PENDING_IMPORT_LINK';
     else if(recStatuses.length&&recStatuses.every(st=>st==='INVENTORY_CONFIRMED'||st==='NON_INVENTORY'))card.dataset.inventoryStatus='INVENTORY_CONFIRMED';
     else if(status)card.dataset.inventoryStatus=status;
@@ -5532,7 +5536,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4290",
+    version:"4300",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -7841,11 +7845,10 @@ window.toggleProductProfitSummaryV216=toggleProductProfitSummaryV368;
 function seedVisibleDayProfitV368(type){setTimeout(()=>renderSelectedDayGrandV362(type),0)}
 setTimeout(()=>{['daily','fair','live'].forEach(seedVisibleDayProfitV368)},220);
 
-/* ================= V36.9 once-per-day unconfirmed draft reminder =================
-   Remind once per calendar day when one or more Sales/Fair/Live sales-card drafts
-   are still unconfirmed. Same-day newly saved drafts are not nagged immediately;
-   the reminder begins on the next calendar day and stops automatically once the
-   draft status is no longer DRAFT / DRAFT_INVENTORY_CHANGED. */
+/* ================= V43.0 once-per-day unconfirmed draft reminder =================
+   Read the complete fresh cloud list across Sales/Fair/Live and every location.
+   Include same-day saved drafts, group by transaction, and stop automatically
+   once the card is confirmed. */
 const SALES_DRAFT_REMINDER_KEY_V369='lover_sales_draft_reminder_v369';
 function localDayISO369(d=new Date()){
   const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
@@ -7863,7 +7866,7 @@ function salesDraftReminderTypeLabelV369(type){
   return type==='live'?'Live':type==='fair'?'Fair':'Sales';
 }
 function collectUnconfirmedDraftsV369(allLinks){
-  const today=localDayISO369(),groups=new Map();
+  const groups=new Map();
   const add=(x,localSavedAt=0)=>{
     const status=String(x?.importSyncStatus||'').trim();
     if(status!=='DRAFT'&&status!=='DRAFT_INVENTORY_CHANGED')return;
@@ -7881,11 +7884,7 @@ function collectUnconfirmedDraftsV369(allLinks){
     const pending=typeof readSalesDraftPendingV314==='function'?readSalesDraftPendingV314():{};
     Object.values(pending||{}).forEach(entry=>(Array.isArray(entry?.items)?entry.items:[]).forEach(x=>{const st=String(x?.importSyncStatus||'').trim();add({...x,importSyncStatus:st||'DRAFT'},Number(entry?.savedAt||0));}));
   }catch(_){}
-  return [...groups.values()].filter(g=>{
-    if(g.updatedMs){const d=new Date(g.updatedMs);return localDayISO369(d)<today;}
-    const iso=typeof displayToISO==='function'?displayToISO(g.date):'';
-    return iso&&iso<today;
-  }).sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.type).localeCompare(String(b.type))||String(a.location).localeCompare(String(b.location)));
+  return [...groups.values()].sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.type).localeCompare(String(b.type))||String(a.location).localeCompare(String(b.location)));
 }
 function readDraftReminderStateV369(){
   try{const x=JSON.parse(localStorage.getItem(SALES_DRAFT_REMINDER_KEY_V369)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}
@@ -7950,9 +7949,8 @@ async function checkUnconfirmedDraftReminderV369(){
   if(String(state.lastReminderDay||'')===today)return;
   let links=null;
   try{
-    if(typeof peekAllSalesProductLinksCacheV367==='function')links=peekAllSalesProductLinksCacheV367(180000);
-    if(!Array.isArray(links)&&typeof loadAllSalesProductLinksV203==='function')links=await loadAllSalesProductLinksV203({force:false,maxAgeMs:180000});
-  }catch(_){links=[]}
+    if(typeof loadAllSalesProductLinksV203==='function')links=await loadAllSalesProductLinksV203({force:true,maxAgeMs:0});
+  }catch(_){return}
   const drafts=collectUnconfirmedDraftsV369(links);
   if(!drafts.length)return;
   // Mark before showing the alert so rerenders/focus events cannot duplicate it today.
