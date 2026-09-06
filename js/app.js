@@ -1612,7 +1612,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4280",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4290",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1630,7 +1630,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4280";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4290";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5532,7 +5532,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4280",
+    version:"4290",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -7892,6 +7892,59 @@ function readDraftReminderStateV369(){
 }
 function writeDraftReminderStateV369(state){try{localStorage.setItem(SALES_DRAFT_REMINDER_KEY_V369,JSON.stringify(state||{}))}catch(_){}
 }
+let unconfirmedDraftReminderItemsV429=[];
+function removeDraftReminderUiV429(){
+  document.getElementById('salesDraftNoticeV429')?.remove();
+  document.getElementById('salesDraftListModalV429')?.remove();
+}
+function ensureDraftReminderReturnButtonV429(){
+  let btn=document.getElementById('salesDraftReturnV429');
+  if(!btn){
+    btn=document.createElement('button');btn.type='button';btn.id='salesDraftReturnV429';btn.className='sales-draft-return-v429';
+    btn.addEventListener('click',()=>openUnconfirmedDraftListV429(true));document.body.appendChild(btn);
+  }
+  const count=unconfirmedDraftReminderItemsV429.length;
+  btn.textContent=`← 未处理销售卡（${count}）`;btn.hidden=!count;
+}
+function renderUnconfirmedDraftListV429(drafts){
+  document.getElementById('salesDraftListModalV429')?.remove();
+  const overlay=document.createElement('div');overlay.id='salesDraftListModalV429';overlay.className='sales-draft-modal-v429';
+  const panel=document.createElement('section');panel.className='sales-draft-modal-panel-v429';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label','尚未确认销售卡清单');
+  const head=document.createElement('div');head.className='sales-draft-modal-head-v429';
+  const title=document.createElement('div');title.innerHTML=`<b>⚠️ 销售卡尚未处理</b><span>${drafts.length} 张草稿等待确认</span>`;
+  const close=document.createElement('button');close.type='button';close.className='sales-draft-modal-close-v429';close.setAttribute('aria-label','关闭');close.textContent='×';close.addEventListener('click',()=>overlay.remove());
+  head.append(title,close);panel.appendChild(head);
+  const list=document.createElement('div');list.className='sales-draft-list-v429';
+  drafts.forEach((g,i)=>{
+    const row=document.createElement('button');row.type='button';row.className='sales-draft-row-v429';
+    const place=g.location?' · '+g.location:'';
+    row.innerHTML=`<span><b>销售卡 ${i+1}</b><small>${escapeChangeLogHtmlV200(g.date)} · ${escapeChangeLogHtmlV200(salesDraftReminderTypeLabelV369(g.type)+place)}</small></span><strong>RM${formatAmount(g.total)}</strong><i aria-hidden="true">›</i>`;
+    row.addEventListener('click',async()=>{overlay.remove();await openPendingInventorySalesCardV250(g);ensureDraftReminderReturnButtonV429();});
+    list.appendChild(row);
+  });
+  panel.appendChild(list);overlay.appendChild(panel);overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove()});document.body.appendChild(overlay);
+}
+async function latestUnconfirmedDraftsV429(force=false){
+  let links=null;
+  try{
+    if(!force&&typeof peekAllSalesProductLinksCacheV367==='function')links=peekAllSalesProductLinksCacheV367(60000);
+    if(!Array.isArray(links)&&typeof loadAllSalesProductLinksV203==='function')links=await loadAllSalesProductLinksV203({force:Boolean(force),maxAgeMs:force?0:60000});
+  }catch(_){links=[]}
+  unconfirmedDraftReminderItemsV429=collectUnconfirmedDraftsV369(links);
+  ensureDraftReminderReturnButtonV429();return unconfirmedDraftReminderItemsV429;
+}
+async function openUnconfirmedDraftListV429(force=true){
+  const drafts=await latestUnconfirmedDraftsV429(force);
+  if(!drafts.length){removeDraftReminderUiV429();const btn=document.getElementById('salesDraftReturnV429');if(btn)btn.hidden=true;showToast('✅ 没有尚未确认的销售卡');return}
+  renderUnconfirmedDraftListV429(drafts);
+}
+function showUnconfirmedDraftNoticeV429(drafts){
+  document.getElementById('salesDraftNoticeV429')?.remove();
+  const notice=document.createElement('button');notice.type='button';notice.id='salesDraftNoticeV429';notice.className='sales-draft-notice-v429';
+  notice.innerHTML=`<span>⚠️ <b>销售卡尚未处理</b><small>共有 ${drafts.length} 张 · 点击查看</small></span><i aria-hidden="true">›</i>`;
+  notice.addEventListener('click',()=>{notice.remove();openUnconfirmedDraftListV429(true)});document.body.appendChild(notice);
+}
+window.openUnconfirmedDraftListV429=openUnconfirmedDraftListV429;
 async function checkUnconfirmedDraftReminderV369(){
   const today=localDayISO369(),state=readDraftReminderStateV369();
   if(String(state.lastReminderDay||'')===today)return;
@@ -7904,9 +7957,8 @@ async function checkUnconfirmedDraftReminderV369(){
   if(!drafts.length)return;
   // Mark before showing the alert so rerenders/focus events cannot duplicate it today.
   writeDraftReminderStateV369({lastReminderDay:today,lastCount:drafts.length,updatedAt:Date.now()});
-  const lines=drafts.slice(0,8).map((g,i)=>`${i+1}. ${g.date} · ${salesDraftReminderTypeLabelV369(g.type)}${g.location?' · '+g.location:''} · RM${formatAmount(g.total)}`);
-  const more=drafts.length>8?`\n…另外 ${drafts.length-8} 张草稿`:'';
-  alert(`⚠️ 有 ${drafts.length} 张销售卡草稿尚未确认\n\n${lines.join('\n')}${more}\n\n系统每天只提醒一次，确认销售后会自动停止提醒。`);
+  unconfirmedDraftReminderItemsV429=drafts;
+  showUnconfirmedDraftNoticeV429(drafts);
 }
 window.checkUnconfirmedDraftReminderV369=checkUnconfirmedDraftReminderV369;
 setTimeout(()=>checkUnconfirmedDraftReminderV369().catch(()=>{}),1800);
