@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b6b2b">
 <title>Lover Sales</title>
-<link rel="manifest" href="manifest.json?v=43.6">
+<link rel="manifest" href="manifest.json?v=43.0">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="style.css?v=43.6">
+<link rel="stylesheet" href="style.css?v=43.0">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
@@ -359,7 +359,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V43.6</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V43.0</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -788,7 +788,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
 
     <div id="backupRestoreStatusV234" class="backup-restore-status-v234 hidden"></div>
-    <p class="note">V43.6：Import 回写时永久完成同一卡的非库存产品，并自动修复现有旧卡遗留的 DRAFT 状态。</p>
+    <p class="note">V43.0：修复已处理卡仍显示草稿及混合库存卡状态；每日提醒以全部地点的最新完整资料计数。</p>
   </div>
 
   
@@ -805,7 +805,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V43.6 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V43.0 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -914,10 +914,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=43.6",
-      "js/sheet.js?v=43.6",
-      "js/app.js?v=43.6",
-      "js/update.js?v=43.6"
+      "js/utils.js?v=43.0",
+      "js/sheet.js?v=43.0",
+      "js/app.js?v=43.0",
+      "js/update.js?v=43.0"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");
