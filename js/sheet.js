@@ -1073,6 +1073,27 @@ function clearSalesChangeLogCacheV237(type,date){
 
 const SALES_CARD_PERSIST_CACHE_KEY_V232="lover_sales_card_links_cache_v232";
 const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=30*24*60*60*1000;
+const SALES_CARD_FINAL_STATUSES_V432=new Set(["INVENTORY_CONFIRMED","NON_INVENTORY"]);
+
+function finalSalesCardTxnIdsV432(links){
+  const groups=new Map();
+  (Array.isArray(links)?links:[]).forEach(x=>{const tx=String(x?.transactionId||x?.saleId||'').trim();if(!tx)return;if(!groups.has(tx))groups.set(tx,[]);groups.get(tx).push(x)});
+  const finalIds=new Set();
+  groups.forEach((items,tx)=>{if(items.length&&items.every(x=>SALES_CARD_FINAL_STATUSES_V432.has(String(x?.importSyncStatus||'')))&&items.some(x=>x?.confirmedOnce===true||SALES_CARD_FINAL_STATUSES_V432.has(String(x?.importSyncStatus||''))))finalIds.add(tx)});
+  return finalIds;
+}
+function allSalesCardsFinalV432(links){
+  const list=Array.isArray(links)?links:[],txns=new Set(list.map(x=>String(x?.transactionId||x?.saleId||'').trim()).filter(Boolean));
+  if(!list.length||!txns.size)return false;
+  const finalIds=finalSalesCardTxnIdsV432(list);return [...txns].every(tx=>finalIds.has(tx));
+}
+function preserveFinalSalesCardCacheV432(existing,incoming){
+  const oldList=Array.isArray(existing)?existing:[],newList=Array.isArray(incoming)?incoming:[];
+  const finalIds=finalSalesCardTxnIdsV432(oldList);if(!finalIds.size)return newList;
+  const protectedRows=oldList.filter(x=>finalIds.has(String(x?.transactionId||x?.saleId||'').trim()));
+  const allowedRows=newList.filter(x=>!finalIds.has(String(x?.transactionId||x?.saleId||'').trim()));
+  return [...protectedRows,...allowedRows];
+}
 
 function readSalesCardPersistentCacheV232(){
   try{
@@ -1091,12 +1112,16 @@ function getSalesCardPersistentCacheV232(type,date,location){
   const all=readSalesCardPersistentCacheV232();
   const rec=all[salesCardPersistentKeyV232(type,date,location)];
   if(!rec||!Array.isArray(rec.links))return null;
-  if(rec.at&&Date.now()-Number(rec.at)>SALES_CARD_PERSIST_CACHE_MAX_AGE_V232)return null;
+  if(rec.at&&Date.now()-Number(rec.at)>SALES_CARD_PERSIST_CACHE_MAX_AGE_V232){
+    const finalIds=finalSalesCardTxnIdsV432(rec.links),finalRows=rec.links.filter(x=>finalIds.has(String(x?.transactionId||x?.saleId||'').trim()));
+    return finalRows.length?finalRows:null;
+  }
   return rec.links;
 }
 function setSalesCardPersistentCacheV232(type,date,location,links){
   const all=readSalesCardPersistentCacheV232();
-  all[salesCardPersistentKeyV232(type,date,location)]={at:Date.now(),links:Array.isArray(links)?links:[]};
+  const key=salesCardPersistentKeyV232(type,date,location),existing=all[key]?.links;
+  all[key]={at:Date.now(),links:preserveFinalSalesCardCacheV432(existing,Array.isArray(links)?links:[])};
   writeSalesCardPersistentCacheV232(all);
 }
 function clearSalesCardPersistentCacheV232(type,date,location){
@@ -1149,8 +1174,10 @@ function getSessionSalesProductLinksCacheV244(type,date,location){
   return Array.isArray(rec.links)?rec.links:null;
 }
 function setCachedSalesProductLinksV216(type,date,location,links){
-  const safe=typeof dedupeAuthoritativeSalesLinksV354==="function"?dedupeAuthoritativeSalesLinksV354(links):(Array.isArray(links)?links:[]);
-  salesProductLinksCacheV216.set(salesProductLinksCacheKeyV216(type,date,location),{links:safe,at:Date.now(),source:"session"});
+  const key=salesProductLinksCacheKeyV216(type,date,location),memory=salesProductLinksCacheV216.get(key)?.links,persistent=getSalesCardPersistentCacheV232(type,date,location);
+  const protectedLinks=preserveFinalSalesCardCacheV432(Array.isArray(memory)?memory:persistent,Array.isArray(links)?links:[]);
+  const safe=typeof dedupeAuthoritativeSalesLinksV354==="function"?dedupeAuthoritativeSalesLinksV354(protectedLinks):protectedLinks;
+  salesProductLinksCacheV216.set(key,{links:safe,at:Date.now(),source:"session"});
   setSalesCardPersistentCacheV232(type,date,location,safe);
   return safe;
 }
