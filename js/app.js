@@ -71,7 +71,7 @@ const LAST_PAGE_KEY_V238="lover_last_active_page_v238";
 // V39.9: turnover writes are real transactions. Keep navigation guarded until cloud confirmation.
 const turnoverWriteStateV382={daily:false,fair:false,live:false};
 function turnoverNewDraftDirtyV382(type){
-  if(type==='fair'||type==='live'){
+  if(type==='daily'||type==='fair'||type==='live'){
     const ids=turnoverIdsV376(type),el=document.getElementById(ids.input);
     return !!String(el?.value||'').trim()&&Math.abs(toAmount(el.value||0))>0.005;
   }
@@ -83,7 +83,7 @@ function turnoverLeaveGuardV382(type){
   return true;
 }
 function setTurnoverWriteStateV382(type,busy){turnoverWriteStateV382[type]=!!busy;}
-function anyTurnoverLeaveRiskV382(){return Object.values(turnoverWriteStateV382).some(Boolean)||turnoverNewDraftDirtyV382('fair')||turnoverNewDraftDirtyV382('live');}
+function anyTurnoverLeaveRiskV382(){return Object.values(turnoverWriteStateV382).some(Boolean)||turnoverNewDraftDirtyV382('daily')||turnoverNewDraftDirtyV382('fair')||turnoverNewDraftDirtyV382('live');}
 function showPage(name,el){
   const current=document.querySelector(".page.active");
   const currentName=String(current?.id||"").replace(/^page-/,"");
@@ -145,7 +145,7 @@ function renderSavedTurnoverSummaryV333(element,name,date,amount){
   detail.textContent=amount===null?String(date||""):`${String(date||"")} · 已保存 RM${money(amount)}`;
   element.replaceChildren(title,detail);
 }
-function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c),input=document.getElementById("dailySales"),draft=getDailyTurnoverDraftV332();input.value=draft?String(draft.value):formatAmount(a);renderSavedTurnoverSummaryV333(document.getElementById("salesDateResult"),companyNames[c],d,a);renderSalesMonthlyList();if(typeof refreshSalesActionLocksV270==="function")refreshSalesActionLocksV270();if(c==="belimbing"&&typeof loadProductLinksIntoEditorV206==="function")Promise.resolve(loadProductLinksIntoEditorV206("daily")).catch(()=>{});}
+function updateDailyInputFromSelectedDate(){const d=isoToDisplay(document.getElementById("saleDate").value),c=document.getElementById("company").value,a=getDailyAmount(d,c),input=document.getElementById("dailySales"),draft=getDailyTurnoverDraftV332();input.value=draft?String(draft.value):formatAmount(a);renderSavedTurnoverSummaryV333(document.getElementById("salesDateResult"),companyNames[c],d,a);renderSalesMonthlyList();if(typeof refreshSalesActionLocksV270==="function")refreshSalesActionLocksV270();if(typeof loadProductLinksIntoEditorV206==="function")Promise.resolve(loadProductLinksIntoEditorV206("daily")).catch(()=>{});}
 function totalBy(type,company="",mode="month"){return rows.filter(r=>r.type===type).filter(r=>company?r.company===company:true).filter(r=>mode==="today"?r.date===isoToDisplay(todayISO()):mode==="month"?sameMonth(r.date):mode==="year"?sameYear(r.date):true).reduce((s,r)=>s+Number(r.amount||0),0)}
 
 // V42.3: Top 5 uses the last saved all-history cache immediately. Opening a
@@ -1612,7 +1612,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4310",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4330",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1630,7 +1630,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4310";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4330";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3017,7 +3017,8 @@ function confirmDiscardSalesCardChangesV238(type){
 let productLinkItemSeqV206=0;
 function productLinkContextV206(type){
   if(type==="daily"){
-    return{pre:"daily",date:isoToDisplay(document.getElementById("saleDate")?.value||""),location:"Belimbing"};
+    const company=String(document.getElementById('company')?.value||'belimbing');
+    return{pre:"daily",date:isoToDisplay(document.getElementById("saleDate")?.value||""),location:company==='balakong'?'Balakong':'Belimbing'};
   }
   const pre=type==="live"?"live":"fair";
   const date=type==="live"?isoToDisplay(document.getElementById("liveDate")?.value||""):String(document.getElementById("fairProductDate")?.value||"");
@@ -3296,7 +3297,7 @@ function renderProductLinksLoadingV231(type){
   if(!wrap||productImportSearchIsActiveV226(type))return;
   wrap.innerHTML='<div class="product-link-loading-v231">正在读取已保存销售卡…</div>';
 }
-const SALES_CARD_LOAD_SEQ_V245={live:0,fair:0};
+const SALES_CARD_LOAD_SEQ_V245={daily:0,live:0,fair:0};
 // V36.0: invalidate any cloud read that began before a local delete/save acknowledgement.
 function invalidateSalesCardLoadRequestsV351(type){
   const t=String(type||'');if(!t)return;
@@ -3306,7 +3307,7 @@ window.invalidateSalesCardLoadRequestsV351=invalidateSalesCardLoadRequestsV351;
 function salesCardContextKeyV245(type,date,location){
   return [String(type||""),String(date||""),String(location||"").trim().toLowerCase()].join("|");
 }
-// V43.1: a completed sale is a whole-card, permanent local fact. Keep it in
+// V43.3: a completed sale is a whole-card, permanent local fact. Keep it in
 // a separate cache so an older draft snapshot can never downgrade the card.
 const SALES_CARD_FINAL_STATE_KEY_V431='lover_sales_card_final_state_v431';
 function readSalesCardFinalStatesV431(){try{const x=JSON.parse(localStorage.getItem(SALES_CARD_FINAL_STATE_KEY_V431)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}}
@@ -3554,7 +3555,7 @@ function recalcSalesCardTransactionV239(card){
   const official=dedupeRows(rows).filter(r=>{
     const ctx=productLinkContextV206(card.dataset.type);
     if(r.type!==card.dataset.type||r.date!==ctx.date)return false;
-    return card.dataset.type==="daily"?r.company==="belimbing":card.dataset.type==="live"?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(ctx.location):normalizeFairLocationKey(r.location)===normalizeFairLocationKey(ctx.location);
+    return card.dataset.type==="daily"?r.company===(String(ctx.location||'').toLowerCase().includes('balakong')?'balakong':'belimbing'):card.dataset.type==="live"?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(ctx.location):normalizeFairLocationKey(r.location)===normalizeFairLocationKey(ctx.location);
   }).reduce((m,r)=>Math.max(m,Number(r.amount||0)),0);
   const warn=card.querySelector(".sales-card-total-warning-v239");
   if(warn){
@@ -4161,7 +4162,7 @@ function recalcSalesCardTransactionV239(card){
   const ctx=productLinkContextV206(card.dataset.type);
   const official=dedupeRows(rows).filter(r=>{
     if(r.type!==card.dataset.type||r.date!==ctx.date)return false;
-    return card.dataset.type==="daily"?r.company==="belimbing":card.dataset.type==="live"?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(ctx.location):normalizeFairLocationKey(r.location)===normalizeFairLocationKey(ctx.location);
+    return card.dataset.type==="daily"?r.company===(String(ctx.location||'').toLowerCase().includes('balakong')?'balakong':'belimbing'):card.dataset.type==="live"?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(ctx.location):normalizeFairLocationKey(r.location)===normalizeFairLocationKey(ctx.location);
   }).reduce((m,r)=>Math.max(m,Number(r.amount||0)),0);
   const warn=card.querySelector(".sales-card-total-warning-v239");
   if(warn){
@@ -4531,7 +4532,6 @@ function homeTodayProfitUniqueLinksV318(links,date){
     if(String(x.date||"")!==String(date||""))return false;
     const type=String(x.type||"");
     if(!["daily","fair","live"].includes(type))return false;
-    if(type==="daily"&&String(x.location||"").trim()&&String(x.location||"").trim().toLowerCase()!=="belimbing")return false;
     const id=String(x.linkId||x.transactionId||"").trim();
     const fallback=[type,x.date,x.location,x.productId,x.productName,x.quantity,x.actualPrice].join("|");
     const key=id||fallback; if(seen.has(key))return false; seen.add(key); return true;
@@ -4577,13 +4577,13 @@ function productProfitSummaryPanelV216(type){return document.getElementById(prod
 function productProfitSelectedDateV216(type){
   return type==="daily"?isoToDisplay(document.getElementById("saleDate")?.value||""):type==="live"?isoToDisplay(document.getElementById("liveDate")?.value||""):String(document.getElementById("fairProductDate")?.value||"");
 }
-function productProfitGroupKeyV216(type,value){return type==="daily"?"belimbing":type==="live"?normalizeLiveHostKey(value):normalizeFairLocationKey(value)}
+function productProfitGroupKeyV216(type,value){return type==="daily"?(String(value||'').toLowerCase().includes('balakong')?'balakong':'belimbing'):type==="live"?normalizeLiveHostKey(value):normalizeFairLocationKey(value)}
 function productProfitSalesByGroupV216(type,date){
   const map=new Map();
   dedupeRows(rows).forEach(r=>{
     if(r.type!==type||r.date!==date)return;
-    if(type==="daily"&&r.company!=="belimbing")return;
-    const name=type==="daily"?"Belimbing":String(r.location||"").trim();if(!name)return;
+    if(type==="daily"){const wanted=String(document.getElementById('company')?.value||'belimbing');if(r.company!==wanted)return;}
+    const name=type==="daily"?(String(r.location||'Belimbing').toLowerCase().includes('balakong')?'Balakong':'Belimbing'):String(r.location||"").trim();if(!name)return;
     const key=productProfitGroupKeyV216(type,name);
     const rec=map.get(key)||{name,sales:0};
     rec.sales=Math.max(rec.sales,Number(r.amount||0));map.set(key,rec);
@@ -4593,7 +4593,7 @@ function productProfitSalesByGroupV216(type,date){
 function productProfitGroupLinksV216(type,date,links){
   const groups=new Map();
   (links||[]).filter(x=>String(x.type||"")===type&&String(x.date||"")===date&&String(x.productName||"").trim()).forEach(x=>{
-    const name=type==="daily"?"Belimbing":String(x.location||"").trim()||"未指定",key=productProfitGroupKeyV216(type,name)||name;
+    const name=type==="daily"?(String(x.location||'Belimbing').toLowerCase().includes('balakong')?'Balakong':'Belimbing'):String(x.location||"").trim()||"未指定",key=productProfitGroupKeyV216(type,name)||name;
     if(!groups.has(key))groups.set(key,{name,links:[]});
     groups.get(key).links.push(x);
   });
@@ -4621,7 +4621,7 @@ function renderProductProfitSummaryV216(type,allLinks){
     return `<section class="product-profit-group"><div class="product-profit-group-title">${type==="live"?"主播":type==="fair"?"地点":"门市"}：${escapeChangeLogHtmlV200(group.name)}</div><div class="product-profit-table-wrap"><table class="product-profit-table"><thead><tr><th>产品名</th><th>成本总数</th><th>售价总数</th><th>利润总数</th><th>利润率</th></tr></thead><tbody>${group.links.length?productProfitDesktopRowsV216(group.links):`<tr><td colspan="5" class="product-profit-empty">没有已保存的关联盆栽资料</td></tr>`}</tbody></table></div><div class="product-profit-mobile-list">${group.links.length?productProfitMobileCardsV216(group.links):`<div class="product-profit-empty">没有已保存的关联盆栽资料</div>`}</div><div class="product-profit-total profit-highlight"><span>总利润</span><b>RM${formatAmount(s.totalProfit)}</b></div><div class="product-profit-total profit-highlight"><span>整体利润率</span><b>${s.overallRate.toFixed(2)}%</b></div><div class="product-profit-formula">全部利润总和 ÷ ${type==="live"?"该主播":type==="fair"?"该地点":"门市"}销售额 RM${formatAmount(s.sales)}</div></section>`;
   }).join("");
   const dayRate=daySales>0?dayProfit/daySales*100:0;
-  panel.innerHTML=`<div class="product-profit-summary-head"><div><b>${date} · ${type==="daily"?"Belimbing 门市":type==="live"?"全部主播":"全部地点"}</b></div><button type="button" class="secondary-btn product-profit-export-btn" onclick="exportProductProfitExcelV216('${type}')">📈 导出 Excel</button></div>${sections||`<div class="product-profit-empty">当天还没有关联盆栽资料</div>`}<div class="product-profit-day-summary"><div class="product-profit-total profit-highlight"><span>当天总利润</span><b>RM${formatAmount(dayProfit)}</b></div><div class="product-profit-total profit-highlight"><span>当天整体利润率</span><b>${dayRate.toFixed(2)}%</b></div></div>`;
+  panel.innerHTML=`<div class="product-profit-summary-head"><div><b>${date} · ${type==="daily"?(String(document.getElementById('company')?.value||'')==='balakong'?"Balakong 门市":"Belimbing 门市"):type==="live"?"全部主播":"全部地点"}</b></div><button type="button" class="secondary-btn product-profit-export-btn" onclick="exportProductProfitExcelV216('${type}')">📈 导出 Excel</button></div>${sections||`<div class="product-profit-empty">当天还没有关联盆栽资料</div>`}<div class="product-profit-day-summary"><div class="product-profit-total profit-highlight"><span>当天总利润</span><b>RM${formatAmount(dayProfit)}</b></div><div class="product-profit-total profit-highlight"><span>当天整体利润率</span><b>${dayRate.toFixed(2)}%</b></div></div>`;
   panel.dataset.summaryDate=date;
   panel.dataset.summaryLinks=JSON.stringify((allLinks||[]).filter(x=>String(x.type||"")===type&&String(x.date||"")===date));
 }
@@ -4792,18 +4792,23 @@ let monthGrandHistoryOpenV223=false;
 let monthGrandHistoryLoadingV223=false;
 let monthGrandProfitLinksV295=[];
 
-function monthGrandProfitV295(month){
-  return (monthGrandProfitLinksV295||[]).reduce((sum,x)=>{
-    if(["deleted","cancelled"].includes(String(x.status||"active").toLowerCase()))return sum;
+function homeCardMetricsByPeriodV433(links,period){
+  return (links||[]).reduce((totals,x)=>{
+    if(["deleted","cancelled"].includes(String(x.status||"active").toLowerCase()))return totals;
     const date=String(x.date||"");
     const iso=/^\d{4}-\d{2}-\d{2}$/.test(date)?date:displayToISO(date);
-    if(!iso||iso.slice(0,7)!==month)return sum;
+    if(!iso||!(iso.slice(0,7)===period||iso.slice(0,4)===period))return totals;
     const type=String(x.type||"").toLowerCase();
-    // Profit source exists for Belimbing Sales Cards, Fair and Live.
-    if(!["daily","fair","live"].includes(type))return sum;
-    const profit=Number(x.profit);
-    return sum+(Number.isFinite(profit)?profit:0);
-  },0);
+    if(!["daily","fair","live"].includes(type))return totals;
+    const profit=Number(x.profit),sale=Number(x.actualPrice);
+    if(Number.isFinite(profit))totals.profit+=profit;
+    if(Number.isFinite(sale)&&sale>0)totals.cardSales+=sale;
+    return totals;
+  },{profit:0,cardSales:0});
+}
+
+function monthGrandProfitV295(month){
+  return homeCardMetricsByPeriodV433(monthGrandProfitLinksV295,month).profit;
 }
 
 function monthGrandHistoryRowsV223(){
@@ -4816,7 +4821,7 @@ function monthGrandHistoryRowsV223(){
       key:item.month,
       label:String(item.month||"").slice(5,7)+"-"+String(item.month||"").slice(0,4),
       amount:Number(item.total||0),
-      profit:monthGrandProfitV295(String(item.month||""))
+      ...homeCardMetricsByPeriodV433(monthGrandProfitLinksV295,String(item.month||""))
     }));
 }
 
@@ -4835,7 +4840,8 @@ function renderMonthGrandHistoryV223(){
   const list=monthGrandHistoryRowsV223();
   const grandSales=list.reduce((sum,item)=>sum+Number(item.amount||0),0);
   const grandProfit=list.reduce((sum,item)=>sum+Number(item.profit||0),0);
-  const grandRate=grandSales>0?grandProfit/grandSales*100:0;
+  const grandCardSales=list.reduce((sum,item)=>sum+Number(item.cardSales||0),0);
+  const grandRate=grandCardSales>0?grandProfit/grandCardSales*100:0;
   panel.classList.remove("hidden");
   if(arrow)arrow.textContent="▲";
 
@@ -4845,7 +4851,7 @@ function renderMonthGrandHistoryV223(){
   }
 
   panel.innerHTML=list.length
-    ?`<div class="month-grand-profit-table-v295"><div class="month-grand-profit-head-v295"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${list.map(x=>{const rate=Number(x.amount||0)>0?Number(x.profit||0)/Number(x.amount||0)*100:0;return `<div class="month-grand-profit-row-v295"><span>${x.label}</span><b>${money(x.amount)}</b><b>${money(x.profit)}</b><b>${rate.toFixed(2)}%</b></div>`}).join("")}<div class="month-grand-profit-row-v295 month-grand-profit-total-v295"><span>总数</span><b>${money(grandSales)}</b><b>${money(grandProfit)}</b><b>${grandRate.toFixed(2)}%</b></div></div>`
+    ?`<div class="month-grand-profit-table-v295"><div class="month-grand-profit-head-v295"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${list.map(x=>{const rate=Number(x.cardSales||0)>0?Number(x.profit||0)/Number(x.cardSales||0)*100:0;return `<div class="month-grand-profit-row-v295"><span>${x.label}</span><b>${money(x.amount)}</b><b>${money(x.profit)}</b><b>${rate.toFixed(2)}%</b></div>`}).join("")}<div class="month-grand-profit-row-v295 month-grand-profit-total-v295"><span>总数</span><b>${money(grandSales)}</b><b>${money(grandProfit)}</b><b>${grandRate.toFixed(2)}%</b></div></div>`
     :'<div class="sub">还没有月份营业额记录</div>';
 }
 
@@ -4887,8 +4893,8 @@ function yearBreakdownProfitV286(kind,key){
     const rowKey=isYear?iso.slice(0,4):iso.slice(0,7);
     if(rowKey!==key)return sum;
     const type=String(x.type||"").toLowerCase();
-    if(kind==="balakong")return sum; // Sales Cards are Belimbing; Balakong has no sales-card profit source.
-    if(kind==="belimbing"&&type!=="daily")return sum;
+    if(kind==="balakong"&&(type!=="daily"||!String(x.location||'').toLowerCase().includes('balakong')))return sum;
+    if(kind==="belimbing"&&(type!=="daily"||String(x.location||'Belimbing').toLowerCase().includes('balakong')))return sum;
     if(kind==="fair"&&type!=="fair")return sum;
     if(kind==="live"&&type!=="live")return sum;
     const profit=Number(x.profit);
@@ -4903,7 +4909,7 @@ function yearBreakdownRowsV224(kind){
       if(!/^\d{4}$/.test(year))return;
       byYear.set(year,(byYear.get(year)||0)+Number(item.total||0));
     });
-    return [...byYear.entries()].map(([year,amount])=>({month:year,year,amount:Number(amount||0),profit:yearBreakdownProfitV286("total",year)}))
+    return [...byYear.entries()].map(([year,amount])=>({month:year,year,amount:Number(amount||0),...homeCardMetricsByPeriodV433(yearBreakdownLinksV286,year)}))
       .filter(item=>Math.abs(item.amount)>0.000001).sort((a,b)=>String(a.year).localeCompare(String(b.year)));
   }
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
@@ -4912,8 +4918,8 @@ function yearBreakdownRowsV224(kind){
     .filter(item=>Math.abs(item.amount)>0.000001).sort((a,b)=>String(a.month).localeCompare(String(b.month)));
 }
 function yearBreakdownTableV286(list,kind){
-  const grandSales=list.reduce((s,x)=>s+Number(x.amount||0),0),grandProfit=list.reduce((s,x)=>s+Number(x.profit||0),0),grandRate=grandSales>0?grandProfit/grandSales*100:0;
-  const rowsHtml=list.map(x=>{const sales=Number(x.amount||0),profit=Number(x.profit||0),rate=sales>0?profit/sales*100:0;const label=kind==="total"?String(x.year||x.month):String(x.month).slice(5,7)+"-"+String(x.month).slice(0,4);return `<div class="year-profit-row-v286"><span>${label}</span><b>${money(sales)}</b><b>${money(profit)}</b><b>${rate.toFixed(2)}%</b></div>`}).join("");
+  const grandSales=list.reduce((s,x)=>s+Number(x.amount||0),0),grandProfit=list.reduce((s,x)=>s+Number(x.profit||0),0),grandCardSales=kind==="total"?list.reduce((s,x)=>s+Number(x.cardSales||0),0):grandSales,grandRate=grandCardSales>0?grandProfit/grandCardSales*100:0;
+  const rowsHtml=list.map(x=>{const sales=Number(x.amount||0),profit=Number(x.profit||0),denominator=kind==="total"?Number(x.cardSales||0):sales,rate=denominator>0?profit/denominator*100:0;const label=kind==="total"?String(x.year||x.month):String(x.month).slice(5,7)+"-"+String(x.month).slice(0,4);return `<div class="year-profit-row-v286"><span>${label}</span><b>${money(sales)}</b><b>${money(profit)}</b><b>${rate.toFixed(2)}%</b></div>`}).join("");
   return `<div class="year-profit-table-v286"><div class="year-profit-head-v286"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${rowsHtml}<div class="year-profit-row-v286 year-profit-total-v286"><span>总数</span><b>${money(grandSales)}</b><b>${money(grandProfit)}</b><b>${grandRate.toFixed(2)}%</b></div></div>`;
 }
 function renderYearBreakdownV224(kind){
@@ -5569,7 +5575,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4310",
+    version:"4330",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5763,7 +5769,7 @@ function salesCardHasUserDataV241(card){
 function salesCardIsSavedV241(card){return !!card&&salesCardProductsV239(card).some(x=>x.dataset.saved==="1"&&String(x.dataset.linkId||''));}
 function salesCardsOfficialAmountV241(type){
   const ctx=productLinkContextV206(type);
-  return dedupeRows(rows).filter(r=>r.type===type&&r.date===ctx.date&&(type==="daily"?r.company==="belimbing":type==="live"?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(ctx.location):normalizeFairLocationKey(r.location)===normalizeFairLocationKey(ctx.location))).reduce((m,r)=>Math.max(m,Number(r.amount||0)),0);
+  return dedupeRows(rows).filter(r=>r.type===type&&r.date===ctx.date&&(type==="daily"?r.company===(String(ctx.location||'').toLowerCase().includes('balakong')?'balakong':'belimbing'):type==="live"?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(ctx.location):normalizeFairLocationKey(r.location)===normalizeFairLocationKey(ctx.location))).reduce((m,r)=>Math.max(m,Number(r.amount||0)),0);
 }
 function salesCardsEnteredTotalV241(type){return salesCardWrappersV239(type).reduce((s,c)=>s+salesCardProductsV239(c).reduce((a,i)=>a+salesCardProductTotalV240(i),0),0);}
 function addProductLinkItemV209(type,data={}){
@@ -6575,7 +6581,7 @@ function renderInventoryPendingGlobalV250(){
     const box=document.getElementById(pageType+"InventoryReminderV250");if(!box)return;
     const list=inventoryPendingCacheV250.filter(item=>{
       const itemType=String(item.type||"").toLowerCase();
-      if(pageType==="daily")return itemType==="daily"&&String(item.location||"Belimbing").toLowerCase()==="belimbing";
+      if(pageType==="daily"){const selected=String(document.getElementById('company')?.value||'belimbing');const actual=String(item.location||'Belimbing').toLowerCase().includes('balakong')?'balakong':'belimbing';return itemType==='daily'&&actual===selected;}
       return itemType===pageType;
     });
     if(!list.length){box.classList.add("hidden");box.innerHTML="";return}
@@ -6601,7 +6607,7 @@ function renderInventoryPendingGlobalV250(){
       };
       return `<button type="button" class="inventory-summary-v264${stale?" stale-v250":""}" onclick='openImportCostSystemV266(${JSON.stringify(targetPayload)})'>
         <div class="inventory-summary-title-v264">⚠️ 有 ${itemCount} 项需要处理的库存变动</div>
-        <div class="inventory-summary-meta-v264">${escapeChangeLogHtmlV200(first.date)}${inventoryPendingTimeV325(first)?" "+escapeChangeLogHtmlV200(inventoryPendingTimeV325(first)):""} · ${String(first.type||"").toLowerCase()==="daily"?"Sales · Belimbing":String(first.type||"").toLowerCase()==="live"?"Live · "+escapeChangeLogHtmlV200(first.location):"Fair · "+escapeChangeLogHtmlV200(first.location)}</div>
+        <div class="inventory-summary-meta-v264">${escapeChangeLogHtmlV200(first.date)}${inventoryPendingTimeV325(first)?" "+escapeChangeLogHtmlV200(inventoryPendingTimeV325(first)):""} · ${String(first.type||"").toLowerCase()==="daily"?"Sales · "+escapeChangeLogHtmlV200(first.location||'Belimbing'):String(first.type||"").toLowerCase()==="live"?"Live · "+escapeChangeLogHtmlV200(first.location):"Fair · "+escapeChangeLogHtmlV200(first.location)}</div>
         <div class="inventory-summary-action-v264">请到 Import Cost System 处理 <span aria-hidden="true">›</span></div>
       </button>`;
     }).join("");
@@ -6681,7 +6687,7 @@ async function openPendingInventorySalesCardV250(raw){
   await new Promise(r=>setTimeout(r,0));
 
   if(type==="daily"){
-    const company=document.getElementById("company");if(company)company.value="belimbing";
+    const company=document.getElementById("company");if(company)company.value=String(item.location||'Belimbing').toLowerCase().includes('balakong')?'balakong':'belimbing';
     setDateControl("saleDate",displayToISO(item.date));
     updateDailyInputFromSelectedDate();
   }else if(type==="live"){
@@ -6811,11 +6817,11 @@ function selectedMonthDisplayV285(){const v=document.getElementById('monthPicker
 function rowTurnoverV285(type,name,start,end){
   const sk=dateKeyV285(start),ek=dateKeyV285(end);let total=0;
   dedupeRows(rows).forEach(r=>{if(r.type!==type)return;const dk=dateKeyV285(r.date);if(!dk||dk<sk||dk>ek)return;
-    if(type==='daily'){if(r.company!=='belimbing')return;}else if(type==='live'){if(normalizeLiveHostKey(r.location)!==normalizeLiveHostKey(name))return;}else if(normalizeFairLocationKey(r.location)!==normalizeFairLocationKey(name))return;
+    if(type==='daily'){const company=String(name||'').toLowerCase().includes('balakong')?'balakong':'belimbing';if(r.company!==company)return;}else if(type==='live'){if(normalizeLiveHostKey(r.location)!==normalizeLiveHostKey(name))return;}else if(normalizeFairLocationKey(r.location)!==normalizeFairLocationKey(name))return;
     total+=Number(r.amount||0);
   });return total;
 }
-function linksProfitV285(links,type,name,start,end){const sk=dateKeyV285(start),ek=dateKeyV285(end);return (links||[]).reduce((sum,x)=>{if(String(x.type||'')!==type)return sum;const dk=dateKeyV285(x.date);if(!dk||dk<sk||dk>ek)return sum;if(type==='daily')return sum+Number(x.profit||0);if(type==='live'&&normalizeLiveHostKey(x.location)!==normalizeLiveHostKey(name))return sum;if(type==='fair'&&normalizeFairLocationKey(x.location)!==normalizeFairLocationKey(name))return sum;return sum+Number(x.profit||0)},0)}
+function linksProfitV285(links,type,name,start,end){const sk=dateKeyV285(start),ek=dateKeyV285(end);return (links||[]).reduce((sum,x)=>{if(String(x.type||'')!==type)return sum;const dk=dateKeyV285(x.date);if(!dk||dk<sk||dk>ek)return sum;if(type==='daily'){const wanted=String(name||'').toLowerCase().includes('balakong')?'balakong':'belimbing',actual=String(x.location||'Belimbing').toLowerCase().includes('balakong')?'balakong':'belimbing';return wanted===actual?sum+Number(x.profit||0):sum}if(type==='live'&&normalizeLiveHostKey(x.location)!==normalizeLiveHostKey(name))return sum;if(type==='fair'&&normalizeFairLocationKey(x.location)!==normalizeFairLocationKey(name))return sum;return sum+Number(x.profit||0)},0)}
 function profitRollupCardV285(title,start,end,sales,profit){const rate=sales>0?profit/sales*100:0;return `<div class="profit-rollup-card-v285"><div class="profit-rollup-title-v285">${escapeChangeLogHtmlV200(title)}</div><div class="profit-rollup-date-v285">${start}${end&&end!==start?' ～ '+end:''}</div><div class="profit-rollup-metrics-v285"><div><span>营业</span><b>RM${formatAmount(sales)}</b></div><div><span>利润</span><b>RM${formatAmount(profit)}</b></div><div><span>利润率</span><b>${rate.toFixed(2)}%</b></div></div></div>`}
 async function renderProfitRollupV285(type){
   const panel=profitRollupPanelV285(type);if(!panel)return;panel.innerHTML='<div class="product-link-loading-v231">正在计算营业 / 利润…</div>';
@@ -6826,7 +6832,7 @@ async function renderProfitRollupV285(type){
   }else if(type==='live'){
     const monthRows=dedupeRows(rows).filter(r=>r.type==='live'&&String(r.date||'').slice(3)===month),names=[...new Set(monthRows.map(r=>canonicalLiveHost(r.location)).filter(Boolean))].sort();const start='01-'+month;let lastDay=31;const [mm,yy]=month.split('-').map(Number);lastDay=new Date(yy,mm,0).getDate();const end=String(lastDay).padStart(2,'0')+'-'+month;names.forEach(name=>cards.push({title:name,start,end,sales:rowTurnoverV285('live',name,start,end),profit:linksProfitV285(links,'live',name,start,end)}));
   }else{
-    const start='01-'+month,[mm,yy]=month.split('-').map(Number),end=String(new Date(yy,mm,0).getDate()).padStart(2,'0')+'-'+month;cards=[{title:'Belimbing',start,end,sales:rowTurnoverV285('daily','Belimbing',start,end),profit:linksProfitV285(links,'daily','Belimbing',start,end)}];
+    const start='01-'+month,[mm,yy]=month.split('-').map(Number),end=String(new Date(yy,mm,0).getDate()).padStart(2,'0')+'-'+month;cards=['Balakong','Belimbing'].map(name=>({title:name,start,end,sales:rowTurnoverV285('daily',name,start,end),profit:linksProfitV285(links,'daily',name,start,end)}));
   }
   const totalSales=cards.reduce((s,x)=>s+x.sales,0),totalProfit=cards.reduce((s,x)=>s+x.profit,0),totalRate=totalSales>0?totalProfit/totalSales*100:0;
   const label=type==='fair'?'Fair':type==='live'?'Live':'Sales';panel.innerHTML=`<div class="profit-rollup-head-v285"><b>${label} · ${month}</b></div>${cards.length?cards.map(x=>profitRollupCardV285(x.title,x.start,x.end,x.sales,x.profit)).join(''):'<div class="product-profit-empty">这个月份没有资料</div>'}<div class="profit-rollup-total-v285"><strong>${label} 总计</strong><div><span>营业</span><b>RM${formatAmount(totalSales)}</b></div><div><span>利润</span><b>RM${formatAmount(totalProfit)}</b></div><div><span>整体利润率</span><b>${totalRate.toFixed(2)}%</b></div></div>`;
@@ -7879,7 +7885,7 @@ window.toggleProductProfitSummaryV216=toggleProductProfitSummaryV368;
 function seedVisibleDayProfitV368(type){setTimeout(()=>renderSelectedDayGrandV362(type),0)}
 setTimeout(()=>{['daily','fair','live'].forEach(seedVisibleDayProfitV368)},220);
 
-/* ================= V43.1 once-per-day unconfirmed draft reminder =================
+/* ================= V43.3 once-per-day unconfirmed draft reminder =================
    Read the complete fresh cloud list across Sales/Fair/Live and every location.
    Include same-day saved drafts, group by transaction, and stop automatically
    once the card is confirmed. */
@@ -8095,8 +8101,9 @@ function writeTurnoverEntryPendingV376(x){try{localStorage.setItem(TURNOVER_ENTR
 function rememberTurnoverEntryPendingV376(type,date,location,entries,total){const p=readTurnoverEntryPendingV376(),key=turnoverContextKeyV376(type,date,location);p[key]={type,date,location,entries:normalizeTurnoverEntriesClientV376(entries),total:Number(total||0),savedAt:Date.now()};writeTurnoverEntryPendingV376(p)}
 function clearTurnoverEntryPendingV376(type,date,location){const p=readTurnoverEntryPendingV376(),key=turnoverContextKeyV376(type,date,location);if(p[key]){delete p[key];writeTurnoverEntryPendingV376(p)}}
 const turnoverEntryMemoryV376=new Map();
-const turnoverEntryLoadTokenV376={fair:0,live:0};
+const turnoverEntryLoadTokenV376={daily:0,fair:0,live:0};
 function turnoverContextV376(type){
+  if(type==='daily')return{type,date:isoToDisplay(String(document.getElementById('saleDate')?.value||'')),location:String(document.getElementById('company')?.value||'')==='balakong'?'Balakong':'Belimbing'};
   if(type==='fair')return{type,date:fairSelectedDateV353(),location:fairSelectedLocationV353()};
   return{type,date:isoToDisplay(String(document.getElementById('liveDate')?.value||'')),location:selectedLiveHost()};
 }
@@ -8105,6 +8112,7 @@ function readTurnoverLocalV376(){try{const x=JSON.parse(localStorage.getItem(TUR
 function writeTurnoverLocalV376(obj){try{localStorage.setItem(TURNOVER_ENTRY_CACHE_KEY_V376,JSON.stringify(obj||{}))}catch(_){}}
 function normalizeTurnoverEntriesClientV376(entries){return(Array.isArray(entries)?entries:[]).slice(0,200).map((x,i)=>{const o=x&&typeof x==='object'?x:{amount:x},amount=Math.round(Number(o.amount||0)*100)/100;if(!Number.isFinite(amount)||amount<=0.005)return null;return{id:String(o.id||('e'+Date.now()+'_'+i)),amount,createdAt:String(o.createdAt||''),updatedAt:String(o.updatedAt||'')}}).filter(Boolean)}
 function officialTurnoverV376(type,date,location){
+  if(type==='daily'){const company=String(location||'').toLowerCase().includes('balakong')?'balakong':'belimbing';const found=dedupeRows(rows).find(r=>r.type==='daily'&&r.date===date&&r.company===company);return found?Number(found.amount||0):0;}
   const norm=type==='live'?normalizeLiveHostKey:normalizeFairLocationKey;
   const found=dedupeRows(rows).find(r=>r.type===type&&r.date===date&&norm(r.location)===norm(location));return found?Number(found.amount||0):0;
 }
@@ -8113,6 +8121,7 @@ const turnoverAuditDerivedV380=new Map();
 function turnoverAuditKeyV380(type,date,location){return turnoverContextKeyV376(type,date,location)}
 function filterTurnoverAuditLogsV380(type,location,logs){
   const clean=Array.isArray(logs)?logs:[];
+  if(type==='daily')return[];
   if(type==='fair')return clean.filter(x=>normalizeFairLocationKey(x.location||'')===normalizeFairLocationKey(location||''));
   if(type==='live')return clean.filter(x=>normalizeLiveHostKey(x.location||'')===normalizeLiveHostKey(location||''));
   return clean;
@@ -8153,10 +8162,10 @@ function getTurnoverEntryCacheV376(type,date,location){
   const key=turnoverContextKeyV376(type,date,location),mem=turnoverEntryMemoryV376.get(key);if(mem)return mem;
   const local=readTurnoverLocalV376()[key];if(local&&Array.isArray(local.entries)){const value={entries:normalizeTurnoverEntriesClientV376(local.entries),source:local.source||'local',at:Number(local.at||0)};turnoverEntryMemoryV376.set(key,value);return value}return null;
 }
-function turnoverIdsV376(type){return type==='fair'?{history:'fairTurnoverHistoryV376',total:'fairTurnoverTotalV376',input:'fairTurnoverNewV376',hidden:'fairSales'}:{history:'liveTurnoverHistoryV376',total:'liveTurnoverTotalV376',input:'liveTurnoverNewV376',hidden:'liveSales'}}
+function turnoverIdsV376(type){return type==='daily'?{history:'dailyTurnoverHistoryV432',total:'dailyTurnoverTotalV432',input:'dailyTurnoverNewV432',hidden:'dailySales'}:type==='fair'?{history:'fairTurnoverHistoryV376',total:'fairTurnoverTotalV376',input:'fairTurnoverNewV376',hidden:'fairSales'}:{history:'liveTurnoverHistoryV376',total:'liveTurnoverTotalV376',input:'liveTurnoverNewV376',hidden:'liveSales'}}
 function renderTurnoverComposerV376(type){
   const ctx=turnoverContextV376(type),ids=turnoverIdsV376(type),history=document.getElementById(ids.history),totalEl=document.getElementById(ids.total),hidden=document.getElementById(ids.hidden);if(!history||!totalEl||!hidden)return;
-  if(!ctx.date||!ctx.location){history.innerHTML='<span class="turnover-history-empty-v376">请选择日期及'+(type==='live'?'主播':'地点')+'</span>';totalEl.textContent='0.00';hidden.value='0.00';return}
+  if(!ctx.date||!ctx.location){history.innerHTML='<span class="turnover-history-empty-v376">请选择日期及'+(type==='live'?'主播':type==='daily'?'公司':'地点')+'</span>';totalEl.textContent='0.00';hidden.value='0.00';return}
   restoreTurnoverNewDraftV376(type);
   const official=officialTurnoverV376(type,ctx.date,ctx.location),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location);let entries=cached?.entries||fallbackTurnoverEntriesV376(type,ctx.date,ctx.location);
   // Entry detail can never replace an authoritative total when they disagree.
@@ -8207,6 +8216,19 @@ async function confirmTurnoverCloudAfterTimeoutV395(localRow){
   }catch(_){return null}
 }
 async function saveTurnoverTotalV376(type,total,notificationMeta={}){
+  if(type==='daily'){
+    if(!ensureWritableSelection())return false;
+    const ctx=turnoverContextV376(type),company=String(document.getElementById('company')?.value||''),hidden=document.getElementById('dailySales');
+    if(!ctx.date){alert('请选择日期');return false}total=Math.round(Number(total||0)*100)/100;if(hidden)hidden.value=formatAmount(total);
+    const previous=rows.find(r=>r.type==='daily'&&r.date===ctx.date&&r.company===company),now=new Date().toISOString(),mutation=nextClientMutationV344();
+    const localRow={type:'daily',date:ctx.date,company,location:'',amount:total,updatedAt:now,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:String(previous?.updatedAt||'')};
+    addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(`${ctx.location} 正在储存营业额，请勿关闭页面...`);
+    try{
+      const saved=await saveDailyToSheet(ctx.date,company,total,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true);
+      if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);else if(total<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));else upsertLocalRow(localRow);
+      clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync(`${ctx.location} 营业额已同步`,true);return true;
+    }catch(e){const confirmed=await confirmTurnoverCloudAfterTimeoutV395(localRow);if(confirmed){setSync(`${ctx.location} 营业额已同步`,true);return true}setPendingRetrySyncStatus();alert(`${ctx.location} 营业额保存失败：${e.message||e}`);return false}
+  }
   if(!ensureWritableSelection())return false;const isLive=type==='live',ctx=turnoverContextV376(type),dateEl=document.getElementById(isLive?'liveDate':'fairStart'),entityEl=document.getElementById(isLive?'liveHost':'fairLocation'),hidden=document.getElementById(isLive?'liveSales':'fairSales');
   if(!ctx.location){alert(isLive?'请输入主播名字':'请输入 Fair 地点');return false}if(!ctx.date){alert('请选择日期');return false}
   let entity=ctx.location;if(isLive){entity=reactivateLiveHostIfNeeded(entity).host;entityEl.value=entity;saveLiveHost(entity);saveLastLiveSession(entity,dateEl.value)}else{entity=canonicalLocation(entity);entityEl.value=entity;saveFairLocation(entity)}
@@ -8236,15 +8258,15 @@ async function commitTurnoverEntriesV376(type,entries,actionText,notificationMet
   // V39.9: the authoritative total write is the user-facing completion point.
   // Entry-detail/audit persistence is secondary and retries durably in background.
   rememberTurnoverEntryPendingV376(type,ctx.date,ctx.location,clean,total);
-  setTimeout(async()=>{try{await saveTurnoverEntriesToSheetV376(type,ctx.date,ctx.location,clean,total,new Date().toISOString());clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');if(turnoverContextV376(type).date===ctx.date&&turnoverContextV376(type).location===ctx.location)renderTurnoverComposerV376(type)}catch(e){console.warn('V39.9 entry detail background sync',e);setSync(`${type==='live'?'Live':'Fair'} 总营业额已同步；明细后台自动重试`,true)}},0);
-  showTempMsg(type==='live'?'liveSaveMsg':'fairSaveMsg');
+  setTimeout(async()=>{try{await saveTurnoverEntriesToSheetV376(type,ctx.date,ctx.location,clean,total,new Date().toISOString());clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');if(turnoverContextV376(type).date===ctx.date&&turnoverContextV376(type).location===ctx.location)renderTurnoverComposerV376(type)}catch(e){console.warn('V43.3 entry detail background sync',e);setSync(`${type==='live'?'Live':type==='daily'?ctx.location:'Fair'} 总营业额已同步；明细后台自动重试`,true)}},0);
+  showTempMsg(type==='daily'?'saveMsg':type==='live'?'liveSaveMsg':'fairSaveMsg');
   // Saving turnover changes the same authoritative total used by every old calculation.
   if(typeof renderSelectedDayGrandV362==='function')renderSelectedDayGrandV362(type);
-  if(type==='fair'){renderFairDailySummary();renderFairMonthlyList()}else{renderLiveDailySummary();renderLiveMonthlyList()}
+  if(type==='fair'){renderFairDailySummary();renderFairMonthlyList()}else if(type==='live'){renderLiveDailySummary();renderLiveMonthlyList()}else renderSalesMonthlyList();
   setTurnoverWriteStateV382(type,false);renderTurnoverComposerV376(type);
   return true;
 }
-function turnoverSaveButtonV382(type){return document.getElementById(type==='live'?'liveTurnoverSaveBtnV382':'fairTurnoverSaveBtnV382')}
+function turnoverSaveButtonV382(type){return document.getElementById(type==='daily'?'dailyTurnoverSaveBtnV382':type==='live'?'liveTurnoverSaveBtnV382':'fairTurnoverSaveBtnV382')}
 function setTurnoverSaveButtonV382(type,state){
   const btn=turnoverSaveButtonV382(type);if(!btn)return;
   if(!btn.dataset.idleText)btn.dataset.idleText=btn.textContent;
@@ -8280,7 +8302,7 @@ async function deleteTurnoverEntryV376(type,id){
 window.editTurnoverEntryV376=editTurnoverEntryV376;window.deleteTurnoverEntryV376=deleteTurnoverEntryV376;
 
 // The visible input is NEW money only. Total is read-only and derived from chips.
-saveFairSales=function(){return addTurnoverEntryV376('fair')};saveLiveSales=function(){return addTurnoverEntryV376('live')};window.saveFairSales=saveFairSales;window.saveLiveSales=saveLiveSales;
+saveDailySales=function(){return addTurnoverEntryV376('daily')};saveFairSales=function(){return addTurnoverEntryV376('fair')};saveLiveSales=function(){return addTurnoverEntryV376('live')};window.saveDailySales=saveDailySales;window.saveFairSales=saveFairSales;window.saveLiveSales=saveLiveSales;
 
 // Context refresh: preserve old official amounts and load breakdown opportunistically.
 const _updateFairSingleAmountV376=updateFairSingleAmountV353;
@@ -8290,7 +8312,7 @@ updateLiveInputFromSelectedDate=function(){_updateLiveInputFromSelectedDateV376(
 
 // Existing turnover draft guards target the now hidden total; disable them and keep new-entry fields transient.
 try{localStorage.removeItem('lover_live_turnover_drafts_v332');localStorage.removeItem('lover_fair_turnover_drafts_v356')}catch(_){}
-['fairTurnoverNewV376','liveTurnoverNewV376'].forEach(id=>{const el=document.getElementById(id);if(el){const type=id.startsWith('fair')?'fair':'live';el.addEventListener('input',()=>saveTurnoverNewDraftV376(type,el.value));el.addEventListener('change',()=>saveTurnoverNewDraftV376(type,el.value));el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();(type==='fair'?saveFairSales():saveLiveSales())}})}});
+['dailyTurnoverNewV432','fairTurnoverNewV376','liveTurnoverNewV376'].forEach(id=>{const el=document.getElementById(id);if(el){const type=id.startsWith('daily')?'daily':id.startsWith('fair')?'fair':'live';el.addEventListener('input',()=>saveTurnoverNewDraftV376(type,el.value));el.addEventListener('change',()=>saveTurnoverNewDraftV376(type,el.value));el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addTurnoverEntryV376(type)}})}});
 
 // V39.9 save-card handoff: immediately repaint the selected day's profit from the saved result/cache.
 const _saveProductLinksV376=saveProductLinksV206;
@@ -8333,7 +8355,7 @@ async function retryTurnoverEntryPendingV376(){
   writeTurnoverEntryPendingV376(pending);
 }
 window.retryTurnoverEntryPendingV376=retryTurnoverEntryPendingV376;
-setTimeout(()=>{renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live');refreshTurnoverEntriesV376('fair');refreshTurnoverEntriesV376('live');retryTurnoverEntryPendingV376()},250);
+setTimeout(()=>{renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live');refreshTurnoverEntriesV376('daily');refreshTurnoverEntriesV376('fair');refreshTurnoverEntriesV376('live');retryTurnoverEntryPendingV376()},250);
 window.addEventListener('focus',()=>setTimeout(()=>retryTurnoverEntryPendingV376(),250));
 
 
@@ -8356,6 +8378,8 @@ function bindTurnoverContextRefreshV377(){
   bind('fairStart','change','fair');
   bind('fairLocation','input','fair');
   bind('fairLocation','change','fair');
+  bind('saleDate','change','daily');
+  bind('company','change','daily');
 }
 bindTurnoverContextRefreshV377();
 
@@ -8364,14 +8388,14 @@ bindTurnoverContextRefreshV377();
 const _renderAllV377=renderAll;
 renderAll=function(){
   const result=_renderAllV377.apply(this,arguments);
-  try{renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live')}catch(e){console.warn('V39.9 post-render turnover',e)}
+  try{renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live')}catch(e){console.warn('V43.3 post-render turnover',e)}
   return result;
 };
 window.renderAll=renderAll;
 
 // Keep the new-entry input truly empty when it has no draft so its instruction
 // is visible before the user taps it. Never turn blank into 0.00.
-['fairTurnoverNewV376','liveTurnoverNewV376'].forEach(id=>{
+['dailyTurnoverNewV432','fairTurnoverNewV376','liveTurnoverNewV376'].forEach(id=>{
   const el=document.getElementById(id);if(!el)return;
   el.classList.remove('money-input');
   if(!String(el.value||'').trim()||Number(el.value)===0)el.value='';

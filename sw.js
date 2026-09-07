@@ -1,4 +1,4 @@
-// Lover Legend Sales PWA Service Worker V43.1
+// Lover Legend Sales PWA Service Worker V43.3
 // OneSignal uses its own worker:
 // /push/onesignal/OneSignalSDKWorker.js
 
@@ -7,5 +7,9 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async()=>{
+    const names=await caches.keys();
+    await Promise.all(names.map(name=>caches.delete(name)));
+    await self.clients.claim();
+  })());
 });
