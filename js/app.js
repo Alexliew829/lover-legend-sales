@@ -1612,7 +1612,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4380",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4400",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1630,7 +1630,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4380";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4400";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2610,7 +2610,7 @@ function buildCloudImportProductRecordsV214(data){
 
     records.push({
       id:String(source?.id||key),
-      // V43.8: prefer the current Products ID. Old cached/import PZ IDs still
+      // V44.0: prefer the current Products ID. Old cached/import PZ IDs still
       // match by exact product name, then are upgraded before a card is saved.
       productId:String(product?.id||source?.productId||""),
       productName,
@@ -3319,7 +3319,7 @@ window.invalidateSalesCardLoadRequestsV351=invalidateSalesCardLoadRequestsV351;
 function salesCardContextKeyV245(type,date,location){
   return [String(type||""),String(date||""),String(location||"").trim().toLowerCase()].join("|");
 }
-// V43.8: a completed sale is a whole-card, permanent local fact. Keep it in
+// V44.0: a completed sale is a whole-card, permanent local fact. Keep it in
 // a separate cache so an older draft snapshot can never downgrade the card.
 const SALES_CARD_FINAL_STATE_KEY_V431='lover_sales_card_final_state_v431';
 function readSalesCardFinalStatesV431(){try{const x=JSON.parse(localStorage.getItem(SALES_CARD_FINAL_STATE_KEY_V431)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}}
@@ -5592,7 +5592,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4380",
+    version:"4400",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6597,7 +6597,7 @@ function renderInventoryPendingGlobalV250(){
   ["daily","live","fair"].forEach(pageType=>{
     const box=document.getElementById(pageType+"InventoryReminderV250");if(!box)return;
     const list=inventoryPendingCacheV250.filter(item=>{
-      // V43.8: a draft card must never flash an Import-inventory reminder.
+      // V44.0: a draft card must never flash an Import-inventory reminder.
       // The pending endpoint can briefly return an older state while a save or
       // confirmation request is still settling, so the visible card is the
       // final display guard. A real confirmed card remains eligible normally.
@@ -7919,7 +7919,7 @@ window.toggleProductProfitSummaryV216=toggleProductProfitSummaryV368;
 function seedVisibleDayProfitV368(type){setTimeout(()=>renderSelectedDayGrandV362(type),0)}
 setTimeout(()=>{['daily','fair','live'].forEach(seedVisibleDayProfitV368)},220);
 
-/* ================= V43.8 once-per-day unconfirmed draft reminder =================
+/* ================= V44.0 once-per-day unconfirmed draft reminder =================
    Read the complete fresh cloud list across Sales/Fair/Live and every location.
    Include same-day saved drafts, group by transaction, and stop automatically
    once the card is confirmed. */
@@ -7981,11 +7981,14 @@ function ensureDraftReminderReturnButtonV429(){
 }
 function renderUnconfirmedDraftListV429(drafts){
   document.getElementById('salesDraftListModalV429')?.remove();
+  document.getElementById('salesDraftNoticeV429')?.remove();
+  const returnBtn=document.getElementById('salesDraftReturnV429');if(returnBtn)returnBtn.hidden=true;
   const overlay=document.createElement('div');overlay.id='salesDraftListModalV429';overlay.className='sales-draft-modal-v429';
   const panel=document.createElement('section');panel.className='sales-draft-modal-panel-v429';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label','尚未确认销售卡清单');
   const head=document.createElement('div');head.className='sales-draft-modal-head-v429';
   const title=document.createElement('div');title.innerHTML=`<b>⚠️ 销售卡尚未处理</b><span>${drafts.length} 张草稿等待确认</span>`;
-  const close=document.createElement('button');close.type='button';close.className='sales-draft-modal-close-v429';close.setAttribute('aria-label','关闭');close.textContent='×';close.addEventListener('click',()=>overlay.remove());
+  const closeReminder=()=>{overlay.remove();ensureDraftReminderReturnButtonV429()};
+  const close=document.createElement('button');close.type='button';close.className='sales-draft-modal-close-v429';close.setAttribute('aria-label','关闭');close.textContent='×';close.addEventListener('click',closeReminder);
   head.append(title,close);panel.appendChild(head);
   const list=document.createElement('div');list.className='sales-draft-list-v429';
   drafts.forEach((g,i)=>{
@@ -7995,7 +7998,7 @@ function renderUnconfirmedDraftListV429(drafts){
     row.addEventListener('click',async()=>{overlay.remove();await openPendingInventorySalesCardV250(g);ensureDraftReminderReturnButtonV429();});
     list.appendChild(row);
   });
-  panel.appendChild(list);overlay.appendChild(panel);overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove()});document.body.appendChild(overlay);
+  panel.appendChild(list);overlay.appendChild(panel);overlay.addEventListener('click',e=>{if(e.target===overlay)closeReminder()});document.body.appendChild(overlay);
 }
 async function latestUnconfirmedDraftsV429(force=false){
   let links=null;
@@ -8011,12 +8014,6 @@ async function openUnconfirmedDraftListV429(force=true){
   if(!drafts.length){removeDraftReminderUiV429();const btn=document.getElementById('salesDraftReturnV429');if(btn)btn.hidden=true;showToast('✅ 没有尚未确认的销售卡');return}
   renderUnconfirmedDraftListV429(drafts);
 }
-function showUnconfirmedDraftNoticeV429(drafts){
-  document.getElementById('salesDraftNoticeV429')?.remove();
-  const notice=document.createElement('button');notice.type='button';notice.id='salesDraftNoticeV429';notice.className='sales-draft-notice-v429';
-  notice.innerHTML=`<span>⚠️ <b>销售卡尚未处理</b><small>共有 ${drafts.length} 张 · 点击查看</small></span><i aria-hidden="true">›</i>`;
-  notice.addEventListener('click',()=>{notice.remove();openUnconfirmedDraftListV429(true)});document.body.appendChild(notice);
-}
 window.openUnconfirmedDraftListV429=openUnconfirmedDraftListV429;
 async function checkUnconfirmedDraftReminderV369(){
   const today=localDayISO369(),state=readDraftReminderStateV369();
@@ -8030,7 +8027,9 @@ async function checkUnconfirmedDraftReminderV369(){
   // Mark before showing the alert so rerenders/focus events cannot duplicate it today.
   writeDraftReminderStateV369({lastReminderDay:today,lastCount:drafts.length,updatedAt:Date.now()});
   unconfirmedDraftReminderItemsV429=drafts;
-  showUnconfirmedDraftNoticeV429(drafts);
+  // V44.0: show the useful card details (date/location/amount) directly at
+  // the top once per day. Do not also create the duplicate yellow summary.
+  renderUnconfirmedDraftListV429(drafts);
 }
 window.checkUnconfirmedDraftReminderV369=checkUnconfirmedDraftReminderV369;
 setTimeout(()=>checkUnconfirmedDraftReminderV369().catch(()=>{}),1800);
@@ -8130,6 +8129,28 @@ function turnoverNewDraftKeyV376(type){const c=turnoverContextV376(type);return 
 function saveTurnoverNewDraftV376(type,value){const key=turnoverNewDraftKeyV376(type);if(!key)return;const all=readTurnoverNewDraftsV376();if(String(value||'').trim())all[key]={value:String(value),at:Date.now()};else delete all[key];try{localStorage.setItem(TURNOVER_NEW_DRAFT_KEY_V376,JSON.stringify(all))}catch(_){}}
 function restoreTurnoverNewDraftV376(type){const ids=turnoverIdsV376(type),input=document.getElementById(ids.input);if(!input||document.activeElement===input)return;const key=turnoverNewDraftKeyV376(type),x=key?readTurnoverNewDraftsV376()[key]:null;input.value=x?String(x.value||''):''}
 function clearTurnoverNewDraftV376(type){saveTurnoverNewDraftV376(type,'')}
+function clearLateConfirmedTurnoverDraftV439(row){
+  const type=String(row?.type||'').trim();if(!['daily','fair','live'].includes(type))return false;
+  const date=String(row?.date||'').trim(),location=type==='daily'?(String(row?.company||'').toLowerCase()==='balakong'?'Balakong':'Belimbing'):String(row?.location||'').trim();
+  if(!date||!location)return false;
+  const expected=Math.round(Number(row?.amount||0)*100)/100,key=turnoverContextKeyV376(type,date,location),cached=getTurnoverEntryCacheV376(type,date,location),entries=normalizeTurnoverEntriesClientV376(cached?.entries||[]);
+  if(!String(cached?.source||'').startsWith('optimistic-v382')||Math.abs(entriesSumV376(entries)-expected)>0.005)return false;
+  const drafts=readTurnoverNewDraftsV376(),draft=drafts[key],last=entries[entries.length-1],draftAmount=Math.round(toAmount(draft?.value||0)*100)/100;
+  if(draft&&last&&Math.abs(draftAmount-Number(last.amount||0))<=0.005){delete drafts[key];try{localStorage.setItem(TURNOVER_NEW_DRAFT_KEY_V376,JSON.stringify(drafts))}catch(_){}}
+  setTurnoverEntryCacheV376(type,date,location,entries,'cloud-confirmed-v439');
+  const ctx=turnoverContextV376(type);
+  if(ctx.date===date&&turnoverContextKeyV376(type,ctx.date,ctx.location)===key){
+    const input=document.getElementById(turnoverIdsV376(type).input),inputAmount=Math.round(toAmount(input?.value||0)*100)/100;
+    if(input&&last&&Math.abs(inputAmount-Number(last.amount||0))<=0.005)input.value='';
+    setTurnoverSaveButtonV382(type,'saved');renderTurnoverComposerV376(type);
+  }
+  return true;
+}
+window.addEventListener('lover-sales-pending-cloud-confirmed-v439',event=>{
+  const confirmed=Array.isArray(event?.detail?.rows)?event.detail.rows:[];
+  let cleared=false;confirmed.forEach(row=>{if(clearLateConfirmedTurnoverDraftV439(row))cleared=true});
+  if(cleared)setSync('营业额已确认同步',true);
+});
 function readTurnoverEntryPendingV376(){try{const x=JSON.parse(localStorage.getItem(TURNOVER_ENTRY_PENDING_KEY_V376)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}}
 function writeTurnoverEntryPendingV376(x){try{localStorage.setItem(TURNOVER_ENTRY_PENDING_KEY_V376,JSON.stringify(x||{}))}catch(_){}}
 function rememberTurnoverEntryPendingV376(type,date,location,entries,total){const p=readTurnoverEntryPendingV376(),key=turnoverContextKeyV376(type,date,location);p[key]={type,date,location,entries:normalizeTurnoverEntriesClientV376(entries),total:Number(total||0),savedAt:Date.now()};writeTurnoverEntryPendingV376(p)}
@@ -8292,7 +8313,7 @@ async function commitTurnoverEntriesV376(type,entries,actionText,notificationMet
   // V39.9: the authoritative total write is the user-facing completion point.
   // Entry-detail/audit persistence is secondary and retries durably in background.
   rememberTurnoverEntryPendingV376(type,ctx.date,ctx.location,clean,total);
-  setTimeout(async()=>{try{await saveTurnoverEntriesToSheetV376(type,ctx.date,ctx.location,clean,total,new Date().toISOString());clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');if(turnoverContextV376(type).date===ctx.date&&turnoverContextV376(type).location===ctx.location)renderTurnoverComposerV376(type)}catch(e){console.warn('V43.8 entry detail background sync',e);setSync(`${type==='live'?'Live':type==='daily'?ctx.location:'Fair'} 总营业额已同步；明细后台自动重试`,true)}},0);
+  setTimeout(async()=>{try{await saveTurnoverEntriesToSheetV376(type,ctx.date,ctx.location,clean,total,new Date().toISOString());clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');if(turnoverContextV376(type).date===ctx.date&&turnoverContextV376(type).location===ctx.location)renderTurnoverComposerV376(type)}catch(e){console.warn('V44.0 entry detail background sync',e);setSync(`${type==='live'?'Live':type==='daily'?ctx.location:'Fair'} 总营业额已同步；明细后台自动重试`,true)}},0);
   showTempMsg(type==='daily'?'saveMsg':type==='live'?'liveSaveMsg':'fairSaveMsg');
   // Saving turnover changes the same authoritative total used by every old calculation.
   if(typeof renderSelectedDayGrandV362==='function')renderSelectedDayGrandV362(type);
@@ -8312,7 +8333,7 @@ async function addTurnoverEntryV376(type){
   if(turnoverWriteStateV382[type])return false;
   const ids=turnoverIdsV376(type),input=document.getElementById(ids.input),value=Math.round(toAmount(input?.value||0)*100)/100;if(!value||value<0){alert('请输入新一笔营业额');return false}
   const ctx=turnoverContextV376(type),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location);
-  // V43.8: after an Apps Script timeout the optimistic entry intentionally
+  // V44.0: after an Apps Script timeout the optimistic entry intentionally
   // remains available for retry. If the user presses Save again with the same
   // value, resend that exact entry set instead of appending the value twice.
   // This is safe whether the first cloud request failed or completed late.
@@ -8429,7 +8450,7 @@ bindTurnoverContextRefreshV377();
 const _renderAllV377=renderAll;
 renderAll=function(){
   const result=_renderAllV377.apply(this,arguments);
-  try{renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live')}catch(e){console.warn('V43.8 post-render turnover',e)}
+  try{renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live')}catch(e){console.warn('V44.0 post-render turnover',e)}
   return result;
 };
 window.renderAll=renderAll;

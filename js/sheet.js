@@ -405,14 +405,23 @@ async function reconcileAllPendingRowsFromCloudV374(options={}){
     }
   }
 
+  const cloudConfirmedRows=[];
   pendingRows=pendingSnapshot.filter(pending=>{
     const month=pendingRowMonthV374(pending);
     const map=cloudMaps.get(month);
     if(!map)return true;
-    return !pendingRowMatchesCloudV374(pending,map.get(syncKey(pending)));
+    const keep=!pendingRowMatchesCloudV374(pending,map.get(syncKey(pending)));
+    if(!keep)cloudConfirmedRows.push({...pending,cloudRow:map.get(syncKey(pending))||null});
+    return keep;
   });
 
   if(pendingRows.length!==before)savePendingRows();
+  // Notify the turnover composer when a request that originally timed
+  // out is later proven to be safely stored in the cloud. The UI can then
+  // remove only the matching stale input draft and its leave-page warning.
+  if(cloudConfirmedRows.length&&typeof window!=='undefined'){
+    try{window.dispatchEvent(new CustomEvent('lover-sales-pending-cloud-confirmed-v439',{detail:{rows:cloudConfirmedRows}}))}catch(_){ }
+  }
   return {ok:true,cleared:before-pendingRows.length,remaining:pendingRows.length,checkedMonths};
 }
 
