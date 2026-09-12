@@ -439,6 +439,7 @@ function setSync(text, good = false, error = false) {
   if (good) {
     const last = document.getElementById("lastSync");
     if (last) last.textContent = "最后同步：" + nowText();
+    try { localStorage.setItem("lover_sales_last_sync_at_v442", new Date().toISOString()); } catch (_) {}
   }
 }
 

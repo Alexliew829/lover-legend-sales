@@ -1612,7 +1612,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4410",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4420",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1630,7 +1630,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4410";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4420";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2610,7 +2610,7 @@ function buildCloudImportProductRecordsV214(data){
 
     records.push({
       id:String(source?.id||key),
-      // V44.1: prefer the current Products ID. Old cached/import PZ IDs still
+      // V44.2: prefer the current Products ID. Old cached/import PZ IDs still
       // match by exact product name, then are upgraded before a card is saved.
       productId:String(product?.id||source?.productId||""),
       productName,
@@ -3319,7 +3319,7 @@ window.invalidateSalesCardLoadRequestsV351=invalidateSalesCardLoadRequestsV351;
 function salesCardContextKeyV245(type,date,location){
   return [String(type||""),String(date||""),String(location||"").trim().toLowerCase()].join("|");
 }
-// V44.1: a completed sale is a whole-card, permanent local fact. Keep it in
+// V44.2: a completed sale is a whole-card, permanent local fact. Keep it in
 // a separate cache so an older draft snapshot can never downgrade the card.
 const SALES_CARD_FINAL_STATE_KEY_V431='lover_sales_card_final_state_v431';
 function readSalesCardFinalStatesV431(){try{const x=JSON.parse(localStorage.getItem(SALES_CARD_FINAL_STATE_KEY_V431)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}}
@@ -5592,7 +5592,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4410",
+    version:"4420",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5624,6 +5624,7 @@ async function backupAllData(){
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
     downloadFile(`Lover_Legend_Sales_V37_6_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
+    setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
     setSync("Backup 已完成",true);
     alert(`Backup 成功。\n\n营业记录：${payload.rows.length} 笔\n销售卡：${payload.productLinks.length} 笔\n新增/修改历史：${payload.salesChangeLogs.length} 笔\n\nBackup 文件已经生成。`);
   }catch(e){
@@ -5681,6 +5682,7 @@ async function restoreBackupFile(file){
     });
     await finishRestoreClientV234(payload);
     setBackupRestoreStateV234({type:"restore",status:"success",jobId:result.jobId||"",message:`Restore 完成并已验证。营业记录 ${payload.rows.length} 笔，销售卡 ${Array.isArray(payload.productLinks)?payload.productLinks.length:0} 笔，新增/修改历史已同步。`});
+    setSystemStoredAtV442(SYSTEM_RESTORE_AT_KEY_V442);
     setSync("Restore 已完成",true);
     alert("Restore 成功。\n\nGoogle Sheet、销售卡及系统设置已经恢复并重新载入。");
   }catch(e){
@@ -6597,7 +6599,7 @@ function renderInventoryPendingGlobalV250(){
   ["daily","live","fair"].forEach(pageType=>{
     const box=document.getElementById(pageType+"InventoryReminderV250");if(!box)return;
     const list=inventoryPendingCacheV250.filter(item=>{
-      // V44.1: a draft card must never flash an Import-inventory reminder.
+      // V44.2: a draft card must never flash an Import-inventory reminder.
       // The pending endpoint can briefly return an older state while a save or
       // confirmation request is still settling, so the visible card is the
       // final display guard. A real confirmed card remains eligible normally.
@@ -7919,7 +7921,7 @@ window.toggleProductProfitSummaryV216=toggleProductProfitSummaryV368;
 function seedVisibleDayProfitV368(type){setTimeout(()=>renderSelectedDayGrandV362(type),0)}
 setTimeout(()=>{['daily','fair','live'].forEach(seedVisibleDayProfitV368)},220);
 
-/* ================= V44.1 once-per-day unconfirmed draft reminder =================
+/* ================= V44.2 once-per-day unconfirmed draft reminder =================
    Read the complete fresh cloud list across Sales/Fair/Live and every location.
    Include same-day saved drafts, group by transaction, and stop automatically
    once the card is confirmed. */
@@ -8030,7 +8032,7 @@ async function checkUnconfirmedDraftReminderV369(){
     const drafts=collectUnconfirmedDraftsV369(links);
     if(!drafts.length)return;
     unconfirmedDraftReminderItemsV429=drafts;
-    // V44.1: only the explicit X button dismisses today's reminder. Leaving,
+    // V44.2: only the explicit X button dismisses today's reminder. Leaving,
     // selecting a card, or tapping the backdrop does not mark it as seen.
     renderUnconfirmedDraftListV429(drafts);
   }catch(_){return}
@@ -8318,7 +8320,7 @@ async function commitTurnoverEntriesV376(type,entries,actionText,notificationMet
   // V39.9: the authoritative total write is the user-facing completion point.
   // Entry-detail/audit persistence is secondary and retries durably in background.
   rememberTurnoverEntryPendingV376(type,ctx.date,ctx.location,clean,total);
-  setTimeout(async()=>{try{await saveTurnoverEntriesToSheetV376(type,ctx.date,ctx.location,clean,total,new Date().toISOString());clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');if(turnoverContextV376(type).date===ctx.date&&turnoverContextV376(type).location===ctx.location)renderTurnoverComposerV376(type)}catch(e){console.warn('V44.1 entry detail background sync',e);setSync(`${type==='live'?'Live':type==='daily'?ctx.location:'Fair'} 总营业额已同步；明细后台自动重试`,true)}},0);
+  setTimeout(async()=>{try{await saveTurnoverEntriesToSheetV376(type,ctx.date,ctx.location,clean,total,new Date().toISOString());clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');if(turnoverContextV376(type).date===ctx.date&&turnoverContextV376(type).location===ctx.location)renderTurnoverComposerV376(type)}catch(e){console.warn('V44.2 entry detail background sync',e);setSync(`${type==='live'?'Live':type==='daily'?ctx.location:'Fair'} 总营业额已同步；明细后台自动重试`,true)}},0);
   showTempMsg(type==='daily'?'saveMsg':type==='live'?'liveSaveMsg':'fairSaveMsg');
   // Saving turnover changes the same authoritative total used by every old calculation.
   if(typeof renderSelectedDayGrandV362==='function')renderSelectedDayGrandV362(type);
@@ -8338,7 +8340,7 @@ async function addTurnoverEntryV376(type){
   if(turnoverWriteStateV382[type])return false;
   const ids=turnoverIdsV376(type),input=document.getElementById(ids.input),value=Math.round(toAmount(input?.value||0)*100)/100;if(!value||value<0){alert('请输入新一笔营业额');return false}
   const ctx=turnoverContextV376(type),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location);
-  // V44.1: after an Apps Script timeout the optimistic entry intentionally
+  // V44.2: after an Apps Script timeout the optimistic entry intentionally
   // remains available for retry. If the user presses Save again with the same
   // value, resend that exact entry set instead of appending the value twice.
   // This is safe whether the first cloud request failed or completed late.
@@ -8455,7 +8457,7 @@ bindTurnoverContextRefreshV377();
 const _renderAllV377=renderAll;
 renderAll=function(){
   const result=_renderAllV377.apply(this,arguments);
-  try{renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live')}catch(e){console.warn('V44.1 post-render turnover',e)}
+  try{renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live')}catch(e){console.warn('V44.2 post-render turnover',e)}
   return result;
 };
 window.renderAll=renderAll;
@@ -8478,3 +8480,63 @@ showPage=function(name,el){
   return _showPageV409(name,el);
 };
 window.showPage=showPage;
+
+/* ================= V44.2 system status + system information ================= */
+const SYSTEM_RELEASE_REVISION_V442='910 → 929';
+const SYSTEM_BACKUP_AT_KEY_V442='lover_sales_last_backup_at_v442';
+const SYSTEM_RESTORE_AT_KEY_V442='lover_sales_last_restore_at_v442';
+let systemHealthStateV442={level:'warning',issues:[],checked:false,data:null,expanded:false};
+function formatSystemDateTimeV442(value){
+  if(!value)return '-';
+  const d=value instanceof Date?value:new Date(value);if(Number.isNaN(d.getTime()))return '-';
+  const p=n=>String(n).padStart(2,'0');return `${p(d.getDate())}-${p(d.getMonth()+1)}-${d.getFullYear()}, ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function setSystemStoredAtV442(key){try{localStorage.setItem(key,new Date().toISOString())}catch(_){}}
+function getSystemStoredAtV442(key){try{return localStorage.getItem(key)||''}catch(_){return''}}
+function systemLastSyncTextV442(){
+  try{const saved=localStorage.getItem('lover_sales_last_sync_at_v442');if(saved)return formatSystemDateTimeV442(saved)}catch(_){}
+  return '-';
+}
+function renderSystemInformationV442(data){
+  const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4420$/,'44.2')}`:'连接异常');
+  set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
+  set('systemInfoLastSyncV442',systemLastSyncTextV442());
+  set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
+  set('systemInfoRestoreV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_RESTORE_AT_KEY_V442)));
+  set('systemInfoRowsV442',Number.isFinite(Number(rows?.length))?String(rows.length):'-');
+  set('systemInfoCardsV442',Number.isFinite(Number(data?.salesCardCount))?String(data.salesCardCount):'-');
+  set('systemInfoPendingV442',Number.isFinite(Number(data?.pendingInventoryCount))?String(data.pendingInventoryCount):'-');
+}
+function renderSystemHealthV442(){
+  const btn=document.getElementById('systemHealthStatusV442'),box=document.getElementById('systemHealthDetailsV442');if(!btn||!box)return;
+  btn.classList.remove('normal','warning','error');btn.classList.add(systemHealthStateV442.level);
+  const issues=Array.isArray(systemHealthStateV442.issues)?systemHealthStateV442.issues:[];
+  if(!systemHealthStateV442.expanded||!issues.length){box.className='system-health-details-v442 hidden';box.innerHTML='';return}
+  box.className=`system-health-details-v442 ${systemHealthStateV442.level==='error'?'error':''}`;
+  box.innerHTML=`<div class="health-title-v442">⚠️ 需要检查</div><ul>${issues.map(x=>`<li>${escapeChangeLogHtmlV200(String(x))}</li>`).join('')}</ul>`;
+}
+function toggleSystemHealthDetailsV442(){
+  if(!systemHealthStateV442.checked||systemHealthStateV442.level==='normal')return;
+  systemHealthStateV442.expanded=!systemHealthStateV442.expanded;renderSystemHealthV442();
+}
+async function runSystemHealthCheckV442(userTriggered=false){
+  const refresh=document.getElementById('systemHealthRefreshV442');
+  if(refresh?.disabled)return;
+  if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
+  try{
+    const data=await jsonp({action:'healthV442',clientVersion:'4420'},{timeoutMs:15000});
+    if(!data?.ok)throw new Error(data?.message||'系统检查失败');
+    const issues=[];
+    if(String(data.apiVersion||'')!=='4420')issues.push(`Frontend / API 版本不一致（Frontend 4420 / API ${data.apiVersion||'未知'}）`);
+    (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4420';
+    systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
+    renderSystemInformationV442(data);renderSystemHealthV442();
+  }catch(e){
+    systemHealthStateV442={level:'error',issues:[`Google Web App / Google Sheet 连接失败：${String(e?.message||e)}`],checked:true,data:null,expanded:false};
+    renderSystemInformationV442(null);renderSystemHealthV442();
+  }finally{if(refresh){refresh.disabled=false;refresh.textContent='重新检查';}}
+}
+window.toggleSystemHealthDetailsV442=toggleSystemHealthDetailsV442;window.runSystemHealthCheckV442=runSystemHealthCheckV442;
+setTimeout(()=>runSystemHealthCheckV442(false),1200);

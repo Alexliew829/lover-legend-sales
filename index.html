@@ -8,10 +8,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Lover Sales</title>
-<link rel="manifest" href="manifest.json?v=44.1">
+<link rel="manifest" href="manifest.json?v=44.2">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="style.css?v=44.1">
+<link rel="stylesheet" href="style.css?v=44.2">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
@@ -362,7 +362,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V44.1</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V44.2</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -370,7 +370,14 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <main>
 <section id="page-home" class="page active">
   <div class="card">
-    <label for="dashboardDateDisplay">查看日期</label>
+    <div class="home-date-status-row-v442">
+      <label for="dashboardDateDisplay">查看日期</label>
+      <div class="system-health-tools-v442">
+        <button type="button" id="systemHealthStatusV442" class="system-health-status-v442 warning" onclick="toggleSystemHealthDetailsV442()"><span class="system-health-dot-v442">●</span><span>系统状态</span></button>
+        <button type="button" id="systemHealthRefreshV442" class="system-health-refresh-v442" onclick="runSystemHealthCheckV442(true)">重新检查</button>
+      </div>
+    </div>
+    <div id="systemHealthDetailsV442" class="system-health-details-v442 hidden"></div>
     <div class="date-field dashboard-date-field">
       <input type="text"
              id="dashboardDateDisplay"
@@ -798,7 +805,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
 
     <div id="backupRestoreStatusV234" class="backup-restore-status-v234 hidden"></div>
-    <p class="note">V44.1：Home 年度利润率只使用对应销售卡售价总数作为分母。</p>
+    <p class="note">V44.2：Home 年度利润率只使用对应销售卡售价总数作为分母。</p>
   </div>
 
   
@@ -815,7 +822,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V44.1 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V44.2 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -885,6 +892,23 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     <div id="liveCommissionSettingsMsg" class="save-msg hidden">Live 佣金制度已储存</div>
   </div>
 </div>
+
+<div class="card system-info-card-v442">
+  <h2>系统资料 / System Information</h2>
+  <div class="system-info-grid-v442">
+    <div><span>版本</span><b>V44.2</b></div>
+    <div><span>API版本</span><b id="systemInfoApiV442">检查中…</b></div>
+    <div><span>Revision（上次 → 当前）</span><b>910 → 929</b></div>
+    <div><span>储存方式</span><b>Google Sheet 自动同步</b></div>
+    <div><span>Google Sheet</span><b id="systemInfoSheetV442">检查中…</b></div>
+    <div><span>最后同步</span><b id="systemInfoLastSyncV442">-</b></div>
+    <div><span>最近 Backup</span><b id="systemInfoBackupV442">-</b></div>
+    <div><span>最近 Restore</span><b id="systemInfoRestoreV442">-</b></div>
+    <div><span>当前载入营业记录</span><b id="systemInfoRowsV442">-</b></div>
+    <div><span>销售卡数量</span><b id="systemInfoCardsV442">-</b></div>
+    <div><span>待处理库存同步</span><b id="systemInfoPendingV442">-</b></div>
+  </div>
+</div>
 </section>
 </main>
 
@@ -924,10 +948,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=44.1",
-      "js/sheet.js?v=44.1",
-      "js/app.js?v=44.1",
-      "js/update.js?v=44.1"
+      "js/utils.js?v=44.2",
+      "js/sheet.js?v=44.2",
+      "js/app.js?v=44.2",
+      "js/update.js?v=44.2"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");

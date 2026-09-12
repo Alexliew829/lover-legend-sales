@@ -106,7 +106,7 @@
   async function registerAndCheckForUpdates() {
     if (!("serviceWorker" in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register("./sw.js?v=44.1", { updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.register("./sw.js?v=44.2", { updateViaCache: "none" });
       await registration.update();
       await activateWaitingWorker(registration);
       registration.addEventListener("updatefound", () => {
@@ -225,7 +225,7 @@
   window.addEventListener("pagehide", () => { hiddenAt = Date.now(); });
   window.addEventListener("pageshow", event => {
     // A restored back-forward-cache page may be an old Fair date-range build.
-    // Reload the document itself so the current V44.1 HTML is used, not only
+    // Reload the document itself so the current V44.2 HTML is used, not only
     // current cloud data inside an obsolete screen.
     if (event.persisted) window.location.reload();
   });
