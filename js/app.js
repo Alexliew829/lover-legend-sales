@@ -1618,7 +1618,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4610",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4620",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1636,7 +1636,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4610";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4620";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2720,7 +2720,7 @@ function getVndPotMossFeeV267(record){
   const currency=String(record?.currency||"").trim().toUpperCase();
   const originalPrice=Math.max(0,Number(record?.unitPrice||0));
   if(currency!=="VND"||originalPrice<=0)return 0;
-  // V46.1: match Import V21.3 VND pot/misc tiers exactly.
+  // V46.2: match Import V21.3 VND pot/misc tiers exactly.
   if(originalPrice>=10000000)return 180;
   if(originalPrice>=4000000)return 105;
   if(originalPrice>=1000000)return 55;
@@ -2739,7 +2739,11 @@ function syncSalesCardAutoExtraV267(card){
   [...card.querySelectorAll(".product-link-item")].forEach(item=>{
     const input=productExtraInputV278(item);
     if(!input||input.dataset.manual==="1")return;
-    input.value=formatAmount(Math.max(0,Number(item.dataset.autoPotMossFeeV267||0)));
+    const unitFee=Math.max(0,Number(item.dataset.autoPotMossFeeV267||0));
+    const qty=Math.max(1,Number(item.querySelector(".product-link-qty")?.value||1));
+    // V46.2: Import V21.3 VND pot/misc fee is a per-unit selling cost.
+    // Auto mode therefore uses unit fee x quantity on Sales / Fair / Live.
+    input.value=formatAmount(unitFee*qty);
   });
   syncCardExtraTotalFromProductsV278(card);
   recalcSalesCardTransactionV239(card);
@@ -4450,7 +4454,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"],[180,"F180"]];
-    // V46.1: only Live auto-selects the Import V21.3 crate/local-delivery tier
+    // V46.2: only Live auto-selects the Import V21.3 crate/local-delivery tier
     // from this product's unit selling price. Existing saved cards are preserved.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
     const autoCrateFromPrice=liveCrateRateForPriceV461(unitPrice);
@@ -4506,6 +4510,13 @@ function buildProductSubItemV239(type,card,data={},order=1){
       shipInput.dataset.manual="0";
       shipInput.value=formatAmount(productAutoDeliveryV240(item));
       syncCardDeliveryTotalFromProductsV240(card);
+    }
+    // V46.2: keep automatic VND pot/misc cost in step with quantity.
+    const autoExtra=productExtraInputV278(item);
+    if(autoExtra&&autoExtra.dataset.manual!=="1"){
+      const unitFee=Math.max(0,Number(item.dataset.autoPotMossFeeV267||0));
+      autoExtra.value=formatAmount(unitFee*salesCardQtyV240(item));
+      syncCardExtraTotalFromProductsV278(card);
     }
   });
   const onCoreEdit=()=>{markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)};
@@ -5806,7 +5817,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4610",
+    version:"4620",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -8401,7 +8412,7 @@ function turnoverNewDraftKeyV376(type){const c=turnoverContextV376(type);return 
 function saveTurnoverNewDraftV376(type,value){const key=turnoverNewDraftKeyV376(type);if(!key)return;const all=readTurnoverNewDraftsV376();if(String(value||'').trim())all[key]={value:String(value),at:Date.now()};else delete all[key];try{localStorage.setItem(TURNOVER_NEW_DRAFT_KEY_V376,JSON.stringify(all))}catch(_){}}
 function restoreTurnoverNewDraftV376(type){const ids=turnoverIdsV376(type),input=document.getElementById(ids.input);if(!input||document.activeElement===input)return;const key=turnoverNewDraftKeyV376(type),x=key?readTurnoverNewDraftsV376()[key]:null;input.value=x?String(x.value||''):''}
 function clearTurnoverNewDraftV376(type){saveTurnoverNewDraftV376(type,'')}
-// V46.1: remove only a proven stale new-turnover draft. If the local draft amount
+// V46.2: remove only a proven stale new-turnover draft. If the local draft amount
 // matches an old cached turnover component but the authoritative total has changed
 // (for example the turnover was deleted on another device), it is not a new unsaved
 // entry anymore. Genuine unmatched local edits remain protected.
@@ -8852,7 +8863,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4610$/,'46.1')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4620$/,'46.2')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8878,12 +8889,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4610'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4620'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4610')issues.push(`Frontend / API 版本不一致（Frontend 4610 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4620')issues.push(`Frontend / API 版本不一致（Frontend 4620 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4610';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4620';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
