@@ -1082,7 +1082,7 @@ function clearSalesChangeLogCacheV237(type,date){
 }
 
 const SALES_CARD_PERSIST_CACHE_KEY_V232="lover_sales_card_links_cache_v232";
-const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=30*24*60*60*1000;
+const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V44.3: local Sales Card cache does not expire; cloud is read only when this device has no cache.
 
 function readSalesCardPersistentCacheV232(){
   try{
@@ -1101,7 +1101,6 @@ function getSalesCardPersistentCacheV232(type,date,location){
   const all=readSalesCardPersistentCacheV232();
   const rec=all[salesCardPersistentKeyV232(type,date,location)];
   if(!rec||!Array.isArray(rec.links))return null;
-  if(rec.at&&Date.now()-Number(rec.at)>SALES_CARD_PERSIST_CACHE_MAX_AGE_V232)return null;
   return rec.links;
 }
 function setSalesCardPersistentCacheV232(type,date,location,links){
