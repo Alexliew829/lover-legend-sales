@@ -136,7 +136,7 @@ function getPrioritySyncLocalV315(){try{return JSON.parse(localStorage.getItem(P
 function setPrioritySyncLocalV315(v){try{localStorage.setItem(PRIORITY_SYNC_CACHE_KEY_V315,JSON.stringify(v||{}))}catch(_){}}
 async function checkPriorityRevisionV315(timeoutMs=4500){return jsonp({action:"priorityRevisionV315"},{timeoutMs});}
 function invalidateSalesCardCachesV315(){
-  // V44.6 cross-device rule: a newer cloud Sales Card revision means this
+  // V44.7 cross-device rule: a newer cloud Sales Card revision means this
   // device's exact-context persistent snapshots may be stale. Clear both the
   // session and persistent Sales Card caches so the visible/open context must
   // re-read the authoritative cloud card before the UI can report 已同步.
@@ -442,7 +442,7 @@ function setSync(text, good = false, error = false) {
   const el = document.getElementById("syncStatus");
   if (!el) return;
 
-  // V44.6: never show a green global "已同步" while the currently opened
+  // V44.7: never show a green global "已同步" while the currently opened
   // Sales Card context is still performing its exact cloud verification.
   // Other success messages (save/confirm/etc.) remain unchanged.
   if(good&&String(text||'')==='已同步'&&typeof window!=='undefined'&&typeof window.salesCardCloudVerifyPendingV445==='function'&&window.salesCardCloudVerifyPendingV445()){
@@ -753,7 +753,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V44.6 Global Revision Gate:
+      // V44.7 Global Revision Gate:
       // One tiny request detects ANY successful cloud write (turnover, Sales Card,
       // Fair/Live, commissions/settings, confirmation/Import ACK, restore, etc.).
       // If the global Revision is unchanged, Local First is already authoritative
@@ -761,6 +761,7 @@ async function loadFromSheet(options = {}) {
       // re-checking every Sales Card. Only a changed Revision enters the heavier
       // selective refresh path below.
       let salesCardRevisionChangedV444=false;
+      let observedPriorityRevisionV447=null;
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
           const rev = await checkCloudRevisionShared(Number(options.revisionTimeoutMs || REVISION_CHECK_TIMEOUT_MS));
@@ -773,21 +774,17 @@ async function loadFromSheet(options = {}) {
             const localTurn=Number(localPr.turnoverRevision||0);
             const localCard=Number(localPr.salesCardRevision||0);
             salesCardRevisionChangedV444=cloudCard!==localCard;
+            observedPriorityRevisionV447={turnoverRevision:cloudTurn,salesCardRevision:cloudCard,at:Date.now()};
 
-            // Persist the lightweight per-domain counters only after reading the
-            // authoritative global marker. They let a changed global Revision
-            // invalidate Sales Card cache only when Cards actually changed.
-            setPrioritySyncLocalV315({turnoverRevision:cloudTurn,salesCardRevision:cloudCard,at:Date.now()});
-
-            // A mismatched Sales Card counter invalidates card snapshots once.
-            // After this baseline is stored it will not repeat on every open.
+            // V44.7 deletion-safe rule: never mark a new cloud Sales Card revision
+            // as locally synchronized before the authoritative refresh succeeds.
+            // Otherwise a timeout can make the next open believe an old card cache
+            // is current even though another device deleted that card.
             if(salesCardRevisionChangedV444){ invalidateSalesCardCachesV315(); }
 
             if(cloudGlobal===localGlobal&&pendingCountAtStart===0){
-              // Usually no work is needed. If this is a one-time priority-counter
-              // baseline mismatch (for example after upgrading from V44.5), refresh
-              // only an already-open card; otherwise return immediately.
               if(salesCardRevisionChangedV444)await refreshVisibleSalesCardsAfterCloudRevisionV444();
+              if(observedPriorityRevisionV447)setPrioritySyncLocalV315(observedPriorityRevisionV447);
               setSync("已同步", true);
               completedSuccessfully = true;
               return {
@@ -798,7 +795,8 @@ async function loadFromSheet(options = {}) {
 
             // Any cloud write advanced the global Revision. Non-card changes keep
             // Sales Card snapshots intact while normal month/settings merge refreshes
-            // the affected visible business data.
+            // the affected visible business data. The priority counters are committed
+            // only after this refresh path completes successfully.
           } else {
             setSync("本机资料已载入 · 云端检查待重试", false, false);
             completedSuccessfully = true;
@@ -878,6 +876,7 @@ async function loadFromSheet(options = {}) {
       if (pendingRows.length > 0) setPendingRetrySyncStatus();
       else {
         if(salesCardRevisionChangedV444)await refreshVisibleSalesCardsAfterCloudRevisionV444();
+        if(observedPriorityRevisionV447)setPrioritySyncLocalV315(observedPriorityRevisionV447);
         setSync("已同步", true);
       }
       completedSuccessfully = true;
@@ -1134,7 +1133,7 @@ function clearSalesChangeLogCacheV237(type,date){
 }
 
 const SALES_CARD_PERSIST_CACHE_KEY_V232="lover_sales_card_links_cache_v232";
-const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V44.6: local cache stays instant until the global Sales Card revision proves another device changed cards.
+const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V44.7: local cache stays instant until the global Sales Card revision proves another device changed cards.
 
 function readSalesCardPersistentCacheV232(){
   try{
