@@ -55,7 +55,7 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
   "lover_sales_data_cache_v92"
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
-const REVISION_CHECK_TIMEOUT_MS = 2500;
+const REVISION_CHECK_TIMEOUT_MS = 9000; // V45.5: survive Apps Script cold-start; Local First remains instant.
 // V29.9: notification dispatch uses the existing keepalive transport.
 // It is fire-and-forget after a successful business save, so OneSignal never
 // blocks the Sales/Fair/Live save or cloud-sync path on mobile or desktop.
@@ -137,7 +137,7 @@ const PRIORITY_SYNC_CACHE_KEY_V315="lover_priority_sync_v315";
 function getPrioritySyncLocalV315(){try{return JSON.parse(localStorage.getItem(PRIORITY_SYNC_CACHE_KEY_V315)||"{}")}catch(_){return{}}}
 function setPrioritySyncLocalV315(v){try{localStorage.setItem(PRIORITY_SYNC_CACHE_KEY_V315,JSON.stringify(v||{}))}catch(_){}}
 
-// V45.4: exact-context freshness stamp. A full cloud bundle updates the global
+// V45.5: exact-context freshness stamp. A full cloud bundle updates the global
 // Sales Card revision, but an editor context is trusted only after that exact
 // date/location has been read from the authoritative endpoint (or this device
 // itself successfully saved that context).
@@ -170,7 +170,7 @@ async function refreshVisibleSalesCardsAfterCloudRevisionV444(){
   if(tasks.length)await Promise.allSettled(tasks);
 }
 
-// V45.4 authoritative cross-device refresh. When the Sales Card revision changes,
+// V45.5 authoritative cross-device refresh. When the Sales Card revision changes,
 // fetch ONE complete active Sales Card snapshot from cloud. Do not clear any
 // local card cache before that request succeeds. The snapshot is committed in
 // one local transaction only after month data + all active cards both arrive.
@@ -191,7 +191,7 @@ function cloudRevisionSafeForWriteV449(){return CLOUD_REVISION_CONFIRMED_V449===
 if(typeof window!=='undefined')window.cloudRevisionSafeForWriteV449=cloudRevisionSafeForWriteV449;
 
 function hasLocalSalesDraftRiskV449(){
-  // V45.4: only a card that is actively being edited in the DOM blocks an
+  // V45.5: only a card that is actively being edited in the DOM blocks an
   // authoritative cloud commit. Durable pending drafts are reconciled against
   // per-context cloud timestamps after the bundle arrives; they must not freeze
   // the entire device or keep an older saved draft above a newer cloud card.
@@ -217,7 +217,7 @@ async function fetchSyncBundleV450(month,timeoutMs=22000){
 }
 if(typeof window!=='undefined')window.fetchSyncBundleV450=fetchSyncBundleV450;
 
-// V45.4: durable local draft retry entries are safety copies, not an authority
+// V45.5: durable local draft retry entries are safety copies, not an authority
 // above a newer cloud context. Compare each pending context with the same-context
 // cloud timestamp from the authoritative bundle before any retry can run.
 const SALES_DRAFT_CONFLICT_BACKUP_KEY_V452='lover_sales_draft_conflict_backup_v452';
@@ -260,7 +260,7 @@ function reconcilePendingSalesDraftsFromBundleV452(bundle){
 }
 if(typeof window!=='undefined')window.reconcilePendingSalesDraftsFromBundleV452=reconcilePendingSalesDraftsFromBundleV452;
 
-// V45.4: Sales Card + profit are one local authority transaction. Profit is
+// V45.5: Sales Card + profit are one local authority transaction. Profit is
 // never allowed to come from a newer/older source than the card snapshot that
 // produced it. Rebuild the daily profit cache from the SAME authoritative card
 // snapshot before any UI repaint can occur.
@@ -317,7 +317,7 @@ function commitAllSalesCardsAtomicV449(allLinks,verifiedRevisionV452=0){
     try{salesProductLinksCacheV216.set(key,{links:g.links,at:Date.now(),source:'cloud-v452'})}catch(_){}
     try{if(Number(verifiedRevisionV452||0)>0&&typeof markSalesCardContextVerifiedV451==='function')markSalesCardContextVerifiedV451(g.type,g.date,g.location,Number(verifiedRevisionV452||0))}catch(_){}
   }
-  // V45.4 atomic authority: card caches and every profit cache are rebuilt
+  // V45.5 atomic authority: card caches and every profit cache are rebuilt
   // from this exact same cloud snapshot before any visible repaint.
   rebuildProfitCachesFromAuthoritativeCardsV453(links);
   try{
@@ -624,7 +624,7 @@ function setSync(text, good = false, error = false) {
   const el = document.getElementById("syncStatus");
   if (!el) return;
 
-  // V45.4: never show a green global "已同步" while the currently opened
+  // V45.5: never show a green global "已同步" while the currently opened
   // Sales Card context is still performing its exact cloud verification.
   // Other success messages (save/confirm/etc.) remain unchanged.
   if(good&&String(text||'')==='已同步'&&typeof window!=='undefined'&&typeof window.cloudAtomicSyncPendingV448==='function'&&window.cloudAtomicSyncPendingV448()){
@@ -906,16 +906,33 @@ function salesSyncDelay(ms) {
 }
 
 function scheduleRevisionRetryV448(){
-  if(revisionRetryTimerV448||revisionRetryCountV448>=3)return;
-  const waits=[1200,3000,7000];
+  // V45.5: never give up after only three probes. A 2.5s probe could expire
+  // during an Apps Script cold start, leaving the device stuck at “后台检查中”
+  // until the user manually refreshed. Keep retrying with a capped backoff.
+  if(revisionRetryTimerV448)return;
+  const waits=[1200,3000,7000,15000,30000];
   const delay=waits[Math.min(revisionRetryCountV448,waits.length-1)];
-  revisionRetryCountV448+=1;
   revisionRetryTimerV448=setTimeout(()=>{
     revisionRetryTimerV448=null;
     if(typeof document!=='undefined'&&document.hidden){scheduleRevisionRetryV448();return;}
-    loadFromSheet({bypassCooldown:true,suppressStartStatus:true,silent:false}).catch(()=>{});
+    revisionRetryCountV448+=1;
+    loadFromSheet({
+      bypassCooldown:true,
+      suppressStartStatus:true,
+      silent:false,
+      revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS
+    }).catch(()=>{});
   },delay);
 }
+
+function retryRevisionNowV455(){
+  if(revisionRetryTimerV448){clearTimeout(revisionRetryTimerV448);revisionRetryTimerV448=null;}
+  // Keep the backoff history for repeated server failures, but resume immediately
+  // when the device comes online / returns to foreground.
+  loadFromSheet({bypassCooldown:true,suppressStartStatus:true,silent:false,revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS}).catch(()=>scheduleRevisionRetryV448());
+}
+if(typeof window!=='undefined')window.addEventListener('online',()=>setTimeout(retryRevisionNowV455,120));
+if(typeof document!=='undefined')document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(retryRevisionNowV455,180)});
 
 async function loadFromSheet(options = {}) {
   if (settingsWritePromise) {
@@ -953,7 +970,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V45.4 Global Revision Gate:
+      // V45.5 Global Revision Gate:
       // One tiny request detects ANY successful cloud write (turnover, Sales Card,
       // Fair/Live, commissions/settings, confirmation/Import ACK, restore, etc.).
       // If the global Revision is unchanged, Local First is already authoritative
@@ -980,7 +997,7 @@ async function loadFromSheet(options = {}) {
             salesCardRevisionChangedV444=cloudCard!==localCard;
             observedPriorityRevisionV447={turnoverRevision:cloudTurn,salesCardRevision:cloudCard,at:Date.now()};
 
-            // V45.4: never clear a valid Local First card merely because a newer
+            // V45.5: never clear a valid Local First card merely because a newer
             // revision was observed. Keep the old complete snapshot visible until
             // month data + selected Sales/Fair/Live card contexts are all fetched.
             if(cloudGlobal===localGlobal&&cloudTurn===localTurn&&!salesCardRevisionChangedV444&&pendingCountAtStart===0){
@@ -1006,7 +1023,7 @@ async function loadFromSheet(options = {}) {
               if(salesCardRevisionChangedV444&&hasLocalSalesDraftRiskV449()){
                 throw new Error('其他设备已有较新的销售卡，本机仍有未完成的销售卡修改/待同步草稿');
               }
-              // V45.4: Sales Card uses the SAME fast cloud path as profit.
+              // V45.5: Sales Card uses the SAME fast cloud path as profit.
               // Card-only changes no longer wait for month rows. If turnover/settings
               // also changed, both requests run in parallel and nothing is published
               // until every required piece succeeds.
@@ -1074,13 +1091,13 @@ async function loadFromSheet(options = {}) {
         : false;
       loadPendingRows();
       reconcilePendingRowsFromCloudV329(json.rows || []);
-      // V45.4 CARD + PROFIT ATOMIC COMMIT:
+      // V45.5 CARD + PROFIT ATOMIC COMMIT:
       // When Sales Card changed, commit the authoritative card snapshot AND the
       // profit caches derived from that same snapshot first. Only then merge the
       // turnover/month rows. No render occurs between these synchronous steps, so
       // the UI can never publish new profit with an old card (or vice versa).
       if(cloudChangedV448&&salesCardRevisionChangedV444){
-        // V45.4: card+profit came from getAllSalesProductLinks, the same fast
+        // V45.5: card+profit came from getAllSalesProductLinks, the same fast
         // authority endpoint used by profit readers. Commit them together BEFORE
         // month/turnover rows can repaint the UI.
         commitAllSalesCardsAtomicV449(prefetchedAllSalesCardsV449||[],Number(observedPriorityRevisionV447?.salesCardRevision||0));
@@ -1395,7 +1412,7 @@ function clearSalesChangeLogCacheV237(type,date){
 }
 
 const SALES_CARD_PERSIST_CACHE_KEY_V232="lover_sales_card_links_cache_v232";
-const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V45.4: local cache stays instant until the global Sales Card revision proves another device changed cards.
+const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V45.5: local cache stays instant until the global Sales Card revision proves another device changed cards.
 
 function readSalesCardPersistentCacheV232(){
   try{
@@ -1486,7 +1503,7 @@ async function loadSalesProductLinksV206(type,date,location,options={}) {
     const json=await jsonp({action:"getSalesProductLinks",type,date,location},{timeoutMs:12000});
     if(!json.ok)throw new Error(json.message||"读取盆栽关联资料失败");
     const links=setCachedSalesProductLinksV216(type,date,location,Array.isArray(json.links)?json.links:[]);
-    // V45.4 exact-context request is also card+profit authority for this context.
+    // V45.5 exact-context request is also card+profit authority for this context.
     if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,date,location,links);
     if(typeof refreshProfitAggregateCachesV321==='function'){
       const txns=[...new Set(links.map(x=>String(x.transactionId||x.saleId||'')).filter(Boolean))];
@@ -1548,7 +1565,7 @@ window.mergeAllSalesProductLinksCacheV321=mergeAllSalesProductLinksCacheV321;
 async function loadAllSalesProductLinksV203(options={}) {
   const maxAge=Number(options.maxAgeMs??120000);
   if(!options.force&&Array.isArray(allSalesProductLinksCacheV216.links)&&Date.now()-allSalesProductLinksCacheV216.at<maxAge)return allSalesProductLinksCacheV216.links;
-  // V45.4: never let an independent profit refresh advance past an actively edited
+  // V45.5: never let an independent profit refresh advance past an actively edited
   // Sales Card. Keep the last complete local authority until the edit is saved/cancelled.
   if(typeof hasLocalSalesDraftRiskV449==='function'&&hasLocalSalesDraftRiskV449()&&Array.isArray(allSalesProductLinksCacheV216.links)){
     return allSalesProductLinksCacheV216.links;
@@ -1558,7 +1575,7 @@ async function loadAllSalesProductLinksV203(options={}) {
     const json=await jsonp({action:"getAllSalesProductLinks"},{timeoutMs:Number(options.timeoutMs||15000)});
     if(!json.ok)throw new Error(json.message||"读取盆栽关联资料失败");
     const links=typeof dedupeAuthoritativeSalesLinksV354==="function"?dedupeAuthoritativeSalesLinksV354(json.links):(Array.isArray(json.links)?json.links:[]);
-    // V45.4 single authority path: the same fast request previously used by profit
+    // V45.5 single authority path: the same fast request previously used by profit
     // now atomically publishes BOTH Sales Card caches and all profit caches.
     if(typeof commitAllSalesCardsAtomicV449==='function')commitAllSalesCardsAtomicV449(links,Number(json.salesCardRevision||0));
     else allSalesProductLinksCacheV216={links,at:Date.now()};
@@ -1889,7 +1906,7 @@ async function deleteSalesTransactionV256(saleId){
   if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
   if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
   try{saveLocalDataCache()}catch(_){}
-  // V45.4: never wipe every local Sales Card after one deletion. The caller
+  // V45.5: never wipe every local Sales Card after one deletion. The caller
   // fetches one complete authoritative cloud snapshot and commits it atomically.
   return json;
 }
