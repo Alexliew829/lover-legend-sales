@@ -136,7 +136,7 @@ function getPrioritySyncLocalV315(){try{return JSON.parse(localStorage.getItem(P
 function setPrioritySyncLocalV315(v){try{localStorage.setItem(PRIORITY_SYNC_CACHE_KEY_V315,JSON.stringify(v||{}))}catch(_){}}
 async function checkPriorityRevisionV315(timeoutMs=4500){return jsonp({action:"priorityRevisionV315"},{timeoutMs});}
 function invalidateSalesCardCachesV315(){
-  // V44.4 cross-device rule: a newer cloud Sales Card revision means this
+  // V44.5 cross-device rule: a newer cloud Sales Card revision means this
   // device's exact-context persistent snapshots may be stale. Clear both the
   // session and persistent Sales Card caches so the visible/open context must
   // re-read the authoritative cloud card before the UI can report 已同步.
@@ -441,6 +441,14 @@ async function reconcileAllPendingRowsFromCloudV374(options={}){
 function setSync(text, good = false, error = false) {
   const el = document.getElementById("syncStatus");
   if (!el) return;
+
+  // V44.5: never show a green global "已同步" while the currently opened
+  // Sales Card context is still performing its exact cloud verification.
+  // Other success messages (save/confirm/etc.) remain unchanged.
+  if(good&&String(text||'')==='已同步'&&typeof window!=='undefined'&&typeof window.salesCardCloudVerifyPendingV445==='function'&&window.salesCardCloudVerifyPendingV445()){
+    el.textContent='🟡 销售卡核对中...';
+    return;
+  }
 
   if (error) {
     el.textContent = "🔴 " + text;
@@ -751,7 +759,7 @@ async function loadFromSheet(options = {}) {
       // check. Cached rows can be incomplete/stale even when revision numbers match
       // (especially after a prior interrupted load). The first sync must hydrate the
       // authoritative selected month; later resume/interval checks keep the fast path.
-      // V44.4: check the Sales Card revision even on the very first startup.
+      // V44.5: check the Sales Card revision even on the very first startup.
       // The previous startup path skipped this check until after initialCloudSyncFinished, allowing a
       // phone to show fresh profit totals while still painting an old persistent
       // Sales Card snapshot from this device.
@@ -1114,7 +1122,7 @@ function clearSalesChangeLogCacheV237(type,date){
 }
 
 const SALES_CARD_PERSIST_CACHE_KEY_V232="lover_sales_card_links_cache_v232";
-const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V44.4: local cache stays instant until the global Sales Card revision proves another device changed cards.
+const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V44.5: local cache stays instant until the global Sales Card revision proves another device changed cards.
 
 function readSalesCardPersistentCacheV232(){
   try{

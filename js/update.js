@@ -225,7 +225,7 @@
   window.addEventListener("pagehide", () => { hiddenAt = Date.now(); });
   window.addEventListener("pageshow", event => {
     // A restored back-forward-cache page may be an old Fair date-range build.
-    // Reload the document itself so the current V44.4 HTML is used, not only
+    // Reload the document itself so the current V44.5 HTML is used, not only
     // current cloud data inside an obsolete screen.
     if (event.persisted) window.location.reload();
   });
