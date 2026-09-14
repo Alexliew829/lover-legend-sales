@@ -1612,7 +1612,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4430",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4440",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1630,7 +1630,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4430";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4440";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2610,7 +2610,7 @@ function buildCloudImportProductRecordsV214(data){
 
     records.push({
       id:String(source?.id||key),
-      // V44.3: prefer the current Products ID. Old cached/import PZ IDs still
+      // V44.4: prefer the current Products ID. Old cached/import PZ IDs still
       // match by exact product name, then are upgraded before a card is saved.
       productId:String(product?.id||source?.productId||""),
       productName,
@@ -3319,7 +3319,7 @@ window.invalidateSalesCardLoadRequestsV351=invalidateSalesCardLoadRequestsV351;
 function salesCardContextKeyV245(type,date,location){
   return [String(type||""),String(date||""),String(location||"").trim().toLowerCase()].join("|");
 }
-// V44.3: a completed sale is a whole-card, permanent local fact. Keep it in
+// V44.4: a completed sale is a whole-card, permanent local fact. Keep it in
 // a separate cache so an older draft snapshot can never downgrade the card.
 const SALES_CARD_FINAL_STATE_KEY_V431='lover_sales_card_final_state_v431';
 function readSalesCardFinalStatesV431(){try{const x=JSON.parse(localStorage.getItem(SALES_CARD_FINAL_STATE_KEY_V431)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}}
@@ -3367,7 +3367,7 @@ async function loadProductLinksIntoEditorV206(type){
     ?applySalesCardFinalStatesV431(type,date,location,filterDeletedSalesLinksV350(type,date,location,cachedRaw))
     :cachedRaw;
 
-  // V44.3 Local Cache First:
+  // V44.4 Local Cache First:
   // Once this exact Sales Card context has been opened/saved on this device,
   // opening it again is 100% local and immediate. Do NOT block on, wait for,
   // or silently repaint from cloud. Cloud is needed only when this device has
@@ -5576,7 +5576,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4430",
+    version:"4440",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5777,7 +5777,7 @@ function salesCardsOfficialAmountV241(type){
 function salesCardsEnteredTotalV241(type){return salesCardWrappersV239(type).reduce((s,c)=>s+salesCardProductsV239(c).reduce((a,i)=>a+salesCardProductTotalV240(i),0),0);}
 function addProductLinkItemV209(type,data={}){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');if(!wrap)return false;
-  // V44.3: New Sales Card is local-only and instant. If a first-time cloud
+  // V44.4: New Sales Card is local-only and instant. If a first-time cloud
   // read is still showing, cancel its right to repaint this editor.
   if(wrap.querySelector('.product-link-loading-v231')){
     invalidateSalesCardLoadRequestsV351(type);
@@ -6589,7 +6589,7 @@ function renderInventoryPendingGlobalV250(){
   ["daily","live","fair"].forEach(pageType=>{
     const box=document.getElementById(pageType+"InventoryReminderV250");if(!box)return;
     const list=inventoryPendingCacheV250.filter(item=>{
-      // V44.3: a draft card must never flash an Import-inventory reminder.
+      // V44.4: a draft card must never flash an Import-inventory reminder.
       // The pending endpoint can briefly return an older state while a save or
       // confirmation request is still settling, so the visible card is the
       // final display guard. A real confirmed card remains eligible normally.
@@ -7911,7 +7911,7 @@ window.toggleProductProfitSummaryV216=toggleProductProfitSummaryV368;
 function seedVisibleDayProfitV368(type){setTimeout(()=>renderSelectedDayGrandV362(type),0)}
 setTimeout(()=>{['daily','fair','live'].forEach(seedVisibleDayProfitV368)},220);
 
-/* ================= V44.3 once-per-day unconfirmed draft reminder =================
+/* ================= V44.4 once-per-day unconfirmed draft reminder =================
    Read the complete fresh cloud list across Sales/Fair/Live and every location.
    Include same-day saved drafts, group by transaction, and stop automatically
    once the card is confirmed. */
@@ -7971,6 +7971,7 @@ function ensureDraftReminderReturnButtonV429(){
   }
   const count=unconfirmedDraftReminderItemsV429.length;
   btn.textContent=`← 未处理销售卡（${count}）`;btn.hidden=!count;
+  try{document.body.classList.toggle('has-sales-draft-return-v444',count>0)}catch(_){}
 }
 function renderUnconfirmedDraftListV429(drafts){
   document.getElementById('salesDraftListModalV429')?.remove();
@@ -8022,7 +8023,7 @@ async function checkUnconfirmedDraftReminderV369(){
     const drafts=collectUnconfirmedDraftsV369(links);
     if(!drafts.length)return;
     unconfirmedDraftReminderItemsV429=drafts;
-    // V44.3: only the explicit X button dismisses today's reminder. Leaving,
+    // V44.4: only the explicit X button dismisses today's reminder. Leaving,
     // selecting a card, or tapping the backdrop does not mark it as seen.
     renderUnconfirmedDraftListV429(drafts);
   }catch(_){return}
@@ -8310,7 +8311,7 @@ async function commitTurnoverEntriesV376(type,entries,actionText,notificationMet
   // V39.9: the authoritative total write is the user-facing completion point.
   // Entry-detail/audit persistence is secondary and retries durably in background.
   rememberTurnoverEntryPendingV376(type,ctx.date,ctx.location,clean,total);
-  setTimeout(async()=>{try{await saveTurnoverEntriesToSheetV376(type,ctx.date,ctx.location,clean,total,new Date().toISOString());clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');if(turnoverContextV376(type).date===ctx.date&&turnoverContextV376(type).location===ctx.location)renderTurnoverComposerV376(type)}catch(e){console.warn('V44.3 entry detail background sync',e);setSync(`${type==='live'?'Live':type==='daily'?ctx.location:'Fair'} 总营业额已同步；明细后台自动重试`,true)}},0);
+  setTimeout(async()=>{try{await saveTurnoverEntriesToSheetV376(type,ctx.date,ctx.location,clean,total,new Date().toISOString());clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');if(turnoverContextV376(type).date===ctx.date&&turnoverContextV376(type).location===ctx.location)renderTurnoverComposerV376(type)}catch(e){console.warn('V44.4 entry detail background sync',e);setSync(`${type==='live'?'Live':type==='daily'?ctx.location:'Fair'} 总营业额已同步；明细后台自动重试`,true)}},0);
   showTempMsg(type==='daily'?'saveMsg':type==='live'?'liveSaveMsg':'fairSaveMsg');
   // Saving turnover changes the same authoritative total used by every old calculation.
   if(typeof renderSelectedDayGrandV362==='function')renderSelectedDayGrandV362(type);
@@ -8330,7 +8331,7 @@ async function addTurnoverEntryV376(type){
   if(turnoverWriteStateV382[type])return false;
   const ids=turnoverIdsV376(type),input=document.getElementById(ids.input),value=Math.round(toAmount(input?.value||0)*100)/100;if(!value||value<0){alert('请输入新一笔营业额');return false}
   const ctx=turnoverContextV376(type),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location);
-  // V44.3: after an Apps Script timeout the optimistic entry intentionally
+  // V44.4: after an Apps Script timeout the optimistic entry intentionally
   // remains available for retry. If the user presses Save again with the same
   // value, resend that exact entry set instead of appending the value twice.
   // This is safe whether the first cloud request failed or completed late.
@@ -8447,7 +8448,7 @@ bindTurnoverContextRefreshV377();
 const _renderAllV377=renderAll;
 renderAll=function(){
   const result=_renderAllV377.apply(this,arguments);
-  try{renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live')}catch(e){console.warn('V44.3 post-render turnover',e)}
+  try{renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live')}catch(e){console.warn('V44.4 post-render turnover',e)}
   return result;
 };
 window.renderAll=renderAll;
@@ -8471,7 +8472,7 @@ showPage=function(name,el){
 };
 window.showPage=showPage;
 
-/* ================= V44.3 system status + system information ================= */
+/* ================= V44.4 system status + system information ================= */
 const SYSTEM_RELEASE_REVISION_V442='910 → 929';
 const SYSTEM_BACKUP_AT_KEY_V442='lover_sales_last_backup_at_v442';
 const SYSTEM_RESTORE_AT_KEY_V442='lover_sales_last_restore_at_v442';
@@ -8489,7 +8490,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4430$/,'44.2')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4440$/,'44.2')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8515,12 +8516,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4430'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4440'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4430')issues.push(`Frontend / API 版本不一致（Frontend 4430 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4440')issues.push(`Frontend / API 版本不一致（Frontend 4440 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4430';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4440';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){

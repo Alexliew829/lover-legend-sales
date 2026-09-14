@@ -136,13 +136,26 @@ function getPrioritySyncLocalV315(){try{return JSON.parse(localStorage.getItem(P
 function setPrioritySyncLocalV315(v){try{localStorage.setItem(PRIORITY_SYNC_CACHE_KEY_V315,JSON.stringify(v||{}))}catch(_){}}
 async function checkPriorityRevisionV315(timeoutMs=4500){return jsonp({action:"priorityRevisionV315"},{timeoutMs});}
 function invalidateSalesCardCachesV315(){
-  // V32.6: a newer sales-card revision must invalidate only in-memory/session data.
-  // Keep the exact-context persistent cache as the last-known-good snapshot so
-  // Sales/Fair/Live never flashes a fake blank/new card while cloud verification
-  // is still running. loadProductLinksIntoEditorV206() paints this snapshot first
-  // and then force-loads the authoritative cloud cards for the same context.
+  // V44.4 cross-device rule: a newer cloud Sales Card revision means this
+  // device's exact-context persistent snapshots may be stale. Clear both the
+  // session and persistent Sales Card caches so the visible/open context must
+  // re-read the authoritative cloud card before the UI can report 已同步.
   try{salesProductLinksCacheV216.clear()}catch(_){}
   try{allSalesProductLinksCacheV216={links:null,at:0}}catch(_){}
+  try{clearSalesCardPersistentCacheV232()}catch(_){}
+}
+
+async function refreshVisibleSalesCardsAfterCloudRevisionV444(){
+  const types=['daily','fair','live'];
+  const tasks=[];
+  for(const type of types){
+    try{
+      if(typeof productLinkBoxIsOpenV210==='function'&&productLinkBoxIsOpenV210(type)&&typeof loadProductLinksIntoEditorV206==='function'){
+        tasks.push(Promise.resolve(loadProductLinksIntoEditorV206(type)));
+      }
+    }catch(_){}
+  }
+  if(tasks.length)await Promise.allSettled(tasks);
 }
 
 async function checkCloudRevisionShared(timeoutMs = REVISION_CHECK_TIMEOUT_MS) {
@@ -738,30 +751,46 @@ async function loadFromSheet(options = {}) {
       // check. Cached rows can be incomplete/stale even when revision numbers match
       // (especially after a prior interrupted load). The first sync must hydrate the
       // authoritative selected month; later resume/interval checks keep the fast path.
-      if (!force && hasLocalData && initialCloudSyncFinished && options.skipRevisionCheck !== true) {
+      // V44.4: check the Sales Card revision even on the very first startup.
+      // The previous startup path skipped this check until after initialCloudSyncFinished, allowing a
+      // phone to show fresh profit totals while still painting an old persistent
+      // Sales Card snapshot from this device.
+      let salesCardRevisionChangedV444=false;
+      if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
           const pr = await checkPriorityRevisionV315(Number(options.revisionTimeoutMs || 4500));
           if (pr && pr.ok) {
             const localPr=getPrioritySyncLocalV315();
             const cloudTurn=Number(pr.turnoverRevision||0), cloudCard=Number(pr.salesCardRevision||0);
             const localTurn=Number(localPr.turnoverRevision||0), localCard=Number(localPr.salesCardRevision||0);
-            if(cloudCard!==localCard){ invalidateSalesCardCachesV315(); }
+            salesCardRevisionChangedV444=cloudCard!==localCard;
+            if(salesCardRevisionChangedV444){ invalidateSalesCardCachesV315(); }
             setPrioritySyncLocalV315({turnoverRevision:cloudTurn,salesCardRevision:cloudCard,at:Date.now()});
-            if(cloudTurn===localTurn && pendingCountAtStart===0){
+
+            // After the first full month hydration, unchanged turnover can keep the
+            // fast path. If Sales Cards changed, refresh any currently open card
+            // editor first; only then is it truthful to show 已同步.
+            if(initialCloudSyncFinished&&cloudTurn===localTurn&&pendingCountAtStart===0){
+              if(salesCardRevisionChangedV444)await refreshVisibleSalesCardsAfterCloudRevisionV444();
               setSync("已同步", true);
               completedSuccessfully = true;
               return {ok:true,month,priorityOnly:true,turnoverRevision:cloudTurn,salesCardRevision:cloudCard};
             }
-            // Turnover changed on another device: continue immediately to current-month load.
-          } else {
+            // First startup always continues to hydrate the selected month.
+            // A turnover change on another device also continues immediately.
+          } else if(initialCloudSyncFinished) {
             setSync("云端确认稍慢 · 可继续使用", false, false);
             completedSuccessfully = true;
             return {ok:true,month,revisionUnconfirmed:true};
           }
         } catch (revisionError) {
-          setSync("云端确认稍慢 · 可继续使用", false, false);
-          completedSuccessfully = true;
-          return {ok:true,month,revisionUnconfirmed:true,error:revisionError};
+          if(initialCloudSyncFinished){
+            setSync("云端确认稍慢 · 可继续使用", false, false);
+            completedSuccessfully = true;
+            return {ok:true,month,revisionUnconfirmed:true,error:revisionError};
+          }
+          // On first startup, a slow revision check must not prevent the normal
+          // authoritative month load below.
         }
       }
       let json = null;
@@ -827,7 +856,10 @@ async function loadFromSheet(options = {}) {
         loadPendingRows();
       }
       if (pendingRows.length > 0) setPendingRetrySyncStatus();
-      else setSync("已同步", true);
+      else {
+        if(salesCardRevisionChangedV444)await refreshVisibleSalesCardsAfterCloudRevisionV444();
+        setSync("已同步", true);
+      }
       completedSuccessfully = true;
 
       const year = month.slice(0, 4);
@@ -1082,7 +1114,7 @@ function clearSalesChangeLogCacheV237(type,date){
 }
 
 const SALES_CARD_PERSIST_CACHE_KEY_V232="lover_sales_card_links_cache_v232";
-const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V44.3: local Sales Card cache does not expire; cloud is read only when this device has no cache.
+const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V44.4: local cache stays instant until the global Sales Card revision proves another device changed cards.
 
 function readSalesCardPersistentCacheV232(){
   try{
