@@ -150,7 +150,7 @@ async function refreshVisibleSalesCardsAfterCloudRevisionV444(){
   if(tasks.length)await Promise.allSettled(tasks);
 }
 
-// V44.9 authoritative cross-device refresh. When the Sales Card revision changes,
+// V45.0 authoritative cross-device refresh. When the Sales Card revision changes,
 // fetch ONE complete active Sales Card snapshot from cloud. Do not clear any
 // local card cache before that request succeeds. The snapshot is committed in
 // one local transaction only after month data + all active cards both arrive.
@@ -188,6 +188,14 @@ async function fetchAllSalesCardsAtomicV449(timeoutMs=20000){
     :(Array.isArray(json.links)?json.links:[]);
 }
 
+async function fetchSyncBundleV450(month,timeoutMs=22000){
+  const json=await jsonp({action:'syncBundleV450',month:String(month||'')},{timeoutMs:Number(timeoutMs||22000)});
+  if(!json||!json.ok)throw new Error((json&&json.message)||'完整云端同步失败');
+  if(!Array.isArray(json.salesProductLinks))throw new Error('云端销售卡快照不完整');
+  return json;
+}
+if(typeof window!=='undefined')window.fetchSyncBundleV450=fetchSyncBundleV450;
+
 function commitAllSalesCardsAtomicV449(allLinks){
   const links=typeof dedupeAuthoritativeSalesLinksV354==='function'
     ?dedupeAuthoritativeSalesLinksV354(Array.isArray(allLinks)?allLinks:[])
@@ -216,6 +224,9 @@ function commitAllSalesCardsAtomicV449(allLinks){
   }
   allSalesProductLinksCacheV216={links,at:Date.now()};
   try{if(typeof clearDailyProfitCacheV237==='function')clearDailyProfitCacheV237()}catch(_){}
+  try{
+    if(typeof renderSelectedDayGrandV362==='function'){['daily','fair','live'].forEach(t=>renderSelectedDayGrandV362(t));}
+  }catch(_){}
 
   // Repaint any currently open context from the same authoritative snapshot.
   for(const type of ['daily','fair','live']){
@@ -517,7 +528,7 @@ function setSync(text, good = false, error = false) {
   const el = document.getElementById("syncStatus");
   if (!el) return;
 
-  // V44.9: never show a green global "已同步" while the currently opened
+  // V45.0: never show a green global "已同步" while the currently opened
   // Sales Card context is still performing its exact cloud verification.
   // Other success messages (save/confirm/etc.) remain unchanged.
   if(good&&String(text||'')==='已同步'&&typeof window!=='undefined'&&typeof window.cloudAtomicSyncPendingV448==='function'&&window.cloudAtomicSyncPendingV448()){
@@ -846,7 +857,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V44.9 Global Revision Gate:
+      // V45.0 Global Revision Gate:
       // One tiny request detects ANY successful cloud write (turnover, Sales Card,
       // Fair/Live, commissions/settings, confirmation/Import ACK, restore, etc.).
       // If the global Revision is unchanged, Local First is already authoritative
@@ -873,7 +884,7 @@ async function loadFromSheet(options = {}) {
             salesCardRevisionChangedV444=cloudCard!==localCard;
             observedPriorityRevisionV447={turnoverRevision:cloudTurn,salesCardRevision:cloudCard,at:Date.now()};
 
-            // V44.9: never clear a valid Local First card merely because a newer
+            // V45.0: never clear a valid Local First card merely because a newer
             // revision was observed. Keep the old complete snapshot visible until
             // month data + selected Sales/Fair/Live card contexts are all fetched.
             if(cloudGlobal===localGlobal&&cloudTurn===localTurn&&!salesCardRevisionChangedV444&&pendingCountAtStart===0){
@@ -899,11 +910,12 @@ async function loadFromSheet(options = {}) {
               if(salesCardRevisionChangedV444&&hasLocalSalesDraftRiskV449()){
                 throw new Error('其他设备已有较新的销售卡，本机仍有未完成的销售卡修改/待同步草稿');
               }
-              const jobs=[loadMonthCloudShared(month,Number(options.timeoutMs||15000))];
-              if(salesCardRevisionChangedV444)jobs.push(fetchAllSalesCardsAtomicV449(20000));
-              const results=await Promise.all(jobs);
-              prefetchedMonthJsonV448=results[0];
-              prefetchedAllSalesCardsV449=salesCardRevisionChangedV444?(results[1]||[]):null;
+              // V45.0: ONE Apps Script request returns month rows + the complete
+              // active Sales Card snapshot. This is faster on mobile cold starts and
+              // removes the split-request half-sync window.
+              const bundleV450=await fetchSyncBundleV450(month,Number(options.timeoutMs||22000));
+              prefetchedMonthJsonV448=bundleV450;
+              prefetchedAllSalesCardsV449=salesCardRevisionChangedV444?(bundleV450.salesProductLinks||[]):null;
               if(!prefetchedMonthJsonV448||!prefetchedMonthJsonV448.ok)throw new Error((prefetchedMonthJsonV448&&prefetchedMonthJsonV448.message)||'云端资料读取失败');
             }
           } else {
@@ -949,7 +961,7 @@ async function loadFromSheet(options = {}) {
       loadPendingRows();
       reconcilePendingRowsFromCloudV329(json.rows || []);
       mergeCloudMonthRows(month, json.rows || [], requestStartedAt);
-      // V44.9 atomic commit: NEVER clear cards before cloud success. A changed
+      // V45.0 atomic commit: NEVER clear cards before cloud success. A changed
       // Sales Card revision carries one complete authoritative active-card snapshot.
       // Only after month rows + that full snapshot both succeeded do we replace
       // card caches in one transaction, including true cloud deletions.
@@ -1185,7 +1197,10 @@ async function confirmSalesCardInventoryV249(payload) {
 }
 
 async function saveSalesProductLinksV206(items, saveMode="confirm", restoreGeneration=getLocalRestoreGenerationV347(), clientDeviceId="", clientSequence=0, deletedLinkIds=[]) {
-  const json = await jsonp({ action:"saveSalesProductLinks", itemsJson:JSON.stringify(items||[]), deletedLinkIdsJson:JSON.stringify(Array.isArray(deletedLinkIds)?deletedLinkIds:[]), saveMode:String(saveMode||"confirm"), restoreGeneration, clientDeviceId, clientSequence }, { timeoutMs:30000 });
+  const priorityV450=getPrioritySyncLocalV315();
+  const hasExpectedV450=Object.prototype.hasOwnProperty.call(priorityV450||{},'salesCardRevision');
+  const expectedSalesCardRevisionV450=hasExpectedV450?Number(priorityV450.salesCardRevision||0):'';
+  const json = await jsonp({ action:"saveSalesProductLinks", itemsJson:JSON.stringify(items||[]), deletedLinkIdsJson:JSON.stringify(Array.isArray(deletedLinkIds)?deletedLinkIds:[]), saveMode:String(saveMode||"confirm"), restoreGeneration, clientDeviceId, clientSequence, expectedSalesCardRevision:expectedSalesCardRevisionV450 }, { timeoutMs:30000 });
   if (!json.ok) throw new Error(json.message || "盆栽资料保存失败");
   if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
   if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
@@ -1260,7 +1275,7 @@ function clearSalesChangeLogCacheV237(type,date){
 }
 
 const SALES_CARD_PERSIST_CACHE_KEY_V232="lover_sales_card_links_cache_v232";
-const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V44.9: local cache stays instant until the global Sales Card revision proves another device changed cards.
+const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V45.0: local cache stays instant until the global Sales Card revision proves another device changed cards.
 
 function readSalesCardPersistentCacheV232(){
   try{
@@ -1719,12 +1734,15 @@ async function verifyAccessBackendVersion() {
 }
 // V29.9 stable API alias: UI save function must never shadow the transport function.
 async function deleteSalesTransactionV256(saleId){
-  const json=await jsonp({action:"deleteSalesTransaction",saleId:String(saleId||"")},{timeoutMs:20000});
+  const priorityV450=getPrioritySyncLocalV315();
+  const hasExpectedV450=Object.prototype.hasOwnProperty.call(priorityV450||{},'salesCardRevision');
+  const expectedSalesCardRevisionV450=hasExpectedV450?Number(priorityV450.salesCardRevision||0):'';
+  const json=await jsonp({action:"deleteSalesTransaction",saleId:String(saleId||""),expectedSalesCardRevision:expectedSalesCardRevisionV450},{timeoutMs:20000});
   if(!json.ok)throw new Error(json.error||"删除销售卡失败");
   if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
   if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
   try{saveLocalDataCache()}catch(_){}
-  // V44.9: never wipe every local Sales Card after one deletion. The caller
+  // V45.0: never wipe every local Sales Card after one deletion. The caller
   // fetches one complete authoritative cloud snapshot and commits it atomically.
   return json;
 }
