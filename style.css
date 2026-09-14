@@ -2986,15 +2986,15 @@ body{overflow-x:hidden;}
 
 /* V46.0 global sync state is visible on every page, including mobile Live/Fair. */
 
-/* V46.0 compact context sync status */
-.context-label-row-v457{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;margin-bottom:4px}
-.context-label-row-v457 label{margin:0;min-width:0}
-.context-sync-status-v457{font-size:15px;font-weight:900;line-height:1.15;text-align:right;white-space:nowrap;color:#6a5332;flex:0 1 auto;min-width:0}
+/* V46.4 context sync status readability: full single-line text, more room to the left. */
+.context-label-row-v457{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:8px;margin-bottom:4px}
+.context-label-row-v457 label{margin:0;min-width:0;flex:0 0 auto}
+.context-sync-status-v457{font-size:17px;font-weight:900;line-height:1.15;text-align:right;white-space:nowrap;color:#6a5332;flex:1 1 0%;min-width:0;max-width:none;overflow:hidden;text-overflow:clip}
 .context-sync-status-v457.is-good{color:#1f6a34}
 .context-sync-status-v457.is-error{color:#a22b2b}
 @media(max-width:700px){
-  .context-sync-status-v457{font-size:clamp(13px,3.55vw,15px);max-width:52%;overflow:hidden;text-overflow:ellipsis}
-  .context-label-row-v457{gap:6px}
+  .context-label-row-v457{gap:4px}
+  .context-sync-status-v457{font-size:17px;letter-spacing:-.12px}
 }
 
 /* V46.0: while a cloud write is in flight, bottom navigation cannot switch pages. */
