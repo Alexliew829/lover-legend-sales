@@ -8,10 +8,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Lover Sales</title>
-<link rel="manifest" href="manifest.json?v=44.7">
+<link rel="manifest" href="manifest.json?v=44.8">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="style.css?v=44.7">
+<link rel="stylesheet" href="style.css?v=44.8">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
@@ -362,7 +362,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V44.7</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V44.8</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -805,7 +805,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
 
     <div id="backupRestoreStatusV234" class="backup-restore-status-v234 hidden"></div>
-    <p class="note">V44.7：Home 年度利润率只使用对应销售卡售价总数作为分母。</p>
+    <p class="note">V44.8：Home 年度利润率只使用对应销售卡售价总数作为分母。</p>
   </div>
 
   
@@ -822,7 +822,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V44.7 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V44.8 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -896,7 +896,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <div class="card system-info-card-v442">
   <h2>系统资料 / System Information</h2>
   <div class="system-info-grid-v442">
-    <div><span>版本</span><b>V44.7</b></div>
+    <div><span>版本</span><b>V44.8</b></div>
     <div><span>API版本</span><b id="systemInfoApiV442">检查中…</b></div>
     <div><span>Revision（上次 → 当前）</span><b>910 → 929</b></div>
     <div><span>储存方式</span><b>Google Sheet 自动同步</b></div>
@@ -948,10 +948,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=44.7",
-      "js/sheet.js?v=44.7",
-      "js/app.js?v=44.7",
-      "js/update.js?v=44.7"
+      "js/utils.js?v=44.8",
+      "js/sheet.js?v=44.8",
+      "js/app.js?v=44.8",
+      "js/update.js?v=44.8"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");
