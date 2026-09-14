@@ -2982,3 +2982,10 @@ body{overflow-x:hidden;}
   body.has-sales-draft-return-v444{padding-bottom:calc(154px + env(safe-area-inset-bottom))!important}
   body.has-sales-draft-return-v444 .page{scroll-margin-bottom:72px}
 }
+
+
+/* V45.6 global sync state is visible on every page, including mobile Live/Fair. */
+.global-sync-status-v456{position:sticky;top:0;z-index:80;margin:0 10px 8px;padding:8px 12px;border-radius:0 0 12px 12px;background:#fff7dc;border:1px solid #e4c45f;font-weight:900;color:#5b4230;box-shadow:0 2px 8px rgba(0,0,0,.08);font-size:13px}
+.global-sync-status-v456.is-good{background:#eef9f0;border-color:#9acaa2;color:#245b2d}
+.global-sync-status-v456.is-error{background:#fff0f0;border-color:#e4a0a0;color:#8a2323}
+@media(max-width:700px){.global-sync-status-v456{margin:0 6px 6px;padding:7px 9px;font-size:12px}}
