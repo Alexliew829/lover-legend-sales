@@ -55,7 +55,7 @@ const LEGACY_LOCAL_DATA_CACHE_KEYS = [
   "lover_sales_data_cache_v92"
 ];
 const CLOUD_LOAD_COOLDOWN_MS = 20000;
-const REVISION_CHECK_TIMEOUT_MS = 9000; // V45.6: survive Apps Script cold-start; Local First remains instant.
+const REVISION_CHECK_TIMEOUT_MS = 9000; // V45.7: survive Apps Script cold-start; Local First remains instant.
 // V29.9: notification dispatch uses the existing keepalive transport.
 // It is fire-and-forget after a successful business save, so OneSignal never
 // blocks the Sales/Fair/Live save or cloud-sync path on mobile or desktop.
@@ -137,7 +137,7 @@ const PRIORITY_SYNC_CACHE_KEY_V315="lover_priority_sync_v315";
 function getPrioritySyncLocalV315(){try{return JSON.parse(localStorage.getItem(PRIORITY_SYNC_CACHE_KEY_V315)||"{}")}catch(_){return{}}}
 function setPrioritySyncLocalV315(v){try{localStorage.setItem(PRIORITY_SYNC_CACHE_KEY_V315,JSON.stringify(v||{}))}catch(_){}}
 
-// V45.6: exact-context freshness stamp. A full cloud bundle updates the global
+// V45.7: exact-context freshness stamp. A full cloud bundle updates the global
 // Sales Card revision, but an editor context is trusted only after that exact
 // date/location has been read from the authoritative endpoint (or this device
 // itself successfully saved that context).
@@ -170,7 +170,7 @@ async function refreshVisibleSalesCardsAfterCloudRevisionV444(){
   if(tasks.length)await Promise.allSettled(tasks);
 }
 
-// V45.6 authoritative cross-device refresh. When the Sales Card revision changes,
+// V45.7 authoritative cross-device refresh. When the Sales Card revision changes,
 // fetch ONE complete active Sales Card snapshot from cloud. Do not clear any
 // local card cache before that request succeeds. The snapshot is committed in
 // one local transaction only after month data + all active cards both arrive.
@@ -191,7 +191,7 @@ function cloudRevisionSafeForWriteV449(){return CLOUD_REVISION_CONFIRMED_V449===
 if(typeof window!=='undefined')window.cloudRevisionSafeForWriteV449=cloudRevisionSafeForWriteV449;
 
 function hasLocalSalesDraftRiskV449(){
-  // V45.6: only a card that is actively being edited in the DOM blocks an
+  // V45.7: only a card that is actively being edited in the DOM blocks an
   // authoritative cloud commit. Durable pending drafts are reconciled against
   // per-context cloud timestamps after the bundle arrives; they must not freeze
   // the entire device or keep an older saved draft above a newer cloud card.
@@ -232,7 +232,7 @@ async function fetchSyncBundleV450(month,timeoutMs=22000){
 }
 if(typeof window!=='undefined')window.fetchSyncBundleV450=fetchSyncBundleV450;
 
-// V45.6: durable local draft retry entries are safety copies, not an authority
+// V45.7: durable local draft retry entries are safety copies, not an authority
 // above a newer cloud context. Compare each pending context with the same-context
 // cloud timestamp from the authoritative bundle before any retry can run.
 const SALES_DRAFT_CONFLICT_BACKUP_KEY_V452='lover_sales_draft_conflict_backup_v452';
@@ -275,7 +275,7 @@ function reconcilePendingSalesDraftsFromBundleV452(bundle){
 }
 if(typeof window!=='undefined')window.reconcilePendingSalesDraftsFromBundleV452=reconcilePendingSalesDraftsFromBundleV452;
 
-// V45.6: Sales Card + profit are one local authority transaction. Profit is
+// V45.7: Sales Card + profit are one local authority transaction. Profit is
 // never allowed to come from a newer/older source than the card snapshot that
 // produced it. Rebuild the daily profit cache from the SAME authoritative card
 // snapshot before any UI repaint can occur.
@@ -305,6 +305,46 @@ function rebuildProfitCachesFromAuthoritativeCardsV453(allLinks){
 }
 if(typeof window!=='undefined')window.rebuildProfitCachesFromAuthoritativeCardsV453=rebuildProfitCachesFromAuthoritativeCardsV453;
 
+// V45.7 final: replace one exact Sales/Fair/Live context in every in-memory
+// aggregate profit authority immediately after the fast context read succeeds.
+// This uses the card payload already in memory, so it adds no cloud request and
+// prevents the Profit panel from reusing a 3-minute-old getAll cache.
+function replaceProfitAggregateContextV457(type,date,location,links){
+  const t=String(type||''),d=String(date||''),loc=String(location||'').trim().toLowerCase();
+  const fresh=typeof dedupeAuthoritativeSalesLinksV354==='function'
+    ?dedupeAuthoritativeSalesLinksV354(Array.isArray(links)?links:[])
+    :(Array.isArray(links)?links:[]);
+  const sameCtx=x=>String(x?.type||'')===t&&String(x?.date||'')===d&&String(x?.location||'').trim().toLowerCase()===loc;
+  try{
+    if(Array.isArray(allSalesProductLinksCacheV216?.links)){
+      const kept=allSalesProductLinksCacheV216.links.filter(x=>!sameCtx(x)&&!['deleted','cancelled'].includes(String(x?.status||'active').toLowerCase()));
+      allSalesProductLinksCacheV216={links:[...kept,...fresh],at:Date.now()};
+    }
+  }catch(_){}
+  try{
+    if(Array.isArray(monthGrandProfitLinksV295)){
+      const kept=monthGrandProfitLinksV295.filter(x=>!sameCtx(x)&&!['deleted','cancelled'].includes(String(x?.status||'active').toLowerCase()));
+      monthGrandProfitLinksV295=[...kept,...fresh];
+    }
+    if(Array.isArray(yearBreakdownLinksV286)){
+      const kept=yearBreakdownLinksV286.filter(x=>!sameCtx(x)&&!['deleted','cancelled'].includes(String(x?.status||'active').toLowerCase()));
+      yearBreakdownLinksV286=[...kept,...fresh];
+    }
+  }catch(_){}
+  try{if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(t,d,location,fresh)}catch(_){}
+  try{if(typeof renderSelectedDayGrandV362==='function')renderSelectedDayGrandV362(t)}catch(_){}
+  try{
+    if(typeof productProfitSelectedDateV216==='function'&&productProfitSummaryOpenV216?.[t]&&productProfitSelectedDateV216(t)===d&&typeof getDailyProfitCacheV237==='function'&&typeof renderProductProfitSummaryV216==='function'){
+      const day=getDailyProfitCacheV237(t,d)||[];
+      renderProductProfitSummaryV216(t,day);
+    }
+  }catch(_){}
+  try{if(monthGrandHistoryOpenV223&&typeof renderMonthGrandHistoryV223==='function')renderMonthGrandHistoryV223()}catch(_){}
+  try{if(Object.values(yearBreakdownOpenV224||{}).some(Boolean)&&typeof renderAllYearBreakdownsV224==='function')renderAllYearBreakdownsV224()}catch(_){}
+  return fresh;
+}
+if(typeof window!=='undefined')window.replaceProfitAggregateContextV457=replaceProfitAggregateContextV457;
+
 function commitAllSalesCardsAtomicV449(allLinks,verifiedRevisionV452=0){
   const links=typeof dedupeAuthoritativeSalesLinksV354==='function'
     ?dedupeAuthoritativeSalesLinksV354(Array.isArray(allLinks)?allLinks:[])
@@ -332,7 +372,7 @@ function commitAllSalesCardsAtomicV449(allLinks,verifiedRevisionV452=0){
     try{salesProductLinksCacheV216.set(key,{links:g.links,at:Date.now(),source:'cloud-v452'})}catch(_){}
     try{if(Number(verifiedRevisionV452||0)>0&&typeof markSalesCardContextVerifiedV451==='function')markSalesCardContextVerifiedV451(g.type,g.date,g.location,Number(verifiedRevisionV452||0))}catch(_){}
   }
-  // V45.6 atomic authority: card caches and every profit cache are rebuilt
+  // V45.7 atomic authority: card caches and every profit cache are rebuilt
   // from this exact same cloud snapshot before any visible repaint.
   rebuildProfitCachesFromAuthoritativeCardsV453(links);
   try{
@@ -386,7 +426,10 @@ async function syncChangedSalesCardContextsV456(changes,cloudCardRevision){
   // Atomic local publication: card cache and profit cache move together per context.
   for(const r of results){
     if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(r.type,r.date,r.location,r.links);
-    if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(r.type,r.date,r.location,r.links);
+    // V45.7 final: the fast context response updates card + every profit authority
+    // in the same synchronous commit. No second network request and no refresh needed.
+    if(typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(r.type,r.date,r.location,r.links);
+    else if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(r.type,r.date,r.location,r.links);
     if(typeof markSalesCardContextVerifiedV451==='function')markSalesCardContextVerifiedV451(r.type,r.date,r.location,Number(cloudCardRevision||0));
     try{
       const cur=typeof productLinkContextV206==='function'?productLinkContextV206(r.type):null;
@@ -672,45 +715,57 @@ async function reconcileAllPendingRowsFromCloudV374(options={}){
   return {ok:true,cleared:before-pendingRows.length,remaining:pendingRows.length,checkedMonths};
 }
 
+function syncStatusNodesV457(){
+  return [
+    document.getElementById("syncStatus"),
+    document.getElementById("salesSyncStatusV457"),
+    document.getElementById("fairSyncStatusV457"),
+    document.getElementById("liveSyncStatusV457")
+  ].filter(Boolean);
+}
+function writeSyncStatusV457(value,state){
+  syncStatusNodesV457().forEach(node=>{
+    node.textContent=value;
+    if(node.classList.contains("context-sync-status-v457")){
+      node.classList.toggle("is-good",state==="good");
+      node.classList.toggle("is-error",state==="error");
+    }
+  });
+}
 function setSync(text, good = false, error = false) {
-  const el = document.getElementById("syncStatus");
-  const globalEl = document.getElementById("globalSyncStatusV456");
-  if (!el && !globalEl) return;
-  const writeStatus=(value,state)=>{
-    [el,globalEl].filter(Boolean).forEach(node=>{node.textContent=value;if(node===globalEl){node.classList.toggle("is-good",state==="good");node.classList.toggle("is-error",state==="error");}});
-  };
+  const nodes=syncStatusNodesV457();
+  if(!nodes.length)return;
 
-  // V45.6: never show a green global "已同步" while the currently opened
-  // Sales Card context is still performing its exact cloud verification.
-  // Other success messages (save/confirm/etc.) remain unchanged.
+  // V45.7: Home keeps the original status row. Sales/Fair/Live show the same
+  // state compactly beside Company / Location / Host. Report and More show none.
   if(good&&String(text||'')==='已同步'&&typeof window!=='undefined'&&typeof window.cloudAtomicSyncPendingV448==='function'&&window.cloudAtomicSyncPendingV448()){
-    writeStatus('🟡 云端新资料正在完整同步...','wait');
+    writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
   if(good&&String(text||'')==='已同步'&&typeof window!=='undefined'&&typeof window.salesCardCloudVerifyPendingV445==='function'&&window.salesCardCloudVerifyPendingV445()){
-    writeStatus('🟡 销售卡核对中...','wait');
+    writeSyncStatusV457('🟡 销售卡同步中…','wait');
     return;
   }
-
-  if (error) {
-    writeStatus("🔴 " + text,"error");
+  if(error){
+    writeSyncStatusV457('🔴 '+text,'error');
     return;
   }
-
-  writeStatus((good ? "🟢 " : "🟡 ") + text,good?"good":"wait");
-
-  if (good) {
-    const last = document.getElementById("lastSync");
-    if (last) last.textContent = "最后同步：" + nowText();
-    try { localStorage.setItem("lover_sales_last_sync_at_v442", new Date().toISOString()); } catch (_) {}
+  writeSyncStatusV457((good?'🟢 ':'🟡 ')+text,good?'good':'wait');
+  if(good){
+    // V45.7 final: a confirmed sync is terminal for the current retry cycle.
+    // Cancel stale retry timers so the page does not keep issuing background
+    // probes / showing a refresh spinner after the UI already says 已同步.
+    try{if(revisionRetryTimerV448){clearTimeout(revisionRetryTimerV448);revisionRetryTimerV448=null;}revisionRetryCountV448=0;}catch(_){}
+    const last=document.getElementById("lastSync");
+    if(last)last.textContent="最后同步："+nowText();
+    try{localStorage.setItem("lover_sales_last_sync_at_v442",new Date().toISOString())}catch(_){}
+    try{window.dispatchEvent(new CustomEvent('lover-sales-sync-complete-v457',{detail:{text:String(text||'已同步')}}))}catch(_){}
   }
 }
 
 
 function markCloudCheckPending(text = "本机资料已显示 · 云端后台同步中") {
-  const el = document.getElementById("syncStatus");
-  const g=document.getElementById("globalSyncStatusV456");
-  [el,g].filter(Boolean).forEach(node=>{node.textContent="🟡 "+text;if(node===g){node.classList.remove("is-good","is-error")}});
+  writeSyncStatusV457("🟡 "+text,"wait");
 }
 
 // V29.9: best-effort immediate cloud dispatch for mobile saves.
@@ -963,7 +1018,7 @@ function salesSyncDelay(ms) {
 }
 
 function scheduleRevisionRetryV448(){
-  // V45.6: never give up after only three probes. A 2.5s probe could expire
+  // V45.7: never give up after only three probes. A 2.5s probe could expire
   // during an Apps Script cold start, leaving the device stuck at “后台检查中”
   // until the user manually refreshed. Keep retrying with a capped backoff.
   if(revisionRetryTimerV448)return;
@@ -1028,7 +1083,7 @@ async function loadFromSheet(options = {}) {
       const month = requestedMonth ||
         ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7));
 
-      // V45.6 Global Revision Gate:
+      // V45.7 Global Revision Gate:
       // One tiny request detects ANY successful cloud write (turnover, Sales Card,
       // Fair/Live, commissions/settings, confirmation/Import ACK, restore, etc.).
       // If the global Revision is unchanged, Local First is already authoritative
@@ -1055,7 +1110,7 @@ async function loadFromSheet(options = {}) {
             salesCardRevisionChangedV444=cloudCard!==localCard;
             observedPriorityRevisionV447={turnoverRevision:cloudTurn,salesCardRevision:cloudCard,at:Date.now()};
 
-            // V45.6: never clear a valid Local First card merely because a newer
+            // V45.7: never clear a valid Local First card merely because a newer
             // revision was observed. Keep the old complete snapshot visible until
             // month data + selected Sales/Fair/Live card contexts are all fetched.
             if(cloudGlobal===localGlobal&&cloudTurn===localTurn&&!salesCardRevisionChangedV444&&pendingCountAtStart===0){
@@ -1083,7 +1138,7 @@ async function loadFromSheet(options = {}) {
               if(salesCardRevisionChangedV444&&changedCardTouchesDirtyContextV456(deltaChangesV456)){
                 throw new Error('当前正在编辑的这张销售卡已有其他设备的新版本；已保护本机未保存内容，请先处理冲突。');
               }
-              // V45.6: Sales Card uses the SAME fast cloud path as profit.
+              // V45.7: Sales Card uses the SAME fast cloud path as profit.
               // Card-only changes no longer wait for month rows. If turnover/settings
               // also changed, both requests run in parallel and nothing is published
               // until every required piece succeeds.
@@ -1156,7 +1211,7 @@ async function loadFromSheet(options = {}) {
         : false;
       loadPendingRows();
       reconcilePendingRowsFromCloudV329(json.rows || []);
-      // V45.6 CARD + PROFIT ATOMIC COMMIT:
+      // V45.7 CARD + PROFIT ATOMIC COMMIT:
       // When Sales Card changed, commit the authoritative card snapshot AND the
       // profit caches derived from that same snapshot first. Only then merge the
       // turnover/month rows. No render occurs between these synchronous steps, so
@@ -1476,7 +1531,7 @@ function clearSalesChangeLogCacheV237(type,date){
 }
 
 const SALES_CARD_PERSIST_CACHE_KEY_V232="lover_sales_card_links_cache_v232";
-const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V45.6: local cache stays instant until the global Sales Card revision proves another device changed cards.
+const SALES_CARD_PERSIST_CACHE_MAX_AGE_V232=0; // V45.7: local cache stays instant until the global Sales Card revision proves another device changed cards.
 
 function readSalesCardPersistentCacheV232(){
   try{
@@ -1567,11 +1622,16 @@ async function loadSalesProductLinksV206(type,date,location,options={}) {
     const json=await jsonp({action:"getSalesProductLinks",type,date,location},{timeoutMs:12000});
     if(!json.ok)throw new Error(json.message||"读取盆栽关联资料失败");
     const links=setCachedSalesProductLinksV216(type,date,location,Array.isArray(json.links)?json.links:[]);
-    // V45.6 exact-context request is also card+profit authority for this context.
-    if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,date,location,links);
-    if(typeof refreshProfitAggregateCachesV321==='function'){
-      const txns=[...new Set(links.map(x=>String(x.transactionId||x.saleId||'')).filter(Boolean))];
-      refreshProfitAggregateCachesV321(links,txns);
+    // V45.7 final exact-context request is card+profit authority for this context.
+    // Replace the exact context in every aggregate cache so the Profit panel cannot
+    // return stale values from the older getAll cache after the card is already new.
+    if(typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(type,date,location,links);
+    else {
+      if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,date,location,links);
+      if(typeof refreshProfitAggregateCachesV321==='function'){
+        const txns=[...new Set(links.map(x=>String(x.transactionId||x.saleId||'')).filter(Boolean))];
+        refreshProfitAggregateCachesV321(links,txns);
+      }
     }
     if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
     if(json.salesCardRevision!==undefined){
@@ -1629,7 +1689,7 @@ window.mergeAllSalesProductLinksCacheV321=mergeAllSalesProductLinksCacheV321;
 async function loadAllSalesProductLinksV203(options={}) {
   const maxAge=Number(options.maxAgeMs??120000);
   if(!options.force&&Array.isArray(allSalesProductLinksCacheV216.links)&&Date.now()-allSalesProductLinksCacheV216.at<maxAge)return allSalesProductLinksCacheV216.links;
-  // V45.6: never let an independent profit refresh advance past an actively edited
+  // V45.7: never let an independent profit refresh advance past an actively edited
   // Sales Card. Keep the last complete local authority until the edit is saved/cancelled.
   if(typeof hasLocalSalesDraftRiskV449==='function'&&hasLocalSalesDraftRiskV449()&&Array.isArray(allSalesProductLinksCacheV216.links)){
     return allSalesProductLinksCacheV216.links;
@@ -1639,7 +1699,7 @@ async function loadAllSalesProductLinksV203(options={}) {
     const json=await jsonp({action:"getAllSalesProductLinks"},{timeoutMs:Number(options.timeoutMs||15000)});
     if(!json.ok)throw new Error(json.message||"读取盆栽关联资料失败");
     const links=typeof dedupeAuthoritativeSalesLinksV354==="function"?dedupeAuthoritativeSalesLinksV354(json.links):(Array.isArray(json.links)?json.links:[]);
-    // V45.6 single authority path: the same fast request previously used by profit
+    // V45.7 single authority path: the same fast request previously used by profit
     // now atomically publishes BOTH Sales Card caches and all profit caches.
     if(typeof commitAllSalesCardsAtomicV449==='function')commitAllSalesCardsAtomicV449(links,Number(json.salesCardRevision||0));
     else allSalesProductLinksCacheV216={links,at:Date.now()};
@@ -1970,7 +2030,7 @@ async function deleteSalesTransactionV256(saleId){
   if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
   if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
   try{saveLocalDataCache()}catch(_){}
-  // V45.6: never wipe every local Sales Card after one deletion. The caller
+  // V45.7: never wipe every local Sales Card after one deletion. The caller
   // fetches one complete authoritative cloud snapshot and commits it atomically.
   return json;
 }

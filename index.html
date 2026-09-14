@@ -8,10 +8,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Lover Sales</title>
-<link rel="manifest" href="manifest.json?v=45.6">
+<link rel="manifest" href="manifest.json?v=45.7">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="style.css?v=45.6">
+<link rel="stylesheet" href="style.css?v=45.7">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
@@ -362,12 +362,11 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V45.6</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V45.7</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
 
-<div id="globalSyncStatusV456" class="global-sync-status-v456" role="status" aria-live="polite">🟡 系统已进入 · 正在准备资料</div>
 <main>
 <section id="page-home" class="page active">
   <div class="card">
@@ -556,7 +555,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div class="card">
     <h2>每日营业额</h2>
     <div id="dailyInventoryReminderV250" class="inventory-global-v250 hidden"></div>
-    <label>公司</label>
+    <div class="context-label-row-v457">
+      <label for="company">公司</label>
+      <span id="salesSyncStatusV457" class="context-sync-status-v457" role="status" aria-live="polite">🟡 后台检查中</span>
+    </div>
     <select id="company">
       <option value="balakong">Lover Legend Adenium - Balakong</option>
       <option value="belimbing" selected>Lover Legend Gardening - Belimbing</option>
@@ -615,7 +617,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div class="card">
     <h2>Fair</h2>
     <div id="fairInventoryReminderV250" class="inventory-global-v250 hidden"></div>
-    <label>地点</label>
+    <div class="context-label-row-v457">
+      <label for="fairLocation">地点</label>
+      <span id="fairSyncStatusV457" class="context-sync-status-v457" role="status" aria-live="polite">🟡 后台检查中</span>
+    </div>
     <div class="fair-location-picker-v359">
       <input id="fairLocation" autocomplete="off" placeholder="输入或选择地点（例如 Sunway）">
     </div>
@@ -698,7 +703,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     <h2>Live</h2>
     <div id="liveInventoryReminderV250" class="inventory-global-v250 hidden"></div>
 
-    <label>主播</label>
+    <div class="context-label-row-v457">
+      <label for="liveHost">主播</label>
+      <span id="liveSyncStatusV457" class="context-sync-status-v457" role="status" aria-live="polite">🟡 后台检查中</span>
+    </div>
     <input id="liveHost" list="liveHostOptions" placeholder="输入或选择主播名字">
     <datalist id="liveHostOptions"></datalist>
 
@@ -806,7 +814,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     <input id="restoreFile" type="file" accept="application/json,.json" hidden>
 
     <div id="backupRestoreStatusV234" class="backup-restore-status-v234 hidden"></div>
-    <p class="note">V45.6：Home 年度利润率只使用对应销售卡售价总数作为分母。</p>
+    <p class="note">V45.7：Home 年度利润率只使用对应销售卡售价总数作为分母。</p>
   </div>
 
   
@@ -823,7 +831,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V45.6 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V45.7 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -897,7 +905,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <div class="card system-info-card-v442">
   <h2>系统资料 / System Information</h2>
   <div class="system-info-grid-v442">
-    <div><span>版本</span><b>V45.6</b></div>
+    <div><span>版本</span><b>V45.7</b></div>
     <div><span>API版本</span><b id="systemInfoApiV442">检查中…</b></div>
     <div><span>Revision（上次 → 当前）</span><b>910 → 930</b></div>
     <div><span>储存方式</span><b>Google Sheet 自动同步</b></div>
@@ -949,10 +957,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=45.6",
-      "js/sheet.js?v=45.6",
-      "js/app.js?v=45.6",
-      "js/update.js?v=45.6"
+      "js/utils.js?v=45.7",
+      "js/sheet.js?v=45.7",
+      "js/app.js?v=45.7",
+      "js/update.js?v=45.7"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");

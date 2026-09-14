@@ -2984,8 +2984,15 @@ body{overflow-x:hidden;}
 }
 
 
-/* V45.6 global sync state is visible on every page, including mobile Live/Fair. */
-.global-sync-status-v456{position:sticky;top:0;z-index:80;margin:0 10px 8px;padding:8px 12px;border-radius:0 0 12px 12px;background:#fff7dc;border:1px solid #e4c45f;font-weight:900;color:#5b4230;box-shadow:0 2px 8px rgba(0,0,0,.08);font-size:13px}
-.global-sync-status-v456.is-good{background:#eef9f0;border-color:#9acaa2;color:#245b2d}
-.global-sync-status-v456.is-error{background:#fff0f0;border-color:#e4a0a0;color:#8a2323}
-@media(max-width:700px){.global-sync-status-v456{margin:0 6px 6px;padding:7px 9px;font-size:12px}}
+/* V45.7 global sync state is visible on every page, including mobile Live/Fair. */
+
+/* V45.7 compact context sync status */
+.context-label-row-v457{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;margin-bottom:4px}
+.context-label-row-v457 label{margin:0;min-width:0}
+.context-sync-status-v457{font-size:12px;font-weight:800;line-height:1.2;text-align:right;white-space:nowrap;color:#6a5332}
+.context-sync-status-v457.is-good{color:#1f6a34}
+.context-sync-status-v457.is-error{color:#a22b2b}
+@media(max-width:700px){.context-sync-status-v457{font-size:11px;max-width:58%;overflow:hidden;text-overflow:ellipsis}.context-label-row-v457{gap:6px}}
+
+/* V45.7: while a cloud write is in flight, bottom navigation cannot switch pages. */
+.sales-mutation-lock-v450 .bottom-nav,.turnover-write-lock-v457 .bottom-nav{pointer-events:none;opacity:.62}
