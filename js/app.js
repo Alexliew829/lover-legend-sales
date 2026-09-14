@@ -1612,7 +1612,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4530",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4540",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1630,7 +1630,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4530";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4540";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1797,7 +1797,7 @@ document.getElementById("fairLocation").addEventListener("blur",()=>{
   setTimeout(()=>document.getElementById("fairLocationHistoryV309")?.classList.add("hidden"),180);
 });
 
-// V45.3: paint Home immediately from Local First cache, then perform one
+// V45.4: paint Home immediately from Local First cache, then perform one
 // lightweight GLOBAL Revision check. Full month data is downloaded only when
 // any other device/cloud write advanced the global Revision.
 attachMoneyInputs();
@@ -1871,7 +1871,7 @@ async function startInitialSalesDataLoad() {
   return startupSalesSyncPromise;
 }
 
-// V45.3: startup performs only Local First + the lightweight global Revision
+// V45.4: startup performs only Local First + the lightweight global Revision
 // gate. Do NOT download the whole year on every app open. Historical year data
 // remains on-demand when Monthly Summary/report features are opened.
 startInitialSalesDataLoad();
@@ -2606,7 +2606,7 @@ function buildCloudImportProductRecordsV214(data){
 
     records.push({
       id:String(source?.id||key),
-      // V45.3: prefer the current Products ID. Old cached/import PZ IDs still
+      // V45.4: prefer the current Products ID. Old cached/import PZ IDs still
       // match by exact product name, then are upgraded before a card is saved.
       productId:String(product?.id||source?.productId||""),
       productName,
@@ -3306,7 +3306,7 @@ function renderProductLinksLoadingV231(type){
   wrap.innerHTML='<div class="product-link-loading-v231">正在读取已保存销售卡…</div>';
 }
 const SALES_CARD_LOAD_SEQ_V245={daily:0,live:0,fair:0};
-// V45.3: Sales Card freshness is controlled by the global Revision gate.
+// V45.4: Sales Card freshness is controlled by the global Revision gate.
 // Cached exact contexts open instantly; they are refreshed only after another
 // device advances the cloud Sales Card revision.
 const SALES_CARD_VERIFY_SEQ_V445={daily:0,live:0,fair:0};
@@ -3383,7 +3383,7 @@ window.invalidateSalesCardLoadRequestsV351=invalidateSalesCardLoadRequestsV351;
 function salesCardContextKeyV245(type,date,location){
   return [String(type||""),String(date||""),String(location||"").trim().toLowerCase()].join("|");
 }
-// V45.3: a completed sale is a whole-card, permanent local fact. Keep it in
+// V45.4: a completed sale is a whole-card, permanent local fact. Keep it in
 // a separate cache so an older draft snapshot can never downgrade the card.
 const SALES_CARD_FINAL_STATE_KEY_V431='lover_sales_card_final_state_v431';
 function readSalesCardFinalStatesV431(){try{const x=JSON.parse(localStorage.getItem(SALES_CARD_FINAL_STATE_KEY_V431)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}}
@@ -3393,7 +3393,7 @@ function rememberSalesCardFinalStateV431(type,date,location,transactionId,kind){
   const tx=String(transactionId||'').trim();if(!tx||!['inventory','non_inventory'].includes(kind))return;
   const all=readSalesCardFinalStatesV431();all[salesCardFinalStateKeyV431(type,date,location,tx)]={kind,at:Date.now()};writeSalesCardFinalStatesV431(all);
 }
-// V45.3: an authoritative cloud context may legitimately become empty after a
+// V45.4: an authoritative cloud context may legitimately become empty after a
 // card is deleted on another device. Remove final-state residue for transactions
 // that no longer exist so a deleted card can never be resurrected by local state.
 function pruneSalesCardFinalStatesV447(type,date,location,links){
@@ -3446,7 +3446,7 @@ async function loadProductLinksIntoEditorV206(type){
     ?applySalesCardFinalStatesV431(type,date,location,filterDeletedSalesLinksV350(type,date,location,cachedRaw))
     :cachedRaw;
 
-  // V45.3 Local First + exact-context verification. Paint the last complete
+  // V45.4 Local First + exact-context verification. Paint the last complete
   // local card immediately. After another device advances Sales Card Revision,
   // this exact date/location is verified once against cloud before the cached
   // editor is trusted again. No cloud change = no extra card request.
@@ -3463,7 +3463,7 @@ async function loadProductLinksIntoEditorV206(type){
       setTimeout(()=>syncQueuedSalesDraftV314(pendingKey,String(pending.token||'')).catch(()=>{}),0);
       return cached;
     }
-    // V45.3: when cloud revision advanced, an old durable pending draft must not
+    // V45.4: when cloud revision advanced, an old durable pending draft must not
     // short-circuit exact verification and keep an older saved card on screen.
     // It remains safely stored until the authoritative cloud context is read.
 
@@ -3479,7 +3479,7 @@ async function loadProductLinksIntoEditorV206(type){
       const authoritative=captureSalesCardFinalStatesV431(type,date,location,deduped);
       if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,date,location,authoritative);
       if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,date,location,authoritative);
-      // V45.3: exact-context refresh commits card + profit together from the SAME
+      // V45.4: exact-context refresh commits card + profit together from the SAME
       // authoritative result. Never let the profit panel advance separately.
       if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,date,location,authoritative);
       if(typeof refreshProfitAggregateCachesV321==='function'){
@@ -3859,7 +3859,7 @@ async function removeProductFromTransactionV239(type,card,item){
 }
 
 function salesCardWriteReadyV449(){
-  // V45.3: do not freeze unrelated work while cloud sync is slow. Existing
+  // V45.4: do not freeze unrelated work while cloud sync is slow. Existing
   // devices carry a last-known Sales Card revision on every save/delete and
   // Code.gs rejects stale writes atomically. Only a device with no known card
   // revision at all is held during a positively detected cloud refresh.
@@ -3889,7 +3889,7 @@ async function deleteSalesCardTransactionV239(type,txnId){
     if(saved.length){
       setSync('删除中 · 正在写入云端…');
       await deleteSalesTransactionV256(txnId);
-      // V45.3: deletion is complete only after an authoritative one-request
+      // V45.4: deletion is complete only after an authoritative one-request
       // bundle confirms BOTH the card snapshot and the month/profit state.
       const month=(typeof selectedMonth==='function'&&selectedMonth())||new Date().toISOString().slice(0,7);
       const bundle=await (typeof fetchSyncBundleV450==='function'?fetchSyncBundleV450(month,22000):window.fetchSyncBundleV450(month,22000));
@@ -5734,7 +5734,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4530",
+    version:"4540",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5935,7 +5935,7 @@ function salesCardsOfficialAmountV241(type){
 function salesCardsEnteredTotalV241(type){return salesCardWrappersV239(type).reduce((s,c)=>s+salesCardProductsV239(c).reduce((a,i)=>a+salesCardProductTotalV240(i),0),0);}
 function addProductLinkItemV209(type,data={}){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');if(!wrap)return false;
-  // V45.3: New Sales Card is local-only and instant. If a first-time cloud
+  // V45.4: New Sales Card is local-only and instant. If a first-time cloud
   // read is still showing, cancel its right to repaint this editor.
   if(wrap.querySelector('.product-link-loading-v231')){
     invalidateSalesCardLoadRequestsV351(type);
@@ -6370,7 +6370,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
 
   if(saveMode==='draft'){
     try{
-      // V45.3: local safety copy is still written first, but “保存成功” is not
+      // V45.4: local safety copy is still written first, but “保存成功” is not
       // shown until Code.gs confirms the cloud write. This prevents a user from
       // leaving while the only copy is still a pending background draft.
       const queued=queueSalesDraftV314(type,ctx.date,ctx.location,items);
@@ -6751,7 +6751,7 @@ function renderInventoryPendingGlobalV250(){
   ["daily","live","fair"].forEach(pageType=>{
     const box=document.getElementById(pageType+"InventoryReminderV250");if(!box)return;
     const list=inventoryPendingCacheV250.filter(item=>{
-      // V45.3: a draft card must never flash an Import-inventory reminder.
+      // V45.4: a draft card must never flash an Import-inventory reminder.
       // The pending endpoint can briefly return an older state while a save or
       // confirmation request is still settling, so the visible card is the
       // final display guard. A real confirmed card remains eligible normally.
@@ -8073,7 +8073,7 @@ window.toggleProductProfitSummaryV216=toggleProductProfitSummaryV368;
 function seedVisibleDayProfitV368(type){setTimeout(()=>renderSelectedDayGrandV362(type),0)}
 setTimeout(()=>{['daily','fair','live'].forEach(seedVisibleDayProfitV368)},220);
 
-/* ================= V45.3 field drag/drop protection =================
+/* ================= V45.4 field drag/drop protection =================
    Prevent selected text/numbers from being dragged into another input and
    overwriting price/cost/quantity/remark fields. Normal keyboard typing and
    clipboard copy/paste remain available. */
@@ -8084,7 +8084,7 @@ setTimeout(()=>{['daily','fair','live'].forEach(seedVisibleDayProfitV368)},220);
   document.addEventListener('drop',event=>{if(isField(event.target)){event.preventDefault();event.stopPropagation()}},true);
 })();
 
-/* ================= V45.3 once-per-day unconfirmed draft reminder =================
+/* ================= V45.4 once-per-day unconfirmed draft reminder =================
    Read the complete fresh cloud list across Sales/Fair/Live and every location.
    Include same-day saved drafts, group by transaction, and stop automatically
    once the card is confirmed. */
@@ -8196,7 +8196,7 @@ async function checkUnconfirmedDraftReminderV369(){
     const drafts=collectUnconfirmedDraftsV369(links);
     if(!drafts.length)return;
     unconfirmedDraftReminderItemsV429=drafts;
-    // V45.3: only the explicit X button dismisses today's reminder. Leaving,
+    // V45.4: only the explicit X button dismisses today's reminder. Leaving,
     // selecting a card, or tapping the backdrop does not mark it as seen.
     renderUnconfirmedDraftListV429(drafts);
   }catch(_){return}
@@ -8484,7 +8484,7 @@ async function commitTurnoverEntriesV376(type,entries,actionText,notificationMet
   // V39.9: the authoritative total write is the user-facing completion point.
   // Entry-detail/audit persistence is secondary and retries durably in background.
   rememberTurnoverEntryPendingV376(type,ctx.date,ctx.location,clean,total);
-  setTimeout(async()=>{try{await saveTurnoverEntriesToSheetV376(type,ctx.date,ctx.location,clean,total,new Date().toISOString());clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');if(turnoverContextV376(type).date===ctx.date&&turnoverContextV376(type).location===ctx.location)renderTurnoverComposerV376(type)}catch(e){console.warn('V45.3 entry detail background sync',e);setSync(`${type==='live'?'Live':type==='daily'?ctx.location:'Fair'} 总营业额已同步；明细后台自动重试`,true)}},0);
+  setTimeout(async()=>{try{await saveTurnoverEntriesToSheetV376(type,ctx.date,ctx.location,clean,total,new Date().toISOString());clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');if(turnoverContextV376(type).date===ctx.date&&turnoverContextV376(type).location===ctx.location)renderTurnoverComposerV376(type)}catch(e){console.warn('V45.4 entry detail background sync',e);setSync(`${type==='live'?'Live':type==='daily'?ctx.location:'Fair'} 总营业额已同步；明细后台自动重试`,true)}},0);
   showTempMsg(type==='daily'?'saveMsg':type==='live'?'liveSaveMsg':'fairSaveMsg');
   // Saving turnover changes the same authoritative total used by every old calculation.
   if(typeof renderSelectedDayGrandV362==='function')renderSelectedDayGrandV362(type);
@@ -8504,7 +8504,7 @@ async function addTurnoverEntryV376(type){
   if(turnoverWriteStateV382[type])return false;
   const ids=turnoverIdsV376(type),input=document.getElementById(ids.input),value=Math.round(toAmount(input?.value||0)*100)/100;if(!value||value<0){alert('请输入新一笔营业额');return false}
   const ctx=turnoverContextV376(type),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location);
-  // V45.3: after an Apps Script timeout the optimistic entry intentionally
+  // V45.4: after an Apps Script timeout the optimistic entry intentionally
   // remains available for retry. If the user presses Save again with the same
   // value, resend that exact entry set instead of appending the value twice.
   // This is safe whether the first cloud request failed or completed late.
@@ -8550,7 +8550,7 @@ try{localStorage.removeItem('lover_live_turnover_drafts_v332');localStorage.remo
 // V39.9 save-card handoff: immediately repaint the selected day's profit from the saved result/cache.
 const _saveProductLinksV376=saveProductLinksV206;
 saveProductLinksV206=async function(type,...args){
-  // V45.3 write barrier: viewing/editing locally is allowed, but a Sales Card
+  // V45.4 write barrier: viewing/editing locally is allowed, but a Sales Card
   // cannot be committed while this device has not confirmed the latest cloud
   // revision. This prevents stale Local First state overwriting another device.
   if(!requireSalesCardWriteReadyV449())return null;
@@ -8625,7 +8625,7 @@ bindTurnoverContextRefreshV377();
 const _renderAllV377=renderAll;
 renderAll=function(){
   const result=_renderAllV377.apply(this,arguments);
-  try{renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live')}catch(e){console.warn('V45.3 post-render turnover',e)}
+  try{renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live')}catch(e){console.warn('V45.4 post-render turnover',e)}
   return result;
 };
 window.renderAll=renderAll;
@@ -8649,7 +8649,7 @@ showPage=function(name,el){
 };
 window.showPage=showPage;
 
-/* ================= V45.3 transaction UX + global drag/drop safety ================= */
+/* ================= V45.4 transaction UX + global drag/drop safety ================= */
 let SALES_MUTATION_LOCK_V450=false;
 function setSalesMutationLockV450(value,label=''){
   SALES_MUTATION_LOCK_V450=!!value;
@@ -8696,7 +8696,7 @@ deleteSalesCardTransactionV239=async function(type,txnId){
 };
 window.deleteSalesCardTransactionV239=deleteSalesCardTransactionV239;
 
-/* ================= V45.3 system status + system information ================= */
+/* ================= V45.4 system status + system information ================= */
 const SYSTEM_RELEASE_REVISION_V442='910 → 930';
 const SYSTEM_BACKUP_AT_KEY_V442='lover_sales_last_backup_at_v442';
 const SYSTEM_RESTORE_AT_KEY_V442='lover_sales_last_restore_at_v442';
@@ -8714,7 +8714,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4530$/,'45.3')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4540$/,'45.4')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8740,12 +8740,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4530'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4540'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4530')issues.push(`Frontend / API 版本不一致（Frontend 4530 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4540')issues.push(`Frontend / API 版本不一致（Frontend 4540 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4530';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4540';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
