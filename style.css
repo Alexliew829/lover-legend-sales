@@ -2984,9 +2984,9 @@ body{overflow-x:hidden;}
 }
 
 
-/* V45.9 global sync state is visible on every page, including mobile Live/Fair. */
+/* V46.0 global sync state is visible on every page, including mobile Live/Fair. */
 
-/* V45.9 compact context sync status */
+/* V46.0 compact context sync status */
 .context-label-row-v457{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;margin-bottom:4px}
 .context-label-row-v457 label{margin:0;min-width:0}
 .context-sync-status-v457{font-size:12px;font-weight:800;line-height:1.2;text-align:right;white-space:nowrap;color:#6a5332}
@@ -2994,5 +2994,5 @@ body{overflow-x:hidden;}
 .context-sync-status-v457.is-error{color:#a22b2b}
 @media(max-width:700px){.context-sync-status-v457{font-size:11px;max-width:58%;overflow:hidden;text-overflow:ellipsis}.context-label-row-v457{gap:6px}}
 
-/* V45.9: while a cloud write is in flight, bottom navigation cannot switch pages. */
+/* V46.0: while a cloud write is in flight, bottom navigation cannot switch pages. */
 .sales-mutation-lock-v450 .bottom-nav,.turnover-write-lock-v457 .bottom-nav{pointer-events:none;opacity:.62}

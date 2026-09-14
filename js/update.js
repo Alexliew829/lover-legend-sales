@@ -11,7 +11,7 @@
   let resumePromise = null;
   let lastResumeAt = 0;
 
-  // V45.9: once the core sync state says 已同步, treat this refresh cycle as
+  // V46.0: once the core sync state says 已同步, treat this refresh cycle as
   // terminal. This prevents a queued focus/resume timer from immediately
   // starting another visible "checking" cycle after success.
   window.addEventListener('lover-sales-sync-complete-v458',()=>{
@@ -114,7 +114,7 @@
   async function registerAndCheckForUpdates() {
     if (!("serviceWorker" in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register("./sw.js?v=45.9", { updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.register("./sw.js?v=46.0", { updateViaCache: "none" });
       await registration.update();
       await activateWaitingWorker(registration);
       registration.addEventListener("updatefound", () => {
@@ -233,7 +233,7 @@
   window.addEventListener("pagehide", () => { hiddenAt = Date.now(); });
   window.addEventListener("pageshow", event => {
     // A restored back-forward-cache page may be an old Fair date-range build.
-    // Reload the document itself so the current V45.9 HTML is used, not only
+    // Reload the document itself so the current V46.0 HTML is used, not only
     // current cloud data inside an obsolete screen.
     if (event.persisted) window.location.reload();
   });
@@ -329,7 +329,7 @@
       indicator.style.transform = "translate(-50%, -70px)";
     }, { passive: true });
 
-    // V45.9: if any automatic/manual cloud path has already reached a
+    // V46.0: if any automatic/manual cloud path has already reached a
     // confirmed 已同步 state, make sure a stale pull-refresh indicator is closed.
     window.addEventListener('lover-sales-sync-complete-v458',()=>{
       tracking=false;verticalGesture=false;distance=0;
