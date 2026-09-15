@@ -200,7 +200,7 @@ async function refreshActiveContextDirectV471(ctx,probe,options={}){
       if(cur&&String(cur.date||'')===String(ctx.date)&&String(cur.location||'').trim().toLowerCase()===String(ctx.location||'').trim().toLowerCase()&&!dirty&&typeof renderProductLinksEditorV206==='function'){renderProductLinksEditorV206(ctx.type,links);if(typeof applyCloudDraftStatusesV322==='function')applyCloudDraftStatusesV322(ctx.type,links);}
     }catch(_){ }
   }
-  setContextPriorityLocalV470(ctx,{turnoverRevision:Number(probe?.turnoverRevision||0),salesCardRevision:Number(probe?.salesCardRevision||0),restoreGeneration:Number(probe?.restoreGeneration||0)});
+  setContextPriorityLocalV470(ctx,{turnoverRevision:Number(probe?.turnoverGlobalRevision||probe?.turnoverRevision||0),salesCardRevision:Number(probe?.salesCardGlobalRevision||probe?.salesCardRevision||0),restoreGeneration:Number(probe?.restoreGeneration||0)});
   setCloudAtomicSyncPendingV448(false);setCloudRevisionConfirmedV449(true);
   if(!options.silent)setSync(contextSyncLabelV471(ctx,needTurn,needCard,true),true);
   return{ok:true,needTurn,needCard};
@@ -224,7 +224,7 @@ function salesCardContextNeedsVerifyV451(type,date,location){
   const all=readSalesCardContextVerifyV451();
   return Number(all[salesCardContextVerifyKeyV451(type,date,location)]||0)!==rev;
 }
-// V47.1 context-aware trust advancement. When the server returns a COMPLETE
+// V47.2 context-aware trust advancement. When the server returns a COMPLETE
 // change journal, every cached Sales Card context that is absent from the card
 // changes is proven unchanged. Advance only those contexts to the new global
 // Sales Card revision locally, without re-reading them from cloud. Changed
@@ -834,7 +834,7 @@ function writeSyncStatusV457(value,state){
 function setSync(text, good = false, error = false) {
   const nodes=syncStatusNodesV457();
   if(!nodes.length)return;
-  // V47.1: foreground turnover save/delete owns this line until its write or
+  // V47.2: foreground turnover save/delete owns this line until its write or
   // timeout reconciliation really finishes. Background checks cannot paint green.
   try{
     const fg=typeof window!=='undefined'&&typeof window.getForegroundTurnoverWriteStatusV471==='function'?window.getForegroundTurnoverWriteStatusV471():null;
@@ -1142,6 +1142,37 @@ function scheduleRevisionRetryV448(){
   },delay);
 }
 
+async function syncCurrentContextNowV472(options={}){
+  const ctx=typeof window!=='undefined'&&typeof window.getActivePriorityContextV469==='function'?window.getActivePriorityContextV469():null;
+  if(!ctx)return{ok:false,skipped:true};
+  const key=contextPriorityKeyV470(ctx),seq=(syncCurrentContextNowV472._seq||0)+1;syncCurrentContextNowV472._seq=seq;
+  if(syncCurrentContextNowV472._promise&&syncCurrentContextNowV472._key===key)return syncCurrentContextNowV472._promise;
+  syncCurrentContextNowV472._key=key;
+  const task=(async()=>{
+    try{
+      if(options.showChecking!==false)setSync(contextSyncLabelV471(ctx,false,false,false));
+      const probe=await checkContextPriorityRevisionV470(ctx,Number(options.revisionTimeoutMs||5000));
+      if(seq!==syncCurrentContextNowV472._seq)return{ok:false,stale:true};
+      if(!probe?.ok)throw new Error(probe?.message||'当前资料检查失败');
+      const local=getContextPriorityLocalV470(ctx),restoreChanged=Number(local.restoreGeneration||0)!==Number(probe.restoreGeneration||0);
+      if(restoreChanged||probe.needsTurnoverRefresh||probe.needsSalesCardRefresh){
+        await refreshActiveContextDirectV471(ctx,probe,{silent:false,timeoutMs:Number(options.timeoutMs||12000),cardTimeoutMs:Number(options.cardTimeoutMs||12000)});
+      }else{
+        setContextPriorityLocalV470(ctx,{turnoverRevision:Number(probe.turnoverGlobalRevision||probe.turnoverRevision||0),salesCardRevision:Number(probe.salesCardGlobalRevision||probe.salesCardRevision||0),restoreGeneration:Number(probe.restoreGeneration||0)});
+        setCloudAtomicSyncPendingV448(false);setCloudRevisionConfirmedV449(true);setSync('已同步',true);
+      }
+      return{ok:true,context:ctx};
+    }catch(e){
+      setSync('上次同步资料已保留，后台检查中',true,false);scheduleRevisionRetryV448();return{ok:false,error:e,context:ctx};
+    }finally{
+      if(syncCurrentContextNowV472._key===key){syncCurrentContextNowV472._promise=null;syncCurrentContextNowV472._key='';}
+    }
+  })();
+  syncCurrentContextNowV472._promise=task;
+  return task;
+}
+if(typeof window!=='undefined')window.syncCurrentContextNowV472=syncCurrentContextNowV472;
+
 function retryRevisionNowV455(){
   if(revisionRetryTimerV448){clearTimeout(revisionRetryTimerV448);revisionRetryTimerV448=null;}
   // Keep the backoff history for repeated server failures, but resume immediately
@@ -1202,7 +1233,7 @@ async function loadFromSheet(options = {}) {
       let activeContextV470=null,contextProbeV470=null;
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
-          // V47.1 normal foreground path: ask only the currently visible
+          // V47.2 normal foreground path: ask only the currently visible
           // Sales/Fair/Live context. Unrelated devices/hosts/dates no longer
           // trigger a global revision probe or a card/month read.
           activeContextV470=typeof window.getActivePriorityContextV469==='function'?window.getActivePriorityContextV469():null;
@@ -1212,12 +1243,13 @@ async function loadFromSheet(options = {}) {
               const localCtx=getContextPriorityLocalV470(activeContextV470);
               const sameCtx=!contextProbeV470.needsTurnoverRefresh&&!contextProbeV470.needsSalesCardRefresh&&Number(localCtx.restoreGeneration||0)===Number(contextProbeV470.restoreGeneration||0);
               if(sameCtx&&pendingCountAtStart===0){
+                setContextPriorityLocalV470(activeContextV470,{turnoverRevision:Number(contextProbeV470.turnoverGlobalRevision||contextProbeV470.turnoverRevision||0),salesCardRevision:Number(contextProbeV470.salesCardGlobalRevision||contextProbeV470.salesCardRevision||0),restoreGeneration:Number(contextProbeV470.restoreGeneration||0)});
                 setCloudAtomicSyncPendingV448(false);setCloudRevisionConfirmedV449(true);setSync('已同步',true);completedSuccessfully=true;
                 return{ok:true,month,contextRevisionOnly:true,context:activeContextV470};
               }
             }
           }
-          // V47.1: a changed visible context closes directly on that context.
+          // V47.2: a changed visible context closes directly on that context.
           // No global revision hop, so unrelated hosts/locations/dates cannot delay
           // the page the user is actually looking at.
           if(activeContextV470&&contextProbeV470?.ok){
@@ -1286,7 +1318,7 @@ async function loadFromSheet(options = {}) {
               const monthPromiseV454=needsMonthRefreshV454?loadMonthCloudShared(month,Number(options.timeoutMs||15000)):Promise.resolve(null);
               const pairV454=await Promise.all([cardPromiseV454,monthPromiseV454]);
               if(canContextDeltaV456){
-                // V47.1: deltaComplete proves which exact contexts changed. The
+                // V47.2: deltaComplete proves which exact contexts changed. The
                 // changed contexts were just fetched above; every cached context
                 // not present in the journal can be trusted at cloudCard without
                 // another request when the user opens/returns to it.
