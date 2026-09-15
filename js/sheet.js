@@ -142,7 +142,54 @@ function readContextPrioritySyncV470(){try{const x=JSON.parse(localStorage.getIt
 function contextPriorityKeyV470(ctx){return [String(ctx?.type||''),String(ctx?.date||''),String(ctx?.location||'').trim().toLowerCase()].join('|')}
 function getContextPriorityLocalV470(ctx){const all=readContextPrioritySyncV470();return all[contextPriorityKeyV470(ctx)]||{};}
 function setContextPriorityLocalV470(ctx,rev){if(!ctx||!ctx.type||!ctx.date||!String(ctx.location||'').trim()||!rev)return;const all=readContextPrioritySyncV470(),key=contextPriorityKeyV470(ctx),old=all[key]&&typeof all[key]==='object'?all[key]:{};all[key]={...old,at:Date.now()};if(Object.prototype.hasOwnProperty.call(rev,'turnoverRevision'))all[key].turnoverRevision=Number(rev.turnoverRevision||0);if(Object.prototype.hasOwnProperty.call(rev,'salesCardRevision'))all[key].salesCardRevision=Number(rev.salesCardRevision||0);if(Object.prototype.hasOwnProperty.call(rev,'restoreGeneration'))all[key].restoreGeneration=Number(rev.restoreGeneration||0);try{localStorage.setItem(CONTEXT_PRIORITY_SYNC_KEY_V470,JSON.stringify(all))}catch(_){}}
-async function checkContextPriorityRevisionV470(ctx,timeoutMs=5000){const local=getContextPriorityLocalV470(ctx);return jsonp({action:'contextPriorityRevisionV470',type:ctx.type,date:ctx.date,location:ctx.location,lastTurnoverRevision:Number(local.turnoverRevision||0),lastSalesCardRevision:Number(local.salesCardRevision||0)},{timeoutMs});}
+let contextJournalProbePromiseV478=null;
+let contextJournalProbeKeyV478='';
+function contextJournalChangeMatchesV478(change,ctx,kind,lastRevision){
+  if(!change||String(change.kind||'')!==String(kind||''))return false;
+  if(Number(change.revision||0)<=Number(lastRevision||0))return false;
+  if(String(change.type||'')!==String(ctx?.type||''))return false;
+  if(String(change.date||'')!==String(ctx?.date||''))return false;
+  return String(change.location||'').trim().toLowerCase()===String(ctx?.location||'').trim().toLowerCase();
+}
+// V47.8 hybrid probe: keep V47.8 per-context watermarks, but use the proven V46.6
+// single lightweight priorityRevisionV456 + change-journal endpoint. Multiple
+// foreground triggers for the same context/watermark share one request. The
+// client derives whether THIS context changed; unrelated hosts/dates never cause
+// a context fetch and no per-context ScriptProperties endpoint is needed.
+async function checkContextPriorityRevisionV470(ctx,timeoutMs=REVISION_CHECK_TIMEOUT_MS){
+  const local=getContextPriorityLocalV470(ctx);
+  const lastTurn=Number(local.turnoverRevision||0),lastCard=Number(local.salesCardRevision||0);
+  const requestKey=[contextPriorityKeyV470(ctx),lastTurn,lastCard].join('|');
+  if(contextJournalProbePromiseV478&&contextJournalProbeKeyV478===requestKey)return contextJournalProbePromiseV478;
+  const task=jsonp({action:'priorityRevisionV456',lastTurnoverRevision:lastTurn,lastSalesCardRevision:lastCard},{timeoutMs:Number(timeoutMs||REVISION_CHECK_TIMEOUT_MS)}).then(rev=>{
+    if(!rev||rev.ok!==true)return rev;
+    const cloudTurn=Number(rev.turnoverRevision||0),cloudCard=Number(rev.salesCardRevision||0),changes=Array.isArray(rev.changes)?rev.changes:[];
+    const turnComplete=rev.turnoverDeltaComplete===true||(rev.deltaComplete===true);
+    const cardComplete=rev.salesCardDeltaComplete===true||(rev.deltaComplete===true);
+    const turnGlobalChanged=cloudTurn!==lastTurn,cardGlobalChanged=cloudCard!==lastCard;
+    const turnConfirmed=turnGlobalChanged&&turnComplete&&changes.some(x=>contextJournalChangeMatchesV478(x,ctx,'turnover',lastTurn));
+    const cardConfirmed=cardGlobalChanged&&cardComplete&&changes.some(x=>contextJournalChangeMatchesV478(x,ctx,'card',lastCard));
+    // If the journal fully covers the interval and this context is absent, it is
+    // proven unchanged. Only an incomplete journal asks for a small safety read.
+    const needTurn=turnGlobalChanged&&(!turnComplete||turnConfirmed);
+    const needCard=cardGlobalChanged&&(!cardComplete||cardConfirmed);
+    return {
+      ok:true,type:ctx.type,date:ctx.date,location:ctx.location,
+      turnoverRevision:cloudTurn,salesCardRevision:cloudCard,
+      turnoverGlobalRevision:cloudTurn,salesCardGlobalRevision:cloudCard,
+      needsTurnoverRefresh:needTurn,needsSalesCardRefresh:needCard,
+      turnoverChangeConfirmed:turnConfirmed,salesCardChangeConfirmed:cardConfirmed,
+      turnoverDeltaComplete:turnComplete,salesCardDeltaComplete:cardComplete,
+      deltaComplete:turnComplete&&cardComplete,
+      restoreGeneration:Number(rev.restoreGeneration||0),
+      changes
+    };
+  }).finally(()=>{
+    if(contextJournalProbeKeyV478===requestKey){contextJournalProbePromiseV478=null;contextJournalProbeKeyV478='';}
+  });
+  contextJournalProbeKeyV478=requestKey;contextJournalProbePromiseV478=task;
+  return task;
+}
 async function loadTurnoverContextV471(ctx,timeoutMs=12000){return jsonp({action:'getTurnoverContextV471',type:ctx.type,date:ctx.date,location:ctx.location},{timeoutMs});}
 function contextSyncLabelV471(ctx,turnoverChanged,cardChanged,done=false){
   const type=String(ctx?.type||''),loc=String(ctx?.location||'').trim(),suffix=done?'已同步':'同步中…';
@@ -195,7 +242,7 @@ function commitTurnoverContextV471(ctx,json){
 async function refreshActiveContextDirectV471(ctx,probe,options={}){
   const restoreChanged=Number(getContextPriorityLocalV470(ctx).restoreGeneration||0)!==Number(probe?.restoreGeneration||0);
   const needTurn=restoreChanged||!!probe?.needsTurnoverRefresh;
-  // V47.7: an incomplete/old card watermark is NOT a card change. Only a journal-
+  // V47.8: an incomplete/old card watermark is NOT a card change. Only a journal-
   // confirmed current-context card change (or Restore) may trigger foreground card I/O.
   const needCard=restoreChanged||probe?.salesCardChangeConfirmed===true||options.allowSafetyCard===true;
   if(!needTurn&&!needCard)return{ok:true,needTurn:false,needCard:false};
@@ -878,7 +925,7 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
-  // V47.7: legacy/safety Sales Card verification is never allowed to hijack a
+  // V47.8: legacy/safety Sales Card verification is never allowed to hijack a
   // confirmed current-context sync status. Real card work paints its own status.
   if(error){
     writeSyncStatusV457('🔴 '+text,'error');
@@ -1205,8 +1252,12 @@ async function syncCurrentContextNowV472(options={}){
       }
       return{ok:true,context:ctx};
     }catch(e){
-      // Keep Local First visible and retry quietly. A transient probe timeout is
-      // not user-visible sync work and must not flash 后台检查中 repeatedly.
+      // V47.8: keep Local First data, but never leave a stale green "已同步" when
+      // the current context revision could not be confirmed. Retry stays deduped.
+      try{
+        const fg=typeof window!=='undefined'&&typeof window.getForegroundTurnoverWriteStatusV471==='function'?window.getForegroundTurnoverWriteStatusV471():null;
+        if(!(fg&&fg.active)&&typeof document!=='undefined'&&!document.hidden)setSync('云端连接较慢 · 本机资料已保留',false,false);
+      }catch(_){ }
       scheduleRevisionRetryV448();return{ok:false,error:e,context:ctx};
     }finally{
       if(syncCurrentContextNowV472._key===key&&syncCurrentContextNowV472._seq===seq){syncCurrentContextNowV472._promise=null;syncCurrentContextNowV472._key='';}
