@@ -1366,7 +1366,9 @@ function setDailyTurnoverSaveButtonV382(state){
   const btn=document.getElementById('dailyTurnoverSaveBtnV382');if(!btn)return;
   if(!btn.dataset.idleText)btn.dataset.idleText=btn.textContent;
   if(state==='saving'){btn.disabled=true;btn.textContent='储存进行中…';return}
+  if(state==='deleting'){btn.disabled=true;btn.textContent='删除中…';return}
   if(state==='saved'){btn.disabled=true;btn.textContent='✓ 已储存';setTimeout(()=>{btn.disabled=false;btn.textContent=btn.dataset.idleText||'储存'},1200);return}
+  if(state==='deleted'){btn.disabled=true;btn.textContent='✓ 已删除';setTimeout(()=>{btn.disabled=false;btn.textContent=btn.dataset.idleText||'储存'},1200);return}
   btn.disabled=false;btn.textContent=btn.dataset.idleText||'储存';
 }
 async function saveDailySales(){
@@ -1618,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4660",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4820",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1636,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4660";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4820";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3458,64 +3460,23 @@ async function loadProductLinksIntoEditorV206(type){
     ?applySalesCardFinalStatesV431(type,date,location,filterDeletedSalesLinksV350(type,date,location,cachedRaw))
     :cachedRaw;
 
-  // V46.0 Local First + exact-context verification. Paint the last complete
-  // local card immediately. After another device advances Sales Card Revision,
-  // this exact date/location is verified once against cloud before the cached
-  // editor is trusted again. No cloud change = no extra card request.
+  // V48.2: keep the V48.2 Local First sync architecture.
+  // A cached Sales Card opens immediately and is NOT exact-read merely because
+  // a legacy/global verification watermark differs. Real cross-device changes
+  // are already handled by the V48.2 shared priorityRevisionV456 change journal,
+  // which fetches only card contexts that actually changed.
   if(Array.isArray(cached)){
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
     applyCloudDraftStatusesV322(type,cached);
     const pendingKey=salesDraftPendingKeyV314(type,date,location);
     const pending=readSalesDraftPendingV314()[pendingKey];
-    const needsExactVerify=typeof salesCardContextNeedsVerifyV451==='function'&&salesCardContextNeedsVerifyV451(type,date,location);
-    if(pending&&!needsExactVerify){
+    if(pending){
       const pre=productLinkPreV208(type),msg=document.getElementById(pre+'ProductLinkMsg');
       if(msg){msg.classList.remove('hidden');msg.textContent='🟡 本机销售卡已打开 · 云端后台自动重试';}
       setSync('本机销售卡待云端同步');
       setTimeout(()=>syncQueuedSalesDraftV314(pendingKey,String(pending.token||'')).catch(()=>{}),0);
-      return cached;
     }
-    // V46.0: when cloud revision advanced, an old durable pending draft must not
-    // short-circuit exact verification and keep an older saved card on screen.
-    // It remains safely stored until the authoritative cloud context is read.
-
-    const dirtyNow=typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238(type);
-    if(!needsExactVerify||dirtyNow)return cached;
-
-    SALES_CARD_VERIFY_PENDING_V445[type]=contextKey;
-    try{
-      const cloudLinksRaw=await loadSalesProductLinksV206(type,date,location,{force:true,maxAgeMs:0});
-      const cloudLinks=filterDeletedSalesLinksV350(type,date,location,cloudLinksRaw);
-      const deduped=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(cloudLinks):cloudLinks;
-      pruneSalesCardFinalStatesV447(type,date,location,deduped);
-      const authoritative=captureSalesCardFinalStatesV431(type,date,location,deduped);
-      if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,date,location,authoritative);
-      if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,date,location,authoritative);
-      // V46.0: exact-context refresh commits card + profit together from the SAME
-      // authoritative result. Never let the profit panel advance separately.
-      if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,date,location,authoritative);
-      if(typeof refreshProfitAggregateCachesV321==='function'){
-        const txns=[...new Set(authoritative.map(x=>String(x.transactionId||x.saleId||'')).filter(Boolean))];
-        refreshProfitAggregateCachesV321(authoritative,txns);
-      }
-      const rev=typeof getPrioritySyncLocalV315==='function'?Number((getPrioritySyncLocalV315()||{}).salesCardRevision||0):0;
-      if(typeof markSalesCardContextVerifiedV451==='function')markSalesCardContextVerifiedV451(type,date,location,rev);
-
-      const current=productLinkContextV206(type),currentKey=salesCardContextKeyV245(type,current.date,current.location);
-      const becameDirty=typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238(type);
-      if(SALES_CARD_LOAD_SEQ_V245[type]===seq&&currentKey===contextKey&&!becameDirty&&!productImportSearchIsActiveV226(type)){
-        renderProductLinksEditorV206(type,authoritative);
-        applyCloudDraftStatusesV322(type,authoritative);
-      }
-      if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-      return authoritative;
-    }catch(e){
-      if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-      const pre=productLinkPreV208(type),msg=document.getElementById(pre+'ProductLinkMsg');
-      if(msg){msg.classList.remove('hidden');msg.textContent='🟡 已显示本机销售卡 · 云端最新卡待重试';}
-      setSync('本机销售卡已显示 · 云端最新卡待重试',false,false);
-      return cached;
-    }
+    return cached;
   }
 
   // No cache on this device: read only this exact context from cloud.
@@ -3558,7 +3519,7 @@ async function loadProductLinksIntoEditorV206(type){
       applyCloudDraftStatusesV322(type,links);
       setTimeout(()=>{if(typeof refreshInventoryPendingV250==='function')refreshInventoryPendingV250(true)},0);
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-      setSync('已同步',true);
+      // V48.2: an explicit Sales Card view does not declare the whole context synced.
     }
     return links;
   }catch(e){
@@ -3568,7 +3529,7 @@ async function loadProductLinksIntoEditorV206(type){
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
       const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
       if(wrap)wrap.innerHTML='<div class="product-link-loading-v231">销售卡读取失败，请再试一次。</div>';
-      setSync('销售卡读取失败',false,true);
+      // V48.2: card-view read failure stays inside the card panel; global sync is unchanged.
     }
     return null;
   }
@@ -5817,7 +5778,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4660",
+    version:"4820",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -8580,12 +8541,13 @@ async function saveTurnoverTotalV376(type,total,notificationMeta={}){
     if(!ctx.date){alert('请选择日期');return false}total=Math.round(Number(total||0)*100)/100;if(hidden)hidden.value=formatAmount(total);
     const previous=rows.find(r=>r.type==='daily'&&r.date===ctx.date&&r.company===company),now=new Date().toISOString(),mutation=nextClientMutationV344();
     const localRow={type:'daily',date:ctx.date,company,location:'',amount:total,updatedAt:now,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:String(previous?.updatedAt||'')};
-    addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(`${ctx.location} 正在储存营业额，请勿关闭页面...`);
+    const deletingTurnover=String(notificationMeta?.action||'')==='deleted_entry';
+    addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(deletingTurnover?`${ctx.location} 营业额删除中，请勿关闭页面...`:`${ctx.location} 正在储存营业额，请勿关闭页面...`);
     try{
       const saved=await saveDailyToSheet(ctx.date,company,total,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true);
       if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);else if(total<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));else upsertLocalRow(localRow);
-      clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync(`${ctx.location} Sales 已同步`,true);return true;
-    }catch(e){const confirmed=await confirmTurnoverCloudAfterTimeoutV395(localRow);if(confirmed){setSync(`${ctx.location} 营业额已同步`,true);return true}setPendingRetrySyncStatus();alert(`${ctx.location} 营业额保存失败：${e.message||e}`);return false}
+      clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync(deletingTurnover?`${ctx.location} 营业额删除成功`:`${ctx.location} Sales 已同步`,true);return true;
+    }catch(e){const confirmed=await confirmTurnoverCloudAfterTimeoutV395(localRow);if(confirmed){setSync(deletingTurnover?`${ctx.location} 营业额删除成功`:`${ctx.location} 营业额已同步`,true);return true}setPendingRetrySyncStatus();alert(`${ctx.location} 营业额${deletingTurnover?'删除':'保存'}失败：${e.message||e}`);return false}
   }
   if(!ensureWritableSelection())return false;const isLive=type==='live',ctx=turnoverContextV376(type),dateEl=document.getElementById(isLive?'liveDate':'fairStart'),entityEl=document.getElementById(isLive?'liveHost':'fairLocation'),hidden=document.getElementById(isLive?'liveSales':'fairSales');
   if(!ctx.location){alert(isLive?'请输入主播名字':'请输入 Fair 地点');return false}if(!ctx.date){alert('请选择日期');return false}
@@ -8593,19 +8555,20 @@ async function saveTurnoverTotalV376(type,total,notificationMeta={}){
   total=Math.round(Number(total||0)*100)/100;hidden.value=formatAmount(total);
   const now=new Date().toISOString(),mutation=nextClientMutationV344(),normalizer=isLive?normalizeLiveHostKey:normalizeFairLocationKey,previous=rows.find(r=>r.type===type&&r.date===ctx.date&&normalizer(r.location)===normalizer(entity));
   const localRow={type,date:ctx.date,company:type,location:entity,amount:total,updatedAt:now,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:String(previous?.updatedAt||'')};
-  addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(`${isLive?'Live':'Fair'} 正在储存营业额，请勿关闭页面...`);
+  const deletingTurnover=String(notificationMeta?.action||'')==='deleted_entry';
+  addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(deletingTurnover?`${isLive?'Live':'Fair'} 营业额删除中，请勿关闭页面...`:`${isLive?'Live':'Fair'} 正在储存营业额，请勿关闭页面...`);
   try{
     let saved=null;if(isLive)saved=await saveLiveToSheet(ctx.date,entity,total,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true,getLocalRestoreGenerationV347(),notificationMeta);
     else{const result=await saveFairBatchToSheet(entity,[{date:ctx.date,amount:total,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:localRow.baseCloudUpdatedAt,notificationAction:String(notificationMeta?.action||''),notificationAmount:Number(notificationMeta?.amount||0),notificationOldAmount:Number(notificationMeta?.oldAmount||0),notificationNewAmount:Number(notificationMeta?.newAmount||0)}],true);saved=Array.isArray(result?.rows)?result.rows.find(r=>String(r.date||'')===ctx.date):null}
     if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);else if(total<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));else upsertLocalRow({...localRow,amount:total});
-    clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync(`${isLive?'Live':'Fair'} 营业额已同步`,true);return true;
+    clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync(deletingTurnover?`${isLive?'Live':'Fair'} 营业额删除成功`:`${isLive?'Live':'Fair'} 营业额已同步`,true);return true;
   }catch(e){
     // V39.9: a browser timeout is not proof that the write failed. Read the
     // authoritative month first. If the exact requested total is already there,
     // acknowledge it locally and NEVER ask the user to save the same entry again.
     const confirmed=await confirmTurnoverCloudAfterTimeoutV395(localRow);
-    if(confirmed){setSync(`${isLive?'Live':'Fair'} 营业额已同步`,true);return true}
-    setPendingRetrySyncStatus();alert(`${isLive?'Live':'Fair'} 营业额保存失败：${e.message||e}`);return false
+    if(confirmed){setSync(deletingTurnover?`${isLive?'Live':'Fair'} 营业额删除成功`:`${isLive?'Live':'Fair'} 营业额已同步`,true);return true}
+    setPendingRetrySyncStatus();alert(`${isLive?'Live':'Fair'} 营业额${deletingTurnover?'删除':'保存'}失败：${e.message||e}`);return false
   }
 }
 async function commitTurnoverEntriesV376(type,entries,actionText,notificationMeta={}){
@@ -8662,7 +8625,7 @@ async function editTurnoverEntryV376(type,id){
 async function deleteTurnoverEntryV376(type,id){
   if(turnoverWriteStateV382[type])return false;
   const entries=proposedEntriesV376(type),index=entries.findIndex(x=>x.id===id);if(index<0)return;const old=Number(entries[index].amount||0),before=entriesSumV376(entries),after=Math.round((before-old)*100)/100;if(!confirm(`确认删除这笔 RM${formatAmount(old)} 营业额？\n\n营业额总数：RM${formatAmount(before)} → RM${formatAmount(after)}\n\n删除后才会保存。`))return;
-  entries.splice(index,1);setTurnoverSaveButtonV382(type,'saving');const ok=await commitTurnoverEntriesV376(type,entries,'删除',{action:'deleted_entry',oldAmount:old});if(ok)setTurnoverSaveButtonV382(type,'saved');else setTurnoverSaveButtonV382(type,'idle');
+  entries.splice(index,1);setTurnoverSaveButtonV382(type,'deleting');const ok=await commitTurnoverEntriesV376(type,entries,'删除',{action:'deleted_entry',oldAmount:old});if(ok)setTurnoverSaveButtonV382(type,'deleted');else setTurnoverSaveButtonV382(type,'idle');
 }
 window.editTurnoverEntryV376=editTurnoverEntryV376;window.deleteTurnoverEntryV376=deleteTurnoverEntryV376;
 
@@ -8850,7 +8813,7 @@ const SYSTEM_RELEASE_REVISION_V442='910 → 930';
 const SYSTEM_BACKUP_AT_KEY_V442='lover_sales_last_backup_at_v442';
 const SYSTEM_RESTORE_AT_KEY_V442='lover_sales_last_restore_at_v442';
 let systemHealthStateV442={level:'warning',issues:[],checked:false,data:null,expanded:false};
-// V46.6: the read-only health endpoint is advisory only. A slow health scan must
+// V48.2: the read-only health endpoint is advisory only. A slow health scan must
 // never override a confirmed business-data sync with a false red connection error.
 const SYSTEM_HEALTH_SESSION_START_V466=Date.now();
 let systemConfirmedSyncAtV466=0;
@@ -8884,7 +8847,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4660$/,'46.6')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4820$/,'48.2')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8910,12 +8873,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4660'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4820'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4660')issues.push(`Frontend / API 版本不一致（Frontend 4660 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4820')issues.push(`Frontend / API 版本不一致（Frontend 4820 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4660';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4820';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
