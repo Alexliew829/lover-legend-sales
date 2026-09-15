@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4790",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4800",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4790";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4800";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3092,7 +3092,7 @@ function toggleProductLinkBoxV206(type){
       }
     }
     Promise.resolve(loadProductLinksIntoEditorV206(type)).catch(()=>{});
-    // V47.9: explicit Sales Card opening may run one silent safety verification
+    // V48.0: explicit Sales Card opening may run one silent safety verification
     // through the unified current-context gate when its watermark is old/incomplete.
     setTimeout(()=>{try{if(typeof window.syncCurrentContextNowV472==='function')window.syncCurrentContextNowV472({showChecking:false,revisionTimeoutMs:9000}).catch(()=>{})}catch(_){}},0);
   }
@@ -3463,7 +3463,7 @@ function captureSalesCardFinalStatesV431(type,date,location,links){
 window.applySalesCardFinalStatesV431=applySalesCardFinalStatesV431;
 async function loadProductLinksIntoEditorV206(type,options={}){
   const {date,location}=productLinkContextV206(type);
-  // V47.9: automatic date/host/page refreshes must never read Sales Card cloud data
+  // V48.0: automatic date/host/page refreshes must never read Sales Card cloud data
   // while the Sales Card panel is closed. Opening the panel is the explicit view action.
   const boxOpenV477=typeof productLinkBoxIsOpenV210==='function'&&productLinkBoxIsOpenV210(type);
   const seq=(SALES_CARD_LOAD_SEQ_V245[type]||0)+1;
@@ -3492,7 +3492,7 @@ async function loadProductLinksIntoEditorV206(type,options={}){
     applyCloudDraftStatusesV322(type,cached);
     const pendingKey=salesDraftPendingKeyV314(type,date,location);
     const pending=readSalesDraftPendingV314()[pendingKey];
-    // V47.9: a cached Sales Card is Local First and is NOT re-read merely because
+    // V48.0: a cached Sales Card is Local First and is NOT re-read merely because
     // an old/global verification watermark differs. Real current-context card changes
     // are fetched by refreshActiveContextDirectV471(); Restore uses that same path.
     // This permanently removes the false "销售卡同步中 / 销售卡读取失败" safety-read path.
@@ -3547,7 +3547,7 @@ async function loadProductLinksIntoEditorV206(type,options={}){
       applyCloudDraftStatusesV322(type,links);
       setTimeout(()=>{if(typeof refreshInventoryPendingV250==='function')refreshInventoryPendingV250(true)},0);
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-      // V47.9: card view success does not declare turnover/context fully synced.
+      // V48.0: card view success does not declare turnover/context fully synced.
     }
     return links;
   }catch(e){
@@ -3557,7 +3557,7 @@ async function loadProductLinksIntoEditorV206(type,options={}){
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
       const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
       if(wrap)wrap.innerHTML='<div class="product-link-loading-v231">销售卡读取失败，请再试一次。</div>';
-      // V47.9: card-view read failure stays inside the card panel only.
+      // V48.0: card-view read failure stays inside the card panel only.
     }
     return null;
   }
@@ -5806,7 +5806,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4790",
+    version:"4800",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5987,8 +5987,15 @@ setTimeout(async()=>{
   }
   resumeRestoreStatusV234();
 },800);
-setTimeout(checkRemoteRestoreMaintenanceV345,1200);
-setInterval(checkRemoteRestoreMaintenanceV345,5000);
+let remoteMaintenanceIntervalV480=null;
+function startRemoteMaintenanceChecksV480(){
+  if(remoteMaintenanceIntervalV480)return;
+  setTimeout(()=>{
+    checkRemoteRestoreMaintenanceV345();
+    remoteMaintenanceIntervalV480=setInterval(checkRemoteRestoreMaintenanceV345,5000);
+  },2400);
+}
+scheduleSecondaryCloudTaskV480(startRemoteMaintenanceChecksV480,2400);
 
 let lastObservedSystemMonth=monthISO();setInterval(()=>{const nowMonth=monthISO();if(nowMonth!==lastObservedSystemMonth){lastObservedSystemMonth=nowMonth;systemState.currentMonth=nowMonth;document.getElementById("monthPicker").value=nowMonth;document.getElementById("yearPicker").value=nowMonth.slice(0,4);renderAll();updateReadOnlyMode();loadFromSheet({force:true})}},60000);
 
@@ -7006,19 +7013,38 @@ async function openPendingInventorySalesCardV250(raw){
 }
 window.openPendingInventorySalesCardV250=openPendingInventorySalesCardV250;
 
+// V48.0: mobile primary-sync priority. Secondary cloud reads must wait until the
+// initial/current-context probe has completed so opening a phone cannot starve the
+// very request that decides whether business data changed.
+function scheduleSecondaryCloudTaskV480(fn,delay=1200){
+  if(typeof fn!=='function')return;
+  let scheduled=false;
+  const run=()=>{
+    if(scheduled)return;scheduled=true;
+    setTimeout(()=>{try{fn()}catch(_){}},Math.max(0,Number(delay||0)));
+  };
+  try{
+    // V48.0: "initial sync finished" may also mean the first probe timed out.
+    // Secondary cloud work must wait for an actually confirmed revision so it
+    // cannot compete with the foreground retry that is trying to recover mobile.
+    if(typeof cloudRevisionSafeForWriteV449==='function'&&cloudRevisionSafeForWriteV449()){run();return;}
+    window.addEventListener('lover-sales-sync-complete-v458',run,{once:true});
+  }catch(_){window.addEventListener('lover-sales-sync-complete-v458',run,{once:true});}
+}
+
 // Always refresh global pending status when Live / Fair page opens.
 const _showPageV249=showPage;
 showPage=function(name,el){
   if(SALES_CONFIRMATION_IN_FLIGHT_V407&&!confirm('销售确认仍在同步中。现在切换页面可能无法立即知道确认结果。\n\n建议等待销售卡显示确认成功。仍要切换页面？'))return false;
   const result=_showPageV249(name,el);
   if(result===false)return false;
-  if(name==="sales"||name==="live"||name==="fair")setTimeout(()=>refreshInventoryPendingV250(true),50);
+  if(name==="sales"||name==="live"||name==="fair")scheduleSecondaryCloudTaskV480(()=>refreshInventoryPendingV250(true),1400);
   return result;
 };
 window.showPage=showPage;
 
-// Cross-day reminder also initializes shortly after startup.
-setTimeout(()=>refreshInventoryPendingV250(true),1200);
+// Cross-day reminder initializes only after the primary startup sync settles.
+scheduleSecondaryCloudTaskV480(()=>refreshInventoryPendingV250(true),1800);
 
 // V29.9: after the user processes inventory in the separate Import tab/app,
 // returning to Sales should refresh the compact reminder automatically.
@@ -7038,10 +7064,8 @@ function scheduleInventoryPendingResumeRefreshV265(){
 // Refresh Import reminders once only after that resume cycle completes, instead
 // of competing with it through visibilitychange + focus + pageshow.
 window.addEventListener("lover-sales-resume-ready",scheduleInventoryPendingResumeRefreshV265);
-// V42.3: do not wait for the full Sales cloud-resume cycle. Import ACK is a
-// separate lightweight request and must refresh as soon as this tab is visible.
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleInventoryPendingResumeRefreshV265()});
-window.addEventListener('focus',scheduleInventoryPendingResumeRefreshV265);
+// V48.0: do not race the primary mobile resume probe with Import reminder reads.
+// The resume-ready event fires after the foreground context check has yielded.
 
 
 /* ================= V29.9 RM0 防误触：Sales / Fair / Live ================= */
@@ -7916,7 +7940,7 @@ async function renderSelectedDayGrandV362(type){
     const rec=await loadDayProfitSummaryV475(type,date,{force:false});
     if(token!==selectedDayGrandTokenV362[type]||date!==selectedDayDateV362(type))return;
     paintSelectedDayGrandV362(type,date,sales,Number(rec.profit||0),false,false);
-    // V47.9: Profit display never owns the sync status. A cached/cloud Profit result
+    // V48.0: Profit display never owns the sync status. A cached/cloud Profit result
     // cannot declare the current turnover/card context authoritative.
   }catch(e){
     if(token!==selectedDayGrandTokenV362[type]||date!==selectedDayDateV362(type))return;
@@ -8147,7 +8171,7 @@ function getSelectedDayProfitLinksV368(type,date,maxAgeMs=180000){
 }
 window.getSelectedDayProfitLinksV368=getSelectedDayProfitLinksV368;
 
-// V47.9: do not let the later V36.8 legacy all-Sales-Card renderer overwrite
+// V48.0: do not let the later V36.8 legacy all-Sales-Card renderer overwrite
 // the V47.6 Home-style Local First Profit renderer. This was causing Profit to
 // wait on loadAllSalesProductLinksV203() and adding unnecessary Apps Script load.
 renderSelectedDayGrandV362=renderSelectedDayGrandLocalFirstV477;
@@ -8937,7 +8961,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4790$/,'47.8')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4800$/,'48.0')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8963,12 +8987,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4790'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4800'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4790')issues.push(`Frontend / API 版本不一致（Frontend 4790 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4800')issues.push(`Frontend / API 版本不一致（Frontend 4800 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4790';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4800';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -8986,7 +9010,7 @@ async function runSystemHealthCheckV442(userTriggered=false){
   }finally{if(refresh){refresh.disabled=false;refresh.textContent='重新检查';}}
 }
 window.toggleSystemHealthDetailsV442=toggleSystemHealthDetailsV442;window.runSystemHealthCheckV442=runSystemHealthCheckV442;
-setTimeout(()=>runSystemHealthCheckV442(false),1200);
+scheduleSecondaryCloudTaskV480(()=>runSystemHealthCheckV442(false),3200);
 
 // V47.5: expose only the currently visible Sales/Fair/Live business context to
 // the lightweight sync gate. This does not fetch or mutate data.

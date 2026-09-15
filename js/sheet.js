@@ -117,9 +117,15 @@ function dispatchSalesNotificationAsync(envelope){
   setLastNotificationDispatchStatus({ok:true,queued:true,attempted:0,sent:0,message:"资料已保存；通知后台发送中"});
   scheduleSalesNotificationWorkerV397(0);
 }
-window.addEventListener("online",()=>scheduleSalesNotificationWorkerV397(100));
-document.addEventListener("visibilitychange",()=>{if(!document.hidden)scheduleSalesNotificationWorkerV397(150)});
-setTimeout(()=>scheduleSalesNotificationWorkerV397(1200),0);
+// V48.0: notification retry is background work. Never race the mobile primary
+// context probe on startup/resume; actual save-triggered notifications still dispatch immediately.
+window.addEventListener("online",()=>scheduleSalesNotificationWorkerV397(1200));
+window.addEventListener("lover-sales-resume-ready",()=>scheduleSalesNotificationWorkerV397(1000));
+if(typeof cloudRevisionSafeForWriteV449==="function"&&cloudRevisionSafeForWriteV449()){
+  setTimeout(()=>scheduleSalesNotificationWorkerV397(2500),0);
+}else{
+  window.addEventListener("lover-sales-sync-complete-v458",()=>setTimeout(()=>scheduleSalesNotificationWorkerV397(1800),0),{once:true});
+}
 
 
 
@@ -151,7 +157,7 @@ function contextJournalChangeMatchesV478(change,ctx,kind,lastRevision){
   if(String(change.date||'')!==String(ctx?.date||''))return false;
   return String(change.location||'').trim().toLowerCase()===String(ctx?.location||'').trim().toLowerCase();
 }
-// V47.9 hybrid probe: keep V47.9 per-context watermarks, but use the proven V46.6
+// V48.0 hybrid probe: keep V48.0 per-context watermarks, but use the proven V46.6
 // single lightweight priorityRevisionV456 + change-journal endpoint. Multiple
 // foreground triggers for the same context/watermark share one request. The
 // client derives whether THIS context changed; unrelated hosts/dates never cause
@@ -242,7 +248,7 @@ function commitTurnoverContextV471(ctx,json){
 async function refreshActiveContextDirectV471(ctx,probe,options={}){
   const restoreChanged=Number(getContextPriorityLocalV470(ctx).restoreGeneration||0)!==Number(probe?.restoreGeneration||0);
   const needTurn=restoreChanged||!!probe?.needsTurnoverRefresh;
-  // V47.9: an incomplete/old card watermark is NOT a card change. Only a journal-
+  // V48.0: an incomplete/old card watermark is NOT a card change. Only a journal-
   // confirmed current-context card change (or Restore) may trigger foreground card I/O.
   const needCard=restoreChanged||probe?.salesCardChangeConfirmed===true||options.allowSafetyCard===true;
   if(!needTurn&&!needCard)return{ok:true,needTurn:false,needCard:false};
@@ -925,7 +931,7 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
-  // V47.9: legacy/safety Sales Card verification is never allowed to hijack a
+  // V48.0: legacy/safety Sales Card verification is never allowed to hijack a
   // confirmed current-context sync status. Real card work paints its own status.
   if(error){
     writeSyncStatusV457('🔴 '+text,'error');
@@ -1050,7 +1056,7 @@ function jsonp(params, options = {}) {
     const cleanupLateCallback=()=>setTimeout(()=>{try{delete window[callback]}catch(_){}},30000);
     const timer = setTimeout(() => {
       if(settled)return; settled=true;
-      // V47.9 mobile safety: removing a <script> does not always cancel an already
+      // V48.0 mobile safety: removing a <script> does not always cancel an already
       // dispatched JSONP request. Leave a short-lived no-op callback so a late
       // Apps Script response cannot throw into the page after timeout.
       window[callback]=()=>{};
@@ -1266,7 +1272,7 @@ async function syncCurrentContextNowV472(options={}){
       }
       return{ok:true,context:ctx};
     }catch(e){
-      // V47.9: keep Local First data, but never leave a stale green "已同步" when
+      // V48.0: keep Local First data, but never leave a stale green "已同步" when
       // the current context revision could not be confirmed. Retry stays deduped.
       try{
         const fg=typeof window!=='undefined'&&typeof window.getForegroundTurnoverWriteStatusV471==='function'?window.getForegroundTurnoverWriteStatusV471():null;
@@ -1292,7 +1298,7 @@ function retryRevisionNowV455(){
   const p=ctx?syncCurrentContextNowV472({showChecking:false,revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS}):loadFromSheet({bypassCooldown:true,suppressStartStatus:true,silent:true,revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS});
   Promise.resolve(p).catch(()=>scheduleRevisionRetryV448());
 }
-// V47.9: update.js is the single owner of normal online/visibility foreground
+// V48.0: update.js is the single owner of normal online/visibility foreground
 // sync triggers. Keeping a second listener here caused mobile wake-up fan-out and
 // could leave a stale retry behind after a timeout. retryRevisionNowV455 remains
 // available for explicit recovery and interrupted-write safety paths.
@@ -1367,6 +1373,17 @@ async function loadFromSheet(options = {}) {
               }
             }
           }
+          // V48.0 mobile-first rule: when a visible business context exists, the
+          // current-context probe is the only foreground authority. If that tiny
+          // request times out, keep Local First data and retry the SAME probe; do
+          // not immediately start a second global revision request behind it.
+          if(activeContextV470&&(!contextProbeV470||contextProbeV470.ok!==true)){
+            setCloudRevisionConfirmedV449(false);
+            if(!silent)setSync('云端连接较慢 · 本机资料已保留',false,false);
+            scheduleRevisionRetryV448();
+            return{ok:false,revisionUnconfirmed:true,context:activeContextV470};
+          }
+
           // V47.5: a changed visible context closes directly on that context.
           // No global revision hop, so unrelated hosts/locations/dates cannot delay
           // the page the user is actually looking at.

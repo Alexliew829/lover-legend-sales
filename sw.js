@@ -1,5 +1,5 @@
-// Lover Legend Sales PWA Service Worker V47.9
-const LOVER_SW_BUILD = "4790";
+// Lover Legend Sales PWA Service Worker V48.0
+const LOVER_SW_BUILD = "4800";
 // OneSignal uses its own worker:
 // /push/onesignal/OneSignalSDKWorker.js
 
