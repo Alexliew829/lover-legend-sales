@@ -54,13 +54,17 @@
     }
 
     lastCloudRefresh = now;
+    // V47.9: an explicit visible foreground check supersedes an old scheduled retry.
+    // This prevents a timed-out mobile cycle from firing a second probe after the
+    // new foreground probe has already completed.
+    try { if (typeof cancelRevisionRetryV479 === "function") cancelRevisionRetryV479(); } catch (e) {}
     refreshPromise = loadFromSheet({
       force: manual || force === true,
       bypassCooldown: reason.includes("reopen") || reason.includes("resume"),
       skipLocalCache: true,
       loadYear: false,
       silent: false,
-      revisionTimeoutMs: reason.includes("reopen") || reason.includes("resume") ? 3500 : undefined,
+      revisionTimeoutMs: reason.includes("reopen") || reason.includes("resume") ? 9000 : undefined,
       statusText: manual ? "正在刷新云端资料..." : "正在检查云端更新...",
       refreshFairInputs: false
     }).then(result => {
@@ -114,7 +118,7 @@
   async function registerAndCheckForUpdates() {
     if (!("serviceWorker" in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register("./sw.js?v=47.6", { updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.register("./sw.js?v=47.9", { updateViaCache: "none" });
       await registration.update();
       await activateWaitingWorker(registration);
       registration.addEventListener("updatefound", () => {
@@ -185,17 +189,8 @@
     // will then publish the specific Live/Fair/Sales sync label itself.
     resumePromise = refreshCloudData(reason, false).then(result => {
       if (result && result.ok && !result.revisionUnconfirmed) lastCloudRefresh = Date.now();
-      if (result && result.revisionUnconfirmed) {
-        // One quiet retry after mobile wake-up. Do not stack focus/pageshow requests.
-        setTimeout(() => {
-          if (document.visibilityState === "visible" && !activeLoadPromise() && !refreshPromise && !resumePromise) {
-            refreshCloudData("resume-retry", false).then(retry => {
-              if (retry && retry.ok && !retry.revisionUnconfirmed) lastCloudRefresh = Date.now();
-              dispatchResumeReady({ reason:"resume-retry", result:retry });
-            });
-          }
-        }, 2200);
-      }
+      // V47.9: revision-unconfirmed retry is owned by sheet.js's single deduped
+      // foreground retry queue. Do not start a second mobile timer here.
       dispatchResumeReady({ reason, result });
       return result;
     }).finally(() => {

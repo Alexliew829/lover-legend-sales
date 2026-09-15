@@ -151,7 +151,7 @@ function contextJournalChangeMatchesV478(change,ctx,kind,lastRevision){
   if(String(change.date||'')!==String(ctx?.date||''))return false;
   return String(change.location||'').trim().toLowerCase()===String(ctx?.location||'').trim().toLowerCase();
 }
-// V47.8 hybrid probe: keep V47.8 per-context watermarks, but use the proven V46.6
+// V47.9 hybrid probe: keep V47.9 per-context watermarks, but use the proven V46.6
 // single lightweight priorityRevisionV456 + change-journal endpoint. Multiple
 // foreground triggers for the same context/watermark share one request. The
 // client derives whether THIS context changed; unrelated hosts/dates never cause
@@ -242,7 +242,7 @@ function commitTurnoverContextV471(ctx,json){
 async function refreshActiveContextDirectV471(ctx,probe,options={}){
   const restoreChanged=Number(getContextPriorityLocalV470(ctx).restoreGeneration||0)!==Number(probe?.restoreGeneration||0);
   const needTurn=restoreChanged||!!probe?.needsTurnoverRefresh;
-  // V47.8: an incomplete/old card watermark is NOT a card change. Only a journal-
+  // V47.9: an incomplete/old card watermark is NOT a card change. Only a journal-
   // confirmed current-context card change (or Restore) may trigger foreground card I/O.
   const needCard=restoreChanged||probe?.salesCardChangeConfirmed===true||options.allowSafetyCard===true;
   if(!needTurn&&!needCard)return{ok:true,needTurn:false,needCard:false};
@@ -925,7 +925,7 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
-  // V47.8: legacy/safety Sales Card verification is never allowed to hijack a
+  // V47.9: legacy/safety Sales Card verification is never allowed to hijack a
   // confirmed current-context sync status. Real card work paints its own status.
   if(error){
     writeSyncStatusV457('🔴 '+text,'error');
@@ -1046,13 +1046,21 @@ function jsonp(params, options = {}) {
     const script = document.createElement("script");
     const query = new URLSearchParams(params).toString();
 
+    let settled=false;
+    const cleanupLateCallback=()=>setTimeout(()=>{try{delete window[callback]}catch(_){}},30000);
     const timer = setTimeout(() => {
-      delete window[callback];
+      if(settled)return; settled=true;
+      // V47.9 mobile safety: removing a <script> does not always cancel an already
+      // dispatched JSONP request. Leave a short-lived no-op callback so a late
+      // Apps Script response cannot throw into the page after timeout.
+      window[callback]=()=>{};
       script.remove();
+      cleanupLateCallback();
       reject(new Error("连接 Google Apps Script 超时"));
     }, timeoutMs);
 
     window[callback] = data => {
+      if(settled)return; settled=true;
       clearTimeout(timer);
       delete window[callback];
       script.remove();
@@ -1062,6 +1070,7 @@ function jsonp(params, options = {}) {
     };
 
     script.onerror = () => {
+      if(settled)return; settled=true;
       clearTimeout(timer);
       delete window[callback];
       script.remove();
@@ -1216,6 +1225,11 @@ function scheduleRevisionRetryV448(){
   },delay);
 }
 
+function cancelRevisionRetryV479(){
+  if(revisionRetryTimerV448){clearTimeout(revisionRetryTimerV448);revisionRetryTimerV448=null;}
+}
+if(typeof window!=='undefined')window.cancelRevisionRetryV479=cancelRevisionRetryV479;
+
 async function syncCurrentContextNowV472(options={}){
   const ctx=typeof window!=='undefined'&&typeof window.getActivePriorityContextV469==='function'?window.getActivePriorityContextV469():null;
   if(!ctx)return{ok:false,skipped:true};
@@ -1231,7 +1245,7 @@ async function syncCurrentContextNowV472(options={}){
       // V47.5: revision/no-change probes are silent. Only once the probe proves
       // this exact context changed do we show a visible syncing state inside
       // refreshActiveContextDirectV471().
-      const probe=await checkContextPriorityRevisionV470(ctx,Number(options.revisionTimeoutMs||5000));
+      const probe=await checkContextPriorityRevisionV470(ctx,Number(options.revisionTimeoutMs||REVISION_CHECK_TIMEOUT_MS));
       if(seq!==syncCurrentContextNowV472._seq)return{ok:false,stale:true};
       if(!probe?.ok)throw new Error(probe?.message||'当前资料检查失败');
       const local=getContextPriorityLocalV470(ctx),restoreChanged=Number(local.restoreGeneration||0)!==Number(probe.restoreGeneration||0);
@@ -1252,7 +1266,7 @@ async function syncCurrentContextNowV472(options={}){
       }
       return{ok:true,context:ctx};
     }catch(e){
-      // V47.8: keep Local First data, but never leave a stale green "已同步" when
+      // V47.9: keep Local First data, but never leave a stale green "已同步" when
       // the current context revision could not be confirmed. Retry stays deduped.
       try{
         const fg=typeof window!=='undefined'&&typeof window.getForegroundTurnoverWriteStatusV471==='function'?window.getForegroundTurnoverWriteStatusV471():null;
@@ -1278,8 +1292,10 @@ function retryRevisionNowV455(){
   const p=ctx?syncCurrentContextNowV472({showChecking:false,revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS}):loadFromSheet({bypassCooldown:true,suppressStartStatus:true,silent:true,revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS});
   Promise.resolve(p).catch(()=>scheduleRevisionRetryV448());
 }
-if(typeof window!=='undefined')window.addEventListener('online',()=>setTimeout(retryRevisionNowV455,120));
-if(typeof document!=='undefined')document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(retryRevisionNowV455,180)});
+// V47.9: update.js is the single owner of normal online/visibility foreground
+// sync triggers. Keeping a second listener here caused mobile wake-up fan-out and
+// could leave a stale retry behind after a timeout. retryRevisionNowV455 remains
+// available for explicit recovery and interrupted-write safety paths.
 
 async function loadFromSheet(options = {}) {
   if (settingsWritePromise) {
