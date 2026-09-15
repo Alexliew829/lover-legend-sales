@@ -197,7 +197,13 @@ async function refreshActiveContextDirectV471(ctx,probe,options={}){
   const needTurn=restoreChanged||!!probe?.needsTurnoverRefresh;
   const needCard=restoreChanged||!!probe?.needsSalesCardRefresh;
   if(!needTurn&&!needCard)return{ok:true,needTurn:false,needCard:false};
-  if(!options.silent)setSync(contextSyncLabelV471(ctx,needTurn,needCard,false));
+  // V47.6: only a journal-confirmed change is allowed to announce "销售卡同步中".
+  // An old/missing watermark can still trigger a safety read, but that read stays
+  // quiet unless Restore itself changed. This removes false-positive sync labels.
+  const visibleTurn=restoreChanged||(needTurn&&probe?.turnoverChangeConfirmed===true);
+  const visibleCard=restoreChanged||(needCard&&probe?.salesCardChangeConfirmed===true);
+  const showWork=!options.silent&&(visibleTurn||visibleCard);
+  if(showWork)setSync(contextSyncLabelV471(ctx,visibleTurn,visibleCard,false));
   const turnPromise=needTurn?loadTurnoverContextV471(ctx,Number(options.timeoutMs||12000)):Promise.resolve(null);
   const cardPromise=needCard?loadExactCardAuthorityV475(ctx,Number(options.cardTimeoutMs||12000)):Promise.resolve(null);
   const [turnJson,cardLinksRaw]=await Promise.all([turnPromise,cardPromise]);
@@ -205,8 +211,6 @@ async function refreshActiveContextDirectV471(ctx,probe,options={}){
   if(needCard){
     if(!Array.isArray(cardLinksRaw))throw new Error('当前销售卡读取失败');
     const links=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(cardLinksRaw):cardLinksRaw;
-    // loadSalesProductLinksV206 already atomically published exact Card + Profit.
-    // The block below only repaints the editor from that same in-memory result.
     if(typeof markSalesCardContextVerifiedV451==='function')markSalesCardContextVerifiedV451(ctx.type,ctx.date,ctx.location,Number(probe?.salesCardGlobalRevision||probe?.salesCardRevision||0));
     try{
       const cur=typeof productLinkContextV206==='function'?productLinkContextV206(ctx.type):null,dirty=typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238(ctx.type);
@@ -215,7 +219,7 @@ async function refreshActiveContextDirectV471(ctx,probe,options={}){
   }
   setContextPriorityLocalV470(ctx,{turnoverRevision:Number(probe?.turnoverGlobalRevision||probe?.turnoverRevision||0),salesCardRevision:Number(probe?.salesCardGlobalRevision||probe?.salesCardRevision||0),restoreGeneration:Number(probe?.restoreGeneration||0)});
   setCloudAtomicSyncPendingV448(false);setCloudRevisionConfirmedV449(true);
-  if(!options.silent)setSync(contextSyncLabelV471(ctx,needTurn,needCard,true),true);
+  if(!options.silent)setSync(showWork?contextSyncLabelV471(ctx,visibleTurn,visibleCard,true):'已同步',true);
   return{ok:true,needTurn,needCard};
 }
 
@@ -409,12 +413,23 @@ if(typeof window!=='undefined')window.rebuildProfitCachesFromAuthoritativeCardsV
 // aggregate profit authority immediately after the fast context read succeeds.
 // This uses the card payload already in memory, so it adds no cloud request and
 // prevents the Profit panel from reusing a 3-minute-old getAll cache.
-function replaceProfitAggregateContextV457(type,date,location,links){
+function replaceProfitAggregateContextV457(type,date,location,links,previousContextLinks=null){
   const t=String(type||''),d=String(date||''),loc=String(location||'').trim().toLowerCase();
   const fresh=typeof dedupeAuthoritativeSalesLinksV354==='function'
     ?dedupeAuthoritativeSalesLinksV354(Array.isArray(links)?links:[])
     :(Array.isArray(links)?links:[]);
   const sameCtx=x=>String(x?.type||'')===t&&String(x?.date||'')===d&&String(x?.location||'').trim().toLowerCase()===loc;
+  // V47.6: preserve the selected-day Profit summary unless the authoritative
+  // Sales Card CONTENT actually changed. A safety refresh caused by an old
+  // watermark must not blank or re-fetch an otherwise valid Profit cache.
+  let actualCardChanged=true;
+  try{
+    const oldDay=typeof getDailyProfitCacheV237==='function'?(getDailyProfitCacheV237(t,d)||[]):[];
+    const oldCtx=Array.isArray(previousContextLinks)?previousContextLinks:oldDay.filter(sameCtx);
+    actualCardChanged=(typeof salesCardCloudFingerprintV445==='function')
+      ?salesCardCloudFingerprintV445(oldCtx)!==salesCardCloudFingerprintV445(fresh)
+      :JSON.stringify(oldCtx)!==JSON.stringify(fresh);
+  }catch(_){actualCardChanged=true;}
   try{
     if(Array.isArray(allSalesProductLinksCacheV216?.links)){
       const kept=allSalesProductLinksCacheV216.links.filter(x=>!sameCtx(x)&&!['deleted','cancelled'].includes(String(x?.status||'active').toLowerCase()));
@@ -432,7 +447,7 @@ function replaceProfitAggregateContextV457(type,date,location,links){
     }
   }catch(_){}
   try{if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(t,d,location,fresh)}catch(_){}
-  try{if(typeof window!=='undefined'&&typeof window.invalidateDayProfitSummaryV475==='function')window.invalidateDayProfitSummaryV475(t,d)}catch(_){}
+  try{if(actualCardChanged&&typeof window!=='undefined'&&typeof window.markDayProfitSummaryStaleV476==='function')window.markDayProfitSummaryStaleV476(t,d)}catch(_){}
   try{if(typeof renderSelectedDayGrandV362==='function')renderSelectedDayGrandV362(t)}catch(_){}
   try{
     if(typeof productProfitSelectedDateV216==='function'&&productProfitSummaryOpenV216?.[t]&&productProfitSelectedDateV216(t)===d&&typeof getDailyProfitCacheV237==='function'&&typeof renderProductProfitSummaryV216==='function'){
@@ -1821,6 +1836,9 @@ function setCachedSalesProductLinksV216(type,date,location,links){
 async function loadSalesProductLinksV206(type,date,location,options={}) {
   const key=salesProductLinksCacheKeyV216(type,date,location);
   const cached=salesProductLinksCacheV216.get(key);
+  // V47.6: keep the pre-read exact context so a safety refresh can prove that
+  // card CONTENT stayed identical even though its revision watermark was old.
+  const previousContextLinksV476=cached&&Array.isArray(cached.links)?cached.links:getSalesCardPersistentCacheV232(type,date,location);
   const maxAge=Number(options.maxAgeMs??120000);
   if(!options.force&&cached&&Date.now()-cached.at<maxAge)return cached.links;
   if(salesProductLinksPendingV216.has(key))return salesProductLinksPendingV216.get(key);
@@ -1831,7 +1849,7 @@ async function loadSalesProductLinksV206(type,date,location,options={}) {
     // V46.0 exact-context request is card+profit authority for this context.
     // Replace the exact context in every aggregate cache so the Profit panel cannot
     // return stale values from the older getAll cache after the card is already new.
-    if(typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(type,date,location,links);
+    if(typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(type,date,location,links,Array.isArray(previousContextLinksV476)?previousContextLinksV476:null);
     else {
       if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,date,location,links);
       if(typeof refreshProfitAggregateCachesV321==='function'){
