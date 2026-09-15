@@ -1618,7 +1618,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4680",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4690",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1636,7 +1636,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4680";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4690";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2935,8 +2935,8 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
   };
 
   nameInput.addEventListener("focus",()=>{
-    // V46.8: a confirmed/locked sales card reuses the product-name field as a
-    // copy target only. Never reopen Import search or trigger any extra read.
+    // V46.9: confirmed/locked product-name copy is handled by the overlay;
+    // the disabled input must never reopen Import search or trigger any extra read.
     if(nameInput.dataset.confirmedCopyV468==="1")return;
     open();
     render();
@@ -3991,33 +3991,51 @@ function salesCardIsConfirmedV322(card){
   if(confirmed)card.dataset.confirmedOnceV401='1';
   return confirmed;
 }
-function copyConfirmedProductNameV468(input,event){
+function copyConfirmedProductNameV469(input,event){
   const card=input?.closest?.('.sales-card-transaction-v239');
   if(!card||!salesCardIsConfirmedV322(card))return;
   const text=String(input.value||'').trim();
   if(!text)return;
   if(event){event.preventDefault();event.stopPropagation();}
-  const done=()=>{if(typeof showToast==='function')showToast('✅ 已复制产品名称');};
+  let notified=false;
+  const done=()=>{if(notified)return;notified=true;if(typeof showToast==='function')showToast('✅ 已复制产品名称');};
   const legacyCopy=()=>{
     const ta=document.createElement('textarea');
-    ta.value=text;ta.setAttribute('readonly','');
-    ta.setAttribute('aria-hidden','true');
-    ta.style.position='fixed';ta.style.left='0';ta.style.top='0';ta.style.width='1px';ta.style.height='1px';
+    ta.value=text;ta.setAttribute('readonly','');ta.setAttribute('aria-hidden','true');
+    ta.style.position='fixed';ta.style.left='-9999px';ta.style.top='0';ta.style.width='2px';ta.style.height='2px';
     ta.style.opacity='0';ta.style.pointerEvents='none';ta.style.fontSize='16px';
     document.body.appendChild(ta);
-    try{ta.focus({preventScroll:true});}catch(_){ta.focus();}
-    ta.select();
-    try{ta.setSelectionRange(0,ta.value.length);}catch(_){}
     let ok=false;
-    try{ok=document.execCommand('copy')===true;}catch(e){console.warn('V46.8 legacy copy product name failed',e);}
+    try{
+      ta.focus({preventScroll:true});ta.select();ta.setSelectionRange(0,ta.value.length);
+      ok=document.execCommand('copy')===true;
+    }catch(e){console.warn('V46.9 legacy copy product name failed',e);}
     ta.remove();
     return ok;
   };
-  // Run the synchronous fallback inside the original user gesture first.
-  // This avoids losing browser clipboard permission after an async rejection.
+  // V46.9: the copy action comes from a dedicated overlay button, so the
+  // browser cannot consume the user gesture as input focus/selection first.
   if(legacyCopy()){done();return;}
   if(navigator.clipboard&&typeof navigator.clipboard.writeText==='function'&&window.isSecureContext){
-    navigator.clipboard.writeText(text).then(done).catch(e=>console.warn('V46.8 clipboard copy product name failed',e));
+    navigator.clipboard.writeText(text).then(done).catch(e=>console.warn('V46.9 clipboard copy product name failed',e));
+  }
+}
+function ensureConfirmedProductCopyOverlayV469(name,locked){
+  const row=name?.closest?.('.product-link-search-input-row')||name?.parentElement;
+  if(!row)return;
+  let overlay=row.querySelector(':scope > .confirmed-product-copy-overlay-v469');
+  row.classList.toggle('confirmed-product-copy-host-v469',!!locked);
+  if(locked){
+    if(!overlay){
+      overlay=document.createElement('button');overlay.type='button';
+      overlay.className='confirmed-product-copy-overlay-v469';
+      overlay.setAttribute('aria-label','点击复制产品名称');overlay.title='点击复制产品名称';
+      overlay.addEventListener('click',e=>copyConfirmedProductNameV469(name,e));
+      row.appendChild(overlay);
+    }
+    overlay.hidden=false;overlay.disabled=false;
+  }else if(overlay){
+    overlay.remove();
   }
 }
 function applyConfirmedCardReadOnlyV405(card){
@@ -4025,27 +4043,19 @@ function applyConfirmedCardReadOnlyV405(card){
   const locked=salesCardIsConfirmedV322(card);
   card.classList.toggle('sales-card-confirmed-readonly-v405',locked);
   card.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=locked;el.setAttribute('aria-readonly',locked?'true':'false')});
-  // V46.8: confirmed cards stay immutable. Only the product-name field is
-  // re-enabled as read-only so a direct user tap/click can copy its text.
-  // No save/sync/search/calculation path is called by this action.
+  // V46.9: confirmed cards remain fully disabled/immutable. A transparent
+  // click layer above each product-name field handles copy only; the original
+  // input never receives focus, selection, search, edit or save events.
   card.querySelectorAll('input.product-link-name').forEach(name=>{
-    if(locked){
-      name.disabled=false;name.readOnly=true;name.dataset.confirmedCopyV468='1';
-      name.setAttribute('aria-readonly','true');name.setAttribute('title','点击复制产品名称');
-      name.classList.add('confirmed-product-copy-v468');
-      if(name.dataset.copyBoundV468!=='1'){
-        name.dataset.copyBoundV468='1';
-        name.addEventListener('click',e=>copyConfirmedProductNameV468(name,e));
-      }
-    }else{
-      name.readOnly=false;delete name.dataset.confirmedCopyV468;
-      name.removeAttribute('title');name.classList.remove('confirmed-product-copy-v468');
-    }
+    name.removeAttribute('title');name.classList.remove('confirmed-product-copy-v468');
+    delete name.dataset.confirmedCopyV468;delete name.dataset.copyBoundV468;
+    name.readOnly=false;
+    ensureConfirmedProductCopyOverlayV469(name,locked);
   });
   card.querySelectorAll('.sales-card-add-product-v239,.product-subitem-remove-v239,.product-link-search-close,.product-link-remove-bottom,.sales-card-draft-btn-v405,.sales-card-confirm-btn-v405').forEach(btn=>{btn.hidden=locked;btn.disabled=locked});
   return locked;
 }
-window.copyConfirmedProductNameV468=copyConfirmedProductNameV468;
+window.copyConfirmedProductNameV469=copyConfirmedProductNameV469;
 function refreshSingleCardActionsV405(card){
   if(!card)return;
   if(applyConfirmedCardReadOnlyV405(card))return;
@@ -5868,7 +5878,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4680",
+    version:"4690",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -8935,7 +8945,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4680$/,'46.8')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4690$/,'46.9')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8961,12 +8971,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4680'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4690'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4680')issues.push(`Frontend / API 版本不一致（Frontend 4680 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4690')issues.push(`Frontend / API 版本不一致（Frontend 4690 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4680';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4690';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
