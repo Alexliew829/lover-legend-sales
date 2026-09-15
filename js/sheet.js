@@ -195,7 +195,9 @@ function commitTurnoverContextV471(ctx,json){
 async function refreshActiveContextDirectV471(ctx,probe,options={}){
   const restoreChanged=Number(getContextPriorityLocalV470(ctx).restoreGeneration||0)!==Number(probe?.restoreGeneration||0);
   const needTurn=restoreChanged||!!probe?.needsTurnoverRefresh;
-  const needCard=restoreChanged||!!probe?.needsSalesCardRefresh;
+  // V47.7: an incomplete/old card watermark is NOT a card change. Only a journal-
+  // confirmed current-context card change (or Restore) may trigger foreground card I/O.
+  const needCard=restoreChanged||probe?.salesCardChangeConfirmed===true||options.allowSafetyCard===true;
   if(!needTurn&&!needCard)return{ok:true,needTurn:false,needCard:false};
   // V47.6: only a journal-confirmed change is allowed to announce "销售卡同步中".
   // An old/missing watermark can still trigger a safety read, but that read stays
@@ -876,10 +878,8 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
-  if(good&&String(text||'')==='已同步'&&typeof window!=='undefined'&&typeof window.salesCardCloudVerifyPendingV445==='function'&&window.salesCardCloudVerifyPendingV445()){
-    writeSyncStatusV457('🟡 销售卡同步中…','wait');
-    return;
-  }
+  // V47.7: legacy/safety Sales Card verification is never allowed to hijack a
+  // confirmed current-context sync status. Real card work paints its own status.
   if(error){
     writeSyncStatusV457('🔴 '+text,'error');
     return;
@@ -1157,7 +1157,7 @@ function scheduleRevisionRetryV448(){
   // legacy loadFromSheet path behind the first request. Home/Report still use the
   // existing global safety path because they have no business context.
   if(revisionRetryTimerV448)return;
-  const waits=[1200,3000,7000,15000,30000];
+  const waits=[1000,2000,4000,8000,12000];
   const delay=waits[Math.min(revisionRetryCountV448,waits.length-1)];
   revisionRetryTimerV448=setTimeout(()=>{
     revisionRetryTimerV448=null;
@@ -1188,12 +1188,17 @@ async function syncCurrentContextNowV472(options={}){
       if(seq!==syncCurrentContextNowV472._seq)return{ok:false,stale:true};
       if(!probe?.ok)throw new Error(probe?.message||'当前资料检查失败');
       const local=getContextPriorityLocalV470(ctx),restoreChanged=Number(local.restoreGeneration||0)!==Number(probe.restoreGeneration||0);
-      if(restoreChanged||probe.needsTurnoverRefresh||probe.needsSalesCardRefresh){
-        await refreshActiveContextDirectV471(ctx,probe,{silent:false,timeoutMs:Number(options.timeoutMs||12000),cardTimeoutMs:Number(options.cardTimeoutMs||12000)});
+      const cardConfirmed=probe.salesCardChangeConfirmed===true;
+      const cardSafetyUncertain=!!probe.needsSalesCardRefresh&&!cardConfirmed;
+      const cardOpen=typeof productLinkBoxIsOpenV210==='function'&&productLinkBoxIsOpenV210(ctx.type);
+      const allowSafetyCard=cardSafetyUncertain&&cardOpen;
+      if(restoreChanged||probe.needsTurnoverRefresh||cardConfirmed||allowSafetyCard){
+        await refreshActiveContextDirectV471(ctx,probe,{silent:false,allowSafetyCard,timeoutMs:Number(options.timeoutMs||12000),cardTimeoutMs:Number(options.cardTimeoutMs||12000)});
       }else{
-        // Advance the exact-context watermark atomically after a successful
-        // no-change probe, but keep the already-visible 已同步 status untouched.
-        setContextPriorityLocalV470(ctx,{turnoverRevision:Number(probe.turnoverGlobalRevision||probe.turnoverRevision||0),salesCardRevision:Number(probe.salesCardGlobalRevision||probe.salesCardRevision||0),restoreGeneration:Number(probe.restoreGeneration||0)});
+        // Advance turnover immediately. If card history cannot be proven and its
+        // panel is closed, preserve the old card watermark; opening the card will
+        // invoke this gate again and perform one silent exact safety verify.
+        setContextPriorityLocalV470(ctx,{turnoverRevision:Number(probe.turnoverGlobalRevision||probe.turnoverRevision||0),salesCardRevision:cardSafetyUncertain?Number(local.salesCardRevision||0):Number(probe.salesCardGlobalRevision||probe.salesCardRevision||0),restoreGeneration:Number(probe.restoreGeneration||0)});
         setCloudAtomicSyncPendingV448(false);setCloudRevisionConfirmedV449(true);
         revisionRetryCountV448=0;
         if(revisionRetryTimerV448){clearTimeout(revisionRetryTimerV448);revisionRetryTimerV448=null;}
@@ -1281,12 +1286,15 @@ async function loadFromSheet(options = {}) {
           // trigger a global revision probe or a card/month read.
           activeContextV470=typeof window.getActivePriorityContextV469==='function'?window.getActivePriorityContextV469():null;
           if(activeContextV470){
-            contextProbeV470=await checkContextPriorityRevisionV470(activeContextV470,Math.min(Number(options.revisionTimeoutMs||REVISION_CHECK_TIMEOUT_MS),5000));
+            contextProbeV470=await checkContextPriorityRevisionV470(activeContextV470,Math.min(Number(options.revisionTimeoutMs||REVISION_CHECK_TIMEOUT_MS),9000));
             if(contextProbeV470?.ok){
               const localCtx=getContextPriorityLocalV470(activeContextV470);
-              const sameCtx=!contextProbeV470.needsTurnoverRefresh&&!contextProbeV470.needsSalesCardRefresh&&Number(localCtx.restoreGeneration||0)===Number(contextProbeV470.restoreGeneration||0);
+              const cardConfirmedV477=contextProbeV470.salesCardChangeConfirmed===true;
+              const cardSafetyUncertainV477=!!contextProbeV470.needsSalesCardRefresh&&!cardConfirmedV477;
+              const cardOpenV477=typeof productLinkBoxIsOpenV210==='function'&&productLinkBoxIsOpenV210(activeContextV470.type);
+              const sameCtx=!contextProbeV470.needsTurnoverRefresh&&!cardConfirmedV477&&!(cardSafetyUncertainV477&&cardOpenV477)&&Number(localCtx.restoreGeneration||0)===Number(contextProbeV470.restoreGeneration||0);
               if(sameCtx&&pendingCountAtStart===0){
-                setContextPriorityLocalV470(activeContextV470,{turnoverRevision:Number(contextProbeV470.turnoverGlobalRevision||contextProbeV470.turnoverRevision||0),salesCardRevision:Number(contextProbeV470.salesCardGlobalRevision||contextProbeV470.salesCardRevision||0),restoreGeneration:Number(contextProbeV470.restoreGeneration||0)});
+                setContextPriorityLocalV470(activeContextV470,{turnoverRevision:Number(contextProbeV470.turnoverGlobalRevision||contextProbeV470.turnoverRevision||0),salesCardRevision:cardSafetyUncertainV477?Number(localCtx.salesCardRevision||0):Number(contextProbeV470.salesCardGlobalRevision||contextProbeV470.salesCardRevision||0),restoreGeneration:Number(contextProbeV470.restoreGeneration||0)});
                 setCloudAtomicSyncPendingV448(false);setCloudRevisionConfirmedV449(true);setSync('已同步',true);completedSuccessfully=true;
                 return{ok:true,month,contextRevisionOnly:true,context:activeContextV470};
               }
@@ -1298,8 +1306,12 @@ async function loadFromSheet(options = {}) {
           if(activeContextV470&&contextProbeV470?.ok){
             const localCtx=getContextPriorityLocalV470(activeContextV470);
             const restoreChanged=Number(localCtx.restoreGeneration||0)!==Number(contextProbeV470.restoreGeneration||0);
-            if(restoreChanged||contextProbeV470.needsTurnoverRefresh||contextProbeV470.needsSalesCardRefresh){
-              await refreshActiveContextDirectV471(activeContextV470,contextProbeV470,{silent,timeoutMs:Number(options.timeoutMs||12000),cardTimeoutMs:Number(options.cardTimeoutMs||12000)});
+            const cardConfirmedV477=contextProbeV470.salesCardChangeConfirmed===true;
+            const cardSafetyUncertainV477=!!contextProbeV470.needsSalesCardRefresh&&!cardConfirmedV477;
+            const cardOpenV477=typeof productLinkBoxIsOpenV210==='function'&&productLinkBoxIsOpenV210(activeContextV470.type);
+            const allowSafetyCardV477=cardSafetyUncertainV477&&cardOpenV477;
+            if(restoreChanged||contextProbeV470.needsTurnoverRefresh||cardConfirmedV477||allowSafetyCardV477){
+              await refreshActiveContextDirectV471(activeContextV470,contextProbeV470,{silent,allowSafetyCard:allowSafetyCardV477,timeoutMs:Number(options.timeoutMs||12000),cardTimeoutMs:Number(options.cardTimeoutMs||12000)});
               completedSuccessfully=true;
               return{ok:true,month,contextDirectSync:true,context:activeContextV470};
             }

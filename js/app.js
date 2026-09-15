@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4760",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4770",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4760";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4770";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3092,6 +3092,9 @@ function toggleProductLinkBoxV206(type){
       }
     }
     Promise.resolve(loadProductLinksIntoEditorV206(type)).catch(()=>{});
+    // V47.7: explicit Sales Card opening may run one silent safety verification
+    // through the unified current-context gate when its watermark is old/incomplete.
+    setTimeout(()=>{try{if(typeof window.syncCurrentContextNowV472==='function')window.syncCurrentContextNowV472({showChecking:false,revisionTimeoutMs:9000}).catch(()=>{})}catch(_){}},0);
   }
 }
 function liveDeliveryDefaultV203(price){
@@ -3460,6 +3463,9 @@ function captureSalesCardFinalStatesV431(type,date,location,links){
 window.applySalesCardFinalStatesV431=applySalesCardFinalStatesV431;
 async function loadProductLinksIntoEditorV206(type,options={}){
   const {date,location}=productLinkContextV206(type);
+  // V47.7: automatic date/host/page refreshes must never read Sales Card cloud data
+  // while the Sales Card panel is closed. Opening the panel is the explicit view action.
+  const boxOpenV477=typeof productLinkBoxIsOpenV210==='function'&&productLinkBoxIsOpenV210(type);
   const seq=(SALES_CARD_LOAD_SEQ_V245[type]||0)+1;
   SALES_CARD_LOAD_SEQ_V245[type]=seq;
 
@@ -3475,6 +3481,8 @@ async function loadProductLinksIntoEditorV206(type,options={}){
     ?applySalesCardFinalStatesV431(type,date,location,filterDeletedSalesLinksV350(type,date,location,cachedRaw))
     :cachedRaw;
 
+  if(!boxOpenV477&&options.forceAuthority!==true&&options.contextProbeOwnsCloud!==true)return cached;
+
   // V46.0 Local First + exact-context verification. Paint the last complete
   // local card immediately. After another device advances Sales Card Revision,
   // this exact date/location is verified once against cloud before the cached
@@ -3484,56 +3492,16 @@ async function loadProductLinksIntoEditorV206(type,options={}){
     applyCloudDraftStatusesV322(type,cached);
     const pendingKey=salesDraftPendingKeyV314(type,date,location);
     const pending=readSalesDraftPendingV314()[pendingKey];
-    const needsExactVerify=typeof salesCardContextNeedsVerifyV451==='function'&&salesCardContextNeedsVerifyV451(type,date,location);
-    if(pending&&!needsExactVerify){
+    // V47.7: a cached Sales Card is Local First and is NOT re-read merely because
+    // an old/global verification watermark differs. Real current-context card changes
+    // are fetched by refreshActiveContextDirectV471(); Restore uses that same path.
+    // This permanently removes the false "销售卡同步中 / 销售卡读取失败" safety-read path.
+    if(pending){
       const pre=productLinkPreV208(type),msg=document.getElementById(pre+'ProductLinkMsg');
       if(msg){msg.classList.remove('hidden');msg.textContent='🟡 本机销售卡已打开 · 云端后台自动重试';}
-      setSync('本机销售卡待云端同步');
       setTimeout(()=>syncQueuedSalesDraftV314(pendingKey,String(pending.token||'')).catch(()=>{}),0);
-      return cached;
     }
-    // V46.0: when cloud revision advanced, an old durable pending draft must not
-    // short-circuit exact verification and keep an older saved card on screen.
-    // It remains safely stored until the authoritative cloud context is read.
-
-    const dirtyNow=typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238(type);
-    if(options.contextProbeOwnsCloud===true)return cached;
-    if(!needsExactVerify||dirtyNow)return cached;
-
-    SALES_CARD_VERIFY_PENDING_V445[type]=contextKey;
-    try{
-      const cloudLinksRaw=await loadSalesProductLinksV206(type,date,location,{force:true,maxAgeMs:0});
-      const cloudLinks=filterDeletedSalesLinksV350(type,date,location,cloudLinksRaw);
-      const deduped=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(cloudLinks):cloudLinks;
-      pruneSalesCardFinalStatesV447(type,date,location,deduped);
-      const authoritative=captureSalesCardFinalStatesV431(type,date,location,deduped);
-      if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,date,location,authoritative);
-      if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,date,location,authoritative);
-      // V46.0: exact-context refresh commits card + profit together from the SAME
-      // authoritative result. Never let the profit panel advance separately.
-      if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,date,location,authoritative);
-      if(typeof refreshProfitAggregateCachesV321==='function'){
-        const txns=[...new Set(authoritative.map(x=>String(x.transactionId||x.saleId||'')).filter(Boolean))];
-        refreshProfitAggregateCachesV321(authoritative,txns);
-      }
-      const rev=typeof getPrioritySyncLocalV315==='function'?Number((getPrioritySyncLocalV315()||{}).salesCardRevision||0):0;
-      if(typeof markSalesCardContextVerifiedV451==='function')markSalesCardContextVerifiedV451(type,date,location,rev);
-
-      const current=productLinkContextV206(type),currentKey=salesCardContextKeyV245(type,current.date,current.location);
-      const becameDirty=typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238(type);
-      if(SALES_CARD_LOAD_SEQ_V245[type]===seq&&currentKey===contextKey&&!becameDirty&&!productImportSearchIsActiveV226(type)){
-        renderProductLinksEditorV206(type,authoritative);
-        applyCloudDraftStatusesV322(type,authoritative);
-      }
-      if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-      return authoritative;
-    }catch(e){
-      if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-      const pre=productLinkPreV208(type),msg=document.getElementById(pre+'ProductLinkMsg');
-      if(msg){msg.classList.remove('hidden');msg.textContent='🟡 上次同步销售卡已保留，后台检查中';}
-      setSync('上次同步销售卡已保留，后台检查中',true,false);
-      return cached;
-    }
+    return cached;
   }
 
   // No cache on this device. During a committed context switch V47.5 lets the
@@ -3570,6 +3538,7 @@ async function loadProductLinksIntoEditorV206(type,options={}){
     if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,date,location,links);
     const verifiedRevisionV451=typeof getPrioritySyncLocalV315==='function'?Number((getPrioritySyncLocalV315()||{}).salesCardRevision||0):0;
     if(typeof markSalesCardContextVerifiedV451==='function')markSalesCardContextVerifiedV451(type,date,location,verifiedRevisionV451);
+    try{if(typeof setContextPriorityLocalV470==='function'){const prev=getContextPriorityLocalV470({type,date,location});setContextPriorityLocalV470({type,date,location},{turnoverRevision:Number(prev.turnoverRevision||0),salesCardRevision:verifiedRevisionV451,restoreGeneration:Number(prev.restoreGeneration||0)})}}catch(_){}
 
     const current=productLinkContextV206(type);
     const currentKey=salesCardContextKeyV245(type,current.date,current.location);
@@ -3578,7 +3547,7 @@ async function loadProductLinksIntoEditorV206(type,options={}){
       applyCloudDraftStatusesV322(type,links);
       setTimeout(()=>{if(typeof refreshInventoryPendingV250==='function')refreshInventoryPendingV250(true)},0);
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-      setSync('已同步',true);
+      // V47.7: card view success does not declare turnover/context fully synced.
     }
     return links;
   }catch(e){
@@ -3588,7 +3557,7 @@ async function loadProductLinksIntoEditorV206(type,options={}){
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
       const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
       if(wrap)wrap.innerHTML='<div class="product-link-loading-v231">销售卡读取失败，请再试一次。</div>';
-      setSync('销售卡读取失败',false,true);
+      // V47.7: card-view read failure stays inside the card panel only.
     }
     return null;
   }
@@ -5837,7 +5806,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4760",
+    version:"4770",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -7947,7 +7916,8 @@ async function renderSelectedDayGrandV362(type){
     const rec=await loadDayProfitSummaryV475(type,date,{force:false});
     if(token!==selectedDayGrandTokenV362[type]||date!==selectedDayDateV362(type))return;
     paintSelectedDayGrandV362(type,date,sales,Number(rec.profit||0),false,false);
-    try{if(typeof cloudRevisionSafeForWriteV449==='function'&&cloudRevisionSafeForWriteV449()&&typeof setSync==='function')setSync('已同步',true)}catch(_){}
+    // V47.7: Profit display never owns the sync status. A cached/cloud Profit result
+    // cannot declare the current turnover/card context authoritative.
   }catch(e){
     if(token!==selectedDayGrandTokenV362[type]||date!==selectedDayDateV362(type))return;
     // Keep the last valid Local First profit on screen. With no cache, stay in a
@@ -7957,6 +7927,7 @@ async function renderSelectedDayGrandV362(type){
   }
 }
 window.renderSelectedDayGrandV362=renderSelectedDayGrandV362;
+const renderSelectedDayGrandLocalFirstV477=renderSelectedDayGrandV362;
 
 // Override V36.0 renderer so all existing Fair/Live refresh hooks use the V36.8 compact grand-total renderer.
 renderSelectedDayTotalV360=function(type){return renderSelectedDayGrandV362(type)};
@@ -8176,27 +8147,10 @@ function getSelectedDayProfitLinksV368(type,date,maxAgeMs=180000){
 }
 window.getSelectedDayProfitLinksV368=getSelectedDayProfitLinksV368;
 
-renderSelectedDayGrandV362=async function(type){
-  const date=selectedDayDateV362(type),token=++selectedDayGrandTokenV362[type];
-  const sales=selectedDayTurnoverV362(type,date);
-  paintSelectedDayGrandV362(type,date,sales,0,true,false);
-  try{
-    const links=await loadAllSalesProductLinksV203({force:false,maxAgeMs:180000});
-    if(token!==selectedDayGrandTokenV362[type]||date!==selectedDayDateV362(type))return;
-    const dayLinks=seedSelectedDayProfitV368(type,date,links);
-    const profit=dayLinks.reduce((sum,x)=>sum+Number(x.profit||0),0);
-    paintSelectedDayGrandV362(type,date,sales,profit,false,false);
-    // If Daily Profit is already open for this exact date, repaint it from the same result now.
-    if(productProfitSummaryOpenV216?.[type]&&productProfitSelectedDateV216(type)===date){
-      renderProductProfitSummaryV216(type,dayLinks);
-      const btn=document.querySelector(`#${productLinkPreV208(type)}ProductLinkBox .product-profit-toggle-btn`);
-      if(btn){btn.disabled=false;btn.textContent='📊 收起利润'}
-    }
-  }catch(e){
-    if(token!==selectedDayGrandTokenV362[type]||date!==selectedDayDateV362(type))return;
-    paintSelectedDayGrandV362(type,date,sales,0,false,true);
-  }
-};
+// V47.7: do not let the later V36.8 legacy all-Sales-Card renderer overwrite
+// the V47.6 Home-style Local First Profit renderer. This was causing Profit to
+// wait on loadAllSalesProductLinksV203() and adding unnecessary Apps Script load.
+renderSelectedDayGrandV362=renderSelectedDayGrandLocalFirstV477;
 window.renderSelectedDayGrandV362=renderSelectedDayGrandV362;
 renderSelectedDayTotalV360=function(type){return renderSelectedDayGrandV362(type)};
 window.renderSelectedDayTotalV360=renderSelectedDayTotalV360;
@@ -8983,7 +8937,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4760$/,'47.6')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4770$/,'47.7')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -9009,12 +8963,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4760'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4770'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4760')issues.push(`Frontend / API 版本不一致（Frontend 4760 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4770')issues.push(`Frontend / API 版本不一致（Frontend 4770 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4760';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4770';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
