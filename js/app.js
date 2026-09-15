@@ -1618,7 +1618,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4730",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4660",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1636,7 +1636,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4730";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4660";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2935,14 +2935,10 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
   };
 
   nameInput.addEventListener("focus",()=>{
-    // V47.3: confirmed/locked product inputs are disabled and use a separate copy button;
-    // the locked input must never reopen Import search.
-    if(nameInput.dataset.confirmedCopyV468==="1")return;
     open();
     render();
   });
   nameInput.addEventListener("input",()=>{
-    if(nameInput.dataset.confirmedCopyV468==="1")return;
     clearImportMappingForManualProductV214(item);
     open();
     render();
@@ -3991,137 +3987,14 @@ function salesCardIsConfirmedV322(card){
   if(confirmed)card.dataset.confirmedOnceV401='1';
   return confirmed;
 }
-function copyConfirmedProductNameV470(input,event){
-  const card=input?.closest?.('.sales-card-transaction-v239');
-  if(!card||!salesCardIsConfirmedV322(card))return false;
-  const text=String(input.value||'').trim();
-  if(!text)return false;
-  if(event){
-    event.preventDefault();
-    event.stopPropagation();
-    if(typeof event.stopImmediatePropagation==='function')event.stopImmediatePropagation();
-  }
-  const done=()=>{
-    input.dataset.copyDoneAtV470=String(Date.now());
-    if(typeof showToast==='function')showToast('✅ 已复制产品名称');
-  };
-  const legacyCopy=()=>{
-    const ta=document.createElement('textarea');
-    ta.value=text;
-    ta.setAttribute('readonly','');
-    ta.setAttribute('aria-hidden','true');
-    ta.style.position='fixed';
-    ta.style.left='0';
-    ta.style.top='0';
-    ta.style.width='1px';
-    ta.style.height='1px';
-    ta.style.padding='0';
-    ta.style.border='0';
-    ta.style.opacity='0.01';
-    ta.style.zIndex='-1';
-    document.body.appendChild(ta);
-    let ok=false;
-    try{
-      ta.focus({preventScroll:true});
-      ta.select();
-      ta.setSelectionRange(0,ta.value.length);
-      ok=document.execCommand('copy')===true;
-    }catch(e){console.warn('V47.3 fallback copy product name failed',e)}
-    ta.remove();
-    return ok;
-  };
-
-  // V47.3: copy is invoked only by the separate enabled copy button. Use the
-  // modern Clipboard API first and fall back to execCommand if rejected.
-  if(navigator.clipboard&&typeof navigator.clipboard.writeText==='function'&&window.isSecureContext){
-    try{
-      const p=navigator.clipboard.writeText(text);
-      if(p&&typeof p.then==='function'){
-        p.then(done).catch(()=>{if(legacyCopy())done()});
-        return true;
-      }
-      done();
-      return true;
-    }catch(_){/* use legacy fallback below */}
-  }
-  if(legacyCopy()){done();return true}
-  if(typeof showToast==='function')showToast('复制失败，请再点一次产品名称');
-  return false;
-}
-function bindConfirmedProductCopyV473(name,locked){
-  if(!name)return;
-  const row=name.closest('.product-link-search-input-row');
-  if(!row)return;
-  let btn=row.querySelector('.confirmed-product-copy-btn-v473');
-  if(locked){
-    // V47.3: keep the confirmed product input genuinely locked/disabled and use a
-    // separate small button in the existing search-close slot. The button is not
-    // part of the disabled input/search gesture path, so confirmed-card locking
-    // cannot swallow the copy click.
-    name.readOnly=false;
-    name.disabled=true;
-    name.removeAttribute('title');
-    name.style.pointerEvents='';
-    name.style.cursor='';
-    delete row.dataset.confirmedCopyHostV472;
-    row.removeAttribute('title');
-    row.style.cursor='';
-    if(!btn){
-      btn=document.createElement('button');
-      btn.type='button';
-      btn.className='confirmed-product-copy-btn-v473';
-      btn.textContent='复制';
-      btn.setAttribute('aria-label','复制产品名称');
-      btn.setAttribute('title','复制产品名称');
-      btn.addEventListener('click',e=>{
-        e.preventDefault();
-        e.stopPropagation();
-        if(typeof e.stopImmediatePropagation==='function')e.stopImmediatePropagation();
-        const currentRow=btn.closest('.product-link-search-input-row');
-        const currentName=currentRow?.querySelector('input.product-link-name');
-        const card=currentName?.closest?.('.sales-card-transaction-v239');
-        if(!currentName||!card||!salesCardIsConfirmedV322(card))return;
-        copyConfirmedProductNameV470(currentName,e);
-      },true);
-      row.appendChild(btn);
-    }
-    btn.hidden=false;
-    btn.disabled=false;
-  }else{
-    btn?.remove();
-    name.readOnly=false;
-    name.disabled=false;
-    name.removeAttribute('title');
-    name.style.pointerEvents='';
-    name.style.cursor='';
-    delete row.dataset.confirmedCopyHostV472;
-    row.removeAttribute('title');
-    row.style.cursor='';
-  }
-}
 function applyConfirmedCardReadOnlyV405(card){
   if(!card)return false;
   const locked=salesCardIsConfirmedV322(card);
   card.classList.toggle('sales-card-confirmed-readonly-v405',locked);
-  // V47.3: confirmed cards remain genuinely locked. Copy is handled only by the
-  // independent small copy button, never by an unlocked/readOnly product input.
-  card.querySelectorAll('input,select,textarea').forEach(el=>{
-    el.disabled=locked;
-    el.setAttribute('aria-readonly',locked?'true':'false');
-  });
-  card.querySelectorAll('input.product-link-name').forEach(name=>{
-    // Remove V46.9 overlay remnants if a cached DOM survives an in-place update.
-    const row=name.closest('.product-link-search-input-row');
-    row?.querySelectorAll('.confirmed-product-copy-overlay-v469').forEach(x=>x.remove());
-    row?.classList.remove('confirmed-product-copy-host-v469');
-    name.classList.remove('confirmed-product-copy-v468');
-    delete name.dataset.copyBoundV468;
-    bindConfirmedProductCopyV473(name,locked);
-  });
+  card.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=locked;el.setAttribute('aria-readonly',locked?'true':'false')});
   card.querySelectorAll('.sales-card-add-product-v239,.product-subitem-remove-v239,.product-link-search-close,.product-link-remove-bottom,.sales-card-draft-btn-v405,.sales-card-confirm-btn-v405').forEach(btn=>{btn.hidden=locked;btn.disabled=locked});
   return locked;
 }
-window.copyConfirmedProductNameV470=copyConfirmedProductNameV470;
 function refreshSingleCardActionsV405(card){
   if(!card)return;
   if(applyConfirmedCardReadOnlyV405(card))return;
@@ -5944,7 +5817,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4730",
+    version:"4660",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -9011,7 +8884,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4730$/,'47.3')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4660$/,'46.6')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -9037,12 +8910,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4730'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4660'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4730')issues.push(`Frontend / API 版本不一致（Frontend 4730 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4660')issues.push(`Frontend / API 版本不一致（Frontend 4660 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4730';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4660';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
