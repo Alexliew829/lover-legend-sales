@@ -155,7 +155,25 @@ function salesCardContextNeedsVerifyV451(type,date,location){
   const all=readSalesCardContextVerifyV451();
   return Number(all[salesCardContextVerifyKeyV451(type,date,location)]||0)!==rev;
 }
-if(typeof window!=="undefined"){window.markSalesCardContextVerifiedV451=markSalesCardContextVerifiedV451;window.salesCardContextNeedsVerifyV451=salesCardContextNeedsVerifyV451;}
+// V46.8 context-aware trust advancement. When the server returns a COMPLETE
+// change journal, every cached Sales Card context that is absent from the card
+// changes is proven unchanged. Advance only those contexts to the new global
+// Sales Card revision locally, without re-reading them from cloud. Changed
+// contexts are still fetched authoritatively before they are marked verified.
+function advanceUnaffectedSalesCardContextsV468(changes,cloudCardRevision){
+  const rev=Math.max(0,Number(cloudCardRevision||0));if(!rev)return;
+  const changed=new Set((Array.isArray(changes)?changes:[]).filter(x=>x&&x.kind==='card').map(x=>salesCardContextVerifyKeyV451(x.type,x.date,x.location)));
+  let persistent={};
+  try{persistent=JSON.parse(localStorage.getItem('lover_sales_card_links_cache_v232')||'{}')||{}}catch(_){persistent={}}
+  const verified=readSalesCardContextVerifyV451();
+  Object.keys(persistent).forEach(key=>{if(!changed.has(key))verified[key]=rev});
+  try{localStorage.setItem(SALES_CARD_CONTEXT_VERIFY_KEY_V451,JSON.stringify(verified))}catch(_){}
+}
+if(typeof window!=="undefined"){
+  window.markSalesCardContextVerifiedV451=markSalesCardContextVerifiedV451;
+  window.salesCardContextNeedsVerifyV451=salesCardContextNeedsVerifyV451;
+  window.advanceUnaffectedSalesCardContextsV468=advanceUnaffectedSalesCardContextsV468;
+}
 async function checkPriorityRevisionV315(timeoutMs=8000){return jsonp({action:"priorityRevisionV315"},{timeoutMs});}
 async function refreshVisibleSalesCardsAfterCloudRevisionV444(){
   const types=['daily','fair','live'];
@@ -396,11 +414,12 @@ function commitAllSalesCardsAtomicV449(allLinks,verifiedRevisionV452=0){
 }
 
 function syncContextLabelV456(change){
-  const type=String(change&&change.type||'');const loc=String(change&&change.location||'').trim();
-  if(type==='fair')return loc?`Fair · ${loc}`:'Fair';
-  if(type==='live')return loc?`Live · ${loc}`:'Live';
-  if(type==='daily')return `${/balakong/i.test(loc)?'Balakong':'Belimbing'} Sales`;
-  return '云端资料';
+  const type=String(change&&change.type||'');const loc=String(change&&change.location||'').trim();const kind=String(change&&change.kind||'');
+  const subject=kind==='card'?'销售卡':kind==='turnover'?'营业额':'资料';
+  if(type==='fair')return loc?`Fair ${loc} ${subject}`:`Fair ${subject}`;
+  if(type==='live')return loc?`Live ${loc} ${subject}`:`Live ${subject}`;
+  if(type==='daily')return `${/balakong/i.test(loc)?'Balakong':'Belimbing'} Sales ${subject}`;
+  return `云端${subject}`;
 }
 function syncChangesLabelV456(changes){const labels=[...new Set((Array.isArray(changes)?changes:[]).map(syncContextLabelV456).filter(Boolean))];return labels.length===1?labels[0]:labels.length>1?`${labels.slice(0,2).join(' / ')}${labels.length>2?' 等':''}`:'云端资料'}
 async function checkCloudRevisionShared(timeoutMs = REVISION_CHECK_TIMEOUT_MS) {
@@ -1161,6 +1180,11 @@ async function loadFromSheet(options = {}) {
               const monthPromiseV454=needsMonthRefreshV454?loadMonthCloudShared(month,Number(options.timeoutMs||15000)):Promise.resolve(null);
               const pairV454=await Promise.all([cardPromiseV454,monthPromiseV454]);
               if(canContextDeltaV456){
+                // V46.8: deltaComplete proves which exact contexts changed. The
+                // changed contexts were just fetched above; every cached context
+                // not present in the journal can be trusted at cloudCard without
+                // another request when the user opens/returns to it.
+                advanceUnaffectedSalesCardContextsV468(deltaChangesV456,cloudCard);
                 prefetchedAllSalesCardsV449=null;
               }else{
                 prefetchedAllSalesCardsV449=pairV454[0];
@@ -1181,7 +1205,7 @@ async function loadFromSheet(options = {}) {
               }
             }
           } else {
-            setSync("上次已同步资料已保留 · 后台检查中", true, false);
+            setSync("上次同步资料已保留，后台检查中", true, false);
             scheduleRevisionRetryV448();
             completedSuccessfully = true;
             return {ok:true,month,revisionUnconfirmed:true};
@@ -1190,7 +1214,7 @@ async function loadFromSheet(options = {}) {
           // Do not replace valid Local First data with a false red failure when
           // only the tiny Revision probe is temporarily slow. Resume/interval/
           // manual refresh will retry this lightweight check.
-          setSync("上次已同步资料已保留 · 后台检查中", true, false);
+          setSync("上次同步资料已保留，后台检查中", true, false);
           scheduleRevisionRetryV448();
           completedSuccessfully = true;
           return {ok:true,month,revisionUnconfirmed:true,error:revisionError};

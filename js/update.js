@@ -114,7 +114,7 @@
   async function registerAndCheckForUpdates() {
     if (!("serviceWorker" in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register("./sw.js?v=46.7", { updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.register("./sw.js?v=46.8", { updateViaCache: "none" });
       await registration.update();
       await activateWaitingWorker(registration);
       registration.addEventListener("updatefound", () => {
