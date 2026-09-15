@@ -1618,7 +1618,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4710",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4720",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1636,7 +1636,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4710";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4720";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2935,7 +2935,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
   };
 
   nameInput.addEventListener("focus",()=>{
-    // V47.1: confirmed/locked product-name copy uses a readOnly input so the
+    // V47.2: confirmed/locked product-name copy uses a readOnly input so the
     // browser can deliver the copy gesture; it must never reopen Import search.
     if(nameInput.dataset.confirmedCopyV468==="1")return;
     open();
@@ -4026,12 +4026,12 @@ function copyConfirmedProductNameV470(input,event){
       ta.select();
       ta.setSelectionRange(0,ta.value.length);
       ok=document.execCommand('copy')===true;
-    }catch(e){console.warn('V47.1 fallback copy product name failed',e)}
+    }catch(e){console.warn('V47.2 fallback copy product name failed',e)}
     ta.remove();
     return ok;
   };
 
-  // V47.1: call the modern Clipboard API directly inside the real pointer/click
+  // V47.2: call the modern Clipboard API directly inside the real pointer/click
   // user gesture. Only fall back to execCommand when the browser rejects it.
   if(navigator.clipboard&&typeof navigator.clipboard.writeText==='function'&&window.isSecureContext){
     try{
@@ -4048,43 +4048,46 @@ function copyConfirmedProductNameV470(input,event){
   if(typeof showToast==='function')showToast('复制失败，请再点一次产品名称');
   return false;
 }
-function bindConfirmedProductCopyV470(name,locked){
+function bindConfirmedProductCopyV472(name,locked){
   if(!name)return;
+  const row=name.closest('.product-link-search-input-row');
   if(locked){
-    // Keep the confirmed card immutable without using disabled on the product
-    // name itself: disabled controls can swallow pointer/click events in Chrome.
+    // V47.2: do not depend on the product-search input receiving the gesture.
+    // The locked input becomes inert to pointer events and its existing outer row
+    // receives the click, completely bypassing input focus/search/selection behavior.
     name.disabled=false;
     name.readOnly=true;
     name.tabIndex=-1;
-    name.dataset.confirmedCopyV468='1';
     name.setAttribute('aria-readonly','true');
     name.setAttribute('title','点击复制产品名称');
-    name.style.cursor='copy';
-    if(name.dataset.copyBoundV471!=='1'){
-      name.dataset.copyBoundV471='1';
-      // V47.1: clipboard write must run from the completed CLICK gesture.
-      // V47.0 tried pointerdown first and then suppressed the following click;
-      // Chrome can reject clipboard access during pointerdown, leaving no
-      // reliable click retry. Keep pointerdown free of clipboard work.
-      name.addEventListener('click',e=>{
-        const card=name.closest('.sales-card-transaction-v239');
-        if(!card||!salesCardIsConfirmedV322(card))return;
-        copyConfirmedProductNameV470(name,e);
-        try{name.blur()}catch(_){ }
-      },true);
-      name.addEventListener('keydown',e=>{
-        if(e.key==='Enter'||e.key===' '){copyConfirmedProductNameV470(name,e)}
-        else{e.preventDefault();e.stopPropagation()}
-      },true);
+    name.style.pointerEvents='none';
+    name.style.cursor='default';
+    if(row){
+      row.dataset.confirmedCopyHostV472='1';
+      row.setAttribute('title','点击复制产品名称');
+      row.style.cursor='copy';
+      if(row.dataset.copyBoundV472!=='1'){
+        row.dataset.copyBoundV472='1';
+        row.addEventListener('click',e=>{
+          if(row.dataset.confirmedCopyHostV472!=='1')return;
+          const currentName=row.querySelector('input.product-link-name');
+          const card=currentName?.closest?.('.sales-card-transaction-v239');
+          if(!currentName||!card||!salesCardIsConfirmedV322(card))return;
+          copyConfirmedProductNameV470(currentName,e);
+        },true);
+      }
     }
   }else{
     name.readOnly=false;
     name.disabled=false;
     name.removeAttribute('title');
+    name.style.pointerEvents='';
     name.style.cursor='';
-    delete name.dataset.confirmedCopyV468;
-    delete name.dataset.copyGestureAtV470;
-    delete name.dataset.copyBoundV471;
+    if(row){
+      delete row.dataset.confirmedCopyHostV472;
+      row.removeAttribute('title');
+      row.style.cursor='';
+    }
   }
 }
 function applyConfirmedCardReadOnlyV405(card){
@@ -4092,7 +4095,7 @@ function applyConfirmedCardReadOnlyV405(card){
   const locked=salesCardIsConfirmedV322(card);
   card.classList.toggle('sales-card-confirmed-readonly-v405',locked);
   // All confirmed-card fields remain disabled except the product-name field,
-  // which is readOnly solely so the browser can deliver the copy gesture.
+  // which stays readOnly while its outer row receives the copy gesture.
   card.querySelectorAll('input,select,textarea').forEach(el=>{
     const isCopyName=el.matches?.('input.product-link-name');
     if(isCopyName){
@@ -4109,7 +4112,7 @@ function applyConfirmedCardReadOnlyV405(card){
     row?.classList.remove('confirmed-product-copy-host-v469');
     name.classList.remove('confirmed-product-copy-v468');
     delete name.dataset.copyBoundV468;
-    bindConfirmedProductCopyV470(name,locked);
+    bindConfirmedProductCopyV472(name,locked);
   });
   card.querySelectorAll('.sales-card-add-product-v239,.product-subitem-remove-v239,.product-link-search-close,.product-link-remove-bottom,.sales-card-draft-btn-v405,.sales-card-confirm-btn-v405').forEach(btn=>{btn.hidden=locked;btn.disabled=locked});
   return locked;
@@ -5937,7 +5940,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4710",
+    version:"4720",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -9004,7 +9007,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4710$/,'47.1')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4720$/,'47.2')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -9030,12 +9033,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4710'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4720'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4710')issues.push(`Frontend / API 版本不一致（Frontend 4710 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4720')issues.push(`Frontend / API 版本不一致（Frontend 4720 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4710';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4720';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
