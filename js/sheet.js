@@ -143,6 +143,68 @@ function contextPriorityKeyV470(ctx){return [String(ctx?.type||''),String(ctx?.d
 function getContextPriorityLocalV470(ctx){const all=readContextPrioritySyncV470();return all[contextPriorityKeyV470(ctx)]||{};}
 function setContextPriorityLocalV470(ctx,rev){if(!ctx||!ctx.type||!ctx.date||!String(ctx.location||'').trim()||!rev)return;const all=readContextPrioritySyncV470(),key=contextPriorityKeyV470(ctx),old=all[key]&&typeof all[key]==='object'?all[key]:{};all[key]={...old,at:Date.now()};if(Object.prototype.hasOwnProperty.call(rev,'turnoverRevision'))all[key].turnoverRevision=Number(rev.turnoverRevision||0);if(Object.prototype.hasOwnProperty.call(rev,'salesCardRevision'))all[key].salesCardRevision=Number(rev.salesCardRevision||0);if(Object.prototype.hasOwnProperty.call(rev,'restoreGeneration'))all[key].restoreGeneration=Number(rev.restoreGeneration||0);try{localStorage.setItem(CONTEXT_PRIORITY_SYNC_KEY_V470,JSON.stringify(all))}catch(_){}}
 async function checkContextPriorityRevisionV470(ctx,timeoutMs=5000){const local=getContextPriorityLocalV470(ctx);return jsonp({action:'contextPriorityRevisionV470',type:ctx.type,date:ctx.date,location:ctx.location,lastTurnoverRevision:Number(local.turnoverRevision||0),lastSalesCardRevision:Number(local.salesCardRevision||0)},{timeoutMs});}
+async function loadTurnoverContextV471(ctx,timeoutMs=12000){return jsonp({action:'getTurnoverContextV471',type:ctx.type,date:ctx.date,location:ctx.location},{timeoutMs});}
+function contextSyncLabelV471(ctx,turnoverChanged,cardChanged,done=false){
+  const type=String(ctx?.type||''),loc=String(ctx?.location||'').trim(),suffix=done?'已同步':'同步中…';
+  if(type==='live'){
+    if(turnoverChanged&&cardChanged)return `Live ${loc} ${suffix}`;
+    if(turnoverChanged)return `Live ${loc} 营业额${suffix}`;
+    if(cardChanged)return `Live ${loc} 销售卡${suffix}`;
+    return `Live ${loc} ${suffix}`;
+  }
+  if(type==='fair')return loc?`Fair ${loc} ${suffix}`:`Fair ${suffix}`;
+  if(type==='daily')return `Sales ${suffix}`;
+  return done?'已同步':'同步中…';
+}
+function contextRowMatchesV471(row,ctx){
+  if(!row||!ctx)return false;const type=String(ctx.type||'');
+  if(String(row.type||'')!==type||String(row.date||'')!==String(ctx.date||''))return false;
+  if(type==='daily')return String(row.company||'').toLowerCase()===String(ctx.location||'').toLowerCase();
+  return String(row.location||'').trim().toLowerCase()===String(ctx.location||'').trim().toLowerCase();
+}
+function commitTurnoverContextV471(ctx,json){
+  if(!ctx||!json||json.ok!==true)return false;
+  const row=json.row||null;
+  if(row&&Number(row.amount||0)>0){upsertLocalRow(row);}else{rows=rows.filter(r=>!contextRowMatchesV471(r,ctx));}
+  try{
+    const rec=json.entryRecord;
+    if(rec&&Array.isArray(rec.entries)&&typeof setTurnoverEntryCacheV376==='function'){
+      const clean=typeof normalizeTurnoverEntriesClientV376==='function'?normalizeTurnoverEntriesClientV376(rec.entries):rec.entries;
+      const sum=typeof entriesSumV376==='function'?entriesSumV376(clean):clean.reduce((a,x)=>a+Number(x.amount||0),0);
+      const official=row?Number(row.amount||0):0;
+      if(Math.abs(sum-official)<=0.005)setTurnoverEntryCacheV376(ctx.type,ctx.date,ctx.location,clean,'cloud-v471');
+    }
+  }catch(_){ }
+  saveLocalDataCache();
+  try{renderAll()}catch(_){try{renderHomeFirst();scheduleDeferredFullRender(0)}catch(__){}}
+  return true;
+}
+async function refreshActiveContextDirectV471(ctx,probe,options={}){
+  const restoreChanged=Number(getContextPriorityLocalV470(ctx).restoreGeneration||0)!==Number(probe?.restoreGeneration||0);
+  const needTurn=restoreChanged||!!probe?.needsTurnoverRefresh;
+  const needCard=restoreChanged||!!probe?.needsSalesCardRefresh;
+  if(!needTurn&&!needCard)return{ok:true,needTurn:false,needCard:false};
+  if(!options.silent)setSync(contextSyncLabelV471(ctx,needTurn,needCard,false));
+  const turnPromise=needTurn?loadTurnoverContextV471(ctx,Number(options.timeoutMs||12000)):Promise.resolve(null);
+  const cardPromise=needCard?jsonp({action:'getSalesProductLinks',type:ctx.type,date:ctx.date,location:ctx.location},{timeoutMs:Number(options.cardTimeoutMs||12000)}):Promise.resolve(null);
+  const [turnJson,cardJson]=await Promise.all([turnPromise,cardPromise]);
+  if(needTurn){if(!turnJson||turnJson.ok!==true)throw new Error((turnJson&&turnJson.message)||'当前营业额读取失败');commitTurnoverContextV471(ctx,turnJson);}
+  if(needCard){
+    if(!cardJson||cardJson.ok!==true)throw new Error((cardJson&&cardJson.message)||'当前销售卡读取失败');
+    const links=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(Array.isArray(cardJson.links)?cardJson.links:[]):(Array.isArray(cardJson.links)?cardJson.links:[]);
+    if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(ctx.type,ctx.date,ctx.location,links);
+    if(typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(ctx.type,ctx.date,ctx.location,links);else if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(ctx.type,ctx.date,ctx.location,links);
+    if(typeof markSalesCardContextVerifiedV451==='function')markSalesCardContextVerifiedV451(ctx.type,ctx.date,ctx.location,Number(probe?.salesCardGlobalRevision||probe?.salesCardRevision||0));
+    try{
+      const cur=typeof productLinkContextV206==='function'?productLinkContextV206(ctx.type):null,dirty=typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238(ctx.type);
+      if(cur&&String(cur.date||'')===String(ctx.date)&&String(cur.location||'').trim().toLowerCase()===String(ctx.location||'').trim().toLowerCase()&&!dirty&&typeof renderProductLinksEditorV206==='function'){renderProductLinksEditorV206(ctx.type,links);if(typeof applyCloudDraftStatusesV322==='function')applyCloudDraftStatusesV322(ctx.type,links);}
+    }catch(_){ }
+  }
+  setContextPriorityLocalV470(ctx,{turnoverRevision:Number(probe?.turnoverRevision||0),salesCardRevision:Number(probe?.salesCardRevision||0),restoreGeneration:Number(probe?.restoreGeneration||0)});
+  setCloudAtomicSyncPendingV448(false);setCloudRevisionConfirmedV449(true);
+  if(!options.silent)setSync(contextSyncLabelV471(ctx,needTurn,needCard,true),true);
+  return{ok:true,needTurn,needCard};
+}
 
 // V46.0: exact-context freshness stamp. A full cloud bundle updates the global
 // Sales Card revision, but an editor context is trusted only after that exact
@@ -162,7 +224,7 @@ function salesCardContextNeedsVerifyV451(type,date,location){
   const all=readSalesCardContextVerifyV451();
   return Number(all[salesCardContextVerifyKeyV451(type,date,location)]||0)!==rev;
 }
-// V47.0 context-aware trust advancement. When the server returns a COMPLETE
+// V47.1 context-aware trust advancement. When the server returns a COMPLETE
 // change journal, every cached Sales Card context that is absent from the card
 // changes is proven unchanged. Advance only those contexts to the new global
 // Sales Card revision locally, without re-reading them from cloud. Changed
@@ -772,6 +834,12 @@ function writeSyncStatusV457(value,state){
 function setSync(text, good = false, error = false) {
   const nodes=syncStatusNodesV457();
   if(!nodes.length)return;
+  // V47.1: foreground turnover save/delete owns this line until its write or
+  // timeout reconciliation really finishes. Background checks cannot paint green.
+  try{
+    const fg=typeof window!=='undefined'&&typeof window.getForegroundTurnoverWriteStatusV471==='function'?window.getForegroundTurnoverWriteStatusV471():null;
+    if(fg&&fg.active&&good)return;
+  }catch(_){ }
 
   // V46.0: Home keeps the original status row. Sales/Fair/Live show the same
   // state compactly beside Company / Location / Host. Report and More show none.
@@ -1134,7 +1202,7 @@ async function loadFromSheet(options = {}) {
       let activeContextV470=null,contextProbeV470=null;
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
-          // V47.0 normal foreground path: ask only the currently visible
+          // V47.1 normal foreground path: ask only the currently visible
           // Sales/Fair/Live context. Unrelated devices/hosts/dates no longer
           // trigger a global revision probe or a card/month read.
           activeContextV470=typeof window.getActivePriorityContextV469==='function'?window.getActivePriorityContextV469():null;
@@ -1149,10 +1217,20 @@ async function loadFromSheet(options = {}) {
               }
             }
           }
-          // First V47.0 visit to a context, or an actual same-context change,
-          // falls through once to the proven V47.0 safety path. After that exact
-          // refresh succeeds the context stamp is stored, so future opens stay
-          // on the tiny context-only check.
+          // V47.1: a changed visible context closes directly on that context.
+          // No global revision hop, so unrelated hosts/locations/dates cannot delay
+          // the page the user is actually looking at.
+          if(activeContextV470&&contextProbeV470?.ok){
+            const localCtx=getContextPriorityLocalV470(activeContextV470);
+            const restoreChanged=Number(localCtx.restoreGeneration||0)!==Number(contextProbeV470.restoreGeneration||0);
+            if(restoreChanged||contextProbeV470.needsTurnoverRefresh||contextProbeV470.needsSalesCardRefresh){
+              await refreshActiveContextDirectV471(activeContextV470,contextProbeV470,{silent,timeoutMs:Number(options.timeoutMs||12000),cardTimeoutMs:Number(options.cardTimeoutMs||12000)});
+              completedSuccessfully=true;
+              return{ok:true,month,contextDirectSync:true,context:activeContextV470};
+            }
+          }
+          // Home/Report or an unavailable context keeps the existing global safety
+          // path; normal Sales/Fair/Live resume no longer uses it.
           const rev = await checkCloudRevisionShared(Number(options.revisionTimeoutMs || REVISION_CHECK_TIMEOUT_MS));
           if (rev && rev.ok) {
             revisionRetryCountV448=0;
@@ -1208,7 +1286,7 @@ async function loadFromSheet(options = {}) {
               const monthPromiseV454=needsMonthRefreshV454?loadMonthCloudShared(month,Number(options.timeoutMs||15000)):Promise.resolve(null);
               const pairV454=await Promise.all([cardPromiseV454,monthPromiseV454]);
               if(canContextDeltaV456){
-                // V47.0: deltaComplete proves which exact contexts changed. The
+                // V47.1: deltaComplete proves which exact contexts changed. The
                 // changed contexts were just fetched above; every cached context
                 // not present in the journal can be trusted at cloudCard without
                 // another request when the user opens/returns to it.
