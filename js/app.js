@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4740",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4750",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4740";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4750";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1867,6 +1867,17 @@ async function startInitialSalesDataLoad() {
       timeoutMs: 10000
     });
 
+    // V47.5: every startup path must settle its visible status. V47.4 could
+    // complete a silent/no-change context path while leaving the earlier
+    // “正在快速确认云端...” text on screen indefinitely.
+    try{
+      const fg=typeof window.getForegroundTurnoverWriteStatusV471==='function'?window.getForegroundTurnoverWriteStatusV471():null;
+      const pending=typeof window.cloudAtomicSyncPendingV448==='function'&&window.cloudAtomicSyncPendingV448();
+      if(result?.ok&&!pending&&!(fg&&fg.active)&&typeof setSync==='function'){
+        if(result?.revisionUnconfirmed)setSync('云端连接较慢 · 本机资料已保留');
+        else setSync('已同步',true);
+      }
+    }catch(_){}
     try { syncFairInputs(); } catch (error) {}
     return result;
   })().catch(error => {
@@ -3299,7 +3310,7 @@ function productLinkBoxIsOpenV210(type){
 }
 function refreshProductLinkContextV210(type){
   if(!productLinkBoxIsOpenV210(type))return;
-  // V47.4: context switches paint Local First immediately, but the dedicated
+  // V47.5: context switches paint Local First immediately, but the dedicated
   // current-context revision probe owns the cloud decision. This prevents the
   // legacy global Sales Card revision verifier from re-reading an unchanged
   // Alex/Jajang/Fair card and flashing “销售卡同步中” repeatedly.
@@ -3525,7 +3536,7 @@ async function loadProductLinksIntoEditorV206(type,options={}){
     }
   }
 
-  // No cache on this device. During a committed context switch V47.4 lets the
+  // No cache on this device. During a committed context switch V47.5 lets the
   // dedicated current-context probe fetch the exact card only if needed.
   renderProductLinksLoadingV231(type);
   if(options.contextProbeOwnsCloud===true)return null;
@@ -5826,7 +5837,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4740",
+    version:"4750",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -7884,23 +7895,55 @@ function paintSelectedDayGrandV362(type,date,sales,profit,loading=false,error=fa
   el.setAttribute('data-selected-date',String(date||''));
   el.innerHTML=`<strong>${selectedDayLabelV362(type)}</strong><div><span>营业额</span><b>${money(sales)}</b></div><div><span>利润</span><b>${loading?'读取中…':error?'读取失败':money(profit)}</b></div><div><span>利润率</span><b>${loading||error?'—':rate.toFixed(2)+'%'}</b></div>`;
 }
+const DAY_PROFIT_SUMMARY_CACHE_KEY_V475='lover_day_profit_summary_v475';
+const dayProfitSummaryPendingV475=new Map();
+const dayProfitSummaryVerifiedV475=new Set();
+function dayProfitSummaryKeyV475(type,date){return `${String(type||'')}|${String(date||'')}`}
+function readDayProfitSummaryStoreV475(){try{const x=JSON.parse(localStorage.getItem(DAY_PROFIT_SUMMARY_CACHE_KEY_V475)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}}
+function getDayProfitSummaryCacheV475(type,date){const x=readDayProfitSummaryStoreV475()[dayProfitSummaryKeyV475(type,date)];return x&&Number.isFinite(Number(x.profit))?x:null}
+function setDayProfitSummaryCacheV475(type,date,rec){const all=readDayProfitSummaryStoreV475();all[dayProfitSummaryKeyV475(type,date)]={profit:Number(rec?.profit||0),revision:Number(rec?.revision||0),at:Date.now()};try{localStorage.setItem(DAY_PROFIT_SUMMARY_CACHE_KEY_V475,JSON.stringify(all))}catch(_){};return all[dayProfitSummaryKeyV475(type,date)]}
+function invalidateDayProfitSummaryV475(type,date){const key=dayProfitSummaryKeyV475(type,date);dayProfitSummaryVerifiedV475.delete(key);const all=readDayProfitSummaryStoreV475();if(Object.prototype.hasOwnProperty.call(all,key)){delete all[key];try{localStorage.setItem(DAY_PROFIT_SUMMARY_CACHE_KEY_V475,JSON.stringify(all))}catch(_){}}}
+window.invalidateDayProfitSummaryV475=invalidateDayProfitSummaryV475;
+function selectedDayPageActiveV475(type){const id=type==='daily'?'page-sales':type==='fair'?'page-fair':'page-live';return !!document.getElementById(id)?.classList.contains('active')}
+async function loadDayProfitSummaryV475(type,date,{force=false}={}){
+  const key=dayProfitSummaryKeyV475(type,date);
+  if(!force&&dayProfitSummaryVerifiedV475.has(key)){const hit=getDayProfitSummaryCacheV475(type,date);if(hit)return hit}
+  if(dayProfitSummaryPendingV475.has(key))return dayProfitSummaryPendingV475.get(key);
+  const task=(async()=>{
+    let json;
+    try{json=await jsonp({action:'getDayProfitSummaryV475',type,date},{timeoutMs:9000});}
+    catch(firstError){await new Promise(resolve=>setTimeout(resolve,350));json=await jsonp({action:'getDayProfitSummaryV475',type,date},{timeoutMs:12000});}
+    if(!json?.ok)throw new Error(json?.message||'利润读取失败');
+    const rec=setDayProfitSummaryCacheV475(type,date,{profit:Number(json.profit||0),revision:Number(json.salesCardRevision||0)});
+    dayProfitSummaryVerifiedV475.add(key);
+    return rec;
+  })().finally(()=>dayProfitSummaryPendingV475.delete(key));
+  dayProfitSummaryPendingV475.set(key,task);
+  return task;
+}
+window.loadDayProfitSummaryV475=loadDayProfitSummaryV475;
+window.visibleDayProfitPendingV475=function(){try{for(const type of ['daily','fair','live']){if(selectedDayPageActiveV475(type)&&dayProfitSummaryPendingV475.has(dayProfitSummaryKeyV475(type,selectedDayDateV362(type))))return true}}catch(_){}return false};
 async function renderSelectedDayGrandV362(type){
   const date=selectedDayDateV362(type),token=++selectedDayGrandTokenV362[type];
   const sales=selectedDayTurnoverV362(type,date);
-  // V47.4: use the last complete daily Profit snapshot immediately when one is
-  // available. A slow Apps Script cold-start must not erase valid Local First
-  // profit and replace it with "读取失败" while the shared retry is running.
-  const cachedV474=typeof getDailyProfitCacheV237==='function'?getDailyProfitCacheV237(type,date):null;
-  if(Array.isArray(cachedV474))paintSelectedDayGrandV362(type,date,sales,selectedDayProfitV362(type,date,cachedV474),false,false);
+  const cached=getDayProfitSummaryCacheV475(type,date);
+  if(cached)paintSelectedDayGrandV362(type,date,sales,Number(cached.profit||0),false,false);
   else paintSelectedDayGrandV362(type,date,sales,0,true,false);
+  // V47.5: inactive pages never start a cloud Profit request. This removes the
+  // old startup burst that fetched every Sales Card merely to paint three hidden
+  // date summaries. The visible page uses one cached server-side day aggregate.
+  if(!selectedDayPageActiveV475(type))return;
   try{
-    const links=await loadAllSalesProductLinksV203({force:false,maxAgeMs:120000});
+    const rec=await loadDayProfitSummaryV475(type,date,{force:false});
     if(token!==selectedDayGrandTokenV362[type]||date!==selectedDayDateV362(type))return;
-    paintSelectedDayGrandV362(type,date,sales,selectedDayProfitV362(type,date,links),false,false);
+    paintSelectedDayGrandV362(type,date,sales,Number(rec.profit||0),false,false);
+    try{if(typeof cloudRevisionSafeForWriteV449==='function'&&cloudRevisionSafeForWriteV449()&&typeof setSync==='function')setSync('已同步',true)}catch(_){}
   }catch(e){
     if(token!==selectedDayGrandTokenV362[type]||date!==selectedDayDateV362(type))return;
-    if(Array.isArray(cachedV474))paintSelectedDayGrandV362(type,date,sales,selectedDayProfitV362(type,date,cachedV474),false,false);
-    else paintSelectedDayGrandV362(type,date,sales,0,false,true);
+    // Keep the last valid Local First profit on screen. With no cache, stay in a
+    // truthful loading state and retry on the next normal foreground/context event.
+    if(cached)paintSelectedDayGrandV362(type,date,sales,Number(cached.profit||0),false,false);
+    else paintSelectedDayGrandV362(type,date,sales,0,true,false);
   }
 }
 window.renderSelectedDayGrandV362=renderSelectedDayGrandV362;
@@ -8785,7 +8828,7 @@ function refreshTurnoverContextV377(type,{cloud=true}={}){
 }
 function bindTurnoverContextRefreshV377(){
   const bind=(id,event,type)=>{const el=document.getElementById(id);if(!el)return;const key='turnoverV377Bound'+event.charAt(0).toUpperCase()+event.slice(1);if(el.dataset[key]==='1')return;el.dataset[key]='1';el.addEventListener(event,()=>refreshTurnoverContextV377(type,{cloud:false}))};
-  // V47.4: context controls repaint local data only. One dedicated current-context
+  // V47.5: context controls repaint local data only. One dedicated current-context
   // probe decides whether turnover/card cloud reads are necessary, so one switch
   // cannot launch parallel legacy reads.
   bind('liveDate','change','live');
@@ -8896,7 +8939,7 @@ const SYSTEM_RELEASE_REVISION_V442='910 → 930';
 const SYSTEM_BACKUP_AT_KEY_V442='lover_sales_last_backup_at_v442';
 const SYSTEM_RESTORE_AT_KEY_V442='lover_sales_last_restore_at_v442';
 let systemHealthStateV442={level:'warning',issues:[],checked:false,data:null,expanded:false};
-// V47.4: the read-only health endpoint is advisory only. A slow health scan must
+// V47.5: the read-only health endpoint is advisory only. A slow health scan must
 // never override a confirmed business-data sync with a false red connection error.
 const SYSTEM_HEALTH_SESSION_START_V466=Date.now();
 let systemConfirmedSyncAtV466=0;
@@ -8930,7 +8973,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4740$/,'47.4')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4750$/,'47.5')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8956,12 +8999,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4740'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4750'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4740')issues.push(`Frontend / API 版本不一致（Frontend 4740 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4750')issues.push(`Frontend / API 版本不一致（Frontend 4750 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4740';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4750';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -8981,7 +9024,7 @@ async function runSystemHealthCheckV442(userTriggered=false){
 window.toggleSystemHealthDetailsV442=toggleSystemHealthDetailsV442;window.runSystemHealthCheckV442=runSystemHealthCheckV442;
 setTimeout(()=>runSystemHealthCheckV442(false),1200);
 
-// V47.4: expose only the currently visible Sales/Fair/Live business context to
+// V47.5: expose only the currently visible Sales/Fair/Live business context to
 // the lightweight sync gate. This does not fetch or mutate data.
 function getActivePriorityContextV469(){
   try{
@@ -8997,7 +9040,7 @@ function getActivePriorityContextV469(){
 window.getActivePriorityContextV469=getActivePriorityContextV469;
 
 
-// V47.4: a committed Sales/Fair/Live context switch must immediately verify the
+// V47.5: a committed Sales/Fair/Live context switch must immediately verify the
 // NEW context, even if the page never went to background. This closes the case
 // where another device updated Jajang while this device was viewing Alex.
 (function bindCommittedContextSyncV472(){

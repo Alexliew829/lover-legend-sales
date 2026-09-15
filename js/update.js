@@ -114,7 +114,7 @@
   async function registerAndCheckForUpdates() {
     if (!("serviceWorker" in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register("./sw.js?v=47.4", { updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.register("./sw.js?v=47.5", { updateViaCache: "none" });
       await registration.update();
       await activateWaitingWorker(registration);
       registration.addEventListener("updatefound", () => {
@@ -180,7 +180,7 @@
     if (now - lastResumeAt < 1200) return Promise.resolve({ ok:true, skipped:true });
     lastResumeAt = now;
 
-    // V47.4: resume revision probes are silent. Keep the existing 已同步 status
+    // V47.5: resume revision probes are silent. Keep the existing 已同步 status
     // unless the current-context probe proves real data changed; loadFromSheet
     // will then publish the specific Live/Fair/Sales sync label itself.
     resumePromise = refreshCloudData(reason, false).then(result => {
