@@ -54,11 +54,11 @@
     }
 
     lastCloudRefresh = now;
-    // V48.0: an explicit visible foreground check supersedes an old scheduled retry.
+    // V48.1: an explicit visible foreground check supersedes an old scheduled retry.
     // This prevents a timed-out mobile cycle from firing a second probe after the
     // new foreground probe has already completed.
     try { if (typeof cancelRevisionRetryV479 === "function") cancelRevisionRetryV479(); } catch (e) {}
-    // V48.0 mobile-first fast path: a normal foreground/reopen on Sales/Fair/Live
+    // V48.1 mobile-first fast path: a normal foreground/reopen on Sales/Fair/Live
     // must use exactly one current-context probe. Do not enter loadFromSheet's
     // global/month safety path unless this is a manual refresh or a non-business page.
     const currentCtx = typeof window.getActivePriorityContextV469 === "function"
@@ -133,7 +133,7 @@
   async function registerAndCheckForUpdates() {
     if (!("serviceWorker" in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register("./sw.js?v=48.0", { updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.register("./sw.js?v=48.1", { updateViaCache: "none" });
       await registration.update();
       await activateWaitingWorker(registration);
       registration.addEventListener("updatefound", () => {
@@ -204,7 +204,7 @@
     // will then publish the specific Live/Fair/Sales sync label itself.
     resumePromise = refreshCloudData(reason, false).then(result => {
       if (result && result.ok && !result.revisionUnconfirmed) lastCloudRefresh = Date.now();
-      // V48.0: revision-unconfirmed retry is owned by sheet.js's single deduped
+      // V48.1: revision-unconfirmed retry is owned by sheet.js's single deduped
       // foreground retry queue. Do not start a second mobile timer here.
       dispatchResumeReady({ reason, result });
       return result;
