@@ -1366,7 +1366,9 @@ function setDailyTurnoverSaveButtonV382(state){
   const btn=document.getElementById('dailyTurnoverSaveBtnV382');if(!btn)return;
   if(!btn.dataset.idleText)btn.dataset.idleText=btn.textContent;
   if(state==='saving'){btn.disabled=true;btn.textContent='储存进行中…';return}
+  if(state==='deleting'){btn.disabled=true;btn.textContent='删除中…';return}
   if(state==='saved'){btn.disabled=true;btn.textContent='✓ 已储存';setTimeout(()=>{btn.disabled=false;btn.textContent=btn.dataset.idleText||'储存'},1200);return}
+  if(state==='deleted'){btn.disabled=true;btn.textContent='✓ 已删除';setTimeout(()=>{btn.disabled=false;btn.textContent=btn.dataset.idleText||'储存'},1200);return}
   btn.disabled=false;btn.textContent=btn.dataset.idleText||'储存';
 }
 async function saveDailySales(){
@@ -1618,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4660",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4670",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1636,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4660";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4670";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5817,7 +5819,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4660",
+    version:"4670",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -8580,12 +8582,13 @@ async function saveTurnoverTotalV376(type,total,notificationMeta={}){
     if(!ctx.date){alert('请选择日期');return false}total=Math.round(Number(total||0)*100)/100;if(hidden)hidden.value=formatAmount(total);
     const previous=rows.find(r=>r.type==='daily'&&r.date===ctx.date&&r.company===company),now=new Date().toISOString(),mutation=nextClientMutationV344();
     const localRow={type:'daily',date:ctx.date,company,location:'',amount:total,updatedAt:now,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:String(previous?.updatedAt||'')};
-    addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(`${ctx.location} 正在储存营业额，请勿关闭页面...`);
+    const deletingTurnover=String(notificationMeta?.action||'')==='deleted_entry';
+    addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(deletingTurnover?`${ctx.location} 营业额删除中，请勿关闭页面...`:`${ctx.location} 正在储存营业额，请勿关闭页面...`);
     try{
       const saved=await saveDailyToSheet(ctx.date,company,total,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true);
       if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);else if(total<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));else upsertLocalRow(localRow);
-      clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync(`${ctx.location} Sales 已同步`,true);return true;
-    }catch(e){const confirmed=await confirmTurnoverCloudAfterTimeoutV395(localRow);if(confirmed){setSync(`${ctx.location} 营业额已同步`,true);return true}setPendingRetrySyncStatus();alert(`${ctx.location} 营业额保存失败：${e.message||e}`);return false}
+      clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync(deletingTurnover?`${ctx.location} 营业额删除成功`:`${ctx.location} Sales 已同步`,true);return true;
+    }catch(e){const confirmed=await confirmTurnoverCloudAfterTimeoutV395(localRow);if(confirmed){setSync(deletingTurnover?`${ctx.location} 营业额删除成功`:`${ctx.location} 营业额已同步`,true);return true}setPendingRetrySyncStatus();alert(`${ctx.location} 营业额${deletingTurnover?'删除':'保存'}失败：${e.message||e}`);return false}
   }
   if(!ensureWritableSelection())return false;const isLive=type==='live',ctx=turnoverContextV376(type),dateEl=document.getElementById(isLive?'liveDate':'fairStart'),entityEl=document.getElementById(isLive?'liveHost':'fairLocation'),hidden=document.getElementById(isLive?'liveSales':'fairSales');
   if(!ctx.location){alert(isLive?'请输入主播名字':'请输入 Fair 地点');return false}if(!ctx.date){alert('请选择日期');return false}
@@ -8593,19 +8596,20 @@ async function saveTurnoverTotalV376(type,total,notificationMeta={}){
   total=Math.round(Number(total||0)*100)/100;hidden.value=formatAmount(total);
   const now=new Date().toISOString(),mutation=nextClientMutationV344(),normalizer=isLive?normalizeLiveHostKey:normalizeFairLocationKey,previous=rows.find(r=>r.type===type&&r.date===ctx.date&&normalizer(r.location)===normalizer(entity));
   const localRow={type,date:ctx.date,company:type,location:entity,amount:total,updatedAt:now,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:String(previous?.updatedAt||'')};
-  addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(`${isLive?'Live':'Fair'} 正在储存营业额，请勿关闭页面...`);
+  const deletingTurnover=String(notificationMeta?.action||'')==='deleted_entry';
+  addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(deletingTurnover?`${isLive?'Live':'Fair'} 营业额删除中，请勿关闭页面...`:`${isLive?'Live':'Fair'} 正在储存营业额，请勿关闭页面...`);
   try{
     let saved=null;if(isLive)saved=await saveLiveToSheet(ctx.date,entity,total,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true,getLocalRestoreGenerationV347(),notificationMeta);
     else{const result=await saveFairBatchToSheet(entity,[{date:ctx.date,amount:total,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:localRow.baseCloudUpdatedAt,notificationAction:String(notificationMeta?.action||''),notificationAmount:Number(notificationMeta?.amount||0),notificationOldAmount:Number(notificationMeta?.oldAmount||0),notificationNewAmount:Number(notificationMeta?.newAmount||0)}],true);saved=Array.isArray(result?.rows)?result.rows.find(r=>String(r.date||'')===ctx.date):null}
     if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);else if(total<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));else upsertLocalRow({...localRow,amount:total});
-    clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync(`${isLive?'Live':'Fair'} 营业额已同步`,true);return true;
+    clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync(deletingTurnover?`${isLive?'Live':'Fair'} 营业额删除成功`:`${isLive?'Live':'Fair'} 营业额已同步`,true);return true;
   }catch(e){
     // V39.9: a browser timeout is not proof that the write failed. Read the
     // authoritative month first. If the exact requested total is already there,
     // acknowledge it locally and NEVER ask the user to save the same entry again.
     const confirmed=await confirmTurnoverCloudAfterTimeoutV395(localRow);
-    if(confirmed){setSync(`${isLive?'Live':'Fair'} 营业额已同步`,true);return true}
-    setPendingRetrySyncStatus();alert(`${isLive?'Live':'Fair'} 营业额保存失败：${e.message||e}`);return false
+    if(confirmed){setSync(deletingTurnover?`${isLive?'Live':'Fair'} 营业额删除成功`:`${isLive?'Live':'Fair'} 营业额已同步`,true);return true}
+    setPendingRetrySyncStatus();alert(`${isLive?'Live':'Fair'} 营业额${deletingTurnover?'删除':'保存'}失败：${e.message||e}`);return false
   }
 }
 async function commitTurnoverEntriesV376(type,entries,actionText,notificationMeta={}){
@@ -8629,7 +8633,9 @@ function setTurnoverSaveButtonV382(type,state){
   const btn=turnoverSaveButtonV382(type);if(!btn)return;
   if(!btn.dataset.idleText)btn.dataset.idleText=btn.textContent;
   if(state==='saving'){btn.disabled=true;btn.textContent='储存进行中…';return}
+  if(state==='deleting'){btn.disabled=true;btn.textContent='删除中…';return}
   if(state==='saved'){btn.disabled=true;btn.textContent='✓ 已储存';setTimeout(()=>{btn.disabled=false;btn.textContent=btn.dataset.idleText||'储存'},1200);return}
+  if(state==='deleted'){btn.disabled=true;btn.textContent='✓ 已删除';setTimeout(()=>{btn.disabled=false;btn.textContent=btn.dataset.idleText||'储存'},1200);return}
   btn.disabled=false;btn.textContent=btn.dataset.idleText||'储存';
 }
 async function addTurnoverEntryV376(type){
@@ -8662,7 +8668,7 @@ async function editTurnoverEntryV376(type,id){
 async function deleteTurnoverEntryV376(type,id){
   if(turnoverWriteStateV382[type])return false;
   const entries=proposedEntriesV376(type),index=entries.findIndex(x=>x.id===id);if(index<0)return;const old=Number(entries[index].amount||0),before=entriesSumV376(entries),after=Math.round((before-old)*100)/100;if(!confirm(`确认删除这笔 RM${formatAmount(old)} 营业额？\n\n营业额总数：RM${formatAmount(before)} → RM${formatAmount(after)}\n\n删除后才会保存。`))return;
-  entries.splice(index,1);setTurnoverSaveButtonV382(type,'saving');const ok=await commitTurnoverEntriesV376(type,entries,'删除',{action:'deleted_entry',oldAmount:old});if(ok)setTurnoverSaveButtonV382(type,'saved');else setTurnoverSaveButtonV382(type,'idle');
+  entries.splice(index,1);setTurnoverSaveButtonV382(type,'deleting');const ok=await commitTurnoverEntriesV376(type,entries,'删除',{action:'deleted_entry',oldAmount:old});if(ok)setTurnoverSaveButtonV382(type,'deleted');else setTurnoverSaveButtonV382(type,'idle');
 }
 window.editTurnoverEntryV376=editTurnoverEntryV376;window.deleteTurnoverEntryV376=deleteTurnoverEntryV376;
 
@@ -8850,7 +8856,7 @@ const SYSTEM_RELEASE_REVISION_V442='910 → 930';
 const SYSTEM_BACKUP_AT_KEY_V442='lover_sales_last_backup_at_v442';
 const SYSTEM_RESTORE_AT_KEY_V442='lover_sales_last_restore_at_v442';
 let systemHealthStateV442={level:'warning',issues:[],checked:false,data:null,expanded:false};
-// V46.6: the read-only health endpoint is advisory only. A slow health scan must
+// V46.7: the read-only health endpoint is advisory only. A slow health scan must
 // never override a confirmed business-data sync with a false red connection error.
 const SYSTEM_HEALTH_SESSION_START_V466=Date.now();
 let systemConfirmedSyncAtV466=0;
@@ -8884,7 +8890,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4660$/,'46.6')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4670$/,'46.7')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8910,12 +8916,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4660'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4670'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4660')issues.push(`Frontend / API 版本不一致（Frontend 4660 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4670')issues.push(`Frontend / API 版本不一致（Frontend 4670 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4660';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4670';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
