@@ -753,7 +753,7 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
-  // V48.2: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
+  // V48.3: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
   if(error){
     writeSyncStatusV457('🔴 '+text,'error');
     return;
@@ -1178,7 +1178,7 @@ async function loadFromSheet(options = {}) {
               }
             }
           } else {
-            setSync("上次已同步资料已保留 · 后台检查中", true, false);
+            setSync("上次同步资料已保留 · 后台检查中", true, false);
             scheduleRevisionRetryV448();
             completedSuccessfully = true;
             return {ok:true,month,revisionUnconfirmed:true};
@@ -1187,7 +1187,7 @@ async function loadFromSheet(options = {}) {
           // Do not replace valid Local First data with a false red failure when
           // only the tiny Revision probe is temporarily slow. Resume/interval/
           // manual refresh will retry this lightweight check.
-          setSync("上次已同步资料已保留 · 后台检查中", true, false);
+          setSync("上次同步资料已保留 · 后台检查中", true, false);
           scheduleRevisionRetryV448();
           completedSuccessfully = true;
           return {ok:true,month,revisionUnconfirmed:true,error:revisionError};

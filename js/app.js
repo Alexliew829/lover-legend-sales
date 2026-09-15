@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4820",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4830",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4820";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4830";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2722,7 +2722,7 @@ function getVndPotMossFeeV267(record){
   const currency=String(record?.currency||"").trim().toUpperCase();
   const originalPrice=Math.max(0,Number(record?.unitPrice||0));
   if(currency!=="VND"||originalPrice<=0)return 0;
-  // V46.3: match Import V21.3 VND pot/misc tiers exactly.
+  // V48.3: match Import V21.5 VND pot/misc tiers exactly.
   if(originalPrice>=10000000)return 180;
   if(originalPrice>=4000000)return 105;
   if(originalPrice>=1000000)return 55;
@@ -2743,7 +2743,7 @@ function syncSalesCardAutoExtraV267(card){
     if(!input||input.dataset.manual==="1")return;
     const unitFee=Math.max(0,Number(item.dataset.autoPotMossFeeV267||0));
     const qty=Math.max(1,Number(item.querySelector(".product-link-qty")?.value||1));
-    // V46.3: Import V21.3 VND pot/misc fee is a per-unit selling cost.
+    // V48.3: Import V21.5 VND pot/misc fee is a per-unit selling cost.
     // Auto mode therefore uses unit fee x quantity on Sales / Fair / Live.
     input.value=formatAmount(unitFee*qty);
   });
@@ -3084,13 +3084,15 @@ function toggleProductLinkBoxV206(type){
   }
 }
 function liveDeliveryDefaultV203(price){
-  const n=Number(price||0);
+  const n=Math.max(0,Number(price||0));
   if(n<=0)return 0;
-  if(n<=300)return 30;
-  if(n<500)return 50;
-  if(n<2000)return 80;
-  if(n<5000)return 120;
-  return 150;
+  // V48.3: match Import V21.5 木架＋本地运费 A–F exactly.
+  if(n<300)return 20;
+  if(n<=500)return 50;
+  if(n<=1000)return 80;
+  if(n<=2000)return 120;
+  if(n<5000)return 150;
+  return 180;
 }
 function fairMonthlyTotalForProductCardV220(){
   const ctx=productLinkContextV206("fair");
@@ -3460,10 +3462,10 @@ async function loadProductLinksIntoEditorV206(type){
     ?applySalesCardFinalStatesV431(type,date,location,filterDeletedSalesLinksV350(type,date,location,cachedRaw))
     :cachedRaw;
 
-  // V48.2: keep the V48.2 Local First sync architecture.
+  // V48.3: keep the V48.3 Local First sync architecture.
   // A cached Sales Card opens immediately and is NOT exact-read merely because
   // a legacy/global verification watermark differs. Real cross-device changes
-  // are already handled by the V48.2 shared priorityRevisionV456 change journal,
+  // are already handled by the V48.3 shared priorityRevisionV456 change journal,
   // which fetches only card contexts that actually changed.
   if(Array.isArray(cached)){
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
@@ -3519,7 +3521,7 @@ async function loadProductLinksIntoEditorV206(type){
       applyCloudDraftStatusesV322(type,links);
       setTimeout(()=>{if(typeof refreshInventoryPendingV250==='function')refreshInventoryPendingV250(true)},0);
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-      // V48.2: an explicit Sales Card view does not declare the whole context synced.
+      // V48.3: an explicit Sales Card view does not declare the whole context synced.
     }
     return links;
   }catch(e){
@@ -3529,7 +3531,7 @@ async function loadProductLinksIntoEditorV206(type){
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
       const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
       if(wrap)wrap.innerHTML='<div class="product-link-loading-v231">销售卡读取失败，请再试一次。</div>';
-      // V48.2: card-view read failure stays inside the card panel; global sync is unchanged.
+      // V48.3: card-view read failure stays inside the card panel; global sync is unchanged.
     }
     return null;
   }
@@ -3589,9 +3591,11 @@ function salesCardSharedValuesV239(card){
 }
 function salesCardAutoDeliveryForItemV239(item){
   const card=item?.closest?.(".sales-card-transaction-v239");
-  if(String(card?.dataset?.type||"").toLowerCase()==="fair")return 0;
+  // V48.3: only Live auto-generates 木架＋本地运费. Sales / Fair stay manual.
+  if(String(card?.dataset?.type||"").toLowerCase()!=="live")return 0;
   const price=toAmount(item.querySelector(".product-link-price")?.value||0);
-  return liveDeliveryDefaultV203(price);
+  const qty=Math.max(1,Number(item.querySelector(".product-link-qty")?.value||1));
+  return liveDeliveryDefaultV203(price)*qty;
 }
 function allocateSalesCardSharedCostsV239(card){
   const products=salesCardProductsV239(card);
@@ -4250,7 +4254,8 @@ function productDeliveryInputV240(item){
 }
 function productAutoDeliveryV240(item){
   const card=item?.closest?.(".sales-card-transaction-v239");
-  if(String(card?.dataset?.type||"").toLowerCase()==="fair")return 0;
+  // V48.3: Sales / Fair never auto-generate delivery; manual input is preserved.
+  if(String(card?.dataset?.type||"").toLowerCase()!=="live")return 0;
   const rate=Number(item?.querySelector(".product-link-crate-v270")?.value||getLiveCrateV269(item)||0);
   return rate*salesCardQtyV240(item);
 }
@@ -4415,7 +4420,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"],[180,"F180"]];
-    // V46.3: only Live auto-selects the Import V21.3 crate/local-delivery tier
+    // V48.3: only Live auto-selects the Import V21.5 crate/local-delivery tier
     // from this product's unit selling price. Existing saved cards are preserved.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
     const autoCrateFromPrice=liveCrateRateForPriceV461(unitPrice);
@@ -5778,7 +5783,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4820",
+    version:"4830",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -8813,7 +8818,7 @@ const SYSTEM_RELEASE_REVISION_V442='910 → 930';
 const SYSTEM_BACKUP_AT_KEY_V442='lover_sales_last_backup_at_v442';
 const SYSTEM_RESTORE_AT_KEY_V442='lover_sales_last_restore_at_v442';
 let systemHealthStateV442={level:'warning',issues:[],checked:false,data:null,expanded:false};
-// V48.2: the read-only health endpoint is advisory only. A slow health scan must
+// V48.3: the read-only health endpoint is advisory only. A slow health scan must
 // never override a confirmed business-data sync with a false red connection error.
 const SYSTEM_HEALTH_SESSION_START_V466=Date.now();
 let systemConfirmedSyncAtV466=0;
@@ -8847,7 +8852,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4820$/,'48.2')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4830$/,'48.3')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8873,12 +8878,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4820'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4830'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4820')issues.push(`Frontend / API 版本不一致（Frontend 4820 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4830')issues.push(`Frontend / API 版本不一致（Frontend 4830 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4820';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4830';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
