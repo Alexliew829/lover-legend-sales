@@ -224,7 +224,7 @@ function salesCardContextNeedsVerifyV451(type,date,location){
   const all=readSalesCardContextVerifyV451();
   return Number(all[salesCardContextVerifyKeyV451(type,date,location)]||0)!==rev;
 }
-// V47.2 context-aware trust advancement. When the server returns a COMPLETE
+// V47.3 context-aware trust advancement. When the server returns a COMPLETE
 // change journal, every cached Sales Card context that is absent from the card
 // changes is proven unchanged. Advance only those contexts to the new global
 // Sales Card revision locally, without re-reading them from cloud. Changed
@@ -834,7 +834,7 @@ function writeSyncStatusV457(value,state){
 function setSync(text, good = false, error = false) {
   const nodes=syncStatusNodesV457();
   if(!nodes.length)return;
-  // V47.2: foreground turnover save/delete owns this line until its write or
+  // V47.3: foreground turnover save/delete owns this line until its write or
   // timeout reconciliation really finishes. Background checks cannot paint green.
   try{
     const fg=typeof window!=='undefined'&&typeof window.getForegroundTurnoverWriteStatusV471==='function'?window.getForegroundTurnoverWriteStatusV471():null;
@@ -1123,9 +1123,10 @@ function salesSyncDelay(ms) {
 }
 
 function scheduleRevisionRetryV448(){
-  // V46.0: never give up after only three probes. A 2.5s probe could expire
-  // during an Apps Script cold start, leaving the device stuck at “后台检查中”
-  // until the user manually refreshed. Keep retrying with a capped backoff.
+  // V47.3: retries for a visible Sales/Fair/Live page stay on the same unified
+  // current-context gate. This prevents a timed-out probe from queueing a second
+  // legacy loadFromSheet path behind the first request. Home/Report still use the
+  // existing global safety path because they have no business context.
   if(revisionRetryTimerV448)return;
   const waits=[1200,3000,7000,15000,30000];
   const delay=waits[Math.min(revisionRetryCountV448,waits.length-1)];
@@ -1133,24 +1134,27 @@ function scheduleRevisionRetryV448(){
     revisionRetryTimerV448=null;
     if(typeof document!=='undefined'&&document.hidden){scheduleRevisionRetryV448();return;}
     revisionRetryCountV448+=1;
-    loadFromSheet({
-      bypassCooldown:true,
-      suppressStartStatus:true,
-      silent:false,
-      revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS
-    }).catch(()=>{});
+    const ctx=typeof window!=='undefined'&&typeof window.getActivePriorityContextV469==='function'?window.getActivePriorityContextV469():null;
+    const p=ctx?syncCurrentContextNowV472({showChecking:false,revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS}):loadFromSheet({bypassCooldown:true,suppressStartStatus:true,silent:true,revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS});
+    Promise.resolve(p).catch(()=>{});
   },delay);
 }
 
 async function syncCurrentContextNowV472(options={}){
   const ctx=typeof window!=='undefined'&&typeof window.getActivePriorityContextV469==='function'?window.getActivePriorityContextV469():null;
   if(!ctx)return{ok:false,skipped:true};
-  const key=contextPriorityKeyV470(ctx),seq=(syncCurrentContextNowV472._seq||0)+1;syncCurrentContextNowV472._seq=seq;
+  const key=contextPriorityKeyV470(ctx);
+  // V47.3 critical fix: dedupe BEFORE advancing the sequence.
+  // V47.2 advanced _seq first, so a duplicate visibility/focus/context trigger could invalidate
+  // the request already in flight and leave another retry waiting behind it.
   if(syncCurrentContextNowV472._promise&&syncCurrentContextNowV472._key===key)return syncCurrentContextNowV472._promise;
+  const seq=(syncCurrentContextNowV472._seq||0)+1;syncCurrentContextNowV472._seq=seq;
   syncCurrentContextNowV472._key=key;
   const task=(async()=>{
     try{
-      if(options.showChecking!==false)setSync(contextSyncLabelV471(ctx,false,false,false));
+      // V47.3: revision/no-change probes are silent. Only once the probe proves
+      // this exact context changed do we show a visible syncing state inside
+      // refreshActiveContextDirectV471().
       const probe=await checkContextPriorityRevisionV470(ctx,Number(options.revisionTimeoutMs||5000));
       if(seq!==syncCurrentContextNowV472._seq)return{ok:false,stale:true};
       if(!probe?.ok)throw new Error(probe?.message||'当前资料检查失败');
@@ -1158,14 +1162,20 @@ async function syncCurrentContextNowV472(options={}){
       if(restoreChanged||probe.needsTurnoverRefresh||probe.needsSalesCardRefresh){
         await refreshActiveContextDirectV471(ctx,probe,{silent:false,timeoutMs:Number(options.timeoutMs||12000),cardTimeoutMs:Number(options.cardTimeoutMs||12000)});
       }else{
+        // Advance the exact-context watermark atomically after a successful
+        // no-change probe, but keep the already-visible 已同步 status untouched.
         setContextPriorityLocalV470(ctx,{turnoverRevision:Number(probe.turnoverGlobalRevision||probe.turnoverRevision||0),salesCardRevision:Number(probe.salesCardGlobalRevision||probe.salesCardRevision||0),restoreGeneration:Number(probe.restoreGeneration||0)});
-        setCloudAtomicSyncPendingV448(false);setCloudRevisionConfirmedV449(true);setSync('已同步',true);
+        setCloudAtomicSyncPendingV448(false);setCloudRevisionConfirmedV449(true);
+        revisionRetryCountV448=0;
+        if(revisionRetryTimerV448){clearTimeout(revisionRetryTimerV448);revisionRetryTimerV448=null;}
       }
       return{ok:true,context:ctx};
     }catch(e){
-      setSync('上次同步资料已保留，后台检查中',true,false);scheduleRevisionRetryV448();return{ok:false,error:e,context:ctx};
+      // Keep Local First visible and retry quietly. A transient probe timeout is
+      // not user-visible sync work and must not flash 后台检查中 repeatedly.
+      scheduleRevisionRetryV448();return{ok:false,error:e,context:ctx};
     }finally{
-      if(syncCurrentContextNowV472._key===key){syncCurrentContextNowV472._promise=null;syncCurrentContextNowV472._key='';}
+      if(syncCurrentContextNowV472._key===key&&syncCurrentContextNowV472._seq===seq){syncCurrentContextNowV472._promise=null;syncCurrentContextNowV472._key='';}
     }
   })();
   syncCurrentContextNowV472._promise=task;
@@ -1175,9 +1185,13 @@ if(typeof window!=='undefined')window.syncCurrentContextNowV472=syncCurrentConte
 
 function retryRevisionNowV455(){
   if(revisionRetryTimerV448){clearTimeout(revisionRetryTimerV448);revisionRetryTimerV448=null;}
-  // Keep the backoff history for repeated server failures, but resume immediately
-  // when the device comes online / returns to foreground.
-  loadFromSheet({bypassCooldown:true,suppressStartStatus:true,silent:false,revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS}).catch(()=>scheduleRevisionRetryV448());
+  // V47.3: foreground resume uses the same single current-context gate as a
+  // committed context switch. No-change checks stay silent; a real change goes
+  // straight to the exact context fetch. Pages without a business context keep
+  // the existing global safety probe.
+  const ctx=typeof window!=='undefined'&&typeof window.getActivePriorityContextV469==='function'?window.getActivePriorityContextV469():null;
+  const p=ctx?syncCurrentContextNowV472({showChecking:false,revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS}):loadFromSheet({bypassCooldown:true,suppressStartStatus:true,silent:true,revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS});
+  Promise.resolve(p).catch(()=>scheduleRevisionRetryV448());
 }
 if(typeof window!=='undefined')window.addEventListener('online',()=>setTimeout(retryRevisionNowV455,120));
 if(typeof document!=='undefined')document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(retryRevisionNowV455,180)});
@@ -1233,7 +1247,7 @@ async function loadFromSheet(options = {}) {
       let activeContextV470=null,contextProbeV470=null;
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
-          // V47.2 normal foreground path: ask only the currently visible
+          // V47.3 normal foreground path: ask only the currently visible
           // Sales/Fair/Live context. Unrelated devices/hosts/dates no longer
           // trigger a global revision probe or a card/month read.
           activeContextV470=typeof window.getActivePriorityContextV469==='function'?window.getActivePriorityContextV469():null;
@@ -1249,7 +1263,7 @@ async function loadFromSheet(options = {}) {
               }
             }
           }
-          // V47.2: a changed visible context closes directly on that context.
+          // V47.3: a changed visible context closes directly on that context.
           // No global revision hop, so unrelated hosts/locations/dates cannot delay
           // the page the user is actually looking at.
           if(activeContextV470&&contextProbeV470?.ok){
@@ -1318,7 +1332,7 @@ async function loadFromSheet(options = {}) {
               const monthPromiseV454=needsMonthRefreshV454?loadMonthCloudShared(month,Number(options.timeoutMs||15000)):Promise.resolve(null);
               const pairV454=await Promise.all([cardPromiseV454,monthPromiseV454]);
               if(canContextDeltaV456){
-                // V47.2: deltaComplete proves which exact contexts changed. The
+                // V47.3: deltaComplete proves which exact contexts changed. The
                 // changed contexts were just fetched above; every cached context
                 // not present in the journal can be trusted at cloudCard without
                 // another request when the user opens/returns to it.
