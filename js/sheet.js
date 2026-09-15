@@ -162,6 +162,24 @@ function contextRowMatchesV471(row,ctx){
   if(type==='daily')return String(row.company||'').toLowerCase()===String(ctx.location||'').toLowerCase();
   return String(row.location||'').trim().toLowerCase()===String(ctx.location||'').trim().toLowerCase();
 }
+// V47.4: a context is not fully ready merely because its revision probe says
+// "no change". After a fresh browser load we also require one exact Sales Card
+// authority snapshot (including a valid empty-card snapshot). That same payload
+// feeds the current-context profit caches, keeping Card + Profit atomic.
+function hasExactCardAuthorityV474(ctx){
+  if(!ctx||!ctx.type||!ctx.date||!String(ctx.location||'').trim())return false;
+  try{return Array.isArray(getCachedSalesProductLinksV216(ctx.type,ctx.date,ctx.location));}catch(_){return false;}
+}
+async function loadExactCardAuthorityV474(ctx,timeoutMs=15000){
+  const options={force:true,maxAgeMs:0,timeoutMs:Number(timeoutMs||15000)};
+  try{return await loadSalesProductLinksV206(ctx.type,ctx.date,ctx.location,options);}
+  catch(firstError){
+    // Read-only retry is safe. Reuse loadSalesProductLinksV206's per-context
+    // in-flight gate so focus/resume/editor triggers cannot stack requests.
+    await new Promise(resolve=>setTimeout(resolve,450));
+    return loadSalesProductLinksV206(ctx.type,ctx.date,ctx.location,options);
+  }
+}
 function commitTurnoverContextV471(ctx,json){
   if(!ctx||!json||json.ok!==true)return false;
   const row=json.row||null;
@@ -182,18 +200,22 @@ function commitTurnoverContextV471(ctx,json){
 async function refreshActiveContextDirectV471(ctx,probe,options={}){
   const restoreChanged=Number(getContextPriorityLocalV470(ctx).restoreGeneration||0)!==Number(probe?.restoreGeneration||0);
   const needTurn=restoreChanged||!!probe?.needsTurnoverRefresh;
-  const needCard=restoreChanged||!!probe?.needsSalesCardRefresh;
+  // V47.4: on a fresh browser session an absent exact-card authority is itself
+  // a reason to fetch the exact context once. A revision-only green state is not
+  // enough because the Card editor and current-context Profit must share one
+  // authoritative payload, even when that payload is an empty array.
+  const needCard=restoreChanged||!!probe?.needsSalesCardRefresh||!hasExactCardAuthorityV474(ctx);
   if(!needTurn&&!needCard)return{ok:true,needTurn:false,needCard:false};
   if(!options.silent)setSync(contextSyncLabelV471(ctx,needTurn,needCard,false));
   const turnPromise=needTurn?loadTurnoverContextV471(ctx,Number(options.timeoutMs||12000)):Promise.resolve(null);
-  const cardPromise=needCard?jsonp({action:'getSalesProductLinks',type:ctx.type,date:ctx.date,location:ctx.location},{timeoutMs:Number(options.cardTimeoutMs||12000)}):Promise.resolve(null);
-  const [turnJson,cardJson]=await Promise.all([turnPromise,cardPromise]);
+  const cardPromise=needCard?loadExactCardAuthorityV474(ctx,Number(options.cardTimeoutMs||15000)):Promise.resolve(null);
+  const [turnJson,cardLinksRaw]=await Promise.all([turnPromise,cardPromise]);
   if(needTurn){if(!turnJson||turnJson.ok!==true)throw new Error((turnJson&&turnJson.message)||'当前营业额读取失败');commitTurnoverContextV471(ctx,turnJson);}
   if(needCard){
-    if(!cardJson||cardJson.ok!==true)throw new Error((cardJson&&cardJson.message)||'当前销售卡读取失败');
-    const links=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(Array.isArray(cardJson.links)?cardJson.links:[]):(Array.isArray(cardJson.links)?cardJson.links:[]);
-    if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(ctx.type,ctx.date,ctx.location,links);
-    if(typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(ctx.type,ctx.date,ctx.location,links);else if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(ctx.type,ctx.date,ctx.location,links);
+    if(!Array.isArray(cardLinksRaw))throw new Error('当前销售卡读取失败');
+    const links=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(cardLinksRaw):cardLinksRaw;
+    // loadSalesProductLinksV206 already atomically published exact Card + Profit.
+    // The block below only repaints the editor from that same in-memory result.
     if(typeof markSalesCardContextVerifiedV451==='function')markSalesCardContextVerifiedV451(ctx.type,ctx.date,ctx.location,Number(probe?.salesCardGlobalRevision||probe?.salesCardRevision||0));
     try{
       const cur=typeof productLinkContextV206==='function'?productLinkContextV206(ctx.type):null,dirty=typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238(ctx.type);
@@ -224,7 +246,7 @@ function salesCardContextNeedsVerifyV451(type,date,location){
   const all=readSalesCardContextVerifyV451();
   return Number(all[salesCardContextVerifyKeyV451(type,date,location)]||0)!==rev;
 }
-// V47.3 context-aware trust advancement. When the server returns a COMPLETE
+// V47.4 context-aware trust advancement. When the server returns a COMPLETE
 // change journal, every cached Sales Card context that is absent from the card
 // changes is proven unchanged. Advance only those contexts to the new global
 // Sales Card revision locally, without re-reading them from cloud. Changed
@@ -406,6 +428,7 @@ function replaceProfitAggregateContextV457(type,date,location,links){
     if(Array.isArray(allSalesProductLinksCacheV216?.links)){
       const kept=allSalesProductLinksCacheV216.links.filter(x=>!sameCtx(x)&&!['deleted','cancelled'].includes(String(x?.status||'active').toLowerCase()));
       allSalesProductLinksCacheV216={links:[...kept,...fresh],at:Date.now()};
+      try{writeAllSalesProductLinksPersistV474(allSalesProductLinksCacheV216.links,Number((getPrioritySyncLocalV315()||{}).salesCardRevision||0));}catch(_){}
     }
   }catch(_){}
   try{
@@ -462,6 +485,10 @@ function commitAllSalesCardsAtomicV449(allLinks,verifiedRevisionV452=0){
   // V46.0 atomic authority: card caches and every profit cache are rebuilt
   // from this exact same cloud snapshot before any visible repaint.
   rebuildProfitCachesFromAuthoritativeCardsV453(links);
+  // V47.4: keep the last COMPLETE Sales Card/Profit authority across browser
+  // refreshes. If Apps Script cold-starts later, profit stays Local First rather
+  // than flashing "读取失败" while the shared cloud read retries.
+  try{writeAllSalesProductLinksPersistV474(links,Number(verifiedRevisionV452||0));}catch(_){}
   try{
     if(typeof renderSelectedDayGrandV362==='function'){['daily','fair','live'].forEach(t=>renderSelectedDayGrandV362(t));}
   }catch(_){}
@@ -834,7 +861,7 @@ function writeSyncStatusV457(value,state){
 function setSync(text, good = false, error = false) {
   const nodes=syncStatusNodesV457();
   if(!nodes.length)return;
-  // V47.3: foreground turnover save/delete owns this line until its write or
+  // V47.4: foreground turnover save/delete owns this line until its write or
   // timeout reconciliation really finishes. Background checks cannot paint green.
   try{
     const fg=typeof window!=='undefined'&&typeof window.getForegroundTurnoverWriteStatusV471==='function'?window.getForegroundTurnoverWriteStatusV471():null;
@@ -1123,7 +1150,7 @@ function salesSyncDelay(ms) {
 }
 
 function scheduleRevisionRetryV448(){
-  // V47.3: retries for a visible Sales/Fair/Live page stay on the same unified
+  // V47.4: retries for a visible Sales/Fair/Live page stay on the same unified
   // current-context gate. This prevents a timed-out probe from queueing a second
   // legacy loadFromSheet path behind the first request. Home/Report still use the
   // existing global safety path because they have no business context.
@@ -1144,7 +1171,7 @@ async function syncCurrentContextNowV472(options={}){
   const ctx=typeof window!=='undefined'&&typeof window.getActivePriorityContextV469==='function'?window.getActivePriorityContextV469():null;
   if(!ctx)return{ok:false,skipped:true};
   const key=contextPriorityKeyV470(ctx);
-  // V47.3 critical fix: dedupe BEFORE advancing the sequence.
+  // V47.4 critical fix: dedupe BEFORE advancing the sequence.
   // V47.2 advanced _seq first, so a duplicate visibility/focus/context trigger could invalidate
   // the request already in flight and leave another retry waiting behind it.
   if(syncCurrentContextNowV472._promise&&syncCurrentContextNowV472._key===key)return syncCurrentContextNowV472._promise;
@@ -1152,7 +1179,7 @@ async function syncCurrentContextNowV472(options={}){
   syncCurrentContextNowV472._key=key;
   const task=(async()=>{
     try{
-      // V47.3: revision/no-change probes are silent. Only once the probe proves
+      // V47.4: revision/no-change probes are silent. Only once the probe proves
       // this exact context changed do we show a visible syncing state inside
       // refreshActiveContextDirectV471().
       const probe=await checkContextPriorityRevisionV470(ctx,Number(options.revisionTimeoutMs||5000));
@@ -1185,7 +1212,7 @@ if(typeof window!=='undefined')window.syncCurrentContextNowV472=syncCurrentConte
 
 function retryRevisionNowV455(){
   if(revisionRetryTimerV448){clearTimeout(revisionRetryTimerV448);revisionRetryTimerV448=null;}
-  // V47.3: foreground resume uses the same single current-context gate as a
+  // V47.4: foreground resume uses the same single current-context gate as a
   // committed context switch. No-change checks stay silent; a real change goes
   // straight to the exact context fetch. Pages without a business context keep
   // the existing global safety probe.
@@ -1247,7 +1274,7 @@ async function loadFromSheet(options = {}) {
       let activeContextV470=null,contextProbeV470=null;
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
-          // V47.3 normal foreground path: ask only the currently visible
+          // V47.4 normal foreground path: ask only the currently visible
           // Sales/Fair/Live context. Unrelated devices/hosts/dates no longer
           // trigger a global revision probe or a card/month read.
           activeContextV470=typeof window.getActivePriorityContextV469==='function'?window.getActivePriorityContextV469():null;
@@ -1256,20 +1283,21 @@ async function loadFromSheet(options = {}) {
             if(contextProbeV470?.ok){
               const localCtx=getContextPriorityLocalV470(activeContextV470);
               const sameCtx=!contextProbeV470.needsTurnoverRefresh&&!contextProbeV470.needsSalesCardRefresh&&Number(localCtx.restoreGeneration||0)===Number(contextProbeV470.restoreGeneration||0);
-              if(sameCtx&&pendingCountAtStart===0){
+              const exactCardReadyV474=hasExactCardAuthorityV474(activeContextV470);
+              if(sameCtx&&exactCardReadyV474&&pendingCountAtStart===0){
                 setContextPriorityLocalV470(activeContextV470,{turnoverRevision:Number(contextProbeV470.turnoverGlobalRevision||contextProbeV470.turnoverRevision||0),salesCardRevision:Number(contextProbeV470.salesCardGlobalRevision||contextProbeV470.salesCardRevision||0),restoreGeneration:Number(contextProbeV470.restoreGeneration||0)});
                 setCloudAtomicSyncPendingV448(false);setCloudRevisionConfirmedV449(true);setSync('已同步',true);completedSuccessfully=true;
                 return{ok:true,month,contextRevisionOnly:true,context:activeContextV470};
               }
             }
           }
-          // V47.3: a changed visible context closes directly on that context.
+          // V47.4: a changed visible context closes directly on that context.
           // No global revision hop, so unrelated hosts/locations/dates cannot delay
           // the page the user is actually looking at.
           if(activeContextV470&&contextProbeV470?.ok){
             const localCtx=getContextPriorityLocalV470(activeContextV470);
             const restoreChanged=Number(localCtx.restoreGeneration||0)!==Number(contextProbeV470.restoreGeneration||0);
-            if(restoreChanged||contextProbeV470.needsTurnoverRefresh||contextProbeV470.needsSalesCardRefresh){
+            if(restoreChanged||contextProbeV470.needsTurnoverRefresh||contextProbeV470.needsSalesCardRefresh||!hasExactCardAuthorityV474(activeContextV470)){
               await refreshActiveContextDirectV471(activeContextV470,contextProbeV470,{silent,timeoutMs:Number(options.timeoutMs||12000),cardTimeoutMs:Number(options.cardTimeoutMs||12000)});
               completedSuccessfully=true;
               return{ok:true,month,contextDirectSync:true,context:activeContextV470};
@@ -1332,7 +1360,7 @@ async function loadFromSheet(options = {}) {
               const monthPromiseV454=needsMonthRefreshV454?loadMonthCloudShared(month,Number(options.timeoutMs||15000)):Promise.resolve(null);
               const pairV454=await Promise.all([cardPromiseV454,monthPromiseV454]);
               if(canContextDeltaV456){
-                // V47.3: deltaComplete proves which exact contexts changed. The
+                // V47.4: deltaComplete proves which exact contexts changed. The
                 // changed contexts were just fetched above; every cached context
                 // not present in the journal can be trusted at cloudCard without
                 // another request when the user opens/returns to it.
@@ -1357,7 +1385,7 @@ async function loadFromSheet(options = {}) {
               }
             }
           } else {
-            setSync("上次同步资料已保留，后台检查中", true, false);
+            if(!silent&&!options.suppressStartStatus)setSync("上次同步资料已保留，后台检查中", true, false);
             scheduleRevisionRetryV448();
             completedSuccessfully = true;
             return {ok:true,month,revisionUnconfirmed:true};
@@ -1365,8 +1393,9 @@ async function loadFromSheet(options = {}) {
         } catch (revisionError) {
           // Do not replace valid Local First data with a false red failure when
           // only the tiny Revision probe is temporarily slow. Resume/interval/
-          // manual refresh will retry this lightweight check.
-          setSync("上次同步资料已保留，后台检查中", true, false);
+          // manual refresh will retry this lightweight check. V47.4 keeps the
+          // no-change retry invisible when the caller requested a silent check.
+          if(!silent&&!options.suppressStartStatus)setSync("上次同步资料已保留，后台检查中", true, false);
           scheduleRevisionRetryV448();
           completedSuccessfully = true;
           return {ok:true,month,revisionUnconfirmed:true,error:revisionError};
@@ -1810,7 +1839,7 @@ async function loadSalesProductLinksV206(type,date,location,options={}) {
   if(!options.force&&cached&&Date.now()-cached.at<maxAge)return cached.links;
   if(salesProductLinksPendingV216.has(key))return salesProductLinksPendingV216.get(key);
   const pending=(async()=>{
-    const json=await jsonp({action:"getSalesProductLinks",type,date,location},{timeoutMs:12000});
+    const json=await jsonp({action:"getSalesProductLinks",type,date,location},{timeoutMs:Number(options.timeoutMs||12000)});
     if(!json.ok)throw new Error(json.message||"读取盆栽关联资料失败");
     const links=setCachedSalesProductLinksV216(type,date,location,Array.isArray(json.links)?json.links:[]);
     // V46.0 exact-context request is card+profit authority for this context.
@@ -1857,6 +1886,13 @@ async function deleteSalesProductLinkV206(linkId) {
 
 let allSalesProductLinksCacheV216={links:null,at:0};
 let allSalesProductLinksPendingV216=null;
+const ALL_SALES_PRODUCT_LINKS_PERSIST_KEY_V474="lover_all_sales_product_links_complete_v474";
+function readAllSalesProductLinksPersistV474(){
+  try{const x=JSON.parse(localStorage.getItem(ALL_SALES_PRODUCT_LINKS_PERSIST_KEY_V474)||"null");return x&&Array.isArray(x.links)?x:null}catch(_){return null}
+}
+function writeAllSalesProductLinksPersistV474(links,revision=0){
+  try{localStorage.setItem(ALL_SALES_PRODUCT_LINKS_PERSIST_KEY_V474,JSON.stringify({at:Date.now(),revision:Number(revision||0),links:Array.isArray(links)?links:[]}))}catch(_){}
+}
 
 // V32.6: keep already-loaded profit rollup data current when a Draft is saved.
 // Only patch the cache when it already represents a complete getAll result; if it
@@ -1881,6 +1917,14 @@ window.mergeAllSalesProductLinksCacheV321=mergeAllSalesProductLinksCacheV321;
 async function loadAllSalesProductLinksV203(options={}) {
   const maxAge=Number(options.maxAgeMs??120000);
   if(!options.force&&Array.isArray(allSalesProductLinksCacheV216.links)&&Date.now()-allSalesProductLinksCacheV216.at<maxAge)return allSalesProductLinksCacheV216.links;
+  // V47.4 Local First aggregate authority: restore the last COMPLETE snapshot
+  // before attempting cloud. It is only a fallback; a stale snapshot still
+  // triggers the normal cloud verification below.
+  const persistedV474=readAllSalesProductLinksPersistV474();
+  if(!Array.isArray(allSalesProductLinksCacheV216.links)&&persistedV474){
+    allSalesProductLinksCacheV216={links:typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(persistedV474.links):persistedV474.links,at:Number(persistedV474.at||0)};
+  }
+  if(!options.force&&persistedV474&&Date.now()-Number(persistedV474.at||0)<maxAge)return allSalesProductLinksCacheV216.links;
   // V46.0: never let an independent profit refresh advance past an actively edited
   // Sales Card. Keep the last complete local authority until the edit is saved/cancelled.
   if(typeof hasLocalSalesDraftRiskV449==='function'&&hasLocalSalesDraftRiskV449()&&Array.isArray(allSalesProductLinksCacheV216.links)){
@@ -1888,8 +1932,16 @@ async function loadAllSalesProductLinksV203(options={}) {
   }
   if(allSalesProductLinksPendingV216)return allSalesProductLinksPendingV216;
   allSalesProductLinksPendingV216=(async()=>{
-    const json=await jsonp({action:"getAllSalesProductLinks"},{timeoutMs:Number(options.timeoutMs||15000)});
-    if(!json.ok)throw new Error(json.message||"读取盆栽关联资料失败");
+    let json;
+    try{json=await jsonp({action:"getAllSalesProductLinks"},{timeoutMs:Number(options.timeoutMs||15000)});}
+    catch(firstError){
+      // One shared, read-only retry. allSalesProductLinksPendingV216 ensures every
+      // Profit panel waits on this same retry instead of launching its own request.
+      await new Promise(resolve=>setTimeout(resolve,500));
+      try{json=await jsonp({action:"getAllSalesProductLinks"},{timeoutMs:Number(options.retryTimeoutMs||18000)});}
+      catch(secondError){if(Array.isArray(allSalesProductLinksCacheV216.links))return allSalesProductLinksCacheV216.links;throw secondError;}
+    }
+    if(!json||!json.ok){if(Array.isArray(allSalesProductLinksCacheV216.links))return allSalesProductLinksCacheV216.links;throw new Error((json&&json.message)||"读取盆栽关联资料失败");}
     const links=typeof dedupeAuthoritativeSalesLinksV354==="function"?dedupeAuthoritativeSalesLinksV354(json.links):(Array.isArray(json.links)?json.links:[]);
     // V46.0 single authority path: the same fast request previously used by profit
     // now atomically publishes BOTH Sales Card caches and all profit caches.
