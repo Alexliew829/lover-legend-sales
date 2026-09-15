@@ -54,35 +54,16 @@
     }
 
     lastCloudRefresh = now;
-    // V48.1: an explicit visible foreground check supersedes an old scheduled retry.
-    // This prevents a timed-out mobile cycle from firing a second probe after the
-    // new foreground probe has already completed.
-    try { if (typeof cancelRevisionRetryV479 === "function") cancelRevisionRetryV479(); } catch (e) {}
-    // V48.1 mobile-first fast path: a normal foreground/reopen on Sales/Fair/Live
-    // must use exactly one current-context probe. Do not enter loadFromSheet's
-    // global/month safety path unless this is a manual refresh or a non-business page.
-    const currentCtx = typeof window.getActivePriorityContextV469 === "function"
-      ? window.getActivePriorityContextV469()
-      : null;
-    const useDirectContext = !manual && currentCtx && typeof window.syncCurrentContextNowV472 === "function";
-    const task = useDirectContext
-      ? window.syncCurrentContextNowV472({
-          showChecking:false,
-          revisionTimeoutMs:9000,
-          timeoutMs:12000,
-          cardTimeoutMs:12000
-        })
-      : loadFromSheet({
-          force: manual || force === true,
-          bypassCooldown: reason.includes("reopen") || reason.includes("resume"),
-          skipLocalCache: true,
-          loadYear: false,
-          silent: false,
-          revisionTimeoutMs: reason.includes("reopen") || reason.includes("resume") ? 9000 : undefined,
-          statusText: manual ? "正在刷新云端资料..." : "正在检查云端更新...",
-          refreshFairInputs: false
-        });
-    refreshPromise = Promise.resolve(task).then(result => {
+    refreshPromise = loadFromSheet({
+      force: manual || force === true,
+      bypassCooldown: reason.includes("reopen") || reason.includes("resume"),
+      skipLocalCache: true,
+      loadYear: false,
+      silent: false,
+      revisionTimeoutMs: reason.includes("reopen") || reason.includes("resume") ? 3500 : undefined,
+      statusText: manual ? "正在刷新云端资料..." : "正在检查云端更新...",
+      refreshFairInputs: false
+    }).then(result => {
       if (result && result.cooldown && typeof setSync === "function") setSync("已同步", true);
       return result;
     }).catch(err => {
@@ -133,7 +114,7 @@
   async function registerAndCheckForUpdates() {
     if (!("serviceWorker" in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register("./sw.js?v=48.1", { updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.register("./sw.js?v=46.6", { updateViaCache: "none" });
       await registration.update();
       await activateWaitingWorker(registration);
       registration.addEventListener("updatefound", () => {
@@ -199,13 +180,23 @@
     if (now - lastResumeAt < 1200) return Promise.resolve({ ok:true, skipped:true });
     lastResumeAt = now;
 
-    // V47.5: resume revision probes are silent. Keep the existing 已同步 status
-    // unless the current-context probe proves real data changed; loadFromSheet
-    // will then publish the specific Live/Fair/Sales sync label itself.
+    if (typeof markCloudCheckPending === "function") {
+      markCloudCheckPending("正在快速确认云端...");
+    }
+
     resumePromise = refreshCloudData(reason, false).then(result => {
       if (result && result.ok && !result.revisionUnconfirmed) lastCloudRefresh = Date.now();
-      // V48.1: revision-unconfirmed retry is owned by sheet.js's single deduped
-      // foreground retry queue. Do not start a second mobile timer here.
+      if (result && result.revisionUnconfirmed) {
+        // One quiet retry after mobile wake-up. Do not stack focus/pageshow requests.
+        setTimeout(() => {
+          if (document.visibilityState === "visible" && !activeLoadPromise() && !refreshPromise && !resumePromise) {
+            refreshCloudData("resume-retry", false).then(retry => {
+              if (retry && retry.ok && !retry.revisionUnconfirmed) lastCloudRefresh = Date.now();
+              dispatchResumeReady({ reason:"resume-retry", result:retry });
+            });
+          }
+        }, 2200);
+      }
       dispatchResumeReady({ reason, result });
       return result;
     }).finally(() => {
