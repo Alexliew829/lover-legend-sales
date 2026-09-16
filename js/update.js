@@ -1,7 +1,7 @@
 (() => {
   const RELOAD_FLAG = "lover_sales_sw_reloaded_v129";
   const REFRESH_COOLDOWN_MS = 5000;
-  const AUTO_REFRESH_MS = 300000;
+  const AUTO_REFRESH_MS = 10000;
   let lastCloudRefresh = 0;
   let refreshPromise = null;
   let initialSyncReady = typeof isInitialCloudSyncFinished === "function" && isInitialCloudSyncFinished();
@@ -49,7 +49,8 @@
     }
 
     const now = Date.now();
-    if (!manual && now - lastCloudRefresh < REFRESH_COOLDOWN_MS) {
+    const wakeRefresh = reason.includes("reopen") || reason.includes("resume") || reason === "online";
+    if (!manual && !wakeRefresh && now - lastCloudRefresh < REFRESH_COOLDOWN_MS) {
       return { ok:true, skipped:true };
     }
 
@@ -78,9 +79,10 @@
 
   function startAutomaticRefreshAfterInitialSync() {
     if (autoRefreshStartTimer || autoRefreshInterval) return;
-    // V21.1: do not fire a second check 5 seconds after startup.
-    // The first automatic check starts only after a full interval from the
-    // completed startup sync, preventing duplicate requests and UI flicker.
+    // V48.7: visible devices run only the tiny V46.6/V48.3 revision gate every 10s.
+    // Unchanged revisions return immediately; changed revisions use the existing
+    // selective authoritative refresh. This restores cross-device auto-sync
+    // without putting turnover-entry detail into the main sync path.
     autoRefreshStartTimer = setTimeout(() => {
       autoRefreshStartTimer = null;
       if (document.visibilityState === "visible") {
@@ -114,7 +116,7 @@
   async function registerAndCheckForUpdates() {
     if (!("serviceWorker" in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register("./sw.js?v=48.6", { updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.register("./sw.js?v=48.7", { updateViaCache: "none" });
       await registration.update();
       await activateWaitingWorker(registration);
       registration.addEventListener("updatefound", () => {
@@ -153,7 +155,7 @@
   window.addEventListener("load", scheduleServiceWorkerCheckAfterStartup, { once:true });
 
   const RESUME_DEBOUNCE_MS = 320;
-  const RESUME_RECENT_SYNC_MS = 30000;
+  const RESUME_RECENT_SYNC_MS = 1500;
   let resumeTimer = null;
 
   function dispatchResumeReady(detail = {}) {
@@ -171,8 +173,9 @@
     const running = activeLoadPromise() || refreshPromise || resumePromise;
     if (running) return running;
 
-    // V32.6: if the page was synced very recently, returning from another app
-    // must not turn the status yellow or start another Apps Script request.
+    // V48.7: keep only a very small reopen debounce. A 30s recent-sync guard
+    // could suppress the exact revision check needed after tapping a fresh
+    // sales notification, leaving authoritative totals stale until pull-refresh.
     if (now - lastCloudRefresh < RESUME_RECENT_SYNC_MS) {
       dispatchResumeReady({ reason, skipped:true, recent:true });
       return Promise.resolve({ ok:true, skipped:true, recent:true });
