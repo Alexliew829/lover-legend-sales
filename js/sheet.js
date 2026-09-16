@@ -403,6 +403,33 @@ function syncContextLabelV456(change){
   return '云端资料';
 }
 function syncChangesLabelV456(changes){const labels=[...new Set((Array.isArray(changes)?changes:[]).map(syncContextLabelV456).filter(Boolean))];return labels.length===1?labels[0]:labels.length>1?`${labels.slice(0,2).join(' / ')}${labels.length>2?' 等':''}`:'云端资料'}
+// V48.9: when another device changes a Fair context, the sync journal already
+// tells us the exact location. If this device has no unsaved Fair work, follow
+// that context so the Fair page does not remain parked on an older location.
+function applyLatestFairSyncContextV489(changes){
+  const list=(Array.isArray(changes)?changes:[]).filter(x=>x&&x.type==='fair'&&String(x.location||'').trim());
+  if(!list.length)return false;
+  try{if(typeof fairInputsHaveUnsavedChanges==='function'&&fairInputsHaveUnsavedChanges())return false}catch(_){}
+  try{if(typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238('fair'))return false}catch(_){}
+  const latest=list[list.length-1],input=document.getElementById('fairLocation');if(!input)return false;
+  const loc=typeof canonicalLocation==='function'?canonicalLocation(String(latest.location||'')):String(latest.location||'').trim();if(!loc)return false;
+  input.value=loc;
+  try{
+    const d=String(latest.date||'').trim();
+    if(d&&typeof displayToISO==='function'&&typeof setDateControl==='function'){
+      const iso=/^\d{2}-\d{2}-\d{4}$/.test(d)?displayToISO(d):d;
+      if(iso){setDateControl('fairStart',iso);setDateControl('fairEnd',iso)}
+    }
+  }catch(_){}
+  try{if(typeof saveFairLocation==='function')saveFairLocation(loc)}catch(_){}
+  try{if(typeof updateFairPageMode==='function')updateFairPageMode()}catch(_){}
+  try{if(typeof syncFairInputs==='function')syncFairInputs()}catch(_){}
+  try{if(typeof syncFairProductDatesV203==='function')syncFairProductDatesV203(true)}catch(_){}
+  try{if(typeof refreshProductLinkContextV210==='function')refreshProductLinkContextV210('fair')}catch(_){}
+  return true;
+}
+if(typeof window!=='undefined')window.applyLatestFairSyncContextV489=applyLatestFairSyncContextV489;
+
 async function checkCloudRevisionShared(timeoutMs = REVISION_CHECK_TIMEOUT_MS) {
   if (revisionCheckPromise) return revisionCheckPromise;
   const local=getPrioritySyncLocalV315();
@@ -753,7 +780,7 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
-  // V48.8: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
+  // V48.9: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
   if(error){
     writeSyncStatusV457('🔴 '+text,'error');
     return;
@@ -1084,6 +1111,7 @@ async function loadFromSheet(options = {}) {
 
     let cloudChangedV448=false;
     let syncLabelV456='';
+    let syncChangesV489=[];
     try {
       const requestedMonth = /^\d{4}-\d{2}$/.test(String(options.month || ""))
         ? String(options.month)
@@ -1143,6 +1171,7 @@ async function loadFromSheet(options = {}) {
               if(!silent)setSync('发现云端新资料 · 正在完整同步');
               const deltaChangesV456=Array.isArray(rev.changes)?rev.changes:[];
               syncLabelV456=syncChangesLabelV456(deltaChangesV456);
+              syncChangesV489=deltaChangesV456;
               if(salesCardRevisionChangedV444&&changedCardTouchesDirtyContextV456(deltaChangesV456)){
                 throw new Error('当前正在编辑的这张销售卡已有其他设备的新版本；已保护本机未保存内容，请先处理冲突。');
               }
@@ -1230,6 +1259,7 @@ async function loadFromSheet(options = {}) {
         commitAllSalesCardsAtomicV449(prefetchedAllSalesCardsV449,Number(observedPriorityRevisionV447?.salesCardRevision||0));
       }
       mergeCloudMonthRows(month, json.rows || [], requestStartedAt);
+      if(syncChangesV489.length)applyLatestFairSyncContextV489(syncChangesV489);
       applyLocalDataRevision(json.dataRevision);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
       if (json.commissionSettings) {
