@@ -753,7 +753,7 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
-  // V48.5: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
+  // V48.6: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
   if(error){
     writeSyncStatusV457('🔴 '+text,'error');
     return;
@@ -1102,8 +1102,6 @@ async function loadFromSheet(options = {}) {
       let observedPriorityRevisionV447=null;
       let prefetchedMonthJsonV448=null;
       let prefetchedAllSalesCardsV449=null;
-      let turnoverJournalChangesV485=[];
-      let turnoverJournalCompleteV485=false;
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
           const rev = await checkCloudRevisionShared(Number(options.revisionTimeoutMs || REVISION_CHECK_TIMEOUT_MS));
@@ -1144,8 +1142,6 @@ async function loadFromSheet(options = {}) {
               setCloudAtomicSyncPendingV448(true);
               if(!silent)setSync('发现云端新资料 · 正在完整同步');
               const deltaChangesV456=Array.isArray(rev.changes)?rev.changes:[];
-              turnoverJournalChangesV485=deltaChangesV456;
-              turnoverJournalCompleteV485=rev.deltaComplete===true;
               syncLabelV456=syncChangesLabelV456(deltaChangesV456);
               if(salesCardRevisionChangedV444&&changedCardTouchesDirtyContextV456(deltaChangesV456)){
                 throw new Error('当前正在编辑的这张销售卡已有其他设备的新版本；已保护本机未保存内容，请先处理冲突。');
@@ -1234,15 +1230,6 @@ async function loadFromSheet(options = {}) {
         commitAllSalesCardsAtomicV449(prefetchedAllSalesCardsV449,Number(observedPriorityRevisionV447?.salesCardRevision||0));
       }
       mergeCloudMonthRows(month, json.rows || [], requestStartedAt);
-      // V48.5: apply exact turnover entry mutations only after authoritative month
-      // rows were merged successfully, so entry history can never move ahead of
-      // a failed or timed-out turnover sync.
-      if(turnoverJournalCompleteV485&&turnoverJournalChangesV485.length&&typeof window.applyTurnoverJournalChangesV485==='function'){
-        try{window.applyTurnoverJournalChangesV485(turnoverJournalChangesV485)}catch(e){console.warn('V48.5 turnover journal apply',e)}
-      }
-      if(turnoverJournalChangesV485.length&&typeof window.scheduleTurnoverDetailRepairV485==='function'){
-        try{window.scheduleTurnoverDetailRepairV485(turnoverJournalChangesV485)}catch(_){ }
-      }
       applyLocalDataRevision(json.dataRevision);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
       if (json.commissionSettings) {
@@ -1756,7 +1743,7 @@ async function loadAllSalesChangeLogsV236() {
   return Array.isArray(json.logs) ? json.logs : [];
 }
 
-async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347(), notificationMeta={}, turnoverEntries=[]) {
+async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347(), notificationMeta={}) {
   const json = await jsonp({
     action: "saveDaily",
     date,
@@ -1764,11 +1751,9 @@ async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "", cli
     amount,
     clientUpdatedAt,clientDeviceId,clientSequence,baseCloudUpdatedAt,foregroundSave:foregroundSave?"1":"",restoreGeneration,
     notificationAction:String(notificationMeta?.action||""),
-    notificationEntryId:String(notificationMeta?.entryId||""),
     notificationAmount:Number(notificationMeta?.amount||0),
     notificationOldAmount:Number(notificationMeta?.oldAmount||0),
-    notificationNewAmount:Number(notificationMeta?.newAmount||0),
-    turnoverEntriesV485:JSON.stringify(normalizeTurnoverEntriesClientV376(turnoverEntries))
+    notificationNewAmount:Number(notificationMeta?.newAmount||0)
   });
 
   if (!json.ok) throw new Error(json.message || "储存失败");
@@ -1806,9 +1791,7 @@ async function sendFairBatchToSheetV343(location, records, foregroundSave=false)
     records: JSON.stringify(records),
     foregroundSave:foregroundSave?"1":"",restoreGeneration,
     notificationAction:String((records&&records[0]&&records[0].notificationAction)||""),
-    notificationEntryId:String((records&&records[0]&&records[0].notificationEntryId)||""),
     notificationAmount:Number((records&&records[0]&&records[0].notificationAmount)||0),
-    turnoverEntriesV485:String((records&&records[0]&&records[0].turnoverEntriesV485)||""),
     notificationOldAmount:Number((records&&records[0]&&records[0].notificationOldAmount)||0),
     notificationNewAmount:Number((records&&records[0]&&records[0].notificationNewAmount)||0),
     // V39.9: interactive Fair saves must return the cloud ACK before any push work.
@@ -1857,7 +1840,7 @@ async function saveFairToSheet(location, records) {
 }
 
 
-async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347(), notificationMeta={}, turnoverEntries=[]) {
+async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347(), notificationMeta={}) {
   const json = await jsonp({
     action: "saveLive",
     date,
@@ -1865,9 +1848,7 @@ async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientD
     amount,
     clientUpdatedAt,clientDeviceId,clientSequence,baseCloudUpdatedAt,foregroundSave:foregroundSave?"1":"",restoreGeneration,
     notificationAction:String(notificationMeta?.action||""),
-    notificationEntryId:String(notificationMeta?.entryId||""),
     notificationAmount:Number(notificationMeta?.amount||0),
-    turnoverEntriesV485:JSON.stringify(normalizeTurnoverEntriesClientV376(turnoverEntries)),
     notificationOldAmount:Number(notificationMeta?.oldAmount||0),
     notificationNewAmount:Number(notificationMeta?.newAmount||0)
   }, { timeoutMs: 30000 });
