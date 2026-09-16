@@ -753,7 +753,7 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
-  // V48.7: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
+  // V48.8: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
   if(error){
     writeSyncStatusV457('🔴 '+text,'error');
     return;
@@ -1754,7 +1754,7 @@ async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "", cli
     notificationAmount:Number(notificationMeta?.amount||0),
     notificationOldAmount:Number(notificationMeta?.oldAmount||0),
     notificationNewAmount:Number(notificationMeta?.newAmount||0)
-  });
+  }, { timeoutMs: foregroundSave ? 45000 : 30000 });
 
   if (!json.ok) throw new Error(json.message || "储存失败");
   applyLocalDataRevision(json.dataRevision);
@@ -1799,7 +1799,7 @@ async function sendFairBatchToSheetV343(location, records, foregroundSave=false)
     notifyInline:"",
     clientVersion:"39.7",
     launchUrl:getSalesLaunchUrlV194()
-  }, { timeoutMs: 30000 });
+  }, { timeoutMs: foregroundSave ? 45000 : 30000 });
 
   if (!json.ok) throw new Error(json.message || "Fair 储存失败");
   applyLocalDataRevision(json.dataRevision);
@@ -1851,7 +1851,7 @@ async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientD
     notificationAmount:Number(notificationMeta?.amount||0),
     notificationOldAmount:Number(notificationMeta?.oldAmount||0),
     notificationNewAmount:Number(notificationMeta?.newAmount||0)
-  }, { timeoutMs: 30000 });
+  }, { timeoutMs: foregroundSave ? 45000 : 30000 });
   if (!json.ok) throw new Error(json.message || "Live 储存失败");
   applyLocalDataRevision(json.dataRevision);
   if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}

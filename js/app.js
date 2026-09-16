@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4870",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4880",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4870";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4880";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2722,7 +2722,7 @@ function getVndPotMossFeeV267(record){
   const currency=String(record?.currency||"").trim().toUpperCase();
   const originalPrice=Math.max(0,Number(record?.unitPrice||0));
   if(currency!=="VND"||originalPrice<=0)return 0;
-  // V48.7: match Import V21.5 VND pot/misc tiers exactly.
+  // V48.8: match Import V21.5 VND pot/misc tiers exactly.
   if(originalPrice>=10000000)return 180;
   if(originalPrice>=4000000)return 105;
   if(originalPrice>=1000000)return 55;
@@ -2743,7 +2743,7 @@ function syncSalesCardAutoExtraV267(card){
     if(!input||input.dataset.manual==="1")return;
     const unitFee=Math.max(0,Number(item.dataset.autoPotMossFeeV267||0));
     const qty=Math.max(1,Number(item.querySelector(".product-link-qty")?.value||1));
-    // V48.7: Import V21.5 VND pot/misc fee is a per-unit selling cost.
+    // V48.8: Import V21.5 VND pot/misc fee is a per-unit selling cost.
     // Auto mode therefore uses unit fee x quantity on Sales / Fair / Live.
     input.value=formatAmount(unitFee*qty);
   });
@@ -3086,7 +3086,7 @@ function toggleProductLinkBoxV206(type){
 function liveDeliveryDefaultV203(price){
   const n=Math.max(0,Number(price||0));
   if(n<=0)return 0;
-  // V48.7: match Import V21.5 木架＋本地运费 A–F exactly.
+  // V48.8: match Import V21.5 木架＋本地运费 A–F exactly.
   if(n<300)return 20;
   if(n<=500)return 50;
   if(n<=1000)return 80;
@@ -3462,10 +3462,10 @@ async function loadProductLinksIntoEditorV206(type){
     ?applySalesCardFinalStatesV431(type,date,location,filterDeletedSalesLinksV350(type,date,location,cachedRaw))
     :cachedRaw;
 
-  // V48.7: keep the V48.7 Local First sync architecture.
+  // V48.8: keep the V48.8 Local First sync architecture.
   // A cached Sales Card opens immediately and is NOT exact-read merely because
   // a legacy/global verification watermark differs. Real cross-device changes
-  // are already handled by the V48.7 shared priorityRevisionV456 change journal,
+  // are already handled by the V48.8 shared priorityRevisionV456 change journal,
   // which fetches only card contexts that actually changed.
   if(Array.isArray(cached)){
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
@@ -3521,7 +3521,7 @@ async function loadProductLinksIntoEditorV206(type){
       applyCloudDraftStatusesV322(type,links);
       setTimeout(()=>{if(typeof refreshInventoryPendingV250==='function')refreshInventoryPendingV250(true)},0);
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-      // V48.7: an explicit Sales Card view does not declare the whole context synced.
+      // V48.8: an explicit Sales Card view does not declare the whole context synced.
     }
     return links;
   }catch(e){
@@ -3531,7 +3531,7 @@ async function loadProductLinksIntoEditorV206(type){
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
       const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
       if(wrap)wrap.innerHTML='<div class="product-link-loading-v231">销售卡读取失败，请再试一次。</div>';
-      // V48.7: card-view read failure stays inside the card panel; global sync is unchanged.
+      // V48.8: card-view read failure stays inside the card panel; global sync is unchanged.
     }
     return null;
   }
@@ -3591,7 +3591,7 @@ function salesCardSharedValuesV239(card){
 }
 function salesCardAutoDeliveryForItemV239(item){
   const card=item?.closest?.(".sales-card-transaction-v239");
-  // V48.7: only Live auto-generates 木架＋本地运费. Sales / Fair stay manual.
+  // V48.8: only Live auto-generates 木架＋本地运费. Sales / Fair stay manual.
   if(String(card?.dataset?.type||"").toLowerCase()!=="live")return 0;
   const price=toAmount(item.querySelector(".product-link-price")?.value||0);
   const qty=Math.max(1,Number(item.querySelector(".product-link-qty")?.value||1));
@@ -4254,7 +4254,7 @@ function productDeliveryInputV240(item){
 }
 function productAutoDeliveryV240(item){
   const card=item?.closest?.(".sales-card-transaction-v239");
-  // V48.7: Sales / Fair never auto-generate delivery; manual input is preserved.
+  // V48.8: Sales / Fair never auto-generate delivery; manual input is preserved.
   if(String(card?.dataset?.type||"").toLowerCase()!=="live")return 0;
   const rate=Number(item?.querySelector(".product-link-crate-v270")?.value||getLiveCrateV269(item)||0);
   return rate*salesCardQtyV240(item);
@@ -4420,7 +4420,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"],[180,"F180"]];
-    // V48.7: only Live auto-selects the Import V21.5 crate/local-delivery tier
+    // V48.8: only Live auto-selects the Import V21.5 crate/local-delivery tier
     // from this product's unit selling price. Existing saved cards are preserved.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
     const autoCrateFromPrice=liveCrateRateForPriceV461(unitPrice);
@@ -5783,7 +5783,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4870",
+    version:"4880",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -8478,6 +8478,42 @@ function fallbackTurnoverEntriesV376(type,date,location){
   const audit=turnoverAuditDerivedV380.get(turnoverAuditKeyV380(type,date,location));if(Array.isArray(audit)&&audit.length)return normalizeTurnoverEntriesClientV376(audit);
   const total=officialTurnoverV376(type,date,location);return total>0?[{id:'legacy_'+turnoverContextKeyV376(type,date,location),amount:total,legacy:true,createdAt:'',updatedAt:''}]:[]
 }
+// V48.8: the authoritative turnover total may arrive a few seconds before the
+// auxiliary 100 + 200 + 300 breakdown. Never replace an already-known breakdown
+// with one fake chip equal to the new total during that short window. For a
+// deletion, reconcile an exact removed component/suffix immediately when possible;
+// otherwise keep the previous breakdown read-only until the auxiliary detail lands.
+function displayTurnoverEntriesV488(type,date,location,official,cached){
+  const clean=normalizeTurnoverEntriesClientV376(cached?.entries||[]);
+  if(!clean.length)return{entries:fallbackTurnoverEntriesV376(type,date,location),pending:false};
+  const sum=entriesSumV376(clean),target=Math.round(Number(official||0)*100)/100;
+  if(Math.abs(sum-target)<=0.005)return{entries:clean,pending:false};
+  if(target<=0.005)return{entries:[],pending:true};
+  if(sum>target+0.005){
+    const delta=Math.round((sum-target)*100)/100;
+    for(let i=clean.length-1;i>=0;i--){
+      if(Math.abs(Number(clean[i].amount||0)-delta)<=0.005){
+        const next=clean.slice();next.splice(i,1);
+        if(Math.abs(entriesSumV376(next)-target)<=0.005)return{entries:next,pending:true};
+      }
+    }
+    let removed=0;
+    for(let i=clean.length-1;i>=0;i--){
+      removed=Math.round((removed+Number(clean[i].amount||0))*100)/100;
+      if(Math.abs(removed-delta)<=0.005){
+        const next=clean.slice(0,i);
+        if(Math.abs(entriesSumV376(next)-target)<=0.005)return{entries:next,pending:true};
+      }
+      if(removed>delta+0.005)break;
+    }
+  }
+  return{entries:clean,pending:true};
+}
+function turnoverDetailPendingV488(type){
+  const ctx=turnoverContextV376(type);if(!ctx.date||!ctx.location)return false;
+  const cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location);if(!cached||!Array.isArray(cached.entries)||!cached.entries.length)return false;
+  return Math.abs(entriesSumV376(cached.entries)-officialTurnoverV376(type,ctx.date,ctx.location))>0.005;
+}
 function setTurnoverEntryCacheV376(type,date,location,entries,source='local'){
   if(!date||!location)return;const key=turnoverContextKeyV376(type,date,location),clean=normalizeTurnoverEntriesClientV376(entries);turnoverEntryMemoryV376.set(key,{entries:clean,source,at:Date.now()});const all=readTurnoverLocalV376();all[key]={entries:clean,source,at:Date.now()};writeTurnoverLocalV376(all)
 }
@@ -8491,14 +8527,15 @@ function renderTurnoverComposerV376(type){
   if(!ctx.date||!ctx.location){history.innerHTML='<span class="turnover-history-empty-v376">请选择日期及'+(type==='live'?'主播':type==='daily'?'公司':'地点')+'</span>';totalEl.textContent='0.00';hidden.value='0.00';return}
   clearStaleTurnoverNewDraftV461(type);
   restoreTurnoverNewDraftV376(type);
-  const official=officialTurnoverV376(type,ctx.date,ctx.location),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location);let entries=cached?.entries||fallbackTurnoverEntriesV376(type,ctx.date,ctx.location);
-  // Entry detail can never replace an authoritative total when they disagree.
-  if(cached&&Math.abs(entriesSumV376(entries)-official)>0.005)entries=fallbackTurnoverEntriesV376(type,ctx.date,ctx.location);
-  const total=entriesSumV376(entries);hidden.value=formatAmount(total);totalEl.textContent=formatAmount(total);
+  const official=officialTurnoverV376(type,ctx.date,ctx.location),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location);
+  const display=displayTurnoverEntriesV488(type,ctx.date,ctx.location,official,cached),entries=display.entries;
+  // The total is always authoritative. Entry history is auxiliary and may remain
+  // on the last known breakdown for a few seconds while its independent read catches up.
+  hidden.value=formatAmount(official);totalEl.textContent=formatAmount(official);
   if(!entries.length){history.innerHTML='';return}
   history.innerHTML='';entries.forEach((entry,index)=>{
     if(index){const plus=document.createElement('span');plus.className='turnover-plus-v376';plus.textContent='+';history.appendChild(plus)}
-    const btn=document.createElement('button');btn.type='button';btn.className='turnover-piece-v376';btn.textContent=Number(entry.amount||0).toLocaleString('en-MY',{minimumFractionDigits:0,maximumFractionDigits:2});btn.title='点击修改；长按删除';btn.dataset.entryId=entry.id;btn.disabled=!!turnoverWriteStateV382[type];btn.addEventListener('contextmenu',e=>e.preventDefault());
+    const btn=document.createElement('button');btn.type='button';btn.className='turnover-piece-v376';btn.textContent=Number(entry.amount||0).toLocaleString('en-MY',{minimumFractionDigits:0,maximumFractionDigits:2});btn.title=display.pending?'营业额明细同步中…':'点击修改；长按删除';btn.dataset.entryId=entry.id;btn.disabled=!!turnoverWriteStateV382[type]||display.pending;btn.addEventListener('contextmenu',e=>e.preventDefault());
     let timer=0,longPressed=false;
     const cancel=()=>{if(timer){clearTimeout(timer);timer=0}};
     btn.addEventListener('pointerdown',()=>{longPressed=false;timer=setTimeout(()=>{longPressed=true;deleteTurnoverEntryV376(type,entry.id)},650)});
@@ -8602,6 +8639,7 @@ function setTurnoverSaveButtonV382(type,state){
 }
 async function addTurnoverEntryV376(type){
   if(turnoverWriteStateV382[type])return false;
+  if(turnoverDetailPendingV488(type)){scheduleTurnoverDetailRepairV486(type);setSync('营业额明细同步中，请稍候…',true);return false}
   const ids=turnoverIdsV376(type),input=document.getElementById(ids.input),value=Math.round(toAmount(input?.value||0)*100)/100;if(!value||value<0){alert('请输入新一笔营业额');return false}
   const ctx=turnoverContextV376(type),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location);
   // V46.0: after an Apps Script timeout the optimistic entry intentionally
@@ -8623,12 +8661,14 @@ async function addTurnoverEntryV376(type){
 }
 async function editTurnoverEntryV376(type,id){
   if(turnoverWriteStateV382[type])return false;
+  if(turnoverDetailPendingV488(type)){scheduleTurnoverDetailRepairV486(type);setSync('营业额明细同步中，请稍候…',true);return false}
   const entries=proposedEntriesV376(type),index=entries.findIndex(x=>x.id===id);if(index<0)return;const old=Number(entries[index].amount||0),raw=prompt(`修改这笔营业额\n\n原金额 RM${formatAmount(old)}`,formatAmount(old));if(raw===null)return;const next=Math.round(toAmount(raw)*100)/100;if(!Number.isFinite(next)||next<0){alert('请输入有效营业额');return}if(Math.abs(next-old)<=0.005)return;
   const before=entriesSumV376(entries),after=Math.round((before-old+next)*100)/100;if(!confirm(`确认把 RM${formatAmount(old)} 修改为 RM${formatAmount(next)}？\n\n营业额总数：RM${formatAmount(before)} → RM${formatAmount(after)}`))return;
   entries[index]={...entries[index],amount:next,updatedAt:new Date().toISOString()};setTurnoverSaveButtonV382(type,'saving');const ok=await commitTurnoverEntriesV376(type,entries,'修改',{action:'modified_entry',oldAmount:old,newAmount:next});if(ok)setTurnoverSaveButtonV382(type,'saved');else setTurnoverSaveButtonV382(type,'idle');
 }
 async function deleteTurnoverEntryV376(type,id){
   if(turnoverWriteStateV382[type])return false;
+  if(turnoverDetailPendingV488(type)){scheduleTurnoverDetailRepairV486(type);setSync('营业额明细同步中，请稍候…',true);return false}
   const entries=proposedEntriesV376(type),index=entries.findIndex(x=>x.id===id);if(index<0)return;const old=Number(entries[index].amount||0),before=entriesSumV376(entries),after=Math.round((before-old)*100)/100;if(!confirm(`确认删除这笔 RM${formatAmount(old)} 营业额？\n\n营业额总数：RM${formatAmount(before)} → RM${formatAmount(after)}\n\n删除后才会保存。`))return;
   entries.splice(index,1);setTurnoverSaveButtonV382(type,'deleting');const ok=await commitTurnoverEntriesV376(type,entries,'删除',{action:'deleted_entry',oldAmount:old});if(ok)setTurnoverSaveButtonV382(type,'deleted');else setTurnoverSaveButtonV382(type,'idle');
 }
@@ -8721,7 +8761,7 @@ bindTurnoverContextRefreshV377();
 
 // Earlier date controls captured the old update function before V39.9 replaced it.
 // Repaint composers after every authoritative render so legacy rows appear immediately.
-// V48.7: keep V48.3/V46.6 main sync untouched. After an authoritative turnover
+// V48.8: keep V48.3/V46.6 main sync untouched. After an authoritative turnover
 // total has already been applied, repair only the auxiliary 100 + 200 + 300
 // breakdown in the background. This never participates in revision decisions,
 // never changes global sync status and never blocks the authoritative total.
@@ -8758,7 +8798,7 @@ renderAll=function(){
     renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live');
     // Schedule only auxiliary detail repair; authoritative V48.3 sync has already finished.
     scheduleTurnoverDetailRepairV486('daily');scheduleTurnoverDetailRepairV486('fair');scheduleTurnoverDetailRepairV486('live');
-  }catch(e){console.warn('V48.7 post-render turnover',e)}
+  }catch(e){console.warn('V48.8 post-render turnover',e)}
   return result;
 };
 window.renderAll=renderAll;
@@ -8852,7 +8892,7 @@ const SYSTEM_RELEASE_REVISION_V442='910 → 930';
 const SYSTEM_BACKUP_AT_KEY_V442='lover_sales_last_backup_at_v442';
 const SYSTEM_RESTORE_AT_KEY_V442='lover_sales_last_restore_at_v442';
 let systemHealthStateV442={level:'warning',issues:[],checked:false,data:null,expanded:false};
-// V48.7: the read-only health endpoint is advisory only. A slow health scan must
+// V48.8: the read-only health endpoint is advisory only. A slow health scan must
 // never override a confirmed business-data sync with a false red connection error.
 const SYSTEM_HEALTH_SESSION_START_V466=Date.now();
 let systemConfirmedSyncAtV466=0;
@@ -8886,7 +8926,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4870$/,'48.7')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4880$/,'48.8')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8912,12 +8952,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4870'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4880'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4870')issues.push(`Frontend / API 版本不一致（Frontend 4870 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4880')issues.push(`Frontend / API 版本不一致（Frontend 4880 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4870';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4880';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
