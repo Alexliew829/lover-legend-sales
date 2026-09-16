@@ -8,10 +8,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Lover Sales</title>
-<link rel="manifest" href="manifest.json?v=49.8">
+<link rel="manifest" href="manifest.json?v=49.9">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="style.css?v=49.8">
+<link rel="stylesheet" href="style.css?v=49.9">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
@@ -362,7 +362,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V49.8</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V49.9</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -802,35 +802,6 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   </div>
 </section>
 
-<section id="page-history" class="page">
-  <div class="card sales-history-card-v497">
-    <div class="sales-history-head-v497">
-      <div>
-        <h2>Sales History / 销售历史</h2>
-        <div class="sub">只读历史分析 · 独立缓存 · 不参与主同步</div>
-      </div>
-      <button type="button" id="salesHistoryToggleV497" class="secondary-btn" onclick="toggleSalesHistoryV497()">📚 打开销售历史</button>
-    </div>
-    <div id="salesHistoryBodyV497" class="sales-history-body-v497 hidden">
-      <div class="sales-history-toolbar-v497">
-        <label>年份<select id="salesHistoryYearV497" onchange="renderSalesHistoryV497()"></select></label>
-        <label>月份<select id="salesHistoryMonthV497" onchange="renderSalesHistoryV497()"><option value="">全部月份</option></select></label>
-        <label>板块<select id="salesHistoryTypeV497" onchange="renderSalesHistoryV497()"><option value="">全部</option><option value="daily">Sales</option><option value="fair">Fair</option><option value="live">Live</option></select></label>
-        <label>状态<select id="salesHistoryStatusV497" onchange="renderSalesHistoryV497()"><option value="confirmed">已确认销售</option><option value="all">全部销售卡</option><option value="draft">草稿</option></select></label>
-        <label class="sales-history-search-v497">搜索<input id="salesHistorySearchV497" type="search" placeholder="产品 / 编号 / 地点 / 主播 / 备注" oninput="renderSalesHistoryV497()"></label>
-      </div>
-      <div id="salesHistoryCacheStatusV497" class="sales-history-cache-status-v497">尚未读取历史资料</div>
-      <div id="salesHistorySummaryV497" class="sales-history-summary-v497"></div>
-      <div class="sales-history-actions-v497">
-        <button type="button" class="gray" onclick="exportSalesHistoryExcelV497()">📈 导出 Excel</button>
-        <button type="button" class="secondary-btn" onclick="refreshSalesHistoryV497(true)">↻ 静默更新历史</button>
-      </div>
-      <div class="sales-history-note-v497">“销售人员/主播”只显示原销售卡已有资料：Live 显示主播；旧 Sales / Fair 没有独立销售人员字段时显示“—”。</div>
-      <div id="salesHistoryListV497" class="sales-history-list-v497"></div>
-    </div>
-  </div>
-</section>
-
 <section id="page-more" class="page">
   <div class="card">
     <h2>More</h2>
@@ -860,7 +831,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V49.8 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V49.9 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -934,7 +905,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <div class="card system-info-card-v442">
   <h2>系统资料 / System Information</h2>
   <div class="system-info-grid-v442">
-    <div><span>版本</span><b>V49.8</b></div>
+    <div><span>版本</span><b>V49.9</b></div>
     <div><span>API版本</span><b id="systemInfoApiV442">检查中…</b></div>
     <div><span>Revision（上次 → 当前）</span><b>910 → 930</b></div>
     <div><span>储存方式</span><b>Google Sheet 自动同步</b></div>
@@ -960,7 +931,6 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div class="nav-item" data-page="fair" onclick="showPage('fair',this)"><span>🏪</span>Fair</div>
   <div class="nav-item" data-page="live" onclick="showPage('live',this)"><span>🔴</span>Live</div>
   <div class="nav-item" data-page="report" onclick="showPage('report',this)"><span>📊</span>Report</div>
-  <div class="nav-item" data-page="history" onclick="showPage('history',this)"><span>📚</span>History</div>
   <div class="nav-item" data-page="more" onclick="showPage('more',this)"><span>⚙️</span>More</div>
 </nav>
 
@@ -987,10 +957,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=49.8",
-      "js/sheet.js?v=49.8",
-      "js/app.js?v=49.8",
-      "js/update.js?v=49.8"
+      "js/utils.js?v=49.9",
+      "js/sheet.js?v=49.9",
+      "js/app.js?v=49.9",
+      "js/update.js?v=49.9"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");
