@@ -127,6 +127,8 @@ function showPage(name,el){
   }
   if(name==="home")renderDashboard();
   if(name==="report")renderTable();
+  if(name==="history"&&typeof openSalesHistoryPageV497==="function")openSalesHistoryPageV497();
+  if(el&&el.scrollIntoView){try{el.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"})}catch(_){}}
   if(name==="fair"&&typeof refreshFairInputsFromRows==="function")refreshFairInputsFromRows(false);
 
   // V29.9: page switching never waits for or triggers cloud sync.
@@ -1620,7 +1622,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4960",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4980",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1640,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4960";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4980";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1813,7 +1815,7 @@ try { renderAll(); } catch (error) { console.warn("Initial empty Home render fai
 setTimeout(()=>{
   try{
     const last=localStorage.getItem(LAST_PAGE_KEY_V238)||"home";
-    const allowed=new Set(["home","sales","fair","live","report","more"]);
+    const allowed=new Set(["home","sales","fair","live","report","history","more"]);
     const page=allowed.has(last)?last:"home";
     const nav=document.querySelector(`.nav-item[data-page="${page}"]`);
     if(nav)showPage(page,nav);
@@ -2722,7 +2724,7 @@ function getVndPotMossFeeV267(record){
   const currency=String(record?.currency||"").trim().toUpperCase();
   const originalPrice=Math.max(0,Number(record?.unitPrice||0));
   if(currency!=="VND"||originalPrice<=0)return 0;
-  // V49.6: match Import V21.5 VND pot/misc tiers exactly.
+  // V49.8: match Import V21.5 VND pot/misc tiers exactly.
   if(originalPrice>=10000000)return 180;
   if(originalPrice>=4000000)return 105;
   if(originalPrice>=1000000)return 55;
@@ -2743,7 +2745,7 @@ function syncSalesCardAutoExtraV267(card){
     if(!input||input.dataset.manual==="1")return;
     const unitFee=Math.max(0,Number(item.dataset.autoPotMossFeeV267||0));
     const qty=Math.max(1,Number(item.querySelector(".product-link-qty")?.value||1));
-    // V49.6: Import V21.5 VND pot/misc fee is a per-unit selling cost.
+    // V49.8: Import V21.5 VND pot/misc fee is a per-unit selling cost.
     // Auto mode therefore uses unit fee x quantity on Sales / Fair / Live.
     input.value=formatAmount(unitFee*qty);
   });
@@ -3086,7 +3088,7 @@ function toggleProductLinkBoxV206(type){
 function liveDeliveryDefaultV203(price){
   const n=Math.max(0,Number(price||0));
   if(n<=0)return 0;
-  // V49.6: match Import V21.5 木架＋本地运费 A–F exactly.
+  // V49.8: match Import V21.5 木架＋本地运费 A–F exactly.
   if(n<300)return 20;
   if(n<=500)return 50;
   if(n<=1000)return 80;
@@ -3462,10 +3464,10 @@ async function loadProductLinksIntoEditorV206(type){
     ?applySalesCardFinalStatesV431(type,date,location,filterDeletedSalesLinksV350(type,date,location,cachedRaw))
     :cachedRaw;
 
-  // V49.6: keep the V49.6 Local First sync architecture.
+  // V49.8: keep the V49.8 Local First sync architecture.
   // A cached Sales Card opens immediately and is NOT exact-read merely because
   // a legacy/global verification watermark differs. Real cross-device changes
-  // are already handled by the V49.6 shared priorityRevisionV456 change journal,
+  // are already handled by the V49.8 shared priorityRevisionV456 change journal,
   // which fetches only card contexts that actually changed.
   if(Array.isArray(cached)){
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
@@ -3521,7 +3523,7 @@ async function loadProductLinksIntoEditorV206(type){
       applyCloudDraftStatusesV322(type,links);
       setTimeout(()=>{if(typeof refreshInventoryPendingV250==='function')refreshInventoryPendingV250(true)},0);
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-      // V49.6: an explicit Sales Card view does not declare the whole context synced.
+      // V49.8: an explicit Sales Card view does not declare the whole context synced.
     }
     return links;
   }catch(e){
@@ -3531,7 +3533,7 @@ async function loadProductLinksIntoEditorV206(type){
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
       const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
       if(wrap)wrap.innerHTML='<div class="product-link-loading-v231">销售卡读取失败，请再试一次。</div>';
-      // V49.6: card-view read failure stays inside the card panel; global sync is unchanged.
+      // V49.8: card-view read failure stays inside the card panel; global sync is unchanged.
     }
     return null;
   }
@@ -3591,7 +3593,7 @@ function salesCardSharedValuesV239(card){
 }
 function salesCardAutoDeliveryForItemV239(item){
   const card=item?.closest?.(".sales-card-transaction-v239");
-  // V49.6: only Live auto-generates 木架＋本地运费. Sales / Fair stay manual.
+  // V49.8: only Live auto-generates 木架＋本地运费. Sales / Fair stay manual.
   if(String(card?.dataset?.type||"").toLowerCase()!=="live")return 0;
   const price=toAmount(item.querySelector(".product-link-price")?.value||0);
   const qty=Math.max(1,Number(item.querySelector(".product-link-qty")?.value||1));
@@ -4254,7 +4256,7 @@ function productDeliveryInputV240(item){
 }
 function productAutoDeliveryV240(item){
   const card=item?.closest?.(".sales-card-transaction-v239");
-  // V49.6: Sales / Fair never auto-generate delivery; manual input is preserved.
+  // V49.8: Sales / Fair never auto-generate delivery; manual input is preserved.
   if(String(card?.dataset?.type||"").toLowerCase()!=="live")return 0;
   const rate=Number(item?.querySelector(".product-link-crate-v270")?.value||getLiveCrateV269(item)||0);
   return rate*salesCardQtyV240(item);
@@ -4420,7 +4422,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"],[180,"F180"]];
-    // V49.6: only Live auto-selects the Import V21.5 crate/local-delivery tier
+    // V49.8: only Live auto-selects the Import V21.5 crate/local-delivery tier
     // from this product's unit selling price. Existing saved cards are preserved.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
     const autoCrateFromPrice=liveCrateRateForPriceV461(unitPrice);
@@ -5783,7 +5785,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4960",
+    version:"4980",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -8430,7 +8432,12 @@ const turnoverAuditDerivedV380=new Map();
 function turnoverAuditKeyV380(type,date,location){return turnoverContextKeyV376(type,date,location)}
 function filterTurnoverAuditLogsV380(type,location,logs){
   const clean=Array.isArray(logs)?logs:[];
-  if(type==='daily')return[];
+  // V49.8: Sales (Balakong / Belimbing) also needs the auxiliary audit fallback.
+  // Cross-device totals can arrive before TurnoverEntries detail. The Sales change
+  // log already records each saved delta, so use ONLY the matching company to
+  // reconstruct missing pieces (for example three separate entries totalling 108)
+  // without touching the V49.6/V49.8 main revision/sync path.
+  if(type==='daily')return clean.filter(x=>normalizeCompany(String(x.company||''))===normalizeCompany(String(location||'')));
   if(type==='fair')return clean.filter(x=>normalizeFairLocationKey(x.location||'')===normalizeFairLocationKey(location||''));
   if(type==='live')return clean.filter(x=>normalizeLiveHostKey(x.location||'')===normalizeLiveHostKey(location||''));
   return clean;
@@ -8464,7 +8471,7 @@ function fallbackTurnoverEntriesV376(type,date,location){
   const audit=turnoverAuditDerivedV380.get(turnoverAuditKeyV380(type,date,location));if(Array.isArray(audit)&&audit.length)return normalizeTurnoverEntriesClientV376(audit);
   const total=officialTurnoverV376(type,date,location);return total>0?[{id:'legacy_'+turnoverContextKeyV376(type,date,location),amount:total,legacy:true,createdAt:'',updatedAt:''}]:[]
 }
-// V49.6: the authoritative turnover total may arrive a few seconds before the
+// V49.8: the authoritative turnover total may arrive a few seconds before the
 // auxiliary 100 + 200 + 300 breakdown. Never replace an already-known breakdown
 // with one fake chip equal to the new total during that short window. For a
 // deletion, reconcile an exact removed component/suffix immediately when possible;
@@ -8747,7 +8754,7 @@ bindTurnoverContextRefreshV377();
 
 // Earlier date controls captured the old update function before V39.9 replaced it.
 // Repaint composers after every authoritative render so legacy rows appear immediately.
-// V49.6: keep V48.3/V46.6 main sync untouched. After an authoritative turnover
+// V49.8: keep V48.3/V46.6 main sync untouched. After an authoritative turnover
 // total has already been applied, repair only the auxiliary 100 + 200 + 300
 // breakdown in the background. This never participates in revision decisions,
 // never changes global sync status and never blocks the authoritative total.
@@ -8784,7 +8791,7 @@ renderAll=function(){
     renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live');
     // Schedule only auxiliary detail repair; authoritative V48.3 sync has already finished.
     scheduleTurnoverDetailRepairV486('daily');scheduleTurnoverDetailRepairV486('fair');scheduleTurnoverDetailRepairV486('live');
-  }catch(e){console.warn('V49.6 post-render turnover',e)}
+  }catch(e){console.warn('V49.8 post-render turnover',e)}
   return result;
 };
 window.renderAll=renderAll;
@@ -8878,7 +8885,7 @@ const SYSTEM_RELEASE_REVISION_V442='910 → 930';
 const SYSTEM_BACKUP_AT_KEY_V442='lover_sales_last_backup_at_v442';
 const SYSTEM_RESTORE_AT_KEY_V442='lover_sales_last_restore_at_v442';
 let systemHealthStateV442={level:'warning',issues:[],checked:false,data:null,expanded:false};
-// V49.6: the read-only health endpoint is advisory only. A slow health scan must
+// V49.8: the read-only health endpoint is advisory only. A slow health scan must
 // never override a confirmed business-data sync with a false red connection error.
 const SYSTEM_HEALTH_SESSION_START_V466=Date.now();
 let systemConfirmedSyncAtV466=0;
@@ -8912,7 +8919,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4960$/,'48.8')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8938,12 +8945,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4960'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4980'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4960')issues.push(`Frontend / API 版本不一致（Frontend 4960 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4980')issues.push(`Frontend / API 版本不一致（Frontend 4980 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4960';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4980';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -8964,8 +8971,8 @@ window.toggleSystemHealthDetailsV442=toggleSystemHealthDetailsV442;window.runSys
 setTimeout(()=>runSystemHealthCheckV442(false),1200);
 
 
-/* ================= V49.6 minimal Sales Card UX fixes (V49.6 baseline) =================
-   Built directly on V49.6. Do not change the V49.6 revision/sync cadence.
+/* ================= V49.8 minimal Sales Card UX fixes (V49.8 baseline) =================
+   Built directly on V49.8. Do not change the V49.8 revision/sync cadence.
    A Sales Card that has no unsaved changes is only a view state, so collapse it
    when the user leaves that Sales / Fair / Live page. Saved cards therefore
    reopen collapsed; genuinely unsaved edits keep the existing leave guard. */
@@ -8993,8 +9000,8 @@ showPage=function(name,el){
 window.showPage=showPage;
 
 
-/* ================= V49.6 persistent profit view cache =================
-   Profit is secondary display data. It never blocks or mutates the V48.8/V49.6
+/* ================= V49.8 persistent profit view cache =================
+   Profit is secondary display data. It never blocks or mutates the V48.8/V49.8
    main revision/sync authority. Existing authoritative Sales Card context updates
    continue to patch daily profit cache immediately; this layer reuses those caches
    across page opens and refreshes them silently only after Sales Card revision changes.
@@ -9061,7 +9068,7 @@ async function runSilentProfitRefreshV496(reason='background'){
       const clean=publishSilentProfitSnapshotV496(json.links,Number(json.salesCardRevision||knownSalesCardRevisionV496()));
       repaintProfitViewsV496();
       return clean;
-    }catch(e){console.warn('V49.6 静默利润读取失败',reason,e);return null}
+    }catch(e){console.warn('V49.8 静默利润读取失败',reason,e);return null}
     finally{silentProfitRefreshPendingV496=null}
   })();
   return silentProfitRefreshPendingV496;
@@ -9101,3 +9108,113 @@ window.toggleHomeTodayProfitV318=toggleHomeTodayProfitV318;
 
 window.addEventListener('lover-sales-sync-complete-v458',()=>scheduleSilentProfitRefreshV496('after-main-sync',900));
 setTimeout(()=>scheduleSilentProfitRefreshV496('startup-idle',2500),2500);
+
+
+/* ================= V49.8 isolated Sales History =================
+   Read-only. It never calls setSync(), never commits Sales Card caches and never
+   joins the V48.8/V49.8 priority sync path. Cache is display-only. */
+const SALES_HISTORY_CACHE_KEY_V497="lover_sales_history_cache_v497";
+let salesHistoryMemoryV497=null;
+let salesHistoryOpenV497=false;
+let salesHistoryRefreshPromiseV497=null;
+function readSalesHistoryCacheV497(){
+  if(salesHistoryMemoryV497)return salesHistoryMemoryV497;
+  try{const x=JSON.parse(localStorage.getItem(SALES_HISTORY_CACHE_KEY_V497)||"null");if(x&&Array.isArray(x.links)){salesHistoryMemoryV497=x;return x}}catch(_){}
+  return null;
+}
+function writeSalesHistoryCacheV497(payload){
+  const safe={revision:Math.max(0,Number(payload?.revision||0)),at:Number(payload?.at||Date.now()),links:Array.isArray(payload?.links)?payload.links:[]};
+  salesHistoryMemoryV497=safe;
+  try{localStorage.setItem(SALES_HISTORY_CACHE_KEY_V497,JSON.stringify(safe))}catch(e){console.warn("Sales History cache full",e)}
+  return safe;
+}
+function salesHistoryConfirmedV497(x){return x?.confirmedOnce===true||["PENDING_IMPORT_LINK","INVENTORY_CONFIRMED","NON_INVENTORY"].includes(String(x?.importSyncStatus||""))}
+function salesHistoryTypeLabelV497(type){return type==="daily"?"Sales":type==="fair"?"Fair":type==="live"?"Live":String(type||"")}
+function salesHistoryLocationV497(x){const type=String(x?.type||"");if(type==="live")return "Live";return String(x?.location||"-")}
+function salesHistorySellerV497(x){return String(x?.type||"")==="live"?String(x?.location||"-"):"—"}
+function salesHistoryTotalCostV497(x){const qty=Math.max(0,Number(x?.quantity||0));return Number(x?.averageCost||0)*qty+Number(x?.localDelivery||0)+Number(x?.extraFee||0)+Number(x?.commissionAmount||0)}
+function salesHistoryYearFromDateV497(d){const m=String(d||"").match(/(\d{4})$/);return m?m[1]:""}
+function salesHistoryMonthFromDateV497(d){const m=String(d||"").match(/^\d{2}-(\d{2})-(\d{4})$/);return m?m[2]+"-"+m[1]:""}
+function salesHistorySortV497(a,b){const pa=String(a?.date||"").split("-").reverse().join(""),pb=String(b?.date||"").split("-").reverse().join("");return pb.localeCompare(pa)||String(b?.createdAt||"").localeCompare(String(a?.createdAt||""))||Number(a?.productOrder||0)-Number(b?.productOrder||0)}
+function salesHistoryFiltersV497(){
+  return{year:String(document.getElementById("salesHistoryYearV497")?.value||""),month:String(document.getElementById("salesHistoryMonthV497")?.value||""),type:String(document.getElementById("salesHistoryTypeV497")?.value||""),status:String(document.getElementById("salesHistoryStatusV497")?.value||"confirmed"),q:String(document.getElementById("salesHistorySearchV497")?.value||"").trim().toLowerCase()}
+}
+function salesHistoryFilteredV497(){
+  const cache=readSalesHistoryCacheV497(),f=salesHistoryFiltersV497();
+  return (cache?.links||[]).filter(x=>{
+    if(f.year&&salesHistoryYearFromDateV497(x.date)!==f.year)return false;
+    if(f.month&&salesHistoryMonthFromDateV497(x.date)!==f.month)return false;
+    if(f.type&&String(x.type||"")!==f.type)return false;
+    const confirmed=salesHistoryConfirmedV497(x);if(f.status==="confirmed"&&!confirmed)return false;if(f.status==="draft"&&confirmed)return false;
+    if(f.q){const hay=[x.productId,x.productName,x.location,x.remark,x.transactionId,salesHistoryTypeLabelV497(x.type),salesHistorySellerV497(x)].join(" ").toLowerCase();if(!hay.includes(f.q))return false}
+    return !["deleted","cancelled"].includes(String(x.status||"active").toLowerCase());
+  }).sort(salesHistorySortV497)
+}
+function populateSalesHistoryFiltersV497(){
+  const cache=readSalesHistoryCacheV497(),yearEl=document.getElementById("salesHistoryYearV497"),monthEl=document.getElementById("salesHistoryMonthV497");if(!yearEl||!monthEl)return;
+  const years=[...new Set((cache?.links||[]).map(x=>salesHistoryYearFromDateV497(x.date)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+  const keepYear=yearEl.value||String(new Date().getFullYear());
+  yearEl.innerHTML='<option value="">全部年份</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join("");
+  yearEl.value=years.includes(keepYear)?keepYear:(years[0]||"");
+  const selectedYear=yearEl.value,months=[...new Set((cache?.links||[]).filter(x=>!selectedYear||salesHistoryYearFromDateV497(x.date)===selectedYear).map(x=>salesHistoryMonthFromDateV497(x.date)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+  const keepMonth=monthEl.value;monthEl.innerHTML='<option value="">全部月份</option>'+months.map(m=>`<option value="${m}">${m}</option>`).join("");if(months.includes(keepMonth))monthEl.value=keepMonth;
+}
+function salesHistorySummaryHtmlV497(list){
+  const confirmed=list.filter(salesHistoryConfirmedV497),qty=confirmed.reduce((s,x)=>s+Number(x.quantity||0),0),sales=confirmed.reduce((s,x)=>s+Number(x.actualPrice||0),0),cost=confirmed.reduce((s,x)=>s+salesHistoryTotalCostV497(x),0),profit=confirmed.reduce((s,x)=>s+Number(x.profit||0),0),rate=sales>0?profit/sales*100:0;
+  return [["销售数量",qty.toLocaleString()],["销售卡售价",`RM${formatAmount(sales)}`],["总成本",`RM${formatAmount(cost)}`],["总利润",`RM${formatAmount(profit)}`],["利润率",`${rate.toFixed(2)}%`]].map(x=>`<div class="sales-history-summary-box-v497"><span>${x[0]}</span><b>${x[1]}</b></div>`).join("")
+}
+function renderSalesHistoryV497(){
+  if(!salesHistoryOpenV497)return;
+  populateSalesHistoryFiltersV497();
+  const list=salesHistoryFilteredV497(),summary=document.getElementById("salesHistorySummaryV497"),host=document.getElementById("salesHistoryListV497"),status=document.getElementById("salesHistoryCacheStatusV497"),cache=readSalesHistoryCacheV497();
+  if(summary)summary.innerHTML=salesHistorySummaryHtmlV497(list);
+  if(status){const when=cache?.at?new Date(cache.at).toLocaleString():"-";status.textContent=cache?`本机历史缓存 · ${list.length} 项显示 · 上次更新 ${when}`:"尚未有本机历史缓存，正在静默读取…"}
+  if(!host)return;if(!list.length){host.innerHTML='<div class="sales-history-empty-v497">所选范围没有销售记录</div>';return}
+  host.innerHTML=list.map(x=>{const confirmed=salesHistoryConfirmedV497(x),unit=Number(x.unitPrice!==undefined?x.unitPrice:(Number(x.quantity||0)>0?Number(x.actualPrice||0)/Number(x.quantity||1):0));return `<div class="sales-history-row-v497"><div class="sales-history-row-top-v497"><div class="sales-history-row-name-v497">${escapeChangeLogHtmlV200(String(x.productId||""))}${x.productId?' · ':''}${escapeChangeLogHtmlV200(String(x.productName||""))}</div><div class="sales-history-row-status-v497 ${confirmed?'sales-history-confirmed-v497':'sales-history-draft-v497'}">${confirmed?'✅ 已确认':'🟡 草稿'}</div></div><div class="sales-history-row-grid-v497"><div><span>日期 / 时间</span><b>${escapeChangeLogHtmlV200(String(x.date||"-"))}${x.createdAt?` · ${escapeChangeLogHtmlV200(String(x.createdAt).split(" ").slice(-1)[0])}`:""}</b></div><div><span>板块</span><b>${salesHistoryTypeLabelV497(x.type)}</b></div><div><span>地点</span><b>${escapeChangeLogHtmlV200(salesHistoryLocationV497(x))}</b></div><div><span>销售人员/主播</span><b>${escapeChangeLogHtmlV200(salesHistorySellerV497(x))}</b></div><div><span>数量</span><b>${Number(x.quantity||0)}</b></div><div><span>单价</span><b>RM${formatAmount(unit)}</b></div><div><span>售价</span><b>RM${formatAmount(Number(x.actualPrice||0))}</b></div><div><span>利润</span><b>RM${formatAmount(Number(x.profit||0))}</b></div></div>${x.remark?`<div class="sales-history-note-v497">备注：${escapeChangeLogHtmlV200(String(x.remark||""))}</div>`:""}</div>`}).join("")
+}
+function salesHistoryMainBusyV497(){try{return (typeof getActiveCloudLoadPromise==="function"&&!!getActiveCloudLoadPromise())||(typeof window.cloudAtomicSyncPendingV448==="function"&&window.cloudAtomicSyncPendingV448())}catch(_){return false}}
+async function refreshSalesHistoryV497(force=false){
+  if(salesHistoryRefreshPromiseV497)return salesHistoryRefreshPromiseV497;
+  const cache=readSalesHistoryCacheV497(),localRev=typeof getPrioritySyncLocalV315==="function"?Number(getPrioritySyncLocalV315()?.salesCardRevision||0):0;
+  if(!force&&cache&&Number(cache.revision||0)>=localRev)return cache;
+  if(salesHistoryMainBusyV497()||(typeof hasLocalSalesDraftRiskV449==="function"&&hasLocalSalesDraftRiskV449())){
+    const status=document.getElementById("salesHistoryCacheStatusV497");if(status)status.textContent="主同步/销售卡操作优先 · 历史稍后静默更新";
+    const once=()=>setTimeout(()=>refreshSalesHistoryV497(force).catch(()=>{}),450);
+    if(salesHistoryMainBusyV497())window.addEventListener("lover-sales-sync-complete-v458",once,{once:true});else setTimeout(once,1200);
+    return cache;
+  }
+  salesHistoryRefreshPromiseV497=(async()=>{
+    const status=document.getElementById("salesHistoryCacheStatusV497");if(status)status.textContent=cache?"正在静默检查历史更新…":"正在静默读取销售历史…";
+    const json=await jsonp({action:"getSalesHistoryV497",clientHistoryRevision:Number(cache?.revision||0)},{timeoutMs:30000});
+    if(!json?.ok)throw new Error(json?.message||"读取销售历史失败");
+    if(json.unchanged&&cache){writeSalesHistoryCacheV497({...cache,revision:Number(json.salesCardRevision||cache.revision||0),at:Date.now()});return readSalesHistoryCacheV497()}
+    const next=writeSalesHistoryCacheV497({revision:Number(json.salesCardRevision||0),at:Date.now(),links:Array.isArray(json.links)?json.links:[]});return next;
+  })().then(x=>{if(salesHistoryOpenV497){populateSalesHistoryFiltersV497();renderSalesHistoryV497()}return x}).catch(e=>{console.warn("V49.8 Sales History silent refresh failed",e);const status=document.getElementById("salesHistoryCacheStatusV497");if(status)status.textContent=cache?"历史更新暂未完成 · 继续显示本机缓存":"历史读取暂未完成 · 不影响主系统";return cache}).finally(()=>{salesHistoryRefreshPromiseV497=null});
+  return salesHistoryRefreshPromiseV497
+}
+function openSalesHistoryPageV497(){
+  const cache=readSalesHistoryCacheV497();if(cache&&salesHistoryOpenV497){populateSalesHistoryFiltersV497();renderSalesHistoryV497()}
+  if(salesHistoryOpenV497)setTimeout(()=>refreshSalesHistoryV497(false).catch(()=>{}),250)
+}
+function toggleSalesHistoryV497(){
+  const body=document.getElementById("salesHistoryBodyV497"),btn=document.getElementById("salesHistoryToggleV497");if(!body)return;
+  salesHistoryOpenV497=!salesHistoryOpenV497;body.classList.toggle("hidden",!salesHistoryOpenV497);if(btn)btn.textContent=salesHistoryOpenV497?"▲ 收起销售历史":"📚 打开销售历史";
+  if(!salesHistoryOpenV497)return;populateSalesHistoryFiltersV497();renderSalesHistoryV497();setTimeout(()=>refreshSalesHistoryV497(false).catch(()=>{}),100)
+}
+function salesHistorySheetXmlV497(table,moneyCols=[],pctCols=[]){
+  const widths=table[0].map((_,c)=>Math.min(42,Math.max(10,...table.map(r=>String(r[c]??"").length+2)))),cols=widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("");
+  const rowsXml=table.map((row,ri)=>`<row r="${ri+1}">${row.map((v,ci)=>{const ref=xlsxColNameV196(ci)+(ri+1);if(ri===0)return `<c r="${ref}" t="inlineStr" s="1"><is><t>${xlsxXmlEscapeV196(v)}</t></is></c>`;if(typeof v==="number"&&moneyCols.includes(ci))return `<c r="${ref}" s="2"><v>${v.toFixed(2)}</v></c>`;if(typeof v==="number"&&pctCols.includes(ci))return `<c r="${ref}" s="3"><v>${v.toFixed(6)}</v></c>`;if(typeof v==="number")return `<c r="${ref}"><v>${v}</v></c>`;return `<c r="${ref}" t="inlineStr"><is><t>${xlsxXmlEscapeV196(v??"")}</t></is></c>`}).join("")}</row>`).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>${cols}</cols><sheetData>${rowsXml}</sheetData></worksheet>`
+}
+function exportSalesHistoryExcelV497(){
+  const list=salesHistoryFilteredV497();if(!list.length){alert("所选范围没有销售历史资料。 ");return}
+  const confirmed=list.filter(salesHistoryConfirmedV497),qty=confirmed.reduce((s,x)=>s+Number(x.quantity||0),0),sales=confirmed.reduce((s,x)=>s+Number(x.actualPrice||0),0),cost=confirmed.reduce((s,x)=>s+salesHistoryTotalCostV497(x),0),profit=confirmed.reduce((s,x)=>s+Number(x.profit||0),0),rate=sales>0?profit/sales:0;
+  const f=salesHistoryFiltersV497(),summary=[["项目","数值"],["年份",f.year||"全部"],["月份",f.month||"全部"],["板块",f.type?salesHistoryTypeLabelV497(f.type):"全部"],["已确认销售数量",String(qty)],["销售卡售价",`RM${formatAmount(sales)}`],["总成本",`RM${formatAmount(cost)}`],["总利润",`RM${formatAmount(profit)}`],["整体利润率",`${(rate*100).toFixed(2)}%`]];
+  const detail=[["日期","时间","板块","地点","销售人员/主播","产品编号","产品名称","数量","单价","售价","总成本","利润","利润率","状态","备注","Transaction ID"]];
+  list.forEach(x=>{const q=Math.max(0,Number(x.quantity||0)),unit=Number(x.unitPrice!==undefined?x.unitPrice:(q>0?Number(x.actualPrice||0)/q:0));detail.push([String(x.date||""),String(x.createdAt||"").split(" ").slice(-1)[0]||"",salesHistoryTypeLabelV497(x.type),salesHistoryLocationV497(x),salesHistorySellerV497(x),String(x.productId||""),String(x.productName||""),q,unit,Number(x.actualPrice||0),salesHistoryTotalCostV497(x),Number(x.profit||0),Number(x.profitRate||0)/100,salesHistoryConfirmedV497(x)?"已确认销售":"草稿",String(x.remark||""),String(x.transactionId||"")])});
+  const summaryXml=salesHistorySheetXmlV497(summary,[],[]),detailXml=salesHistorySheetXmlV497(detail,[8,9,10,11],[12]);
+  const styles=`<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="10" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>`;
+  const files=[{name:"[Content_Types].xml",data:`<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},{name:"_rels/.rels",data:`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},{name:"xl/workbook.xml",data:`<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Summary" sheetId="1" r:id="rId1"/><sheet name="Details" sheetId="2" r:id="rId2"/></sheets></workbook>`},{name:"xl/_rels/workbook.xml.rels",data:`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},{name:"xl/styles.xml",data:styles},{name:"xl/worksheets/sheet1.xml",data:summaryXml},{name:"xl/worksheets/sheet2.xml",data:detailXml}];
+  const blob=new Blob([zipStoreV196(files)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=`Lover_Sales_History_${f.year||"All"}${f.month?"_"+f.month:""}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1200)
+}
+window.toggleSalesHistoryV497=toggleSalesHistoryV497;window.renderSalesHistoryV497=renderSalesHistoryV497;window.refreshSalesHistoryV497=refreshSalesHistoryV497;window.exportSalesHistoryExcelV497=exportSalesHistoryExcelV497;window.openSalesHistoryPageV497=openSalesHistoryPageV497;
