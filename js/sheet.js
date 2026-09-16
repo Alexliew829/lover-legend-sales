@@ -396,40 +396,15 @@ function commitAllSalesCardsAtomicV449(allLinks,verifiedRevisionV452=0){
 }
 
 function syncContextLabelV456(change){
-  const type=String(change&&change.type||'');const loc=String(change&&change.location||'').trim();
+  const type=String(change&&change.type||'');const kind=String(change&&change.kind||'');const loc=String(change&&change.location||'').trim();
+  // V49.1: a Fair Sales Card sync is a card operation, not a Fair turnover/location label.
+  if(type==='fair'&&kind==='card')return 'Fair Sales Card';
   if(type==='fair')return loc?`Fair · ${loc}`:'Fair';
   if(type==='live')return loc?`Live · ${loc}`:'Live';
   if(type==='daily')return `${/balakong/i.test(loc)?'Balakong':'Belimbing'} Sales`;
   return '云端资料';
 }
 function syncChangesLabelV456(changes){const labels=[...new Set((Array.isArray(changes)?changes:[]).map(syncContextLabelV456).filter(Boolean))];return labels.length===1?labels[0]:labels.length>1?`${labels.slice(0,2).join(' / ')}${labels.length>2?' 等':''}`:'云端资料'}
-// V49.0: when another device changes a Fair context, the sync journal already
-// tells us the exact location. If this device has no unsaved Fair work, follow
-// that context so the Fair page does not remain parked on an older location.
-function applyLatestFairSyncContextV489(changes){
-  const list=(Array.isArray(changes)?changes:[]).filter(x=>x&&x.type==='fair'&&String(x.location||'').trim());
-  if(!list.length)return false;
-  try{if(typeof fairInputsHaveUnsavedChanges==='function'&&fairInputsHaveUnsavedChanges())return false}catch(_){}
-  try{if(typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238('fair'))return false}catch(_){}
-  const latest=list[list.length-1],input=document.getElementById('fairLocation');if(!input)return false;
-  const loc=typeof canonicalLocation==='function'?canonicalLocation(String(latest.location||'')):String(latest.location||'').trim();if(!loc)return false;
-  input.value=loc;
-  try{
-    const d=String(latest.date||'').trim();
-    if(d&&typeof displayToISO==='function'&&typeof setDateControl==='function'){
-      const iso=/^\d{2}-\d{2}-\d{4}$/.test(d)?displayToISO(d):d;
-      if(iso){setDateControl('fairStart',iso);setDateControl('fairEnd',iso)}
-    }
-  }catch(_){}
-  try{if(typeof saveFairLocation==='function')saveFairLocation(loc)}catch(_){}
-  try{if(typeof updateFairPageMode==='function')updateFairPageMode()}catch(_){}
-  try{if(typeof syncFairInputs==='function')syncFairInputs()}catch(_){}
-  try{if(typeof syncFairProductDatesV203==='function')syncFairProductDatesV203(true)}catch(_){}
-  try{if(typeof refreshProductLinkContextV210==='function')refreshProductLinkContextV210('fair')}catch(_){}
-  return true;
-}
-if(typeof window!=='undefined')window.applyLatestFairSyncContextV489=applyLatestFairSyncContextV489;
-
 async function checkCloudRevisionShared(timeoutMs = REVISION_CHECK_TIMEOUT_MS) {
   if (revisionCheckPromise) return revisionCheckPromise;
   const local=getPrioritySyncLocalV315();
@@ -452,6 +427,9 @@ async function syncChangedSalesCardContextsV456(changes,cloudCardRevision){
   }));
   // Atomic local publication: card cache and profit cache move together per context.
   for(const r of results){
+    // V49.1: an empty authoritative context means another device deleted the last card.
+    // Remove only older local safety/cache state before publishing the empty context.
+    if(!r.links.length&&typeof invalidateStaleLocalSalesCardAfterCloudDeleteV491==='function')invalidateStaleLocalSalesCardAfterCloudDeleteV491(r,cloudCardRevision);
     if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(r.type,r.date,r.location,r.links);
     // V46.0: the fast context response updates card + every profit authority
     // in the same synchronous commit. No second network request and no refresh needed.
@@ -480,6 +458,61 @@ async function syncChangedSalesCardContextsV456(changes,cloudCardRevision){
   return results;
 }
 if(typeof window!=='undefined'){window.syncContextLabelV456=syncContextLabelV456;window.syncChangesLabelV456=syncChangesLabelV456;}
+
+// V49.1: V49.1 remains the sync authority. These helpers only consume the
+// already-returned V49.1 change journal; they add no polling and no extra cloud read.
+function invalidateStaleLocalSalesCardAfterCloudDeleteV491(change,cloudCardRevision){
+  if(!change||String(change.kind||'')!=='card'||!change.type||!change.date||!String(change.location||'').trim())return;
+  const key=typeof salesDraftPendingKeyV314==='function'?salesDraftPendingKeyV314(change.type,change.date,change.location):[change.type,change.date,String(change.location).trim().toLowerCase()].join('|');
+  try{
+    if(typeof readSalesDraftPendingV314==='function'&&typeof writeSalesDraftPendingV314==='function'){
+      const all=readSalesDraftPendingV314()||{},pending=all[key];
+      if(pending){
+        const cloudAt=Number(change.at||0),localAt=Number(pending.savedAt||0),base=Number(pending.baseSalesCardRevision||0);
+        // Only invalidate a safety copy proven older than this cloud deletion.
+        // A truly newer offline draft is preserved exactly as in V49.1.
+        const cloudIsNewer=(cloudAt>0&&localAt>0&&cloudAt>=localAt)||(Number(cloudCardRevision||0)>base&&cloudAt>0&&localAt>0&&cloudAt>=localAt-1500);
+        if(cloudIsNewer){
+          try{if(typeof backupSalesDraftConflictV452==='function')backupSalesDraftConflictV452(key,pending,'V49.1：云端已删除该销售卡；旧本机安全副本已停止自动回写')}catch(_){}
+          delete all[key];writeSalesDraftPendingV314(all);
+        }
+      }
+    }
+  }catch(_){}
+  try{if(typeof clearSalesCardPersistentCacheV232==='function')clearSalesCardPersistentCacheV232(change.type,change.date,change.location)}catch(_){}
+  try{if(typeof salesProductLinksCacheV216!=='undefined')salesProductLinksCacheV216.delete(salesProductLinksCacheKeyV216(change.type,change.date,change.location))}catch(_){}
+  try{if(typeof pruneSalesCardFinalStatesV447==='function')pruneSalesCardFinalStatesV447(change.type,change.date,change.location,[])}catch(_){}
+  try{if(typeof invalidateSalesCardLoadRequestsV351==='function')invalidateSalesCardLoadRequestsV351(change.type)}catch(_){}
+}
+function autoFollowLatestFairContextV491(changes){
+  try{
+    const fair=(Array.isArray(changes)?changes:[]).filter(x=>x&&String(x.type||'')==='fair'&&String(x.location||'').trim());
+    if(!fair.length)return false;
+    // Never steal the page away from unsaved local work.
+    if(typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238('fair'))return false;
+    if(typeof fairInputsHaveUnsavedChanges==='function'&&fairInputsHaveUnsavedChanges())return false;
+    if(typeof turnoverNewDraftDirtyV382==='function'&&turnoverNewDraftDirtyV382('fair'))return false;
+    const latest=[...fair].sort((a,b)=>Number(a.at||a.revision||0)-Number(b.at||b.revision||0)).pop();
+    const loc=typeof canonicalLocation==='function'?canonicalLocation(String(latest.location||'')):String(latest.location||'').trim();
+    if(!loc)return false;
+    const input=document.getElementById('fairLocation');if(!input)return false;
+    if(typeof saveFairLocation==='function')saveFairLocation(loc);
+    const session=typeof findFairSessionV320==='function'?findFairSessionV320(loc):null;
+    if(session&&typeof switchFairLocationV320==='function')switchFairLocationV320(loc);
+    else{
+      input.value=loc;
+      try{if(typeof fairSessionDraftDirtyV282!=='undefined')fairSessionDraftDirtyV282=false}catch(_){}
+      try{if(typeof updateFairPageMode==='function')updateFairPageMode()}catch(_){}
+      try{if(typeof syncFairInputs==='function')syncFairInputs()}catch(_){}
+      try{if(typeof syncFairProductDatesV203==='function')syncFairProductDatesV203(true)}catch(_){}
+      try{if(typeof renderFairMonthlyList==='function')renderFairMonthlyList()}catch(_){}
+      try{if(typeof refreshProductLinkContextV210==='function')refreshProductLinkContextV210('fair')}catch(_){}
+    }
+    return true;
+  }catch(_){return false}
+}
+if(typeof window!=='undefined'){window.autoFollowLatestFairContextV491=autoFollowLatestFairContextV491;window.invalidateStaleLocalSalesCardAfterCloudDeleteV491=invalidateStaleLocalSalesCardAfterCloudDeleteV491;}
+
 
 
 async function loadMonthCloudShared(month, timeoutMs = 15000) {
@@ -780,7 +813,7 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
-  // V49.0: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
+  // V49.1: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
   if(error){
     writeSyncStatusV457('🔴 '+text,'error');
     return;
@@ -1111,7 +1144,6 @@ async function loadFromSheet(options = {}) {
 
     let cloudChangedV448=false;
     let syncLabelV456='';
-    let syncChangesV489=[];
     try {
       const requestedMonth = /^\d{4}-\d{2}$/.test(String(options.month || ""))
         ? String(options.month)
@@ -1130,6 +1162,7 @@ async function loadFromSheet(options = {}) {
       let observedPriorityRevisionV447=null;
       let prefetchedMonthJsonV448=null;
       let prefetchedAllSalesCardsV449=null;
+      let deltaChangesForUiV491=[];
       if (!force && hasLocalData && options.skipRevisionCheck !== true) {
         try {
           const rev = await checkCloudRevisionShared(Number(options.revisionTimeoutMs || REVISION_CHECK_TIMEOUT_MS));
@@ -1170,8 +1203,8 @@ async function loadFromSheet(options = {}) {
               setCloudAtomicSyncPendingV448(true);
               if(!silent)setSync('发现云端新资料 · 正在完整同步');
               const deltaChangesV456=Array.isArray(rev.changes)?rev.changes:[];
+              deltaChangesForUiV491=deltaChangesV456;
               syncLabelV456=syncChangesLabelV456(deltaChangesV456);
-              syncChangesV489=deltaChangesV456;
               if(salesCardRevisionChangedV444&&changedCardTouchesDirtyContextV456(deltaChangesV456)){
                 throw new Error('当前正在编辑的这张销售卡已有其他设备的新版本；已保护本机未保存内容，请先处理冲突。');
               }
@@ -1201,6 +1234,7 @@ async function loadFromSheet(options = {}) {
                 setCloudAtomicSyncPendingV448(false);
                 setCloudRevisionConfirmedV449(true);
                 try{renderHomeFirst();scheduleDeferredFullRender(0)}catch(_){}
+                try{if(typeof autoFollowLatestFairContextV491==='function')autoFollowLatestFairContextV491(deltaChangesV456)}catch(_){}
                 setSync(`${syncChangesLabelV456(deltaChangesV456)} 已同步`,true);
                 completedSuccessfully=true;
                 return {ok:true,month,cardOnlySync:true,dataRevision:cloudGlobal,turnoverRevision:cloudTurn,salesCardRevision:cloudCard};
@@ -1259,7 +1293,6 @@ async function loadFromSheet(options = {}) {
         commitAllSalesCardsAtomicV449(prefetchedAllSalesCardsV449,Number(observedPriorityRevisionV447?.salesCardRevision||0));
       }
       mergeCloudMonthRows(month, json.rows || [], requestStartedAt);
-      if(syncChangesV489.length)applyLatestFairSyncContextV489(syncChangesV489);
       applyLocalDataRevision(json.dataRevision);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
       if (json.commissionSettings) {
@@ -1278,6 +1311,7 @@ async function loadFromSheet(options = {}) {
       }
       saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
       if(typeof refreshFairSessionsV281==="function"){try{await refreshFairSessionsV281({applyLatest:true,forceApply:false})}catch(_){}}
+      try{if(typeof autoFollowLatestFairContextV491==='function')autoFollowLatestFairContextV491(deltaChangesForUiV491)}catch(_){}
 
       // V39.9: verify durable pending rows against their own authoritative
       // month BEFORE retrying writes. If the cloud already contains the exact
