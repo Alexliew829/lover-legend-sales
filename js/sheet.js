@@ -431,6 +431,11 @@ async function syncChangedSalesCardContextsV456(changes,cloudCardRevision){
     // Remove only older local safety/cache state before publishing the empty context.
     if(!r.links.length&&typeof invalidateStaleLocalSalesCardAfterCloudDeleteV491==='function')invalidateStaleLocalSalesCardAfterCloudDeleteV491(r,cloudCardRevision);
     if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(r.type,r.date,r.location,r.links);
+    // V49.2: the exact cloud context is authoritative for BOTH memory and persistent
+    // Sales Card caches. Without this, a card changed on another device can update
+    // status/revision in memory while a later reopen still paints an older persistent
+    // snapshot (for example product 1 only after product 2 was added remotely).
+    if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(r.type,r.date,r.location,r.links);
     // V46.0: the fast context response updates card + every profit authority
     // in the same synchronous commit. No second network request and no refresh needed.
     if(typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(r.type,r.date,r.location,r.links);

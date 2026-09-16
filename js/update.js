@@ -79,7 +79,7 @@
 
   function startAutomaticRefreshAfterInitialSync() {
     if (autoRefreshStartTimer || autoRefreshInterval) return;
-    // V49.1: visible devices run only the tiny V46.6/V48.3 revision gate every 10s.
+    // V49.2: visible devices run only the tiny V46.6/V48.3 revision gate every 10s.
     // Unchanged revisions return immediately; changed revisions use the existing
     // selective authoritative refresh. This restores cross-device auto-sync
     // without putting turnover-entry detail into the main sync path.
@@ -116,7 +116,7 @@
   async function registerAndCheckForUpdates() {
     if (!("serviceWorker" in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register("./sw.js?v=49.1", { updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.register("./sw.js?v=49.2", { updateViaCache: "none" });
       await registration.update();
       await activateWaitingWorker(registration);
       registration.addEventListener("updatefound", () => {
@@ -173,7 +173,7 @@
     const running = activeLoadPromise() || refreshPromise || resumePromise;
     if (running) return running;
 
-    // V49.1: keep only a very small reopen debounce. A 30s recent-sync guard
+    // V49.2: keep only a very small reopen debounce. A 30s recent-sync guard
     // could suppress the exact revision check needed after tapping a fresh
     // sales notification, leaving authoritative totals stale until pull-refresh.
     if (now - lastCloudRefresh < RESUME_RECENT_SYNC_MS) {

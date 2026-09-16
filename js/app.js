@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4910",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4920",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4910";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4920";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3894,12 +3894,12 @@ async function deleteSalesCardTransactionV239(type,txnId){
   setSalesCardWriteBusyV456(true,"删除销售卡");
   try{
     if(saved.length){
-      setSync('删除中…');
+      setSync(salesCardActionStatusV492(type,'删除中'));
       let result=null;
       try{result=await deleteSalesTransactionV256(txnId)}
       catch(e){
         if(!e?.deleteTimeoutV459)throw e;
-        setSync('正在确认删除结果…');
+        setSync(salesCardActionStatusV492(type,'确认删除中'));
         const verify=await verifySalesTransactionDeletedV459(txnId,type,ctx.date,ctx.location);
         if(!verify?.deleted)throw new Error('删除失败，请重试');
         result=verify;
@@ -3910,7 +3910,7 @@ async function deleteSalesCardTransactionV239(type,txnId){
       if(fresh)commitDeletedContextV459(fresh);
       else{
         // Backward-compatible fallback only if an older API is still deployed.
-        setSync('正在确认删除结果…');
+        setSync(salesCardActionStatusV492(type,'确认删除中'));
         const verify=await verifySalesTransactionDeletedV459(txnId,type,ctx.date,ctx.location);
         if(!verify?.deleted)throw new Error('删除失败，请重试');
         commitDeletedContextV459(Array.isArray(verify.links)?verify.links:[]);
@@ -5783,7 +5783,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4910",
+    version:"4920",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6389,6 +6389,8 @@ async function validateSalesInventoryAvailabilityV325(type,items,saveMode='draft
 window.validateSalesInventoryAvailabilityV325=validateSalesInventoryAvailabilityV325;
 
 let SALES_CONFIRMATION_IN_FLIGHT_V407=false;
+function salesBoardLabelV492(type){return type==='fair'?'Fair':type==='live'?'Live':'Sales'}
+function salesCardActionStatusV492(type,action){return `${salesBoardLabelV492(type)} · Sales Card ${action}`}
 saveProductLinksV206=async function(type,saveMode='confirm',button=null){
   saveMode=saveMode==='draft'?'draft':'confirm';
   if(button?.dataset?.busyV285==='1')return null;
@@ -6426,7 +6428,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
       // leaving while the only copy is still a pending background draft.
       const queued=queueSalesDraftV314(type,ctx.date,ctx.location,items);
       markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds);
-      setSync('保存中 · 正在写入云端…');
+      setSync(salesCardActionStatusV492(type,'保存中'));
       const result=await syncQueuedSalesDraftV314(queued.key,queued.token);
       if(!result||result.ok===false)throw new Error((result&&result.message)||'云端未确认保存');
       // V46.0: action result and sync state are separate. The alert reports the
@@ -6446,7 +6448,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
     // confirm API atomically saves the current card and confirms that SAME
     // transaction/link set. There is never a second sale/card created here.
     await flushSalesDraftBeforeConfirmV314(type,ctx.date,ctx.location);
-    setSync('销售确认同步中...');
+    setSync(salesCardActionStatusV492(type,'确认中'));
     const mutationV350=nextClientMutationV344();
     const deletedLinkIdsV350=getDeletedSalesLinkIdsV350(type,ctx.date,ctx.location);
     let result=await window.saveSalesProductLinksApiV241(items,'confirm',typeof getLocalRestoreGenerationV347==='function'?getLocalRestoreGenerationV347():0,String(mutationV350.clientDeviceId||''),Number(mutationV350.clientSequence||0),deletedLinkIdsV350);
@@ -8584,7 +8586,7 @@ async function saveTurnoverTotalV376(type,total,notificationMeta={}){
     const previous=rows.find(r=>r.type==='daily'&&r.date===ctx.date&&r.company===company),now=new Date().toISOString(),mutation=nextClientMutationV344();
     const localRow={type:'daily',date:ctx.date,company,location:'',amount:total,updatedAt:now,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:String(previous?.updatedAt||'')};
     const deletingTurnover=String(notificationMeta?.action||'')==='deleted_entry';
-    addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(deletingTurnover?`${ctx.location} 营业额删除中，请勿关闭页面...`:`${ctx.location} 正在储存营业额，请勿关闭页面...`);
+    addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(deletingTurnover?'Sales · 营业额 删除中':'Sales · 新增营业额 保存中');
     try{
       const saved=await saveDailyToSheet(ctx.date,company,total,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true,getLocalRestoreGenerationV347(),notificationMeta);
       if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);else if(total<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));else upsertLocalRow(localRow);
@@ -8598,7 +8600,7 @@ async function saveTurnoverTotalV376(type,total,notificationMeta={}){
   const now=new Date().toISOString(),mutation=nextClientMutationV344(),normalizer=isLive?normalizeLiveHostKey:normalizeFairLocationKey,previous=rows.find(r=>r.type===type&&r.date===ctx.date&&normalizer(r.location)===normalizer(entity));
   const localRow={type,date:ctx.date,company:type,location:entity,amount:total,updatedAt:now,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:String(previous?.updatedAt||'')};
   const deletingTurnover=String(notificationMeta?.action||'')==='deleted_entry';
-  addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(deletingTurnover?`${isLive?'Live':'Fair'} 营业额删除中，请勿关闭页面...`:`${isLive?'Live':'Fair'} 正在储存营业额，请勿关闭页面...`);
+  addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(deletingTurnover?`${isLive?'Live':'Fair'} · 营业额 删除中`:`${isLive?'Live':'Fair'} · 新增营业额 保存中`);
   try{
     let saved=null;if(isLive)saved=await saveLiveToSheet(ctx.date,entity,total,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true,getLocalRestoreGenerationV347(),notificationMeta);
     else{const result=await saveFairBatchToSheet(entity,[{date:ctx.date,amount:total,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:localRow.baseCloudUpdatedAt,notificationAction:String(notificationMeta?.action||''),notificationAmount:Number(notificationMeta?.amount||0),notificationOldAmount:Number(notificationMeta?.oldAmount||0),notificationNewAmount:Number(notificationMeta?.newAmount||0)}],true);saved=Array.isArray(result?.rows)?result.rows.find(r=>String(r.date||'')===ctx.date):null}
@@ -8926,7 +8928,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4910$/,'48.8')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4920$/,'49.2')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8952,12 +8954,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4910'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4920'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4910')issues.push(`Frontend / API 版本不一致（Frontend 4910 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4920')issues.push(`Frontend / API 版本不一致（Frontend 4920 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4910';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4920';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
