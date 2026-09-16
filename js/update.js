@@ -35,7 +35,7 @@
     const running = activeLoadPromise() || refreshPromise;
     if (running) {
       if (!manual) return running;
-      // V50.0: manual refresh is accepted even while an automatic probe is active.
+      // V50.1: manual refresh is accepted even while an automatic probe is active.
       // Wait for the single in-flight request, then run ONE fresh lightweight
       // revision probe. Do not force a full-month reload.
       if (typeof setSync === "function") setSync("手动刷新已接收 · 等待后台检查完成", true, false);
@@ -60,7 +60,7 @@
 
     lastCloudRefresh = now;
     refreshPromise = loadFromSheet({
-      // V50.0: even manual pull uses the V48.8 selective revision gate first.
+      // V50.1: even manual pull uses the V48.8 selective revision gate first.
       // force=true bypasses that gate and can trigger an unnecessarily heavy
       // month/card reload, which was the main reason pull-refresh felt slow.
       force: force === true && !manual,
@@ -86,7 +86,7 @@
 
   function startAutomaticRefreshAfterInitialSync() {
     if (autoRefreshStartTimer || autoRefreshInterval) return;
-    // V50.0: visible devices run only the tiny V46.6/V48.3 revision gate every 10s.
+    // V50.1: visible devices run only the tiny V46.6/V48.3 revision gate every 10s.
     // Unchanged revisions return immediately; changed revisions use the existing
     // selective authoritative refresh. This restores cross-device auto-sync
     // without putting turnover-entry detail into the main sync path.
@@ -180,7 +180,7 @@
     const running = activeLoadPromise() || refreshPromise || resumePromise;
     if (running) return running;
 
-    // V50.0: keep only a very small reopen debounce. A 30s recent-sync guard
+    // V50.1: keep only a very small reopen debounce. A 30s recent-sync guard
     // could suppress the exact revision check needed after tapping a fresh
     // sales notification, leaving authoritative totals stale until pull-refresh.
     if (now - lastCloudRefresh < RESUME_RECENT_SYNC_MS) {
@@ -196,7 +196,7 @@
 
     resumePromise = refreshCloudData(reason, false).then(result => {
       if (result && result.ok && !result.revisionUnconfirmed) lastCloudRefresh = Date.now();
-      // V50.0: do not schedule a second resume retry here. sheet.js already owns
+      // V50.1: do not schedule a second resume retry here. sheet.js already owns
       // the capped revision retry/backoff. Keeping a single retry owner prevents
       // resume + interval + pull-refresh from stacking probes on mobile.
       dispatchResumeReady({ reason, result });
@@ -258,7 +258,7 @@
     const threshold = 78;
 
     document.addEventListener("touchstart", event => {
-      // V50.0: manual pull-to-refresh must remain available even while a background
+      // V50.1: manual pull-to-refresh must remain available even while a background
       // revision check is running. The manual path below already waits for the
       // in-flight request and then performs one forced authoritative refresh, so
       // blocking the gesture here only made the phone feel stuck.
