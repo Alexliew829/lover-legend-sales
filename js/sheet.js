@@ -397,7 +397,7 @@ function commitAllSalesCardsAtomicV449(allLinks,verifiedRevisionV452=0){
 
 function syncContextLabelV456(change){
   const type=String(change&&change.type||'');const kind=String(change&&change.kind||'');const loc=String(change&&change.location||'').trim();
-  // V49.1: a Fair Sales Card sync is a card operation, not a Fair turnover/location label.
+  // V49.4: a Fair Sales Card sync is a card operation, not a Fair turnover/location label.
   if(type==='fair'&&kind==='card')return 'Fair Sales Card';
   if(type==='fair')return loc?`Fair · ${loc}`:'Fair';
   if(type==='live')return loc?`Live · ${loc}`:'Live';
@@ -427,15 +427,11 @@ async function syncChangedSalesCardContextsV456(changes,cloudCardRevision){
   }));
   // Atomic local publication: card cache and profit cache move together per context.
   for(const r of results){
-    // V49.1: an empty authoritative context means another device deleted the last card.
+    // V49.4: an empty authoritative context means another device deleted the last card.
     // Remove only older local safety/cache state before publishing the empty context.
     if(!r.links.length&&typeof invalidateStaleLocalSalesCardAfterCloudDeleteV491==='function')invalidateStaleLocalSalesCardAfterCloudDeleteV491(r,cloudCardRevision);
-    if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(r.type,r.date,r.location,r.links);
-    // V49.2: the exact cloud context is authoritative for BOTH memory and persistent
-    // Sales Card caches. Without this, a card changed on another device can update
-    // status/revision in memory while a later reopen still paints an older persistent
-    // snapshot (for example product 1 only after product 2 was added remotely).
-    if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(r.type,r.date,r.location,r.links);
+    if(typeof setSessionSalesProductLinksV493==='function')setSessionSalesProductLinksV493(r.type,r.date,r.location,r.links);else if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(r.type,r.date,r.location,r.links);
+    if(typeof deferSalesCardPersistentCacheV493==='function')deferSalesCardPersistentCacheV493(r.type,r.date,r.location,r.links);
     // V46.0: the fast context response updates card + every profit authority
     // in the same synchronous commit. No second network request and no refresh needed.
     if(typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(r.type,r.date,r.location,r.links);
@@ -464,8 +460,8 @@ async function syncChangedSalesCardContextsV456(changes,cloudCardRevision){
 }
 if(typeof window!=='undefined'){window.syncContextLabelV456=syncContextLabelV456;window.syncChangesLabelV456=syncChangesLabelV456;}
 
-// V49.1: V49.1 remains the sync authority. These helpers only consume the
-// already-returned V49.1 change journal; they add no polling and no extra cloud read.
+// V49.4: V49.4 remains the sync authority. These helpers only consume the
+// already-returned V49.4 change journal; they add no polling and no extra cloud read.
 function invalidateStaleLocalSalesCardAfterCloudDeleteV491(change,cloudCardRevision){
   if(!change||String(change.kind||'')!=='card'||!change.type||!change.date||!String(change.location||'').trim())return;
   const key=typeof salesDraftPendingKeyV314==='function'?salesDraftPendingKeyV314(change.type,change.date,change.location):[change.type,change.date,String(change.location).trim().toLowerCase()].join('|');
@@ -475,10 +471,10 @@ function invalidateStaleLocalSalesCardAfterCloudDeleteV491(change,cloudCardRevis
       if(pending){
         const cloudAt=Number(change.at||0),localAt=Number(pending.savedAt||0),base=Number(pending.baseSalesCardRevision||0);
         // Only invalidate a safety copy proven older than this cloud deletion.
-        // A truly newer offline draft is preserved exactly as in V49.1.
+        // A truly newer offline draft is preserved exactly as in V49.4.
         const cloudIsNewer=(cloudAt>0&&localAt>0&&cloudAt>=localAt)||(Number(cloudCardRevision||0)>base&&cloudAt>0&&localAt>0&&cloudAt>=localAt-1500);
         if(cloudIsNewer){
-          try{if(typeof backupSalesDraftConflictV452==='function')backupSalesDraftConflictV452(key,pending,'V49.1：云端已删除该销售卡；旧本机安全副本已停止自动回写')}catch(_){}
+          try{if(typeof backupSalesDraftConflictV452==='function')backupSalesDraftConflictV452(key,pending,'V49.4：云端已删除该销售卡；旧本机安全副本已停止自动回写')}catch(_){}
           delete all[key];writeSalesDraftPendingV314(all);
         }
       }
@@ -818,7 +814,7 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
-  // V49.1: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
+  // V49.4: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
   if(error){
     writeSyncStatusV457('🔴 '+text,'error');
     return;
@@ -1688,6 +1684,18 @@ function setCachedSalesProductLinksV216(type,date,location,links){
   salesProductLinksCacheV216.set(salesProductLinksCacheKeyV216(type,date,location),{links:safe,at:Date.now(),source:"session"});
   setSalesCardPersistentCacheV232(type,date,location,safe);
   return safe;
+}
+// V49.4: changed-card sync publishes the authoritative card to memory immediately,
+// then persists it after the visible sync commit. This keeps the V49.1/V48.8
+// main sync path light while still refreshing the full card snapshot for later opens.
+function setSessionSalesProductLinksV493(type,date,location,links){
+  const safe=typeof dedupeAuthoritativeSalesLinksV354==="function"?dedupeAuthoritativeSalesLinksV354(links):(Array.isArray(links)?links:[]);
+  salesProductLinksCacheV216.set(salesProductLinksCacheKeyV216(type,date,location),{links:safe,at:Date.now(),source:"session-v493"});
+  return safe;
+}
+function deferSalesCardPersistentCacheV493(type,date,location,links){
+  const safe=Array.isArray(links)?links:[];
+  setTimeout(()=>{try{setSalesCardPersistentCacheV232(type,date,location,safe)}catch(_){}},80);
 }
 async function loadSalesProductLinksV206(type,date,location,options={}) {
   const key=salesProductLinksCacheKeyV216(type,date,location);
