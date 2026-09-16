@@ -403,7 +403,7 @@ function syncContextLabelV456(change){
   return '云端资料';
 }
 function syncChangesLabelV456(changes){const labels=[...new Set((Array.isArray(changes)?changes:[]).map(syncContextLabelV456).filter(Boolean))];return labels.length===1?labels[0]:labels.length>1?`${labels.slice(0,2).join(' / ')}${labels.length>2?' 等':''}`:'云端资料'}
-// V48.9: when another device changes a Fair context, the sync journal already
+// V49.0: when another device changes a Fair context, the sync journal already
 // tells us the exact location. If this device has no unsaved Fair work, follow
 // that context so the Fair page does not remain parked on an older location.
 function applyLatestFairSyncContextV489(changes){
@@ -780,7 +780,7 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
-  // V48.9: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
+  // V49.0: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
   if(error){
     writeSyncStatusV457('🔴 '+text,'error');
     return;

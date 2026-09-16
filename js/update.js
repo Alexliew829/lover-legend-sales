@@ -79,7 +79,7 @@
 
   function startAutomaticRefreshAfterInitialSync() {
     if (autoRefreshStartTimer || autoRefreshInterval) return;
-    // V48.9: visible devices run only the tiny V46.6/V48.3 revision gate every 10s.
+    // V49.0: visible devices run only the tiny V46.6/V48.3 revision gate every 10s.
     // Unchanged revisions return immediately; changed revisions use the existing
     // selective authoritative refresh. This restores cross-device auto-sync
     // without putting turnover-entry detail into the main sync path.
@@ -173,7 +173,7 @@
     const running = activeLoadPromise() || refreshPromise || resumePromise;
     if (running) return running;
 
-    // V48.9: keep only a very small reopen debounce. A 30s recent-sync guard
+    // V49.0: keep only a very small reopen debounce. A 30s recent-sync guard
     // could suppress the exact revision check needed after tapping a fresh
     // sales notification, leaving authoritative totals stale until pull-refresh.
     if (now - lastCloudRefresh < RESUME_RECENT_SYNC_MS) {
