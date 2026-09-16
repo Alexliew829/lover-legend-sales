@@ -2178,6 +2178,12 @@ async function loadTurnoverEntriesFromSheetV376(type,date,location){
   if(!json.ok)throw new Error(json.message||'读取营业额明细失败');
   return json.record||null;
 }
+async function getTurnoverTotalFromSheetV504(type,date,location){
+  const json=await jsonp({action:'getTurnoverTotalV504',type,date,location},{timeoutMs:8000});
+  if(!json.ok)throw new Error(json.message||'确认营业额失败');
+  return json.record||null;
+}
+window.getTurnoverTotalFromSheetV504=getTurnoverTotalFromSheetV504;
 async function loadAllTurnoverEntriesV376(){
   const json=await jsonp({action:'getAllTurnoverEntriesV376'},{timeoutMs:30000});
   if(!json.ok)throw new Error(json.message||'读取营业额明细失败');

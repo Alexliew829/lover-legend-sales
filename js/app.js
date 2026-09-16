@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5030",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5040",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5030";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5040";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3772,7 +3772,7 @@ function renumberTransactionProductsV239(card){
   });
 }
 
-// V50.3: draft product order is presentation metadata only. Keep it contiguous
+// V50.4: draft product order is presentation metadata only. Keep it contiguous
 // immediately after deletes and at every draft serialization/cache boundary.
 function normalizeDraftProductOrdersV503(card){
   if(!card||salesCardIsConfirmedV322(card))return;
@@ -5792,7 +5792,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5030",
+    version:"5040",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -8642,15 +8642,20 @@ async function refreshTurnoverEntriesV376(type,{force=false,fast=false}={}){
 }
 function proposedEntriesV376(type){const ctx=turnoverContextV376(type),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location),official=officialTurnoverV376(type,ctx.date,ctx.location);const validCached=cached&&Math.abs(entriesSumV376(cached.entries)-official)<=0.005?cached.entries:null;return normalizeTurnoverEntriesClientV376(validCached||fallbackTurnoverEntriesV376(type,ctx.date,ctx.location))}
 async function confirmTurnoverCloudAfterTimeoutV395(localRow){
+  // V50.4: timeout confirmation must be tiny and context-only. Do not download
+  // the whole month while the main sync/save/delete queues are busy.
   try{
-    const month=pendingRowMonthV374(localRow);if(!month)return null;
-    const json=await loadMonthCloudShared(month,15000);if(!json||!json.ok)return null;
-    const cloud=(Array.isArray(json.rows)?json.rows:[]).find(r=>syncKey(r)===syncKey(localRow));
-    if(!pendingRowMatchesCloudV374(localRow,cloud))return null;
+    if(typeof getTurnoverTotalFromSheetV504!=='function')return null;
+    const type=String(localRow?.type||''),date=String(localRow?.date||'');
+    const location=type==='daily'?String(localRow?.company||''):String(localRow?.location||'');
+    if(!type||!date||!location)return null;
+    const cloud=await getTurnoverTotalFromSheetV504(type,date,location);
+    if(!cloud||Math.abs(Number(cloud.amount||0)-Number(localRow.amount||0))>0.005)return null;
     clearPendingRowIfVersionV343(localRow);
-    if(cloud&&Number(cloud.amount||0)>0)upsertLocalRow(cloud);else if(Number(localRow.amount||0)<=0.005)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));
+    if(Number(cloud.amount||0)>0)upsertLocalRow({...localRow,...cloud});
+    else rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));
     saveLocalDataCache();renderAll();
-    return cloud||{...localRow,amount:0};
+    return {...localRow,...cloud};
   }catch(_){return null}
 }
 async function saveTurnoverTotalV376(type,total,notificationMeta={}){
@@ -8837,7 +8842,7 @@ async function retryTurnoverEntryPendingV376(){
   writeTurnoverEntryPendingV376(pending);
 }
 window.retryTurnoverEntryPendingV376=retryTurnoverEntryPendingV376;
-setTimeout(()=>{renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live');refreshTurnoverEntriesV376('daily');refreshTurnoverEntriesV376('fair');refreshTurnoverEntriesV376('live');retryTurnoverEntryPendingV376()},250);
+setTimeout(()=>{renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live');retryTurnoverEntryPendingV376()},250);
 window.addEventListener('focus',()=>setTimeout(()=>retryTurnoverEntryPendingV376(),250));
 
 
@@ -8902,10 +8907,9 @@ function scheduleTurnoverDetailRepairV486(type){
 }
 
 
-// V50.2 fast turnover-detail lane. This timer performs LOCAL comparisons only.
-// It makes a cloud request only when the current visible Sales/Fair/Live context
-// has a total/detail mismatch (or a non-canonical legacy chip). Therefore it does
-// not add polling to the main V49.6/V50.1 revision chain.
+// V50.4 lean turnover-detail lane. No 1.8s polling, no focus polling, and no
+// all-module post-render repair. Detail is auxiliary: refresh only the currently
+// visible context when an authoritative render/context change asks for it.
 const turnoverDetailFastStateV502={daily:{busy:false,last:0},fair:{busy:false,last:0},live:{busy:false,last:0}};
 function activeTurnoverTypeV502(){
   const id=String(document.querySelector('.page.active')?.id||'');
@@ -8918,23 +8922,26 @@ async function ensureTurnoverDetailFreshV502(type){
   const cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location),sum=cached?Math.round(entriesSumV376(cached.entries)*100)/100:null;
   const canonical=cached&&['cloud-v502','cloud-v501'].includes(String(cached.source||''));
   if(cached&&Math.abs(Number(sum)-official)<=0.005&&canonical)return true;
-  const st=turnoverDetailFastStateV502[type],now=Date.now();if(st.busy||now-st.last<1500)return false;
+  const st=turnoverDetailFastStateV502[type],now=Date.now();if(st.busy||now-st.last<1200)return false;
   st.busy=true;st.last=now;
   try{await refreshTurnoverEntriesV376(type,{force:true,fast:true});return true}catch(_){return false}finally{st.busy=false;st.last=Date.now()}
 }
 window.ensureTurnoverDetailFreshV502=ensureTurnoverDetailFreshV502;
-setInterval(()=>{const type=activeTurnoverTypeV502();if(type)ensureTurnoverDetailFreshV502(type)},1800);
-window.addEventListener('focus',()=>setTimeout(()=>{const type=activeTurnoverTypeV502();if(type)ensureTurnoverDetailFreshV502(type)},120));
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>{const type=activeTurnoverTypeV502();if(type)ensureTurnoverDetailFreshV502(type)},120)});
+function requestVisibleTurnoverDetailV504(){
+  const type=activeTurnoverTypeV502();if(!type)return;
+  setTimeout(()=>ensureTurnoverDetailFreshV502(type),80);
+}
+window.requestVisibleTurnoverDetailV504=requestVisibleTurnoverDetailV504;
 
 const _renderAllV377=renderAll;
 renderAll=function(){
   const result=_renderAllV377.apply(this,arguments);
   try{
     renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live');
-    // Schedule only auxiliary detail repair; authoritative V48.3 sync has already finished.
-    scheduleTurnoverDetailRepairV486('daily');scheduleTurnoverDetailRepairV486('fair');scheduleTurnoverDetailRepairV486('live');
-  }catch(e){console.warn('V50.2 post-render turnover',e)}
+    // V50.4: only the visible context may request auxiliary detail, once. Never
+    // schedule Sales + Fair + Live repairs together after every main render.
+    requestVisibleTurnoverDetailV504();
+  }catch(e){console.warn('V50.4 post-render turnover',e)}
   return result;
 };
 window.renderAll=renderAll;
@@ -9088,12 +9095,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5030'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5040'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5030')issues.push(`Frontend / API 版本不一致（Frontend 5030 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5040')issues.push(`Frontend / API 版本不一致（Frontend 5040 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5030';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5040';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
