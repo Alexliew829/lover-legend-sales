@@ -1,0 +1,24 @@
+V49.2 CHANGELOG
+
+Baseline: V49.1 (which was rebuilt from V48.8 perfect-sync/stable).
+
+Fixes
+1. Cross-device Sales Card full-content sync
+   - Exact changed cloud context is now committed to both memory and persistent Sales Card caches.
+   - Fixes the case where another device receives the correct draft status but still shows only old product rows (for example product 1 while product 2 was already saved on the other device).
+   - The same authoritative context also removes stale product rows after remote edits/deletes.
+
+2. Sales Card state consistency
+   - By publishing one exact authoritative context to all local card caches, stale persistent card state can no longer repaint an old confirmation/draft state after the revision sync has already received newer data.
+
+3. Compact operation status text
+   - Sales / Fair / Live use clear section-first text such as:
+     Fair · Sales Card 保存中
+     Fair · Sales Card 删除中
+     Fair · 新增营业额 保存中
+   - Removed redundant “正在写入云端” wording from these active-operation labels.
+
+Protected behavior
+- V48.8/V49.1 sync cadence and priorityRevisionV456 architecture are unchanged.
+- V49.1 deleted-card cache protection is retained.
+- No cost/profit/commission/Import ACK formulas changed.
