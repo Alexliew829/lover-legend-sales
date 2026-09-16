@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4990",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5000",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4990";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5000";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2722,7 +2722,7 @@ function getVndPotMossFeeV267(record){
   const currency=String(record?.currency||"").trim().toUpperCase();
   const originalPrice=Math.max(0,Number(record?.unitPrice||0));
   if(currency!=="VND"||originalPrice<=0)return 0;
-  // V49.9: match Import V21.5 VND pot/misc tiers exactly.
+  // V50.0: match Import V21.5 VND pot/misc tiers exactly.
   if(originalPrice>=10000000)return 180;
   if(originalPrice>=4000000)return 105;
   if(originalPrice>=1000000)return 55;
@@ -2743,7 +2743,7 @@ function syncSalesCardAutoExtraV267(card){
     if(!input||input.dataset.manual==="1")return;
     const unitFee=Math.max(0,Number(item.dataset.autoPotMossFeeV267||0));
     const qty=Math.max(1,Number(item.querySelector(".product-link-qty")?.value||1));
-    // V49.9: Import V21.5 VND pot/misc fee is a per-unit selling cost.
+    // V50.0: Import V21.5 VND pot/misc fee is a per-unit selling cost.
     // Auto mode therefore uses unit fee x quantity on Sales / Fair / Live.
     input.value=formatAmount(unitFee*qty);
   });
@@ -3086,7 +3086,7 @@ function toggleProductLinkBoxV206(type){
 function liveDeliveryDefaultV203(price){
   const n=Math.max(0,Number(price||0));
   if(n<=0)return 0;
-  // V49.9: match Import V21.5 木架＋本地运费 A–F exactly.
+  // V50.0: match Import V21.5 木架＋本地运费 A–F exactly.
   if(n<300)return 20;
   if(n<=500)return 50;
   if(n<=1000)return 80;
@@ -3462,10 +3462,10 @@ async function loadProductLinksIntoEditorV206(type){
     ?applySalesCardFinalStatesV431(type,date,location,filterDeletedSalesLinksV350(type,date,location,cachedRaw))
     :cachedRaw;
 
-  // V49.9: keep the V49.9 Local First sync architecture.
+  // V50.0: keep the V50.0 Local First sync architecture.
   // A cached Sales Card opens immediately and is NOT exact-read merely because
   // a legacy/global verification watermark differs. Real cross-device changes
-  // are already handled by the V49.9 shared priorityRevisionV456 change journal,
+  // are already handled by the V50.0 shared priorityRevisionV456 change journal,
   // which fetches only card contexts that actually changed.
   if(Array.isArray(cached)){
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
@@ -3521,7 +3521,7 @@ async function loadProductLinksIntoEditorV206(type){
       applyCloudDraftStatusesV322(type,links);
       setTimeout(()=>{if(typeof refreshInventoryPendingV250==='function')refreshInventoryPendingV250(true)},0);
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-      // V49.9: an explicit Sales Card view does not declare the whole context synced.
+      // V50.0: an explicit Sales Card view does not declare the whole context synced.
     }
     return links;
   }catch(e){
@@ -3531,7 +3531,7 @@ async function loadProductLinksIntoEditorV206(type){
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
       const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
       if(wrap)wrap.innerHTML='<div class="product-link-loading-v231">销售卡读取失败，请再试一次。</div>';
-      // V49.9: card-view read failure stays inside the card panel; global sync is unchanged.
+      // V50.0: card-view read failure stays inside the card panel; global sync is unchanged.
     }
     return null;
   }
@@ -3591,7 +3591,7 @@ function salesCardSharedValuesV239(card){
 }
 function salesCardAutoDeliveryForItemV239(item){
   const card=item?.closest?.(".sales-card-transaction-v239");
-  // V49.9: only Live auto-generates 木架＋本地运费. Sales / Fair stay manual.
+  // V50.0: only Live auto-generates 木架＋本地运费. Sales / Fair stay manual.
   if(String(card?.dataset?.type||"").toLowerCase()!=="live")return 0;
   const price=toAmount(item.querySelector(".product-link-price")?.value||0);
   const qty=Math.max(1,Number(item.querySelector(".product-link-qty")?.value||1));
@@ -4254,7 +4254,7 @@ function productDeliveryInputV240(item){
 }
 function productAutoDeliveryV240(item){
   const card=item?.closest?.(".sales-card-transaction-v239");
-  // V49.9: Sales / Fair never auto-generate delivery; manual input is preserved.
+  // V50.0: Sales / Fair never auto-generate delivery; manual input is preserved.
   if(String(card?.dataset?.type||"").toLowerCase()!=="live")return 0;
   const rate=Number(item?.querySelector(".product-link-crate-v270")?.value||getLiveCrateV269(item)||0);
   return rate*salesCardQtyV240(item);
@@ -4420,7 +4420,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"],[180,"F180"]];
-    // V49.9: only Live auto-selects the Import V21.5 crate/local-delivery tier
+    // V50.0: only Live auto-selects the Import V21.5 crate/local-delivery tier
     // from this product's unit selling price. Existing saved cards are preserved.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
     const autoCrateFromPrice=liveCrateRateForPriceV461(unitPrice);
@@ -5783,7 +5783,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4990",
+    version:"5000",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -8430,7 +8430,7 @@ const turnoverAuditDerivedV380=new Map();
 function turnoverAuditKeyV380(type,date,location){return turnoverContextKeyV376(type,date,location)}
 function filterTurnoverAuditLogsV380(type,location,logs){
   const clean=Array.isArray(logs)?logs:[];
-  // V49.9: Sales (Balakong / Belimbing) uses the same auxiliary audit fallback
+  // V50.0: Sales (Balakong / Belimbing) uses the same auxiliary audit fallback
   // already used by Fair / Live. Cross-device authoritative totals can arrive
   // before TurnoverEntries detail, so reconstruct ONLY the matching Sales company
   // from the existing change log. This stays outside the main sync/revision path.
@@ -8455,6 +8455,62 @@ function deriveTurnoverEntriesFromAuditV380(type,date,location,logs){
   const official=officialTurnoverV376(type,date,location),sum=entriesSumV376(parts);
   return Math.abs(sum-official)<=0.005?parts:[];
 }
+
+// V50.0: when the authoritative total is newer than the auxiliary detail row,
+// preserve the real cloud chips and append/apply only the missing audit tail.
+// Example: cloud detail 784.5 + 70 + 12 = 866.5, while the main total already
+// moved 866.5 -> 892.5. Reconcile the missing +26 instead of displaying one
+// fake legacy chip of 892.5. This is read-only/local-cache repair only.
+function reconcileTurnoverEntriesTailV500(type,date,location,record,logs,official){
+  const base=normalizeTurnoverEntriesClientV376(record?.entries||[]).map(x=>({...x}));
+  const target=Math.round(Number(official||0)*100)/100;
+  let running=entriesSumV376(base);
+  if(Math.abs(running-target)<=0.005)return base;
+  if(!base.length||target<0)return[];
+  const ordered=filterTurnoverAuditLogsV380(type,location,logs).slice().sort((a,b)=>Number(a.timestampMs||0)-Number(b.timestampMs||0));
+  if(!ordered.length)return[];
+  const recordMs=Date.parse(String(record?.updatedAt||''))||0;
+  const applyDelta=(parts,delta,item,seq)=>{
+    delta=Math.round(Number(delta||0)*100)/100;
+    if(delta>0.005){
+      parts.push({id:`audit_v500_tail_${Number(item?.timestampMs||0)}_${seq}`,amount:delta,auditDerived:true,createdAt:'',updatedAt:''});
+      return;
+    }
+    if(delta>=-0.005)return;
+    let need=Math.round(-delta*100)/100;
+    // Prefer removing one exact component; this preserves the original chips
+    // for a cross-device delete whenever the deleted amount is identifiable.
+    for(let i=parts.length-1;i>=0;i--){
+      if(Math.abs(Number(parts[i].amount||0)-need)<=0.005){parts.splice(i,1);return}
+    }
+    // Otherwise reduce from the newest components until the authoritative
+    // delta is satisfied. This is only a local display reconciliation.
+    for(let i=parts.length-1;i>=0&&need>0.005;i--){
+      const amount=Math.round(Number(parts[i].amount||0)*100)/100,take=Math.min(amount,need);
+      parts[i].amount=Math.round((amount-take)*100)/100;
+      need=Math.round((need-take)*100)/100;
+      if(parts[i].amount<=0.005)parts.splice(i,1);
+    }
+  };
+  const tryChain=(candidates)=>{
+    const parts=base.map(x=>({...x}));let total=running,used=0;
+    for(const item of candidates){
+      const oldAmount=Math.round(Number(item.oldAmount||0)*100)/100;
+      const newAmount=Math.round(Number(item.newAmount||0)*100)/100;
+      if(Math.abs(oldAmount-total)>0.005)continue;
+      const delta=Math.round((newAmount-oldAmount)*100)/100;
+      applyDelta(parts,delta,item,used++);total=newAmount;
+      if(Math.abs(total-target)<=0.005&&Math.abs(entriesSumV376(parts)-target)<=0.005)return parts;
+    }
+    return[];
+  };
+  // First use only audit rows newer than the detail row. If timestamps from an
+  // older backup are unavailable, fall back to a value-linked chain.
+  let fixed=tryChain(ordered.filter(x=>!recordMs||Number(x.timestampMs||0)>recordMs-1000));
+  if(fixed.length)return fixed;
+  fixed=tryChain(ordered);
+  return fixed;
+}
 async function refreshTurnoverAuditDerivedV380(type,ctx){
   if(!ctx?.date||!ctx?.location)return[];
   try{
@@ -8468,7 +8524,7 @@ function fallbackTurnoverEntriesV376(type,date,location){
   const audit=turnoverAuditDerivedV380.get(turnoverAuditKeyV380(type,date,location));if(Array.isArray(audit)&&audit.length)return normalizeTurnoverEntriesClientV376(audit);
   const total=officialTurnoverV376(type,date,location);return total>0?[{id:'legacy_'+turnoverContextKeyV376(type,date,location),amount:total,legacy:true,createdAt:'',updatedAt:''}]:[]
 }
-// V49.9: the authoritative turnover total may arrive a few seconds before the
+// V50.0: the authoritative turnover total may arrive a few seconds before the
 // auxiliary 100 + 200 + 300 breakdown. Never replace an already-known breakdown
 // with one fake chip equal to the new total during that short window. For a
 // deletion, reconcile an exact removed component/suffix immediately when possible;
@@ -8540,13 +8596,18 @@ async function refreshTurnoverEntriesV376(type,{force=false}={}){
   try{
     const rec=await loadTurnoverEntriesFromSheetV376(type,ctx.date,ctx.location);if(token!==turnoverEntryLoadTokenV376[type])return null;
     const current=turnoverContextV376(type);if(current.date!==ctx.date||turnoverContextKeyV376(type,current.date,current.location)!==turnoverContextKeyV376(type,ctx.date,ctx.location))return null;
-    const derived=await refreshTurnoverAuditDerivedV380(type,ctx);
+    const auditData=await loadSalesChangeLogFromSheetV200(type,ctx.date,{force:true,location:type==='fair'?ctx.location:''}).catch(()=>({logs:[]}));
+    const auditLogs=Array.isArray(auditData?.logs)?auditData.logs:[];
+    const derived=deriveTurnoverEntriesFromAuditV380(type,ctx.date,ctx.location,auditLogs);
+    if(derived.length||officialTurnoverV376(type,ctx.date,ctx.location)===0)turnoverAuditDerivedV380.set(turnoverAuditKeyV380(type,ctx.date,ctx.location),derived);
     if(token!==turnoverEntryLoadTokenV376[type])return null;
     const official=officialTurnoverV376(type,ctx.date,ctx.location);
     if(rec&&Array.isArray(rec.entries)){
       const clean=normalizeTurnoverEntriesClientV376(rec.entries),sum=entriesSumV376(clean);
       const isV380Committed=clean.some(x=>String(x.id||'').startsWith('audit_v380_')||String(x.id||'').startsWith('v380_'));
+      const tailFixed=reconcileTurnoverEntriesTailV500(type,ctx.date,ctx.location,rec,auditLogs,official);
       if(Math.abs(sum-official)<=0.005&&isV380Committed)setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud-v380');
+      else if(tailFixed.length&&Math.abs(entriesSumV376(tailFixed)-official)<=0.005)setTurnoverEntryCacheV376(type,ctx.date,ctx.location,tailFixed,'audit-tail-v500');
       else if(Array.isArray(derived)&&derived.length&&Math.abs(entriesSumV376(derived)-official)<=0.005)setTurnoverEntryCacheV376(type,ctx.date,ctx.location,derived,'audit-v380');
       else if(Math.abs(sum-official)<=0.005)setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud');
     }else if(Array.isArray(derived)&&derived.length)setTurnoverEntryCacheV376(type,ctx.date,ctx.location,derived,'audit-v380');
@@ -8751,7 +8812,7 @@ bindTurnoverContextRefreshV377();
 
 // Earlier date controls captured the old update function before V39.9 replaced it.
 // Repaint composers after every authoritative render so legacy rows appear immediately.
-// V49.9: keep V48.3/V46.6 main sync untouched. After an authoritative turnover
+// V50.0: keep V48.3/V46.6 main sync untouched. After an authoritative turnover
 // total has already been applied, repair only the auxiliary 100 + 200 + 300
 // breakdown in the background. This never participates in revision decisions,
 // never changes global sync status and never blocks the authoritative total.
@@ -8788,7 +8849,7 @@ renderAll=function(){
     renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live');
     // Schedule only auxiliary detail repair; authoritative V48.3 sync has already finished.
     scheduleTurnoverDetailRepairV486('daily');scheduleTurnoverDetailRepairV486('fair');scheduleTurnoverDetailRepairV486('live');
-  }catch(e){console.warn('V49.9 post-render turnover',e)}
+  }catch(e){console.warn('V50.0 post-render turnover',e)}
   return result;
 };
 window.renderAll=renderAll;
@@ -8882,7 +8943,7 @@ const SYSTEM_RELEASE_REVISION_V442='910 → 930';
 const SYSTEM_BACKUP_AT_KEY_V442='lover_sales_last_backup_at_v442';
 const SYSTEM_RESTORE_AT_KEY_V442='lover_sales_last_restore_at_v442';
 let systemHealthStateV442={level:'warning',issues:[],checked:false,data:null,expanded:false};
-// V49.9: the read-only health endpoint is advisory only. A slow health scan must
+// V50.0: the read-only health endpoint is advisory only. A slow health scan must
 // never override a confirmed business-data sync with a false red connection error.
 const SYSTEM_HEALTH_SESSION_START_V466=Date.now();
 let systemConfirmedSyncAtV466=0;
@@ -8916,7 +8977,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4990$/,'48.8')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^5000$/,'48.8')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8942,12 +9003,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4990'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5000'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4990')issues.push(`Frontend / API 版本不一致（Frontend 4990 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5000')issues.push(`Frontend / API 版本不一致（Frontend 5000 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4990';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5000';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -8968,8 +9029,8 @@ window.toggleSystemHealthDetailsV442=toggleSystemHealthDetailsV442;window.runSys
 setTimeout(()=>runSystemHealthCheckV442(false),1200);
 
 
-/* ================= V49.9 minimal Sales Card UX fixes (V49.9 baseline) =================
-   Built directly on V49.9. Do not change the V49.9 revision/sync cadence.
+/* ================= V50.0 minimal Sales Card UX fixes (V50.0 baseline) =================
+   Built directly on V50.0. Do not change the V50.0 revision/sync cadence.
    A Sales Card that has no unsaved changes is only a view state, so collapse it
    when the user leaves that Sales / Fair / Live page. Saved cards therefore
    reopen collapsed; genuinely unsaved edits keep the existing leave guard. */
@@ -8997,8 +9058,8 @@ showPage=function(name,el){
 window.showPage=showPage;
 
 
-/* ================= V49.9 persistent profit view cache =================
-   Profit is secondary display data. It never blocks or mutates the V48.8/V49.9
+/* ================= V50.0 persistent profit view cache =================
+   Profit is secondary display data. It never blocks or mutates the V48.8/V50.0
    main revision/sync authority. Existing authoritative Sales Card context updates
    continue to patch daily profit cache immediately; this layer reuses those caches
    across page opens and refreshes them silently only after Sales Card revision changes.
@@ -9065,7 +9126,7 @@ async function runSilentProfitRefreshV496(reason='background'){
       const clean=publishSilentProfitSnapshotV496(json.links,Number(json.salesCardRevision||knownSalesCardRevisionV496()));
       repaintProfitViewsV496();
       return clean;
-    }catch(e){console.warn('V49.9 静默利润读取失败',reason,e);return null}
+    }catch(e){console.warn('V50.0 静默利润读取失败',reason,e);return null}
     finally{silentProfitRefreshPendingV496=null}
   })();
   return silentProfitRefreshPendingV496;
