@@ -397,7 +397,7 @@ function commitAllSalesCardsAtomicV449(allLinks,verifiedRevisionV452=0){
 
 function syncContextLabelV456(change){
   const type=String(change&&change.type||'');const kind=String(change&&change.kind||'');const loc=String(change&&change.location||'').trim();
-  // V49.8: a Fair Sales Card sync is a card operation, not a Fair turnover/location label.
+  // V49.9: a Fair Sales Card sync is a card operation, not a Fair turnover/location label.
   if(type==='fair'&&kind==='card')return 'Fair Sales Card';
   if(type==='fair')return loc?`Fair · ${loc}`:'Fair';
   if(type==='live')return loc?`Live · ${loc}`:'Live';
@@ -427,7 +427,7 @@ async function syncChangedSalesCardContextsV456(changes,cloudCardRevision){
   }));
   // Atomic local publication: card cache and profit cache move together per context.
   for(const r of results){
-    // V49.8: an empty authoritative context means another device deleted the last card.
+    // V49.9: an empty authoritative context means another device deleted the last card.
     // Remove only older local safety/cache state before publishing the empty context.
     if(!r.links.length&&typeof invalidateStaleLocalSalesCardAfterCloudDeleteV491==='function')invalidateStaleLocalSalesCardAfterCloudDeleteV491(r,cloudCardRevision);
     if(typeof setSessionSalesProductLinksV493==='function')setSessionSalesProductLinksV493(r.type,r.date,r.location,r.links);else if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(r.type,r.date,r.location,r.links);
@@ -460,8 +460,8 @@ async function syncChangedSalesCardContextsV456(changes,cloudCardRevision){
 }
 if(typeof window!=='undefined'){window.syncContextLabelV456=syncContextLabelV456;window.syncChangesLabelV456=syncChangesLabelV456;}
 
-// V49.8: V49.8 remains the sync authority. These helpers only consume the
-// already-returned V49.8 change journal; they add no polling and no extra cloud read.
+// V49.9: V49.9 remains the sync authority. These helpers only consume the
+// already-returned V49.9 change journal; they add no polling and no extra cloud read.
 function invalidateStaleLocalSalesCardAfterCloudDeleteV491(change,cloudCardRevision){
   if(!change||String(change.kind||'')!=='card'||!change.type||!change.date||!String(change.location||'').trim())return;
   const key=typeof salesDraftPendingKeyV314==='function'?salesDraftPendingKeyV314(change.type,change.date,change.location):[change.type,change.date,String(change.location).trim().toLowerCase()].join('|');
@@ -471,10 +471,10 @@ function invalidateStaleLocalSalesCardAfterCloudDeleteV491(change,cloudCardRevis
       if(pending){
         const cloudAt=Number(change.at||0),localAt=Number(pending.savedAt||0),base=Number(pending.baseSalesCardRevision||0);
         // Only invalidate a safety copy proven older than this cloud deletion.
-        // A truly newer offline draft is preserved exactly as in V49.8.
+        // A truly newer offline draft is preserved exactly as in V49.9.
         const cloudIsNewer=(cloudAt>0&&localAt>0&&cloudAt>=localAt)||(Number(cloudCardRevision||0)>base&&cloudAt>0&&localAt>0&&cloudAt>=localAt-1500);
         if(cloudIsNewer){
-          try{if(typeof backupSalesDraftConflictV452==='function')backupSalesDraftConflictV452(key,pending,'V49.8：云端已删除该销售卡；旧本机安全副本已停止自动回写')}catch(_){}
+          try{if(typeof backupSalesDraftConflictV452==='function')backupSalesDraftConflictV452(key,pending,'V49.9：云端已删除该销售卡；旧本机安全副本已停止自动回写')}catch(_){}
           delete all[key];writeSalesDraftPendingV314(all);
         }
       }
@@ -814,7 +814,7 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
-  // V49.8: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
+  // V49.9: legacy/safety Sales Card verification never hijacks a confirmed global sync status.
   if(error){
     writeSyncStatusV457('🔴 '+text,'error');
     return;
@@ -1103,7 +1103,7 @@ function scheduleRevisionRetryV448(){
   revisionRetryTimerV448=setTimeout(()=>{
     revisionRetryTimerV448=null;
     if(typeof document!=='undefined'&&document.hidden){scheduleRevisionRetryV448();return;}
-    // V49.8: never start a retry on top of a live sync/probe. Let the current
+    // V49.9: never start a retry on top of a live sync/probe. Let the current
     // single-flight request finish, then the next interval/manual/resume can probe.
     if(cloudLoadPromise){scheduleRevisionRetryV448();return;}
     revisionRetryCountV448+=1;
@@ -1118,7 +1118,7 @@ function scheduleRevisionRetryV448(){
 
 function retryRevisionNowV455(){
   if(revisionRetryTimerV448){clearTimeout(revisionRetryTimerV448);revisionRetryTimerV448=null;}
-  // V49.8: update.js owns foreground/resume probes. This helper is kept for
+  // V49.9: update.js owns foreground/resume probes. This helper is kept for
   // network-online recovery only, and it never overlaps an active cloud load.
   if(cloudLoadPromise){scheduleRevisionRetryV448();return;}
   loadFromSheet({bypassCooldown:true,suppressStartStatus:true,silent:false,revisionTimeoutMs:REVISION_CHECK_TIMEOUT_MS}).catch(()=>scheduleRevisionRetryV448());
@@ -1246,7 +1246,7 @@ async function loadFromSheet(options = {}) {
                 setCloudRevisionConfirmedV449(true);
                 try{renderHomeFirst();scheduleDeferredFullRender(0)}catch(_){}
                 try{if(typeof autoFollowLatestFairContextV491==='function')autoFollowLatestFairContextV491(deltaChangesV456)}catch(_){}
-                // V49.8: status follows the authoritative card paint, not the ACK.
+                // V49.9: status follows the authoritative card paint, not the ACK.
                 await yieldAuthoritativeUiV495();
                 setSync(`${syncChangesLabelV456(deltaChangesV456)} 已同步`,true);
                 completedSuccessfully=true;
@@ -1323,7 +1323,7 @@ async function loadFromSheet(options = {}) {
         refreshFairInputsFromRows(true);
       }
       saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
-      // V49.8: Fair session/history registry is secondary metadata. Do not block
+      // V49.9: Fair session/history registry is secondary metadata. Do not block
       // turnover/Sales Card authoritative sync completion on this extra request.
       // The change journal already contains the latest Fair context for auto-follow.
       try{if(typeof autoFollowLatestFairContextV491==='function')autoFollowLatestFairContextV491(deltaChangesForUiV491)}catch(_){}
@@ -1350,7 +1350,7 @@ async function loadFromSheet(options = {}) {
         if(observedPriorityRevisionV447)setPrioritySyncLocalV315(observedPriorityRevisionV447);
         setCloudAtomicSyncPendingV448(false);
         setCloudRevisionConfirmedV449(true);
-        // V49.8: do not advertise “已同步” until the authoritative rows/cards
+        // V49.9: do not advertise “已同步” until the authoritative rows/cards
         // have been committed and the current UI has had a chance to paint them.
         await yieldAuthoritativeUiV495();
         setSync(syncLabelV456?`${syncLabelV456} 已同步`:"已同步", true);
@@ -1703,7 +1703,7 @@ function setCachedSalesProductLinksV216(type,date,location,links){
   setSalesCardPersistentCacheV232(type,date,location,safe);
   return safe;
 }
-// V49.8: changed-card sync publishes the authoritative card to memory immediately,
+// V49.9: changed-card sync publishes the authoritative card to memory immediately,
 // then persists it after the visible sync commit. This keeps the V49.1/V48.8
 // main sync path light while still refreshing the full card snapshot for later opens.
 function setSessionSalesProductLinksV493(type,date,location,links){
