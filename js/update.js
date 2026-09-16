@@ -35,9 +35,9 @@
     const running = activeLoadPromise() || refreshPromise;
     if (running) {
       if (!manual) return running;
-      // V49.4: a manual pull is never rejected just because an automatic check is
-      // active. Queue it behind the current request, then force one fresh read.
-      // Keep the message short and explicit so the user knows the pull was accepted.
+      // V49.5: manual refresh is accepted even while an automatic probe is active.
+      // Wait for the single in-flight request, then run ONE fresh lightweight
+      // revision probe. Do not force a full-month reload.
       if (typeof setSync === "function") setSync("手动刷新已接收 · 等待后台检查完成", true, false);
       try { await running; } catch (err) {}
     }
@@ -60,8 +60,11 @@
 
     lastCloudRefresh = now;
     refreshPromise = loadFromSheet({
-      force: manual || force === true,
-      bypassCooldown: reason.includes("reopen") || reason.includes("resume"),
+      // V49.5: even manual pull uses the V48.8 selective revision gate first.
+      // force=true bypasses that gate and can trigger an unnecessarily heavy
+      // month/card reload, which was the main reason pull-refresh felt slow.
+      force: force === true && !manual,
+      bypassCooldown: manual || reason.includes("reopen") || reason.includes("resume"),
       skipLocalCache: true,
       loadYear: false,
       silent: false,
@@ -83,7 +86,7 @@
 
   function startAutomaticRefreshAfterInitialSync() {
     if (autoRefreshStartTimer || autoRefreshInterval) return;
-    // V49.4: visible devices run only the tiny V46.6/V48.3 revision gate every 10s.
+    // V49.5: visible devices run only the tiny V46.6/V48.3 revision gate every 10s.
     // Unchanged revisions return immediately; changed revisions use the existing
     // selective authoritative refresh. This restores cross-device auto-sync
     // without putting turnover-entry detail into the main sync path.
@@ -120,7 +123,7 @@
   async function registerAndCheckForUpdates() {
     if (!("serviceWorker" in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register("./sw.js?v=49.4", { updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.register("./sw.js?v=49.5", { updateViaCache: "none" });
       await registration.update();
       await activateWaitingWorker(registration);
       registration.addEventListener("updatefound", () => {
@@ -177,7 +180,7 @@
     const running = activeLoadPromise() || refreshPromise || resumePromise;
     if (running) return running;
 
-    // V49.4: keep only a very small reopen debounce. A 30s recent-sync guard
+    // V49.5: keep only a very small reopen debounce. A 30s recent-sync guard
     // could suppress the exact revision check needed after tapping a fresh
     // sales notification, leaving authoritative totals stale until pull-refresh.
     if (now - lastCloudRefresh < RESUME_RECENT_SYNC_MS) {
@@ -193,17 +196,9 @@
 
     resumePromise = refreshCloudData(reason, false).then(result => {
       if (result && result.ok && !result.revisionUnconfirmed) lastCloudRefresh = Date.now();
-      if (result && result.revisionUnconfirmed) {
-        // One quiet retry after mobile wake-up. Do not stack focus/pageshow requests.
-        setTimeout(() => {
-          if (document.visibilityState === "visible" && !activeLoadPromise() && !refreshPromise && !resumePromise) {
-            refreshCloudData("resume-retry", false).then(retry => {
-              if (retry && retry.ok && !retry.revisionUnconfirmed) lastCloudRefresh = Date.now();
-              dispatchResumeReady({ reason:"resume-retry", result:retry });
-            });
-          }
-        }, 2200);
-      }
+      // V49.5: do not schedule a second resume retry here. sheet.js already owns
+      // the capped revision retry/backoff. Keeping a single retry owner prevents
+      // resume + interval + pull-refresh from stacking probes on mobile.
       dispatchResumeReady({ reason, result });
       return result;
     }).finally(() => {
@@ -263,7 +258,7 @@
     const threshold = 78;
 
     document.addEventListener("touchstart", event => {
-      // V49.4: manual pull-to-refresh must remain available even while a background
+      // V49.5: manual pull-to-refresh must remain available even while a background
       // revision check is running. The manual path below already waits for the
       // in-flight request and then performs one forced authoritative refresh, so
       // blocking the gesture here only made the phone feel stuck.
