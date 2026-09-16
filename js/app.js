@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4950",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"4960",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4950";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"4960";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2722,7 +2722,7 @@ function getVndPotMossFeeV267(record){
   const currency=String(record?.currency||"").trim().toUpperCase();
   const originalPrice=Math.max(0,Number(record?.unitPrice||0));
   if(currency!=="VND"||originalPrice<=0)return 0;
-  // V49.5: match Import V21.5 VND pot/misc tiers exactly.
+  // V49.6: match Import V21.5 VND pot/misc tiers exactly.
   if(originalPrice>=10000000)return 180;
   if(originalPrice>=4000000)return 105;
   if(originalPrice>=1000000)return 55;
@@ -2743,7 +2743,7 @@ function syncSalesCardAutoExtraV267(card){
     if(!input||input.dataset.manual==="1")return;
     const unitFee=Math.max(0,Number(item.dataset.autoPotMossFeeV267||0));
     const qty=Math.max(1,Number(item.querySelector(".product-link-qty")?.value||1));
-    // V49.5: Import V21.5 VND pot/misc fee is a per-unit selling cost.
+    // V49.6: Import V21.5 VND pot/misc fee is a per-unit selling cost.
     // Auto mode therefore uses unit fee x quantity on Sales / Fair / Live.
     input.value=formatAmount(unitFee*qty);
   });
@@ -3086,7 +3086,7 @@ function toggleProductLinkBoxV206(type){
 function liveDeliveryDefaultV203(price){
   const n=Math.max(0,Number(price||0));
   if(n<=0)return 0;
-  // V49.5: match Import V21.5 木架＋本地运费 A–F exactly.
+  // V49.6: match Import V21.5 木架＋本地运费 A–F exactly.
   if(n<300)return 20;
   if(n<=500)return 50;
   if(n<=1000)return 80;
@@ -3462,10 +3462,10 @@ async function loadProductLinksIntoEditorV206(type){
     ?applySalesCardFinalStatesV431(type,date,location,filterDeletedSalesLinksV350(type,date,location,cachedRaw))
     :cachedRaw;
 
-  // V49.5: keep the V49.5 Local First sync architecture.
+  // V49.6: keep the V49.6 Local First sync architecture.
   // A cached Sales Card opens immediately and is NOT exact-read merely because
   // a legacy/global verification watermark differs. Real cross-device changes
-  // are already handled by the V49.5 shared priorityRevisionV456 change journal,
+  // are already handled by the V49.6 shared priorityRevisionV456 change journal,
   // which fetches only card contexts that actually changed.
   if(Array.isArray(cached)){
     if(!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cached);
@@ -3521,7 +3521,7 @@ async function loadProductLinksIntoEditorV206(type){
       applyCloudDraftStatusesV322(type,links);
       setTimeout(()=>{if(typeof refreshInventoryPendingV250==='function')refreshInventoryPendingV250(true)},0);
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-      // V49.5: an explicit Sales Card view does not declare the whole context synced.
+      // V49.6: an explicit Sales Card view does not declare the whole context synced.
     }
     return links;
   }catch(e){
@@ -3531,7 +3531,7 @@ async function loadProductLinksIntoEditorV206(type){
       if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
       const pre=productLinkPreV208(type),wrap=document.getElementById(pre+'ProductItems');
       if(wrap)wrap.innerHTML='<div class="product-link-loading-v231">销售卡读取失败，请再试一次。</div>';
-      // V49.5: card-view read failure stays inside the card panel; global sync is unchanged.
+      // V49.6: card-view read failure stays inside the card panel; global sync is unchanged.
     }
     return null;
   }
@@ -3591,7 +3591,7 @@ function salesCardSharedValuesV239(card){
 }
 function salesCardAutoDeliveryForItemV239(item){
   const card=item?.closest?.(".sales-card-transaction-v239");
-  // V49.5: only Live auto-generates 木架＋本地运费. Sales / Fair stay manual.
+  // V49.6: only Live auto-generates 木架＋本地运费. Sales / Fair stay manual.
   if(String(card?.dataset?.type||"").toLowerCase()!=="live")return 0;
   const price=toAmount(item.querySelector(".product-link-price")?.value||0);
   const qty=Math.max(1,Number(item.querySelector(".product-link-qty")?.value||1));
@@ -4254,7 +4254,7 @@ function productDeliveryInputV240(item){
 }
 function productAutoDeliveryV240(item){
   const card=item?.closest?.(".sales-card-transaction-v239");
-  // V49.5: Sales / Fair never auto-generate delivery; manual input is preserved.
+  // V49.6: Sales / Fair never auto-generate delivery; manual input is preserved.
   if(String(card?.dataset?.type||"").toLowerCase()!=="live")return 0;
   const rate=Number(item?.querySelector(".product-link-crate-v270")?.value||getLiveCrateV269(item)||0);
   return rate*salesCardQtyV240(item);
@@ -4420,7 +4420,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     const crateTitle=document.createElement("small");crateTitle.textContent="木架等级";crate.appendChild(crateTitle);
     crateSelect=document.createElement("select");crateSelect.className="product-link-crate-v270";
     const opts=[[0,"自取0"],[20,"A20"],[50,"B50"],[80,"C80"],[120,"D120"],[150,"E150"],[180,"F180"]];
-    // V49.5: only Live auto-selects the Import V21.5 crate/local-delivery tier
+    // V49.6: only Live auto-selects the Import V21.5 crate/local-delivery tier
     // from this product's unit selling price. Existing saved cards are preserved.
     const perTreeStored=qty>0?storedDelivery/qty:storedDelivery;
     const autoCrateFromPrice=liveCrateRateForPriceV461(unitPrice);
@@ -5783,7 +5783,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"4950",
+    version:"4960",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -7159,7 +7159,7 @@ renderFairMonthlyList=function(){
   const token=++monthlyProfitRenderTokenV294.fair;
   container.innerHTML=locations.map(group=>{const sales=group.rows.reduce((s,r)=>s+Number(r.amount||0),0),commission=sales*fairRate;return `<div class="month-record-group month-profit-group-v294" data-profit-group="${escapeChangeLogHtmlV200(group.name)}"><div class="month-record-group-title fair-location-title-v298"><span>${escapeChangeLogHtmlV200(group.name)}</span><b>佣金 ${fairRatePct}% · RM${money(commission)}</b></div>${profitHeadV294()}${group.rows.map(r=>`<div class="month-profit-row-v294"><span>${r.date}</span><strong>${money(Number(r.amount||0))}</strong><strong class="profit-value-v294">--</strong><strong class="profit-rate-v294">--</strong></div>`).join('')}<div class="month-profit-row-v294 month-profit-total-v294"><span>总数</span><strong>${money(sales)}</strong><strong class="profit-value-v294">--</strong><strong class="profit-rate-v294">--</strong></div></div>`}).join('')+`<div id="fairProfitGrandV294" class="profit-grand-v294"><strong>全部地点总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>0.00</b></div><div><span>整体利润率</span><b>0.00%</b></div></div>`;
   renderFairPageTop3();
-  Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000})).then(links=>{
+  profitLinksForMonthPromiseV496('fair',month).then(links=>{
     if(token!==monthlyProfitRenderTokenV294.fair)return;
     container.innerHTML=locations.map(group=>{
       let groupProfit=0,groupSales=0;
@@ -7184,7 +7184,7 @@ renderLiveMonthlyList=function(){
   const token=++monthlyProfitRenderTokenV294.live;
   container.innerHTML=groups.map(group=>{const sales=group.rows.reduce((s,r)=>s+Number(r.amount||0),0),comm=group.rows.reduce((s,r)=>s+Number(r.commissionAmount||0),0);return `<div class="live-sales-group month-profit-group-v294"><div class="live-sales-group-title"><span>${escapeChangeLogHtmlV200(group.name)}</span></div>${liveProfitHeadV297(group)}${group.rows.map(r=>`<div class="month-profit-row-v294 live-profit-row-v294"><span>${shortDayMonthV297(r.date)}</span><strong>${money(Number(r.amount||0))}</strong><strong class="live-commission-value-v297">${money(Number(r.commissionAmount||0))}</strong><strong class="profit-value-v294">--</strong><strong class="profit-rate-v294">--</strong></div>`).join('')}<div class="month-profit-row-v294 live-profit-row-v294 month-profit-total-v294"><span>总数</span><strong>${money(sales)}</strong><strong class="live-commission-value-v297">${money(comm)}</strong><strong class="profit-value-v294">--</strong><strong class="profit-rate-v294">--</strong></div></div>`}).join('')+`<div class="profit-grand-v294"><strong>全部主播总计</strong><div><span>营业额</span><b>${money(total)}</b></div><div><span>利润</span><b>0.00</b></div><div><span>整体利润率</span><b>0.00%</b></div></div>`;
   renderLivePageTop3();
-  Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000})).then(links=>{
+  profitLinksForMonthPromiseV496('live',liveMonth).then(links=>{
     if(token!==monthlyProfitRenderTokenV294.live)return;
     container.innerHTML=groups.map(group=>{let gp=0,gs=0;const comm=group.rows.reduce((s,r)=>s+Number(r.commissionAmount||0),0);const html=group.rows.map(r=>{const p=profitByDayV294(links,'live',group.name,r.date);gp+=p;gs+=Number(r.amount||0);return liveProfitRowV294(r,p)}).join('');return `<div class="live-sales-group month-profit-group-v294"><div class="live-sales-group-title"><span>${escapeChangeLogHtmlV200(group.name)}</span></div>${liveProfitHeadV297(group)}${html}<div class="month-profit-row-v294 live-profit-row-v294 month-profit-total-v294"><span>总数</span><strong>${money(gs)}</strong><strong class="live-commission-value-v297">${money(comm)}</strong><strong class="profit-value-v294">${money(gp)}</strong><strong class="profit-rate-v294">${marginTextV294(gp,gs)}</strong></div></div>`}).join('');
     const totalProfit=groups.reduce((sum,g)=>sum+g.rows.reduce((s,r)=>s+profitByDayV294(links,'live',g.name,r.date),0),0);
@@ -7931,27 +7931,11 @@ function paintMonthlyRollupV365(type,state='loading',links=null){
   profitEl.textContent=money(profit);rateEl.textContent=rate.toFixed(2)+'%';
 }
 function refreshMonthlyRollupV365(type){
-  const token=++monthlyRollupTokenV365[type];paintMonthlyRollupV365(type,'loading');
-  // V39.9: profit data is a second cloud source. A transient timeout used to
-  // leave Fair/Live permanently at "--" until the user left and reopened the
-  // page. Retry once with a forced read, but only let the newest render token
-  // paint the result so an older request can never overwrite a newer page.
-  const paintIfCurrent=(links)=>{
-    if(token!==monthlyRollupTokenV365[type])return false;
-    paintMonthlyRollupV365(type,'ready',links);
-    return true;
-  };
-  Promise.resolve(loadAllSalesProductLinksV203({force:false,maxAgeMs:180000}))
-    .then(paintIfCurrent)
-    .catch(async()=>{
-      if(token!==monthlyRollupTokenV365[type])return;
-      try{
-        const links=await loadAllSalesProductLinksV203({force:true,maxAgeMs:0});
-        paintIfCurrent(links);
-      }catch(_){
-        if(token===monthlyRollupTokenV365[type])paintMonthlyRollupV365(type,'error');
-      }
-    });
+  const token=++monthlyRollupTokenV365[type];
+  const info=monthInfoV365(type),cached=profitLinksForMonthCacheV496(type,info.month);
+  if(Array.isArray(cached))paintMonthlyRollupV365(type,'ready',cached);
+  else paintMonthlyRollupV365(type,'loading');
+  scheduleSilentProfitRefreshV496('monthly-rollup-'+type);
 }
 const _renderFairMonthlyListV365=renderFairMonthlyList;
 renderFairMonthlyList=function(){const r=_renderFairMonthlyListV365();paintMonthlyRollupV365('fair','loading');refreshMonthlyRollupV365('fair');return r};
@@ -8480,7 +8464,7 @@ function fallbackTurnoverEntriesV376(type,date,location){
   const audit=turnoverAuditDerivedV380.get(turnoverAuditKeyV380(type,date,location));if(Array.isArray(audit)&&audit.length)return normalizeTurnoverEntriesClientV376(audit);
   const total=officialTurnoverV376(type,date,location);return total>0?[{id:'legacy_'+turnoverContextKeyV376(type,date,location),amount:total,legacy:true,createdAt:'',updatedAt:''}]:[]
 }
-// V49.5: the authoritative turnover total may arrive a few seconds before the
+// V49.6: the authoritative turnover total may arrive a few seconds before the
 // auxiliary 100 + 200 + 300 breakdown. Never replace an already-known breakdown
 // with one fake chip equal to the new total during that short window. For a
 // deletion, reconcile an exact removed component/suffix immediately when possible;
@@ -8763,7 +8747,7 @@ bindTurnoverContextRefreshV377();
 
 // Earlier date controls captured the old update function before V39.9 replaced it.
 // Repaint composers after every authoritative render so legacy rows appear immediately.
-// V49.5: keep V48.3/V46.6 main sync untouched. After an authoritative turnover
+// V49.6: keep V48.3/V46.6 main sync untouched. After an authoritative turnover
 // total has already been applied, repair only the auxiliary 100 + 200 + 300
 // breakdown in the background. This never participates in revision decisions,
 // never changes global sync status and never blocks the authoritative total.
@@ -8800,7 +8784,7 @@ renderAll=function(){
     renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live');
     // Schedule only auxiliary detail repair; authoritative V48.3 sync has already finished.
     scheduleTurnoverDetailRepairV486('daily');scheduleTurnoverDetailRepairV486('fair');scheduleTurnoverDetailRepairV486('live');
-  }catch(e){console.warn('V49.5 post-render turnover',e)}
+  }catch(e){console.warn('V49.6 post-render turnover',e)}
   return result;
 };
 window.renderAll=renderAll;
@@ -8894,7 +8878,7 @@ const SYSTEM_RELEASE_REVISION_V442='910 → 930';
 const SYSTEM_BACKUP_AT_KEY_V442='lover_sales_last_backup_at_v442';
 const SYSTEM_RESTORE_AT_KEY_V442='lover_sales_last_restore_at_v442';
 let systemHealthStateV442={level:'warning',issues:[],checked:false,data:null,expanded:false};
-// V49.5: the read-only health endpoint is advisory only. A slow health scan must
+// V49.6: the read-only health endpoint is advisory only. A slow health scan must
 // never override a confirmed business-data sync with a false red connection error.
 const SYSTEM_HEALTH_SESSION_START_V466=Date.now();
 let systemConfirmedSyncAtV466=0;
@@ -8928,7 +8912,7 @@ function systemLastSyncTextV442(){
 }
 function renderSystemInformationV442(data){
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
-  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4950$/,'48.8')}`:'连接异常');
+  set('systemInfoApiV442',data?.apiVersion?`V${String(data.apiVersion).replace(/^V/i,'').replace(/^4960$/,'48.8')}`:'连接异常');
   set('systemInfoSheetV442',data?.sheetConnected?'已连接 Google Web App':'连接异常');
   set('systemInfoLastSyncV442',systemLastSyncTextV442());
   set('systemInfoBackupV442',formatSystemDateTimeV442(getSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442)));
@@ -8954,12 +8938,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'4950'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'4960'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='4950')issues.push(`Frontend / API 版本不一致（Frontend 4950 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='4960')issues.push(`Frontend / API 版本不一致（Frontend 4960 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4950';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='4960';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -8980,8 +8964,8 @@ window.toggleSystemHealthDetailsV442=toggleSystemHealthDetailsV442;window.runSys
 setTimeout(()=>runSystemHealthCheckV442(false),1200);
 
 
-/* ================= V49.5 minimal Sales Card UX fixes (V49.5 baseline) =================
-   Built directly on V49.5. Do not change the V49.5 revision/sync cadence.
+/* ================= V49.6 minimal Sales Card UX fixes (V49.6 baseline) =================
+   Built directly on V49.6. Do not change the V49.6 revision/sync cadence.
    A Sales Card that has no unsaved changes is only a view state, so collapse it
    when the user leaves that Sales / Fair / Live page. Saved cards therefore
    reopen collapsed; genuinely unsaved edits keep the existing leave guard. */
@@ -9007,3 +8991,113 @@ showPage=function(name,el){
   return result;
 };
 window.showPage=showPage;
+
+
+/* ================= V49.6 persistent profit view cache =================
+   Profit is secondary display data. It never blocks or mutates the V48.8/V49.6
+   main revision/sync authority. Existing authoritative Sales Card context updates
+   continue to patch daily profit cache immediately; this layer reuses those caches
+   across page opens and refreshes them silently only after Sales Card revision changes.
+*/
+const PROFIT_SNAPSHOT_META_KEY_V496='lover_profit_snapshot_meta_v496';
+let silentProfitRefreshPendingV496=null;
+let silentProfitRefreshTimerV496=null;
+function profitSnapshotMetaV496(){try{const x=JSON.parse(localStorage.getItem(PROFIT_SNAPSHOT_META_KEY_V496)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}}
+function writeProfitSnapshotMetaV496(revision){try{localStorage.setItem(PROFIT_SNAPSHOT_META_KEY_V496,JSON.stringify({salesCardRevision:Number(revision||0),at:Date.now()}))}catch(_){}}
+function knownSalesCardRevisionV496(){try{return Number((typeof getPrioritySyncLocalV315==='function'?getPrioritySyncLocalV315():{})?.salesCardRevision||0)}catch(_){return 0}}
+function mainSyncBusyV496(){
+  try{return (typeof syncStatusNodesV457==='function'?syncStatusNodesV457():[]).some(n=>/后台检查中|同步中|云端新资料|等待后台检查/.test(String(n?.textContent||'')))}catch(_){return false}
+}
+function profitExpectedDatesV496(type,month){
+  return [...new Set(dedupeRows(rows).filter(r=>String(r.type||'')===String(type||'')&&displayToISO(String(r.date||'')).slice(0,7)===String(month||'')&&Number(r.amount||0)>0).map(r=>String(r.date||'')))];
+}
+function profitLinksForMonthCacheV496(type,month){
+  const dates=profitExpectedDatesV496(type,month),all=[];
+  for(const d of dates){
+    const cached=typeof getDailyProfitCacheV237==='function'?getDailyProfitCacheV237(type,d):null;
+    if(!Array.isArray(cached))return null;
+    all.push(...cached);
+  }
+  return typeof dedupeProfitLinksV360==='function'?dedupeProfitLinksV360(all):all;
+}
+function profitLinksForMonthPromiseV496(type,month){
+  const cached=profitLinksForMonthCacheV496(type,month);
+  scheduleSilentProfitRefreshV496('month-'+type);
+  return Array.isArray(cached)?Promise.resolve(cached):Promise.reject(new Error('profit-cache-miss'));
+}
+function profitLinksForDayCacheV496(type,date){
+  const cached=typeof getDailyProfitCacheV237==='function'?getDailyProfitCacheV237(type,date):null;
+  return Array.isArray(cached)?cached:null;
+}
+function profitSnapshotNeedsRefreshV496(){
+  const meta=profitSnapshotMetaV496(),known=knownSalesCardRevisionV496();
+  if(!meta.at)return true;
+  if(known>0&&Number(meta.salesCardRevision||0)!==known)return true;
+  return false;
+}
+function publishSilentProfitSnapshotV496(links,revision){
+  const clean=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(Array.isArray(links)?links:[]):(Array.isArray(links)?links:[]);
+  const groups=new Map();
+  clean.forEach(x=>{if(!x?.type||!x?.date)return;const k=String(x.type)+'|'+String(x.date);if(!groups.has(k))groups.set(k,{type:String(x.type),date:String(x.date),links:[]});groups.get(k).links.push(x)});
+  // Profit cache only. Never touch Sales Card caches, revision authority or setSync().
+  if(typeof clearDailyProfitCacheV237==='function')clearDailyProfitCacheV237();
+  groups.forEach(g=>{try{setDailyProfitCacheV237(g.type,g.date,g.links)}catch(_){}});
+  writeProfitSnapshotMetaV496(revision||knownSalesCardRevisionV496());
+  return clean;
+}
+function repaintProfitViewsV496(){
+  try{['daily','fair','live'].forEach(t=>renderSelectedDayGrandV362(t))}catch(_){ }
+  try{renderFairMonthlyList()}catch(_){ }
+  try{renderLiveMonthlyList()}catch(_){ }
+  try{if(typeof homeTodayProfitOpenV318!=='undefined'&&homeTodayProfitOpenV318){const d=homeTodayProfitDateV318(),c=homeTodayProfitCachedLinksV318(d);if(Array.isArray(c))renderHomeTodayProfitV318(c,d)}}catch(_){ }
+}
+async function runSilentProfitRefreshV496(reason='background'){
+  if(silentProfitRefreshPendingV496)return silentProfitRefreshPendingV496;
+  if(!profitSnapshotNeedsRefreshV496()||mainSyncBusyV496())return null;
+  silentProfitRefreshPendingV496=(async()=>{
+    try{
+      const json=await jsonp({action:'getAllSalesProductLinks'},{timeoutMs:15000});
+      if(!json?.ok)throw new Error(json?.message||'利润资料读取失败');
+      const clean=publishSilentProfitSnapshotV496(json.links,Number(json.salesCardRevision||knownSalesCardRevisionV496()));
+      repaintProfitViewsV496();
+      return clean;
+    }catch(e){console.warn('V49.6 静默利润读取失败',reason,e);return null}
+    finally{silentProfitRefreshPendingV496=null}
+  })();
+  return silentProfitRefreshPendingV496;
+}
+function scheduleSilentProfitRefreshV496(reason='background',delay=1800){
+  if(!profitSnapshotNeedsRefreshV496())return;
+  if(silentProfitRefreshTimerV496)return;
+  silentProfitRefreshTimerV496=setTimeout(async()=>{
+    silentProfitRefreshTimerV496=null;
+    if(document.visibilityState==='hidden'||mainSyncBusyV496()){scheduleSilentProfitRefreshV496(reason,2500);return}
+    await runSilentProfitRefreshV496(reason);
+  },Math.max(500,Number(delay||0)));
+}
+window.scheduleSilentProfitRefreshV496=scheduleSilentProfitRefreshV496;
+
+renderSelectedDayGrandV362=async function(type){
+  const date=selectedDayDateV362(type),token=++selectedDayGrandTokenV362[type],sales=selectedDayTurnoverV362(type,date);
+  const cached=profitLinksForDayCacheV496(type,date);
+  if(Array.isArray(cached))paintSelectedDayGrandV362(type,date,sales,selectedDayProfitV362(type,date,cached),false,false);
+  else paintSelectedDayGrandV362(type,date,sales,0,true,false);
+  scheduleSilentProfitRefreshV496('selected-day-'+type);
+};
+window.renderSelectedDayGrandV362=renderSelectedDayGrandV362;
+renderSelectedDayTotalV360=function(type){return renderSelectedDayGrandV362(type)};
+window.renderSelectedDayTotalV360=renderSelectedDayTotalV360;
+
+toggleHomeTodayProfitV318=async function(button){
+  const panel=document.getElementById('homeTodayProfitPanelV318');if(!panel)return;
+  if(homeTodayProfitOpenV318&&!panel.classList.contains('hidden')){homeTodayProfitOpenV318=false;panel.classList.add('hidden');if(button)button.textContent='📊 今日总利润';return}
+  const date=homeTodayProfitDateV318();if(!date)return;
+  const cached=homeTodayProfitCachedLinksV318(date);
+  if(Array.isArray(cached)){renderHomeTodayProfitV318(cached,date);homeTodayProfitOpenV318=true;if(button)button.textContent='📊 收起今日总利润'}
+  else{homeTodayProfitOpenV318=true;panel.classList.remove('hidden');panel.innerHTML='<div class="change-log-loading">利润缓存准备中…</div>';if(button)button.textContent='📊 收起今日总利润'}
+  scheduleSilentProfitRefreshV496('home-today');
+};
+window.toggleHomeTodayProfitV318=toggleHomeTodayProfitV318;
+
+window.addEventListener('lover-sales-sync-complete-v458',()=>scheduleSilentProfitRefreshV496('after-main-sync',900));
+setTimeout(()=>scheduleSilentProfitRefreshV496('startup-idle',2500),2500);
