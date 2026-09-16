@@ -1754,15 +1754,9 @@ async function deleteSalesProductLinkV206(linkId) {
   if(typeof window.purgeDeletedSalesLinkV348==='function')window.purgeDeletedSalesLinkV348(linkId);
   if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
   if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
-  salesProductLinksCacheV216.clear();
-  allSalesProductLinksCacheV216={links:null,at:0};
-  clearDailyProfitCacheV237();
-  if(Array.isArray(json.links)&&json.links.length){
-    const first=json.links[0];
-    setSalesCardPersistentCacheV232(first.type,first.date,first.location,json.links);
-  }else{
-    clearSalesCardPersistentCacheV232();
-  }
+  // V50.7: the deleted Link ID is purged precisely by purgeDeletedSalesLinkV348.
+  // Never clear all Sales Card / Profit caches here; unrelated contexts must stay hot.
+  if(Array.isArray(allSalesProductLinksCacheV216?.links))allSalesProductLinksCacheV216={links:allSalesProductLinksCacheV216.links.filter(x=>String(x?.linkId||'').trim()!==String(linkId||'').trim()),at:Date.now()};
   return json;
 }
 

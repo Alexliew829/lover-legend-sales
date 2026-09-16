@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5060",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5070",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5060";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5070";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3772,7 +3772,7 @@ function renumberTransactionProductsV239(card){
   });
 }
 
-// V50.6: draft product order is presentation metadata only. Keep it contiguous
+// V50.7: draft product order is presentation metadata only. Keep it contiguous
 // immediately after deletes and at every draft serialization/cache boundary.
 function normalizeDraftProductOrdersV503(card){
   if(!card||salesCardIsConfirmedV322(card))return;
@@ -4686,7 +4686,7 @@ async function saveProductLinksV206(type){
 
     if(typeof setCachedSalesProductLinksV216==="function")setCachedSalesProductLinksV216(type,first.date,first.location,savedLinks);
     if(typeof setSalesCardPersistentCacheV232==="function")setSalesCardPersistentCacheV232(type,first.date,first.location,savedLinks);
-    // V50.6: the saved Sales Card context is also the authoritative profit context.
+    // V50.7: the saved Sales Card context is also the authoritative profit context.
     // Replace the exact context in every profit cache immediately, using the same
     // server response. No extra cloud read and no delayed background handoff.
     if(typeof replaceProfitAggregateContextV457==="function")replaceProfitAggregateContextV457(type,first.date,first.location,savedLinks);
@@ -5800,7 +5800,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5060",
+    version:"5070",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -7289,7 +7289,7 @@ syncQueuedSalesDraftV314=async function(key,expectedToken=''){
       removeSalesDraftPendingV314(key,entry.token);
       const authoritativeSaved=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(saved):saved;
       const mergedContextV424=mergeSingleCardDraftAckV424(entry,authoritativeSaved);
-      setCachedSalesProductLinksV216(entry.type,entry.date,entry.location,mergedContextV424);setSalesCardPersistentCacheV232(entry.type,entry.date,entry.location,mergedContextV424);mergeDailyProfitContextCacheV237(entry.type,entry.date,entry.location,mergedContextV424);
+      setCachedSalesProductLinksV216(entry.type,entry.date,entry.location,mergedContextV424);setSalesCardPersistentCacheV232(entry.type,entry.date,entry.location,mergedContextV424);if(typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(entry.type,entry.date,entry.location,mergedContextV424);else mergeDailyProfitContextCacheV237(entry.type,entry.date,entry.location,mergedContextV424);
       refreshProfitAggregateCachesV321(authoritativeSaved,[...new Set(entry.items.map(x=>String(x.transactionId||'')).filter(Boolean))]);applyCloudDraftStatusesV322(entry.type,mergedContextV424);
       const ctxNow=productLinkContextV206(entry.type);
       const hasOpenUnsavedCard=salesCardWrappersV239(entry.type).some(card=>!salesCardIsSavedV241(card));
@@ -7352,7 +7352,7 @@ removeProductFromTransactionV239=async function(type,card,item){
   item.dataset.deletingV253='1';
   // Immediately invalidate every older local snapshot/cache containing this
   // line. The card remains dirty until Save Draft completes the cloud delete.
-  if(linkId){rememberDeletedSalesLinkV350(type,productLinkContextV206(type).date,productLinkContextV206(type).location,linkId);invalidateSalesCardLoadRequestsV351(type);purgeDeletedSalesLinkV348(linkId);}
+  if(linkId){rememberDeletedSalesLinkV350(type,productLinkContextV206(type).date,productLinkContextV206(type).location,linkId);invalidateSalesCardLoadRequestsV351(type);}
   item.remove();normalizeDraftProductOrdersV503(card);markSalesCardTransactionDirtyV239(card);card.dataset.productRemovedV259='1';recalcSalesCardTransactionV239(card);
   setSync('产品已从本机草稿删除 · 请点击保存草稿同步云端',false,true);
 };
@@ -8444,7 +8444,7 @@ function officialTurnoverV376(type,date,location){
   const found=dedupeRows(rows).find(r=>r.type===type&&r.date===date&&norm(r.location)===norm(location));return found?Number(found.amount||0):0;
 }
 function entriesSumV376(entries){return Math.round(normalizeTurnoverEntriesClientV376(entries).reduce((s,x)=>s+Number(x.amount||0),0)*100)/100}
-// V50.6: current turnover detail is sourced only from TurnoverEntries.
+// V50.7: current turnover detail is sourced only from TurnoverEntries.
 // Sales Change Log is audit/history only; it must never create, split, merge,
 // edit, or delete a visible turnover entry. This keeps entry IDs stable across
 // devices and makes edit/delete deterministic.
@@ -8520,19 +8520,19 @@ async function refreshTurnoverEntriesV376(type,{force=false,fast=false}={}){
     const rec=await loadTurnoverEntriesFromSheetV376(type,ctx.date,ctx.location);if(token!==turnoverEntryLoadTokenV376[type])return null;
     const current=turnoverContextV376(type);if(current.date!==ctx.date||turnoverContextKeyV376(type,current.date,current.location)!==turnoverContextKeyV376(type,ctx.date,ctx.location))return null;
     if(rec&&Array.isArray(rec.entries)){
-      // V50.6: publish only the real TurnoverEntries row. If the authoritative
+      // V50.7: publish only the real TurnoverEntries row. If the authoritative
       // total arrives first, keep the previous detail temporarily rather than
       // inventing a delta chip from Change Log. The next selective detail read
       // will replace it with the real edited/deleted entry set.
       const clean=normalizeTurnoverEntriesClientV376(rec.entries);
       setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud-v506');
     }
-  }catch(e){console.warn('V50.6 turnover entry read',e)}
+  }catch(e){console.warn('V50.7 turnover entry read',e)}
   renderTurnoverComposerV376(type);return getTurnoverEntryCacheV376(type,ctx.date,ctx.location);
 }
 function proposedEntriesV376(type){const ctx=turnoverContextV376(type),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location),official=officialTurnoverV376(type,ctx.date,ctx.location);const validCached=cached&&Math.abs(entriesSumV376(cached.entries)-official)<=0.005?cached.entries:null;return normalizeTurnoverEntriesClientV376(validCached||fallbackTurnoverEntriesV376(type,ctx.date,ctx.location))}
 async function confirmTurnoverCloudAfterTimeoutV395(localRow){
-  // V50.6: timeout confirmation must be tiny and context-only. Do not download
+  // V50.7: timeout confirmation must be tiny and context-only. Do not download
   // the whole month while the main sync/save/delete queues are busy.
   try{
     if(typeof getTurnoverTotalFromSheetV504!=='function')return null;
@@ -8679,13 +8679,13 @@ saveProductLinksV206=async function(type,...args){
     const exact=Array.isArray(result.links)?result.links:[];
     if(Array.isArray(exact)&&typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(type,ctx.date,ctx.location,exact);
     const dayLinks=typeof getDailyProfitCacheV237==='function'?(getDailyProfitCacheV237(type,ctx.date)||[]):exact;
-    // V50.6: seed the selected-day authority with the WHOLE day cache, never with
+    // V50.7: seed the selected-day authority with the WHOLE day cache, never with
     // one Fair location / Live host context only. This keeps Card + Profit atomic.
     if(Array.isArray(dayLinks)&&typeof seedSelectedDayProfitV368==='function')seedSelectedDayProfitV368(type,ctx.date,dayLinks);
     if(Array.isArray(dayLinks)&&productProfitSummaryOpenV216?.[type]&&productProfitSelectedDateV216(type)===ctx.date&&typeof renderProductProfitSummaryV216==='function')renderProductProfitSummaryV216(type,dayLinks);
     if(typeof renderSelectedDayGrandV362==='function')renderSelectedDayGrandV362(type);
     if(type==='fair')renderFairMonthlyList();if(type==='live')renderLiveMonthlyList();
-  }catch(e){console.warn('V50.6 immediate card/profit repaint',e)}return result;
+  }catch(e){console.warn('V50.7 immediate card/profit repaint',e)}return result;
 };window.saveProductLinksV206=saveProductLinksV206;
 
 // V39.9 deep-link fast path: handle target as soon as scripts are ready instead of waiting for full load + 500ms.
@@ -8803,7 +8803,7 @@ function scheduleTurnoverDetailRepairV486(type){
 }
 
 
-// V50.6 lean turnover-detail lane. No 1.8s polling, no focus polling, and no
+// V50.7 lean turnover-detail lane. No 1.8s polling, no focus polling, and no
 // all-module post-render repair. Detail is auxiliary: refresh only the currently
 // visible context when an authoritative render/context change asks for it.
 const turnoverDetailFastStateV502={daily:{busy:false,last:0},fair:{busy:false,last:0},live:{busy:false,last:0}};
@@ -8834,10 +8834,10 @@ renderAll=function(){
   const result=_renderAllV377.apply(this,arguments);
   try{
     renderTurnoverComposerV376('daily');renderTurnoverComposerV376('fair');renderTurnoverComposerV376('live');
-    // V50.6: only the visible context may request auxiliary detail, once. Never
+    // V50.7: only the visible context may request auxiliary detail, once. Never
     // schedule Sales + Fair + Live repairs together after every main render.
     requestVisibleTurnoverDetailV504();
-  }catch(e){console.warn('V50.6 post-render turnover',e)}
+  }catch(e){console.warn('V50.7 post-render turnover',e)}
   return result;
 };
 window.renderAll=renderAll;
@@ -8991,12 +8991,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5060'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5070'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5060')issues.push(`Frontend / API 版本不一致（Frontend 5060 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5070')issues.push(`Frontend / API 版本不一致（Frontend 5070 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5060';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5070';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -9247,3 +9247,74 @@ renderSelectedDayGrandV362=async function(type){
 window.renderSelectedDayGrandV362=renderSelectedDayGrandV362;
 renderSelectedDayTotalV360=function(type){return renderSelectedDayGrandV362(type)};
 window.renderSelectedDayTotalV360=renderSelectedDayTotalV360;
+
+
+/* ================= V50.7 Sales Card + Profit single-context authority =================
+   A Sales Card context and its profit are published from the same authoritative links.
+   No full-cache purge, no extra cloud read, and no delayed profit refresh is required.
+   Draft product removal only creates a tombstone until Save Draft succeeds. */
+function purgeDeletedSalesLinkV507(linkId){
+  const target=String(linkId||'').trim();if(!target)return;
+  const without=list=>(Array.isArray(list)?list:[]).filter(x=>String(x?.linkId||'').trim()!==target);
+  try{
+    const pending=readSalesDraftPendingV314();let changed=false;
+    Object.keys(pending||{}).forEach(key=>{const entry=pending[key],before=Array.isArray(entry?.items)?entry.items:[],after=without(before);if(after.length===before.length)return;changed=true;if(after.length)pending[key]={...entry,items:after,token:Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),savedAt:Date.now()};else delete pending[key]});
+    if(changed)writeSalesDraftPendingV314(pending);
+  }catch(_){}
+  try{if(Array.isArray(monthGrandProfitLinksV295))monthGrandProfitLinksV295=without(monthGrandProfitLinksV295)}catch(_){}
+  try{if(Array.isArray(yearBreakdownLinksV286))yearBreakdownLinksV286=without(yearBreakdownLinksV286)}catch(_){}
+  try{if(Array.isArray(allSalesProductLinksCacheV216?.links))allSalesProductLinksCacheV216={...allSalesProductLinksCacheV216,links:without(allSalesProductLinksCacheV216.links),at:Date.now()}}catch(_){}
+  // Remove the deleted row from exact local caches only. Never clear unrelated dates/locations.
+  try{
+    if(typeof readViewCacheMapV237==='function'&&typeof writeViewCacheMapV237==='function'&&typeof PROFIT_CACHE_KEY_V237!=='undefined'){
+      const all=readViewCacheMapV237(PROFIT_CACHE_KEY_V237);let changed=false;
+      Object.keys(all||{}).forEach(key=>{const rec=all[key];if(!rec||!Array.isArray(rec.links))return;const next=without(rec.links);if(next.length!==rec.links.length){all[key]={...rec,links:next,at:Date.now()};changed=true}});
+      if(changed)writeViewCacheMapV237(PROFIT_CACHE_KEY_V237,all);
+    }
+  }catch(_){}
+  try{
+    if(typeof readSalesCardPersistentCacheV232==='function'&&typeof writeSalesCardPersistentCacheV232==='function'){
+      const all=readSalesCardPersistentCacheV232();let changed=false;
+      Object.keys(all||{}).forEach(key=>{const rec=all[key];if(!rec||!Array.isArray(rec.links))return;const next=without(rec.links);if(next.length!==rec.links.length){all[key]={...rec,links:next,at:Date.now()};changed=true}});
+      if(changed)writeSalesCardPersistentCacheV232(all);
+    }
+  }catch(_){}
+  try{if(typeof salesProductLinksCacheV216!=='undefined'&&salesProductLinksCacheV216?.forEach)salesProductLinksCacheV216.forEach((rec,key)=>{if(rec&&Array.isArray(rec.links)){const next=without(rec.links);if(next.length!==rec.links.length)salesProductLinksCacheV216.set(key,{...rec,links:next,at:Date.now()})}})}catch(_){}
+  try{if(typeof selectedDayProfitLinksV368!=='undefined'&&selectedDayProfitLinksV368?.forEach)selectedDayProfitLinksV368.forEach((list,key)=>{const next=without(list);if(next.length!==list.length){selectedDayProfitLinksV368.set(key,next);selectedDayProfitReadyV368.set(key,Date.now())}})}catch(_){}
+  try{if(monthGrandHistoryOpenV223&&typeof renderMonthGrandHistoryV223==='function')renderMonthGrandHistoryV223()}catch(_){}
+  try{if(Object.values(yearBreakdownOpenV224||{}).some(Boolean)&&typeof renderAllYearBreakdownsV224==='function')renderAllYearBreakdownsV224()}catch(_){}
+}
+purgeDeletedSalesLinkV348=purgeDeletedSalesLinkV507;
+window.purgeDeletedSalesLinkV348=purgeDeletedSalesLinkV507;
+
+function replaceProfitAggregateContextV507(type,date,location,links){
+  const t=String(type||''),d=String(date||''),loc=String(location||'').trim().toLowerCase();
+  const fresh=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(Array.isArray(links)?links:[]):(Array.isArray(links)?links:[]);
+  const sameCtx=x=>String(x?.type||'')===t&&String(x?.date||'')===d&&String(x?.location||'').trim().toLowerCase()===loc;
+  const active=x=>!['deleted','cancelled'].includes(String(x?.status||'active').toLowerCase());
+  try{if(Array.isArray(allSalesProductLinksCacheV216?.links)){const kept=allSalesProductLinksCacheV216.links.filter(x=>!sameCtx(x)&&active(x));allSalesProductLinksCacheV216={links:[...kept,...fresh],at:Date.now()}}}catch(_){}
+  try{if(Array.isArray(monthGrandProfitLinksV295)){const kept=monthGrandProfitLinksV295.filter(x=>!sameCtx(x)&&active(x));monthGrandProfitLinksV295=[...kept,...fresh]}if(Array.isArray(yearBreakdownLinksV286)){const kept=yearBreakdownLinksV286.filter(x=>!sameCtx(x)&&active(x));yearBreakdownLinksV286=[...kept,...fresh]}}catch(_){}
+  try{if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(t,d,location,fresh)}catch(_){}
+  const day=(()=>{try{return typeof getDailyProfitCacheV237==='function'?(getDailyProfitCacheV237(t,d)||[]):fresh}catch(_){return fresh}})();
+  // Publish the whole selected day to the in-memory day authority immediately.
+  try{if(typeof seedSelectedDayProfitV368==='function')seedSelectedDayProfitV368(t,d,day)}catch(_){}
+  // Repaint visible profit from the same day payload. No loadAllSalesProductLinks request.
+  try{
+    const panel=typeof productProfitSummaryPanelV216==='function'?productProfitSummaryPanelV216(t):null;
+    const visible=!!(panel&&!panel.classList.contains('hidden'));
+    if(typeof productProfitSelectedDateV216==='function'&&(productProfitSummaryOpenV216?.[t]||visible)&&productProfitSelectedDateV216(t)===d&&typeof renderProductProfitSummaryV216==='function')renderProductProfitSummaryV216(t,day);
+  }catch(_){}
+  // Repaint the top selected-day profit locally instead of calling the old async full-table renderer.
+  try{
+    if(typeof selectedDayDateV362==='function'&&selectedDayDateV362(t)===d&&typeof paintSelectedDayGrandV362==='function'&&typeof selectedDayTurnoverV362==='function'&&typeof selectedDayProfitV362==='function'){
+      const sales=selectedDayTurnoverV362(t,d),profit=selectedDayProfitV362(t,d,day);paintSelectedDayGrandV362(t,d,sales,profit,false,false);
+    }
+  }catch(_){}
+  try{if(typeof homeTodayProfitOpenV318!=='undefined'&&homeTodayProfitOpenV318&&typeof homeTodayProfitDateV318==='function'&&homeTodayProfitDateV318()===d&&typeof renderHomeTodayProfitV318==='function')renderHomeTodayProfitV318(day,d)}catch(_){}
+  try{if(monthGrandHistoryOpenV223&&typeof renderMonthGrandHistoryV223==='function')renderMonthGrandHistoryV223()}catch(_){}
+  try{if(Object.values(yearBreakdownOpenV224||{}).some(Boolean)&&typeof renderAllYearBreakdownsV224==='function')renderAllYearBreakdownsV224()}catch(_){}
+  try{if(t==='fair'&&typeof renderFairMonthlyList==='function')renderFairMonthlyList();if(t==='live'&&typeof renderLiveMonthlyList==='function')renderLiveMonthlyList()}catch(_){}
+  return fresh;
+}
+replaceProfitAggregateContextV457=replaceProfitAggregateContextV507;
+window.replaceProfitAggregateContextV457=replaceProfitAggregateContextV507;
