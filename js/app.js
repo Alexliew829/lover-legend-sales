@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5080",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5090",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5080";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5090";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2789,7 +2789,16 @@ function clearImportMappingForManualProductV214(item){
   item.dataset.importMapped="0";
   item.dataset.autoPotMossFeeV267="0";
   const card=item.closest(".sales-card-transaction-v239");
-  if(card)syncSalesCardAutoExtraV267(card);
+  if(card){
+    syncSalesCardAutoExtraV267(card);
+    // V50.9: clearing/changing a product on an unconfirmed card is a draft edit,
+    // never an Import-pending/confirmed transition. Search behavior is unchanged.
+    if(String(card.dataset.confirmedOnceV401||'')!=='1'){
+      card.dataset.confirmedOnceV401='0';
+      card.dataset.inventoryStatus='DRAFT_INVENTORY_CHANGED';
+      item.dataset.inventoryStatus='DRAFT_INVENTORY_CHANGED';
+    }
+  }
   updateProductLinkMinimumWarningV214(item);
 }
 function updateProductLinkMinimumWarningV214(item){
@@ -2974,10 +2983,14 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
       updateProductLinkMinimumWarningV214(item);
 
       const card=item.closest(".sales-card-transaction-v239");
-      if(wasMapped&&card){
-        item.dataset.inventoryStatus="PENDING_IMPORT_LINK";
-        card.dataset.inventoryStatus="PENDING_IMPORT_LINK";
+      if(card&&String(card.dataset.confirmedOnceV401||'')!=='1'){
+        // V50.9: X still clears only the current product selection/name mapping,
+        // but an editable draft must stay editable and must never become Import pending.
+        card.dataset.confirmedOnceV401='0';
+        item.dataset.inventoryStatus='DRAFT_INVENTORY_CHANGED';
+        card.dataset.inventoryStatus='DRAFT_INVENTORY_CHANGED';
         if(card._renderInventoryStatusV249)card._renderInventoryStatusV249();
+        if(card._renderSalesStateV317)card._renderSalesStateV317();
       }
 
       if(typeof markSalesCardDirtyV238==="function")markSalesCardDirtyV238(item);
@@ -3952,8 +3965,19 @@ function salesCardStatusIsConfirmedV322(status){
   const s=String(status||'').trim();
   return s==='PENDING_IMPORT_LINK'||s==='INVENTORY_CONFIRMED'||s==='NON_INVENTORY';
 }
+function salesCardIsEditableDraftV509(card){
+  if(!card)return false;
+  if(String(card.dataset.confirmedOnceV401||'')==='1')return false;
+  const cardStatus=String(card.dataset.inventoryStatus||'').trim();
+  if(card.dataset.dirty==='1'||card.dataset.productRemovedV259==='1'||cardStatus==='DRAFT'||cardStatus==='DRAFT_INVENTORY_CHANGED')return true;
+  const items=[...card.querySelectorAll('.product-link-item')];
+  if(items.some(i=>{const s=String(i.dataset.inventoryStatus||'').trim();return s==='DRAFT'||s==='DRAFT_INVENTORY_CHANGED';}))return true;
+  // Blank status on an explicitly unconfirmed editor is also a draft, not confirmation.
+  return !salesCardStatusIsConfirmedV322(cardStatus)&&!items.some(i=>salesCardStatusIsConfirmedV322(i.dataset.inventoryStatus));
+}
 function salesCardIsConfirmedV322(card){
   if(!card)return false;
+  if(salesCardIsEditableDraftV509(card))return false;
   if(String(card.dataset.confirmedOnceV401||'')==='1')return true;
   if(salesCardStatusIsConfirmedV322(card.dataset.inventoryStatus)){card.dataset.confirmedOnceV401='1';return true;}
   const confirmed=[...card.querySelectorAll('.product-link-item')].some(i=>salesCardStatusIsConfirmedV322(i.dataset.inventoryStatus));
@@ -4388,6 +4412,9 @@ function buildProductSubItemV239(type,card,data={},order=1){
   item.dataset.minimumPrice=String(Number(data.minimumPrice||0));
   item.dataset.importMapped=String(data.productId||"")?"1":"0";
   item.dataset.productOrder=String(order);
+  // V50.9: every visible row has an explicit state. Missing status on a saved/unconfirmed
+  // row is a draft-safe fallback, never PENDING_IMPORT_LINK.
+  item.dataset.inventoryStatus=String(data.importSyncStatus||'DRAFT');
 
   const head=document.createElement("div");head.className="product-subitem-head-v239";
   const title=document.createElement("b");title.className="product-subitem-title-v239";title.textContent=`产品 ${order}`;
@@ -4542,7 +4569,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   // V42.3: confirmation belongs to the sales-card transaction, not only to the
   // current product rows. Once any row was confirmed/non-inventory, later draft
   // edits must never turn the card back into an unconfirmed draft.
-  card.dataset.confirmedOnceV401=(list.some(x=>x&&x.confirmedOnce===true)||savedStatusesV317.some(s=>salesCardStatusIsConfirmedV322(s)))?"1":"0";
+  card.dataset.confirmedOnceV401=hasDraftV317?"0":((list.some(x=>x&&x.confirmedOnce===true)||savedStatusesV317.some(s=>salesCardStatusIsConfirmedV322(s)))?"1":"0");
   card.dataset.inventoryStatus=hasDraftV317?"DRAFT":hasPendingV317?"PENDING_IMPORT_LINK":hasConfirmedV317?"INVENTORY_CONFIRMED":"";
 
   const header=document.createElement("div");header.className="sales-card-header-v239";
@@ -5800,7 +5827,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5080",
+    version:"5090",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6145,8 +6172,10 @@ function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
   const cardByTxn=new Map(dirty.map(c=>[String(c.dataset.transactionId||''),c]));
   const local=items.map(x=>{
     const tx=String(x.transactionId||''),card=cardByTxn.get(tx),prev=oldByTxn.get(tx)||[];
-    const wasConfirmed=salesCardIsConfirmedV322(card)||prev.some(r=>r.confirmedOnce===true||salesCardStatusIsConfirmedV322(r.importSyncStatus));
+    const activeDraft=!!card&&salesCardIsEditableDraftV509(card);
+    const wasConfirmed=!activeDraft&&(salesCardIsConfirmedV322(card)||prev.some(r=>r.confirmedOnce===true||salesCardStatusIsConfirmedV322(r.importSyncStatus)));
     if(wasConfirmed&&card)card.dataset.confirmedOnceV401='1';
+    else if(activeDraft&&card)card.dataset.confirmedOnceV401='0';
     const prior=prev.find(r=>String(r.linkId||'')&&String(r.linkId||'')===String(x.linkId||''));
     let status='DRAFT';
     if(wasConfirmed){
@@ -6944,6 +6973,10 @@ function reconcileVisibleSalesCardAckV407(items=[],options={}){
     const ctx=productLinkContextV206(type);if(!ctx.date||!ctx.location)return;
     const changedStatuses=new Map();
     salesCardWrappersV239(type).forEach(card=>{
+      // V50.9: Import pending/ACK is evidence for confirmed sales only. While a
+      // visible card is an unconfirmed/dirty draft, stale background status must
+      // not change its state, lock its inputs, or persist into local caches.
+      if(salesCardIsEditableDraftV509(card))return;
       let changed=false,hasPending=false,hasSaved=false,allDone=true;
       const savedItems=[...card.querySelectorAll('.product-link-item')].filter(item=>item.dataset.saved==='1'&&String(item.dataset.linkId||'').trim());
       savedItems.forEach(item=>{
@@ -8555,24 +8588,29 @@ async function refreshTurnoverEntriesV376(type,{force=false,fast=false}={}){
   renderTurnoverComposerV376(type);return getTurnoverEntryCacheV376(type,ctx.date,ctx.location);
 }
 function proposedEntriesV376(type){const ctx=turnoverContextV376(type),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location),official=officialTurnoverV376(type,ctx.date,ctx.location);const validCached=cached&&Math.abs(entriesSumV376(cached.entries)-official)<=0.005?cached.entries:null;return normalizeTurnoverEntriesClientV376(validCached||fallbackTurnoverEntriesV376(type,ctx.date,ctx.location))}
-async function confirmTurnoverCloudAfterTimeoutV395(localRow){
-  // V50.8: timeout confirmation must be tiny and context-only. Do not download
-  // the whole month while the main sync/save/delete queues are busy.
+async function confirmTurnoverCloudAfterTimeoutV395(localRow,expectedEntries=null){
+  // V50.9: a timeout is success only when BOTH authoritative total and the exact
+  // TurnoverEntries context reached cloud. This prevents false success with split state.
   try{
-    if(typeof getTurnoverTotalFromSheetV504!=='function')return null;
     const type=String(localRow?.type||''),date=String(localRow?.date||'');
     const location=type==='daily'?String(localRow?.company||''):String(localRow?.location||'');
     if(!type||!date||!location)return null;
-    const cloud=await getTurnoverTotalFromSheetV504(type,date,location);
+    const cloud=typeof getTurnoverContextFromSheetV509==='function'?await getTurnoverContextFromSheetV509(type,date,location):null;
     if(!cloud||Math.abs(Number(cloud.amount||0)-Number(localRow.amount||0))>0.005)return null;
+    const wanted=normalizeTurnoverEntriesClientV376(expectedEntries||[]),got=normalizeTurnoverEntriesClientV376(cloud.entries||[]);
+    if(Array.isArray(expectedEntries)){
+      const sig=x=>x.map(e=>`${String(e.id||'')}@${Number(e.amount||0).toFixed(2)}`).join('|');
+      if(sig(wanted)!==sig(got))return null;
+    }
     clearPendingRowIfVersionV343(localRow);
-    if(Number(cloud.amount||0)>0)upsertLocalRow({...localRow,...cloud});
+    if(Number(cloud.amount||0)>0)upsertLocalRow({...localRow,amount:Number(cloud.amount||0),updatedAt:String(cloud.updatedAt||localRow.updatedAt||'')});
     else rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));
+    if(Array.isArray(cloud.entries))setTurnoverEntryCacheV376(type,date,location,cloud.entries,'cloud-v509-timeout-confirmed');
     saveLocalDataCache();renderAll();
     return {...localRow,...cloud};
   }catch(_){return null}
 }
-async function saveTurnoverTotalV376(type,total,notificationMeta={}){
+async function saveTurnoverTotalV376(type,total,notificationMeta={},turnoverEntries=null){
   if(type==='daily'){
     if(!ensureWritableSelection())return false;
     const ctx=turnoverContextV376(type),company=String(document.getElementById('company')?.value||''),hidden=document.getElementById('dailySales');
@@ -8582,10 +8620,11 @@ async function saveTurnoverTotalV376(type,total,notificationMeta={}){
     const deletingTurnover=String(notificationMeta?.action||'')==='deleted_entry';
     addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(deletingTurnover?'Sales · 营业额 删除中':'Sales · 新增营业额 保存中');
     try{
-      const saved=await saveDailyToSheet(ctx.date,company,total,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true,getLocalRestoreGenerationV347(),notificationMeta);
+      const saved=await saveDailyToSheet(ctx.date,company,total,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true,getLocalRestoreGenerationV347(),notificationMeta,turnoverEntries);
+      if(saved&&Math.abs(Number(saved.amount||0)-total)>0.005){upsertLocalRow(saved);clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();throw new Error('云端营业额已经改变，请刷新后再修改');}
       if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);else if(total<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));else upsertLocalRow(localRow);
       clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync(deletingTurnover?`${ctx.location} 营业额删除成功`:`${ctx.location} Sales 已同步`,true);return true;
-    }catch(e){const confirmed=await confirmTurnoverCloudAfterTimeoutV395(localRow);if(confirmed){setSync(deletingTurnover?`${ctx.location} 营业额删除成功`:`${ctx.location} 营业额已同步`,true);return true}setPendingRetrySyncStatus();alert(`${ctx.location} 营业额${deletingTurnover?'删除':'保存'}失败：${e.message||e}`);return false}
+    }catch(e){const confirmed=await confirmTurnoverCloudAfterTimeoutV395(localRow,turnoverEntries);if(confirmed){setSync(deletingTurnover?`${ctx.location} 营业额删除成功`:`${ctx.location} 营业额已同步`,true);return true}setPendingRetrySyncStatus();alert(`${ctx.location} 营业额${deletingTurnover?'删除':'保存'}失败：${e.message||e}`);return false}
   }
   if(!ensureWritableSelection())return false;const isLive=type==='live',ctx=turnoverContextV376(type),dateEl=document.getElementById(isLive?'liveDate':'fairStart'),entityEl=document.getElementById(isLive?'liveHost':'fairLocation'),hidden=document.getElementById(isLive?'liveSales':'fairSales');
   if(!ctx.location){alert(isLive?'请输入主播名字':'请输入 Fair 地点');return false}if(!ctx.date){alert('请选择日期');return false}
@@ -8596,15 +8635,16 @@ async function saveTurnoverTotalV376(type,total,notificationMeta={}){
   const deletingTurnover=String(notificationMeta?.action||'')==='deleted_entry';
   addPendingRow(localRow);if(typeof markLocalRowMutation==='function')markLocalRowMutation(localRow);setSync(deletingTurnover?`${isLive?'Live':'Fair'} · 营业额 删除中`:`${isLive?'Live':'Fair'} · 新增营业额 保存中`);
   try{
-    let saved=null;if(isLive)saved=await saveLiveToSheet(ctx.date,entity,total,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true,getLocalRestoreGenerationV347(),notificationMeta);
-    else{const result=await saveFairBatchToSheet(entity,[{date:ctx.date,amount:total,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:localRow.baseCloudUpdatedAt,notificationAction:String(notificationMeta?.action||''),notificationAmount:Number(notificationMeta?.amount||0),notificationOldAmount:Number(notificationMeta?.oldAmount||0),notificationNewAmount:Number(notificationMeta?.newAmount||0)}],true);saved=Array.isArray(result?.rows)?result.rows.find(r=>String(r.date||'')===ctx.date):null}
+    let saved=null;if(isLive)saved=await saveLiveToSheet(ctx.date,entity,total,now,mutation.clientDeviceId||'',Number(mutation.clientSequence||0),localRow.baseCloudUpdatedAt,true,getLocalRestoreGenerationV347(),notificationMeta,turnoverEntries);
+    else{const result=await saveFairBatchToSheet(entity,[{date:ctx.date,amount:total,clientUpdatedAt:now,...mutation,baseCloudUpdatedAt:localRow.baseCloudUpdatedAt,notificationAction:String(notificationMeta?.action||''),notificationAmount:Number(notificationMeta?.amount||0),notificationOldAmount:Number(notificationMeta?.oldAmount||0),notificationNewAmount:Number(notificationMeta?.newAmount||0)}],true,turnoverEntries);saved=Array.isArray(result?.rows)?result.rows.find(r=>String(r.date||'')===ctx.date):null}
+    if(saved&&Math.abs(Number(saved.amount||0)-total)>0.005){upsertLocalRow(saved);clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();throw new Error('云端营业额已经改变，请刷新后再修改');}
     if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);else if(total<=0)rows=rows.filter(r=>syncKey(r)!==syncKey(localRow));else upsertLocalRow({...localRow,amount:total});
     clearPendingRowIfVersionV343(localRow);saveLocalDataCache();renderAll();setSync(deletingTurnover?`${isLive?'Live':'Fair'} 营业额删除成功`:`${isLive?'Live':'Fair'} 营业额已同步`,true);return true;
   }catch(e){
     // V39.9: a browser timeout is not proof that the write failed. Read the
     // authoritative month first. If the exact requested total is already there,
     // acknowledge it locally and NEVER ask the user to save the same entry again.
-    const confirmed=await confirmTurnoverCloudAfterTimeoutV395(localRow);
+    const confirmed=await confirmTurnoverCloudAfterTimeoutV395(localRow,turnoverEntries);
     if(confirmed){setSync(deletingTurnover?`${isLive?'Live':'Fair'} 营业额删除成功`:`${isLive?'Live':'Fair'} 营业额已同步`,true);return true}
     setPendingRetrySyncStatus();alert(`${isLive?'Live':'Fair'} 营业额${deletingTurnover?'删除':'保存'}失败：${e.message||e}`);return false
   }
@@ -8612,20 +8652,19 @@ async function saveTurnoverTotalV376(type,total,notificationMeta={}){
 async function commitTurnoverEntriesV376(type,entries,actionText,notificationMeta={}){
   setTurnoverWriteStateV382(type,true);renderTurnoverComposerV376(type);
   const ctx=turnoverContextV376(type),clean=normalizeTurnoverEntriesClientV376(entries),total=entriesSumV376(clean),before=officialTurnoverV376(type,ctx.date,ctx.location);
-  const ok=await saveTurnoverTotalV376(type,total,notificationMeta);if(!ok){setTurnoverWriteStateV382(type,false);renderTurnoverComposerV376(type);return false}
-  // V50.2: once the authoritative total is confirmed (including timeout-confirm),
-  // the new amount is already saved. Clear only that proven draft immediately so
-  // refresh/reopen cannot restore it and tempt a duplicate submission.
+  // V50.9: one foreground request carries total + exact TurnoverEntries. The server
+  // writes detail before publishing the turnover revision, so no device can observe
+  // a new total revision with an older detail row.
+  const ok=await saveTurnoverTotalV376(type,total,notificationMeta,clean);if(!ok){setTurnoverWriteStateV382(type,false);renderTurnoverComposerV376(type);return false}
+  // Once the atomic cloud context is confirmed (including timeout-confirm), clear
+  // only the proven new-entry draft so it cannot be submitted twice.
   if(['added_entry','retried_entry'].includes(String(notificationMeta?.action||''))){
     const input=document.getElementById(turnoverIdsV376(type).input),savedAmount=Math.round(Number(notificationMeta?.amount||0)*100)/100;
     if(input&&Math.abs(Math.round(toAmount(input.value||0)*100)/100-savedAmount)<=0.005)input.value='';
     clearTurnoverNewDraftV376(type);
   }
-  setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'local');renderTurnoverComposerV376(type);
-  // V39.9: the authoritative total write is the user-facing completion point.
-  // Entry-detail/audit persistence is secondary and retries durably in background.
-  rememberTurnoverEntryPendingV376(type,ctx.date,ctx.location,clean,total);
-  setTimeout(async()=>{try{const rec=await saveTurnoverEntriesToSheetV376(type,ctx.date,ctx.location,clean,total,new Date().toISOString());clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);setTurnoverEntryCacheV376(type,ctx.date,ctx.location,rec?.entries||clean,'cloud-v502');if(turnoverContextV376(type).date===ctx.date&&turnoverContextV376(type).location===ctx.location)renderTurnoverComposerV376(type)}catch(e){console.warn('V50.2 entry detail background sync',e);scheduleTurnoverEntryPendingRetryV502(type,ctx.date,ctx.location,0)}},0);
+  clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);
+  setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud-v509-atomic');renderTurnoverComposerV376(type);
   showTempMsg(type==='daily'?'saveMsg':type==='live'?'liveSaveMsg':'fairSaveMsg');
   // Saving turnover changes the same authoritative total used by every old calculation.
   if(typeof renderSelectedDayGrandV362==='function')renderSelectedDayGrandV362(type);
@@ -8827,6 +8866,27 @@ function scheduleTurnoverDetailRepairV486(type){
 }
 
 
+// V50.9: fetch only turnover detail contexts that are BOTH changed and currently
+// visible. This runs in parallel with the month fetch and commits before "已同步".
+async function syncTurnoverDetailsForChangesV509(changes){
+  const list=Array.isArray(changes)?changes.filter(x=>x&&x.kind==='turnover'):[];
+  if(!list.length)return true;
+  const tasks=[];
+  ['daily','fair','live'].forEach(type=>{
+    const ctx=turnoverContextV376(type);if(!ctx.date||!ctx.location)return;
+    const norm=type==='live'?normalizeLiveHostKey:normalizeFairLocationKey;
+    const touched=list.some(x=>String(x.type||'')===type&&String(x.date||'')===ctx.date&&norm(String(x.location||''))===norm(ctx.location));
+    if(!touched)return;
+    tasks.push(loadTurnoverEntriesFromSheetV376(type,ctx.date,ctx.location).then(rec=>{
+      if(rec&&Array.isArray(rec.entries))setTurnoverEntryCacheV376(type,ctx.date,ctx.location,rec.entries,'cloud-v509-revision');
+      return rec;
+    }));
+  });
+  if(tasks.length)await Promise.all(tasks);
+  return true;
+}
+window.syncTurnoverDetailsForChangesV509=syncTurnoverDetailsForChangesV509;
+
 // V50.8 lean turnover-detail lane. No 1.8s polling, no focus polling, and no
 // all-module post-render repair. Detail is auxiliary: refresh only the currently
 // visible context when an authoritative render/context change asks for it.
@@ -9015,12 +9075,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5080'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5090'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5080')issues.push(`Frontend / API 版本不一致（Frontend 5080 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5090')issues.push(`Frontend / API 版本不一致（Frontend 5090 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5080';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5090';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){

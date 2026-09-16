@@ -1229,7 +1229,11 @@ async function loadFromSheet(options = {}) {
               const canContextDeltaV456=salesCardRevisionChangedV444&&deltaCompleteV456&&deltaChangesV456.some(x=>x&&x.kind==='card');
               const cardPromiseV454=salesCardRevisionChangedV444?(canContextDeltaV456?syncChangedSalesCardContextsV456(deltaChangesV456,cloudCard):fetchAllSalesCardsAtomicV449(Number(options.cardTimeoutMs||15000))):Promise.resolve(null);
               const monthPromiseV454=needsMonthRefreshV454?loadMonthCloudShared(month,Number(options.timeoutMs||15000)):Promise.resolve(null);
-              const pairV454=await Promise.all([cardPromiseV454,monthPromiseV454]);
+              // V50.9: turnover total + TurnoverEntries are published under the same
+              // revision. If the visible context is touched, fetch that tiny detail row
+              // in parallel with the month so total/detail paint together.
+              const turnoverDetailPromiseV509=(cloudTurn!==localTurn&&typeof window.syncTurnoverDetailsForChangesV509==='function')?window.syncTurnoverDetailsForChangesV509(deltaChangesV456):Promise.resolve(null);
+              const pairV454=await Promise.all([cardPromiseV454,monthPromiseV454,turnoverDetailPromiseV509]);
               if(canContextDeltaV456){
                 prefetchedAllSalesCardsV449=null;
               }else{
@@ -1832,7 +1836,7 @@ async function loadAllSalesChangeLogsV236() {
   return Array.isArray(json.logs) ? json.logs : [];
 }
 
-async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347(), notificationMeta={}) {
+async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347(), notificationMeta={}, turnoverEntries=null) {
   const json = await jsonp({
     action: "saveDaily",
     date,
@@ -1842,7 +1846,8 @@ async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "", cli
     notificationAction:String(notificationMeta?.action||""),
     notificationAmount:Number(notificationMeta?.amount||0),
     notificationOldAmount:Number(notificationMeta?.oldAmount||0),
-    notificationNewAmount:Number(notificationMeta?.newAmount||0)
+    notificationNewAmount:Number(notificationMeta?.newAmount||0),
+    turnoverEntries:Array.isArray(turnoverEntries)?JSON.stringify(turnoverEntries):""
   }, { timeoutMs: foregroundSave ? 45000 : 30000 });
 
   if (!json.ok) throw new Error(json.message || "储存失败");
@@ -1872,7 +1877,7 @@ async function deleteFairLocationFromSheetV358(location){
   return json;
 }
 
-async function sendFairBatchToSheetV343(location, records, foregroundSave=false) {
+async function sendFairBatchToSheetV343(location, records, foregroundSave=false, turnoverEntries=null) {
   const restoreGeneration=Array.isArray(records)&&records.length?Number(records[0].restoreGeneration||0):getLocalRestoreGenerationV347();
   const json = await jsonp({
     action: "saveFairBatch",
@@ -1887,7 +1892,8 @@ async function sendFairBatchToSheetV343(location, records, foregroundSave=false)
     // Inline notification is reserved for pagehide/keepalive requests only.
     notifyInline:"",
     clientVersion:"39.7",
-    launchUrl:getSalesLaunchUrlV194()
+    launchUrl:getSalesLaunchUrlV194(),
+    turnoverEntries:Array.isArray(turnoverEntries)?JSON.stringify(turnoverEntries):""
   }, { timeoutMs: foregroundSave ? 45000 : 30000 });
 
   if (!json.ok) throw new Error(json.message || "Fair 储存失败");
@@ -1905,10 +1911,10 @@ async function sendFairBatchToSheetV343(location, records, foregroundSave=false)
 // Keep all writes for one canonical Fair location in creation order.  This
 // closes the foreground-save/background-retry race on the same device; the
 // Apps Script timestamp guard remains authoritative across devices/pagehide.
-function saveFairBatchToSheet(location, records, foregroundSave=false) {
+function saveFairBatchToSheet(location, records, foregroundSave=false, turnoverEntries=null) {
   const queueKey=normalizeFairLocationKey(location);
   const previous=fairWriteQueuesV343.get(queueKey)||Promise.resolve();
-  const task=previous.catch(()=>{}).then(()=>sendFairBatchToSheetV343(location,records,foregroundSave));
+  const task=previous.catch(()=>{}).then(()=>sendFairBatchToSheetV343(location,records,foregroundSave,turnoverEntries));
   fairWriteQueuesV343.set(queueKey,task);
   task.finally(()=>{
     if(fairWriteQueuesV343.get(queueKey)===task)fairWriteQueuesV343.delete(queueKey);
@@ -1929,7 +1935,7 @@ async function saveFairToSheet(location, records) {
 }
 
 
-async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347(), notificationMeta={}) {
+async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347(), notificationMeta={}, turnoverEntries=null) {
   const json = await jsonp({
     action: "saveLive",
     date,
@@ -1939,7 +1945,8 @@ async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientD
     notificationAction:String(notificationMeta?.action||""),
     notificationAmount:Number(notificationMeta?.amount||0),
     notificationOldAmount:Number(notificationMeta?.oldAmount||0),
-    notificationNewAmount:Number(notificationMeta?.newAmount||0)
+    notificationNewAmount:Number(notificationMeta?.newAmount||0),
+    turnoverEntries:Array.isArray(turnoverEntries)?JSON.stringify(turnoverEntries):""
   }, { timeoutMs: foregroundSave ? 45000 : 30000 });
   if (!json.ok) throw new Error(json.message || "Live 储存失败");
   applyLocalDataRevision(json.dataRevision);
@@ -2168,7 +2175,7 @@ window.peekAllSalesProductLinksCacheV368=peekAllSalesProductLinksCacheV367;
 
 /* ================= V39.9 Fair/Live turnover entry details ================= */
 async function loadTurnoverEntriesFromSheetV376(type,date,location){
-  const json=await jsonp({action:'getTurnoverEntriesV502',type,date,location},{timeoutMs:15000});
+  const json=await jsonp({action:'getTurnoverEntriesV502',type,date,location},{timeoutMs:8000});
   if(!json.ok)throw new Error(json.message||'读取营业额明细失败');
   return json.record||null;
 }
@@ -2177,7 +2184,14 @@ async function getTurnoverTotalFromSheetV504(type,date,location){
   if(!json.ok)throw new Error(json.message||'确认营业额失败');
   return json.record||null;
 }
+async function getTurnoverContextFromSheetV509(type,date,location){
+  const json=await jsonp({action:'getTurnoverContextV509',type,date,location},{timeoutMs:8000});
+  if(!json.ok)throw new Error(json.message||'确认营业额资料失败');
+  if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
+  return json.record||null;
+}
 window.getTurnoverTotalFromSheetV504=getTurnoverTotalFromSheetV504;
+window.getTurnoverContextFromSheetV509=getTurnoverContextFromSheetV509;
 async function loadAllTurnoverEntriesV376(){
   const json=await jsonp({action:'getAllTurnoverEntriesV376'},{timeoutMs:30000});
   if(!json.ok)throw new Error(json.message||'读取营业额明细失败');
@@ -2191,6 +2205,7 @@ async function saveTurnoverEntriesToSheetV376(type,date,location,entries,total,c
     restoreGeneration:getLocalRestoreGenerationV347()
   },{timeoutMs:20000});
   if(!json.ok)throw new Error(json.message||'营业额明细同步失败');
+  if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
   return json.record||null;
 }
 window.loadTurnoverEntriesFromSheetV376=loadTurnoverEntriesFromSheetV376;
