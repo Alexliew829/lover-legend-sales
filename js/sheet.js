@@ -858,6 +858,7 @@ function flushPendingRowsKeepalive() {
     const fairGroups=new Map();
 
     pendingRows.forEach(row => {
+      const turnoverMutation=row&&row.turnoverMutation&&typeof row.turnoverMutation==='object'?row.turnoverMutation:{};
       if (row.type === "daily") {
         dispatchKeepalive({
           action:"saveDaily",
@@ -868,6 +869,11 @@ function flushPendingRowsKeepalive() {
           clientDeviceId:row.clientDeviceId||"",
           clientSequence:Number(row.clientSequence||0),
           baseCloudUpdatedAt:row.baseCloudUpdatedAt||"",
+          notificationAction:String(turnoverMutation.action||""),
+          notificationAmount:Number(turnoverMutation.amount||0),
+          notificationOldAmount:Number(turnoverMutation.oldAmount||0),
+          notificationNewAmount:Number(turnoverMutation.newAmount||0),
+          notificationEntryId:String(turnoverMutation.entryId||""),
           restoreGeneration:Number(row.restoreGeneration||0),
           notifyInline:"1",
           clientVersion:"24.1",
@@ -883,6 +889,11 @@ function flushPendingRowsKeepalive() {
           clientDeviceId:row.clientDeviceId||"",
           clientSequence:Number(row.clientSequence||0),
           baseCloudUpdatedAt:row.baseCloudUpdatedAt||"",
+          notificationAction:String(turnoverMutation.action||""),
+          notificationAmount:Number(turnoverMutation.amount||0),
+          notificationOldAmount:Number(turnoverMutation.oldAmount||0),
+          notificationNewAmount:Number(turnoverMutation.newAmount||0),
+          notificationEntryId:String(turnoverMutation.entryId||""),
           restoreGeneration:Number(row.restoreGeneration||0),
           notifyInline:"1",
           clientVersion:"24.1",
@@ -890,8 +901,9 @@ function flushPendingRowsKeepalive() {
         });
       } else if (row.type === "fair") {
         const loc=canonicalLocation(row.location);
-        if(!fairGroups.has(loc))fairGroups.set(loc,[]);
-        fairGroups.get(loc).push({
+        const groupKey=String(turnoverMutation.entryId||'')?loc+'|'+String(row.date||'')+'|'+String(turnoverMutation.entryId):loc;
+        if(!fairGroups.has(groupKey))fairGroups.set(groupKey,{location:loc,records:[]});
+        fairGroups.get(groupKey).records.push({
           date:row.date,
           amount:Number(row.amount||0),
           clientUpdatedAt:row.clientUpdatedAt||""
@@ -899,11 +911,17 @@ function flushPendingRowsKeepalive() {
           ,clientSequence:Number(row.clientSequence||0)
           ,baseCloudUpdatedAt:row.baseCloudUpdatedAt||""
           ,restoreGeneration:Number(row.restoreGeneration||0)
+          ,notificationAction:String(turnoverMutation.action||"")
+          ,notificationAmount:Number(turnoverMutation.amount||0)
+          ,notificationOldAmount:Number(turnoverMutation.oldAmount||0)
+          ,notificationNewAmount:Number(turnoverMutation.newAmount||0)
+          ,notificationEntryId:String(turnoverMutation.entryId||"")
         });
       }
     });
 
-    fairGroups.forEach((records,location)=>{
+    fairGroups.forEach(group=>{
+      const location=group.location,records=group.records;
       dispatchKeepalive({
         action:"saveFairBatch",
         location,
@@ -1433,6 +1451,7 @@ async function syncPendingRows() {
     const liveRows = pendingRows.filter(r => r.type === "live");
 
     for (const row of dailyRows) {
+      const turnoverMutation=row&&row.turnoverMutation&&typeof row.turnoverMutation==='object'?row.turnoverMutation:{};
       const saved = await saveDailyToSheet(
         row.date,
         row.company,
@@ -1440,7 +1459,7 @@ async function syncPendingRows() {
         row.clientUpdatedAt || "",
         row.clientDeviceId||"",
         Number(row.clientSequence||0)
-        ,row.baseCloudUpdatedAt||"",false,Number(row.restoreGeneration||0)
+        ,row.baseCloudUpdatedAt||"",false,Number(row.restoreGeneration||0),turnoverMutation,null
       );
       if (saved) upsertLocalRow(saved);
       clearPendingRowIfVersionV343(row);
@@ -1449,9 +1468,11 @@ async function syncPendingRows() {
     const fairGroups = new Map();
 
     fairRows.forEach(row => {
+      const turnoverMutation=row&&row.turnoverMutation&&typeof row.turnoverMutation==='object'?row.turnoverMutation:{};
       const loc = canonicalLocation(row.location);
-      if (!fairGroups.has(loc)) fairGroups.set(loc, []);
-      fairGroups.get(loc).push({
+      const groupKey=String(turnoverMutation.entryId||'')?loc+'|'+String(row.date||'')+'|'+String(turnoverMutation.entryId):loc;
+      if (!fairGroups.has(groupKey)) fairGroups.set(groupKey, {location:loc,records:[]});
+      fairGroups.get(groupKey).records.push({
         date: row.date,
         amount: Number(row.amount || 0),
         clientUpdatedAt: row.clientUpdatedAt || ""
@@ -1459,10 +1480,16 @@ async function syncPendingRows() {
         ,clientSequence:Number(row.clientSequence||0)
         ,baseCloudUpdatedAt:row.baseCloudUpdatedAt||""
         ,restoreGeneration:Number(row.restoreGeneration||0)
+        ,notificationAction:String(turnoverMutation.action||"")
+        ,notificationAmount:Number(turnoverMutation.amount||0)
+        ,notificationOldAmount:Number(turnoverMutation.oldAmount||0)
+        ,notificationNewAmount:Number(turnoverMutation.newAmount||0)
+        ,notificationEntryId:String(turnoverMutation.entryId||"")
       });
     });
 
     for (const row of liveRows) {
+      const turnoverMutation=row&&row.turnoverMutation&&typeof row.turnoverMutation==='object'?row.turnoverMutation:{};
       const saved = await saveLiveToSheet(
         row.date,
         row.location,
@@ -1470,14 +1497,15 @@ async function syncPendingRows() {
         row.clientUpdatedAt || "",
         row.clientDeviceId||"",
         Number(row.clientSequence||0)
-        ,row.baseCloudUpdatedAt||"",false,Number(row.restoreGeneration||0)
+        ,row.baseCloudUpdatedAt||"",false,Number(row.restoreGeneration||0),turnoverMutation,null
       );
       if (saved && Number(saved.amount) > 0) upsertLocalRow(saved);
       else rows = rows.filter(x => syncKey(x) !== syncKey(row));
       clearPendingRowIfVersionV343(row);
     }
 
-    for (const [location, records] of fairGroups.entries()) {
+    for (const group of fairGroups.values()) {
+      const location=group.location,records=group.records;
       const result = await saveFairBatchToSheet(location, records);
 
       if (result && Array.isArray(result.rows)) {
@@ -1847,6 +1875,7 @@ async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "", cli
     notificationAmount:Number(notificationMeta?.amount||0),
     notificationOldAmount:Number(notificationMeta?.oldAmount||0),
     notificationNewAmount:Number(notificationMeta?.newAmount||0),
+    notificationEntryId:String(notificationMeta?.entryId||""),
     turnoverEntries:Array.isArray(turnoverEntries)?JSON.stringify(turnoverEntries):""
   }, { timeoutMs: foregroundSave ? 45000 : 30000 });
 
@@ -1854,7 +1883,8 @@ async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "", cli
   applyLocalDataRevision(json.dataRevision);
   if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
   dispatchSalesNotificationAsync(json.notificationEnvelope);
-  return json.row || null;
+  const row=json.row||null;if(row&&json.turnoverEntriesRecord)row.turnoverEntriesRecord=json.turnoverEntriesRecord;
+  return row;
 }
 
 async function saveFairSessionToSheetV281(location,start,end){
@@ -1888,6 +1918,7 @@ async function sendFairBatchToSheetV343(location, records, foregroundSave=false,
     notificationAmount:Number((records&&records[0]&&records[0].notificationAmount)||0),
     notificationOldAmount:Number((records&&records[0]&&records[0].notificationOldAmount)||0),
     notificationNewAmount:Number((records&&records[0]&&records[0].notificationNewAmount)||0),
+    notificationEntryId:String((records&&records[0]&&records[0].notificationEntryId)||""),
     // V39.9: interactive Fair saves must return the cloud ACK before any push work.
     // Inline notification is reserved for pagehide/keepalive requests only.
     notifyInline:"",
@@ -1946,6 +1977,7 @@ async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientD
     notificationAmount:Number(notificationMeta?.amount||0),
     notificationOldAmount:Number(notificationMeta?.oldAmount||0),
     notificationNewAmount:Number(notificationMeta?.newAmount||0),
+    notificationEntryId:String(notificationMeta?.entryId||""),
     turnoverEntries:Array.isArray(turnoverEntries)?JSON.stringify(turnoverEntries):""
   }, { timeoutMs: foregroundSave ? 45000 : 30000 });
   if (!json.ok) throw new Error(json.message || "Live 储存失败");
@@ -1953,7 +1985,8 @@ async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientD
   if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
   dispatchSalesNotificationAsync(json.notificationEnvelope);
   Promise.resolve(loadSalesChangeLogFromSheetV200("live",date,{force:true})).catch(()=>{});
-  return json.row || null;
+  const row=json.row||null;if(row&&json.turnoverEntriesRecord)row.turnoverEntriesRecord=json.turnoverEntriesRecord;
+  return row;
 }
 
 async function saveCommissionSettingsToSheet(settings, targetMonth = "") {
