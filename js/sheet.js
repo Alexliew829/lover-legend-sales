@@ -1143,6 +1143,13 @@ function retryRevisionNowV455(){
 }
 if(typeof window!=='undefined')window.addEventListener('online',()=>setTimeout(retryRevisionNowV455,120));
 
+async function tryFastVisibleTurnoverFallbackV516(){
+  try{
+    if(typeof window==='undefined'||typeof window.fastSyncVisibleTurnoverContextV516!=='function')return null;
+    return await window.fastSyncVisibleTurnoverContextV516();
+  }catch(_){return null;}
+}
+
 async function loadFromSheet(options = {}) {
   if (settingsWritePromise) {
     await settingsWritePromise.catch(() => {});
@@ -1276,19 +1283,23 @@ async function loadFromSheet(options = {}) {
               }
             }
           } else {
-            setSync("上次同步资料已保留 · 后台检查中", true, false);
+            const fastTurnoverV516=await tryFastVisibleTurnoverFallbackV516();
+            if(fastTurnoverV516)setSync(fastTurnoverV516.updated?"营业额已同步":"当前营业额已确认 · 后台检查其他资料",true,false);
+            else setSync("上次同步资料已保留 · 后台检查中", true, false);
             scheduleRevisionRetryV448();
             completedSuccessfully = true;
-            return {ok:true,month,revisionUnconfirmed:true};
+            return {ok:true,month,revisionUnconfirmed:true,fastTurnoverV516};
           }
         } catch (revisionError) {
           // Do not replace valid Local First data with a false red failure when
           // only the tiny Revision probe is temporarily slow. Resume/interval/
           // manual refresh will retry this lightweight check.
-          setSync("上次同步资料已保留 · 后台检查中", true, false);
+          const fastTurnoverV516=await tryFastVisibleTurnoverFallbackV516();
+          if(fastTurnoverV516)setSync(fastTurnoverV516.updated?"营业额已同步":"当前营业额已确认 · 后台检查其他资料",true,false);
+          else setSync("上次同步资料已保留 · 后台检查中", true, false);
           scheduleRevisionRetryV448();
           completedSuccessfully = true;
-          return {ok:true,month,revisionUnconfirmed:true,error:revisionError};
+          return {ok:true,month,revisionUnconfirmed:true,error:revisionError,fastTurnoverV516};
         }
       }
       let json = prefetchedMonthJsonV448;
@@ -2234,8 +2245,8 @@ async function getTurnoverTotalFromSheetV504(type,date,location){
   if(!json.ok)throw new Error(json.message||'确认营业额失败');
   return json.record||null;
 }
-async function getTurnoverContextFromSheetV509(type,date,location){
-  const json=await jsonp({action:'getTurnoverContextV509',type,date,location},{timeoutMs:8000});
+async function getTurnoverContextFromSheetV509(type,date,location,timeoutMs=8000){
+  const json=await jsonp({action:'getTurnoverContextV509',type,date,location},{timeoutMs:Number(timeoutMs||8000)});
   if(!json.ok)throw new Error(json.message||'确认营业额资料失败');
   if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
   return json.record||null;
