@@ -311,6 +311,12 @@ function normalizeFairLocationKey(value){
     .replace(/[\p{P}\p{S}\s]+/gu,"");
 }
 
+// V51.8: daily rows may arrive as an internal key, a display label, or older
+// mixed-case cache text. They must still identify the same nursery.
+function canonicalDailyCompanyKeyV518(value){
+  return String(value||"").toLowerCase().includes("balakong")?"balakong":"belimbing";
+}
+
 function yearAfter(y){
   return String(Number(y)+1);
 }
@@ -319,7 +325,8 @@ function syncKey(row){
   const location=row.type==="live"
     ? String(row.location||"").replace(/\s+/g,"").toLowerCase()
     : normalizeFairLocationKey(row.location||"");
-  return[row.type,row.date,row.company,location].join("|");
+  const company=row.type==="daily"?canonicalDailyCompanyKeyV518(row.company||row.location||""):row.company;
+  return[row.type,row.date,company,location].join("|");
 }
 
 function openDatePicker(id){

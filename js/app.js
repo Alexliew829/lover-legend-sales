@@ -132,7 +132,7 @@ function showPage(name,el){
   // V29.9: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
-function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");const company=r.type==="fair"?"fair":r.company;return [r.type,r.date,company,location].join("|")}
+function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");const company=r.type==="daily"?canonicalDailyCompanyKeyV518(r.company||r.location||""):r.type==="fair"?"fair":r.company;return [r.type,r.date,company,location].join("|")}
 function dedupeRows(list){const m=new Map();list.forEach(r=>{const k=rowKey(r),old=m.get(k),fresh=String(r.clientUpdatedAt||r.updatedAt||""),oldFresh=String(old?.clientUpdatedAt||old?.updatedAt||"");if(!old||fresh>=oldFresh)m.set(k,r)});return [...m.values()]}
 function upsertLocalRow(n){rows=dedupeRows([...rows,n])}
 function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&r.company===c);return f?Number(f.amount||0):0}
@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5170",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5180",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5170";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5180";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1896,7 +1896,8 @@ function rowKey(r){
   const location=r.type==="live"
     ? normalizeLiveHostKey(r.location||"")
     : normalizeFairLocationKey(r.location||"");
-  return [r.type,r.date,r.company,location].join("|");
+  const company=r.type==="daily"?canonicalDailyCompanyKeyV518(r.company||r.location||""):r.company;
+  return [r.type,r.date,company,location].join("|");
 }
 function getSavedLiveHosts(){
   try{return JSON.parse(localStorage.getItem("lover_live_hosts_v69")||"[]")}catch(e){return[]}
@@ -5852,7 +5853,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5170",
+    version:"5180",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -7966,7 +7967,13 @@ function selectedDayDateV362(type){
   return selectedDayDateV360(type);
 }
 function selectedDayTurnoverV362(type,date){
-  return dedupeRows(rows).filter(r=>String(r.type||'')===type&&String(r.date||'')===String(date||'')).reduce((sum,r)=>sum+Number(r.amount||0),0);
+  const list=dedupeRows(rows).filter(r=>String(r.type||'')===type&&String(r.date||'')===String(date||''));
+  if(type==='daily'){
+    const byCompany={balakong:0,belimbing:0};
+    list.forEach(r=>{const company=canonicalDailyCompanyKeyV518(r.company||r.location||'');byCompany[company]=Math.max(byCompany[company]||0,Number(r.amount||0))});
+    return Number(byCompany.balakong||0)+Number(byCompany.belimbing||0);
+  }
+  return list.reduce((sum,r)=>sum+Number(r.amount||0),0);
 }
 function selectedDayProfitV362(type,date,links){
   return dedupeProfitLinksV360(links).filter(x=>String(x.type||'')===type&&String(x.date||'')===String(date||'')).reduce((sum,x)=>sum+Number(x.profit||0),0);
@@ -8611,6 +8618,18 @@ function getTurnoverEntryCacheV376(type,date,location){
   const key=turnoverContextKeyV376(type,date,location),mem=turnoverEntryMemoryV376.get(key);if(mem)return mem;
   const local=readTurnoverLocalV376()[key];if(local&&Array.isArray(local.entries)){const value={entries:normalizeTurnoverEntriesClientV376(local.entries),source:local.source||'local',at:Number(local.at||0)};turnoverEntryMemoryV376.set(key,value);return value}return null;
 }
+function replaceAuthoritativeDailyLocalV518(date,location,amount,updatedAt=''){
+  const company=canonicalDailyCompanyKeyV518(location||'');
+  const same=r=>String(r?.type||'')==='daily'&&String(r?.date||'')===String(date||'')&&canonicalDailyCompanyKeyV518(r?.company||r?.location||'')===company;
+  rows=rows.filter(r=>!same(r));
+  if(typeof pendingRows!=='undefined'&&Array.isArray(pendingRows)){
+    pendingRows=pendingRows.filter(r=>!same(r));
+    if(typeof savePendingRows==='function')savePendingRows();
+  }
+  const value=Math.round(Number(amount||0)*100)/100;
+  if(value>0)rows.push({type:'daily',date:String(date||''),company,location:'',amount:value,updatedAt:String(updatedAt||'')});
+  return company;
+}
 function turnoverIdsV376(type){return type==='daily'?{history:'dailyTurnoverHistoryV432',total:'dailyTurnoverTotalV432',input:'dailyTurnoverNewV432',hidden:'dailySales'}:type==='fair'?{history:'fairTurnoverHistoryV376',total:'fairTurnoverTotalV376',input:'fairTurnoverNewV376',hidden:'fairSales'}:{history:'liveTurnoverHistoryV376',total:'liveTurnoverTotalV376',input:'liveTurnoverNewV376',hidden:'liveSales'}}
 function renderTurnoverComposerV376(type){
   const ctx=turnoverContextV376(type),ids=turnoverIdsV376(type),history=document.getElementById(ids.history),totalEl=document.getElementById(ids.total),hidden=document.getElementById(ids.hidden);if(!history||!totalEl||!hidden)return;
@@ -8647,6 +8666,11 @@ async function refreshTurnoverEntriesV376(type,{force=false,fast=false}={}){
       // will replace it with the real edited/deleted entry set.
       const clean=normalizeTurnoverEntriesClientV376(rec.entries);
       setTurnoverEntryCacheV376(type,ctx.date,ctx.location,clean,'cloud-v506');
+      if(type==='daily'&&Number.isFinite(Number(rec.amount))){
+        replaceAuthoritativeDailyLocalV518(ctx.date,ctx.location,Number(rec.amount||0),String(rec.updatedAt||''));
+        saveLocalDataCache();
+        if(typeof renderSelectedDayGrandV362==='function')renderSelectedDayGrandV362('daily');
+      }
     }
   }catch(e){console.warn('V50.8 turnover entry read',e)}
   renderTurnoverComposerV376(type);return getTurnoverEntryCacheV376(type,ctx.date,ctx.location);
@@ -8685,7 +8709,7 @@ async function confirmTurnoverCloudAfterTimeoutV395(localRow,expectedEntries=nul
   }catch(_){return null}
 }
 async function awaitTurnoverWriteOrVerifyV516(writePromise,localRow,expectedEntries,notificationMeta){
-  // V51.7: keep the original fast path untouched. If its ACK is unusually slow,
+  // V51.8: keep the original fast path untouched. If its ACK is unusually slow,
   // verify only this exact turnover context instead of leaving the button busy
   // for the full 45-second transport timeout.
   const outcomeV516=Promise.resolve(writePromise).then(value=>({ok:true,value}),error=>({ok:false,error}));
@@ -8710,9 +8734,8 @@ async function fastSyncVisibleTurnoverContextV516(){
   const rec=await getTurnoverContextFromSheetV509(type,ctx.date,ctx.location,6000);if(!rec)return null;
   const previous=officialTurnoverV376(type,ctx.date,ctx.location),amount=Math.round(Number(rec.amount||0)*100)/100;
   if(type==='daily'){
-    const company=String(ctx.location||'').toLowerCase().includes('balakong')?'balakong':'belimbing';
-    const row={type:'daily',date:ctx.date,company,location:'',amount,updatedAt:String(rec.updatedAt||'')};
-    if(amount>0)upsertLocalRow(row);else rows=rows.filter(r=>syncKey(r)!==syncKey(row));
+    // V51.8: replace every spelling/case variant and obsolete pending cache.
+    replaceAuthoritativeDailyLocalV518(ctx.date,ctx.location,amount,String(rec.updatedAt||''));
   }else{
     const row={type,date:ctx.date,company:type,location:ctx.location,amount,updatedAt:String(rec.updatedAt||'')};
     if(amount>0)upsertLocalRow(row);else rows=rows.filter(r=>syncKey(r)!==syncKey(row));
@@ -9194,12 +9217,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5170'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5180'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5170')issues.push(`Frontend / API 版本不一致（Frontend 5170 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5180')issues.push(`Frontend / API 版本不一致（Frontend 5180 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5170';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5180';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
