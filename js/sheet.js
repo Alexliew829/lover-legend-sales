@@ -1544,11 +1544,19 @@ async function syncPendingRows() {
 }
 
 async function saveSalesProductLinkV203(payload) {
+  const safePayload={...(payload||{})};
+  if(!String(safePayload.linkId||'').trim()){
+    const tx=String(safePayload.transactionId||'').trim().replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80),order=Math.max(1,Number(safePayload.productOrder||1));
+    safePayload.linkId=tx?('spl_v514_'+tx+'_'+order):('spl_v514_'+Date.now()+'_'+Math.random().toString(36).slice(2,10));
+    if(payload&&typeof payload==='object')payload.linkId=safePayload.linkId;
+  }
   const json = await jsonp({
     action: "saveSalesProductLink",
-    ...payload
+    ...safePayload
   }, { timeoutMs: 20000 });
   if (!json.ok) throw new Error(json.message || "盆栽资料保存失败");
+  if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
+  if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
   return json.link || null;
 }
 
@@ -1781,11 +1789,13 @@ async function loadSalesProductLinksV206(type,date,location,options={}) {
 }
 
 async function deleteSalesProductLinkV206(linkId) {
-  const json = await jsonp({ action:"deleteSalesProductLink", linkId }, { timeoutMs:20000 });
+  const priority=typeof getPrioritySyncLocalV315==='function'?getPrioritySyncLocalV315():{};
+  const expectedSalesCardRevision=Object.prototype.hasOwnProperty.call(priority||{},'salesCardRevision')?Number(priority.salesCardRevision||0):'';
+  const json = await jsonp({ action:"deleteSalesProductLink", linkId, expectedSalesCardRevision }, { timeoutMs:20000 });
   if (!json.ok) throw new Error(json.message || "删除盆栽关联失败");
   if(typeof window.purgeDeletedSalesLinkV348==='function')window.purgeDeletedSalesLinkV348(linkId);
   if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
-  if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
+  if(json.salesCardRevision!==undefined)setPrioritySyncLocalV315({...priority,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()});
   // V50.8: the deleted Link ID is purged precisely by purgeDeletedSalesLinkV348.
   // Never clear all Sales Card / Profit caches here; unrelated contexts must stay hot.
   if(Array.isArray(allSalesProductLinksCacheV216?.links))allSalesProductLinksCacheV216={links:allSalesProductLinksCacheV216.links.filter(x=>String(x?.linkId||'').trim()!==String(linkId||'').trim()),at:Date.now()};
@@ -1887,23 +1897,29 @@ async function saveDailyToSheet(date, company, amount, clientUpdatedAt = "", cli
   return row;
 }
 
+let fairSessionRevisionV514=0;
+let fairSessionRevisionKnownV514=false;
+function applyFairSessionRevisionV514(value){if(value===undefined||value===null||value==='')return;fairSessionRevisionV514=Math.max(0,Number(value||0));fairSessionRevisionKnownV514=true;}
 async function saveFairSessionToSheetV281(location,start,end){
-  const json=await jsonp({action:"saveFairSessionV281",location,start,end});
+  const json=await jsonp({action:"saveFairSessionV281",location,start,end,expectedFairSessionRevision:fairSessionRevisionKnownV514?fairSessionRevisionV514:""});
   if(!json.ok)throw new Error(json.message||"Fair 活动资料储存失败");
   applyLocalDataRevision(json.dataRevision);
+  applyFairSessionRevisionV514(json.fairSessionRevision);
   return json;
 }
 async function loadFairSessionsFromSheetV281(){
   const json=await jsonp({action:"getFairSessionsV281"});
   if(!json.ok)throw new Error(json.message||"读取 Fair 活动资料失败");
   if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
+  applyFairSessionRevisionV514(json.fairSessionRevision);
   return json;
 }
 
 async function deleteFairLocationFromSheetV358(location){
-  const json=await jsonp({action:"deleteFairLocationV358",location,restoreGeneration:getLocalRestoreGenerationV347()});
+  const json=await jsonp({action:"deleteFairLocationV358",location,restoreGeneration:getLocalRestoreGenerationV347(),expectedFairSessionRevision:fairSessionRevisionKnownV514?fairSessionRevisionV514:""});
   if(!json.ok)throw new Error(json.message||"删除 Fair 地点失败");
   if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
+  applyFairSessionRevisionV514(json.fairSessionRevision);
   return json;
 }
 
@@ -2138,7 +2154,8 @@ async function saveAccessSettingsToSheet(settings) {
     const json = await jsonp({
       action: "saveAccessSettings",
       accessPasswordHash: settings.accessPasswordHash,
-      accessPasswordHint: settings.accessPasswordHint
+      accessPasswordHint: settings.accessPasswordHint,
+      expectedAccessRevision:Number(settings.accessRevision||0)
     }, { timeoutMs: 20000 });
     if (!json.ok) throw new Error(json.message || "密码设置同步失败");
     return json.accessSettings || null;
