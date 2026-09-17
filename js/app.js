@@ -2605,7 +2605,7 @@ function buildCloudImportProductRecordsV214(data){
     const currency=String(source?.currency||"").trim().toUpperCase();
     const unitPrice=parseCloudNumberV214(source?.unitPrice);
 
-    if(!productName||category!=="盆栽"||!currency||!Number.isFinite(unitPrice)||unitPrice<=0)return;
+    if(!productName||!["盆栽","杂花杂木"].includes(category)||!currency||!Number.isFinite(unitPrice)||unitPrice<=0)return;
 
     const key=[
       normalizeImportProductSearchTextV214(productName),
