@@ -2248,6 +2248,7 @@ async function getTurnoverTotalFromSheetV504(type,date,location){
 async function getTurnoverContextFromSheetV509(type,date,location,timeoutMs=8000){
   const json=await jsonp({action:'getTurnoverContextV509',type,date,location},{timeoutMs:Number(timeoutMs||8000)});
   if(!json.ok)throw new Error(json.message||'确认营业额资料失败');
+  if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
   if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
   return json.record||null;
 }
