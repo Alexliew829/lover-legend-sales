@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5090",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5100",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5090";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5100";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2494,6 +2494,31 @@ function unorderedImportProductMatchV214(sourceValue,queryValue){
     return true;
   });
 }
+
+// V51.0: mirror Import System V21.8 exact Original Cost search.
+// Pure numeric queries are reserved for exact unitPrice matching only.
+// Currency is ignored; 120 matches 120 / 120.00, never 1200 or 1201.
+// Uses the already-loaded Import product records, so no new API request or polling is added.
+function parseOriginalCostSearchQueryV510(queryValue){
+  const text=String(queryValue||"")
+    .normalize("NFKC")
+    .replace(/[,，\s]/g,"");
+  if(!/^\d+(?:\.\d+)?$/.test(text))return null;
+  const value=Number(text);
+  return Number.isFinite(value)?value:null;
+}
+function originalCostNumberMatchesV510(value,queryValue){
+  const query=parseOriginalCostSearchQueryV510(queryValue);
+  if(query===null)return false;
+  const cost=Number(value);
+  return Number.isFinite(cost)&&Math.abs(cost-query)<0.000001;
+}
+function importProductSearchMatchesV510(record,searchableValue,queryValue){
+  if(parseOriginalCostSearchQueryV510(queryValue)!==null){
+    return originalCostNumberMatchesV510(record?.unitPrice,queryValue);
+  }
+  return unorderedImportProductMatchV214(searchableValue,queryValue);
+}
 function isDateLikeCorruptedNumberV214(value){
   if(typeof value!=="string")return false;
   const text=value.trim();
@@ -2791,7 +2816,7 @@ function clearImportMappingForManualProductV214(item){
   const card=item.closest(".sales-card-transaction-v239");
   if(card){
     syncSalesCardAutoExtraV267(card);
-    // V50.9: clearing/changing a product on an unconfirmed card is a draft edit,
+    // V51.0: clearing/changing a product on an unconfirmed card is a draft edit,
     // never an Import-pending/confirmed transition. Search behavior is unchanged.
     if(String(card.dataset.confirmedOnceV401||'')!=='1'){
       card.dataset.confirmedOnceV401='0';
@@ -2856,7 +2881,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
           record.inlandMiscPercent,
           record.minimumPrice
         ].join(" ");
-        return unorderedImportProductMatchV214(searchable,keyword);
+        return importProductSearchMatchesV510(record,searchable,keyword);
       }).slice(0,30);
 
       resultsBox.innerHTML="";
@@ -2984,7 +3009,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
 
       const card=item.closest(".sales-card-transaction-v239");
       if(card&&String(card.dataset.confirmedOnceV401||'')!=='1'){
-        // V50.9: X still clears only the current product selection/name mapping,
+        // V51.0: X still clears only the current product selection/name mapping,
         // but an editable draft must stay editable and must never become Import pending.
         card.dataset.confirmedOnceV401='0';
         item.dataset.inventoryStatus='DRAFT_INVENTORY_CHANGED';
@@ -3158,7 +3183,7 @@ function buildProductLinkItemV209(type,id,data={}){
   const input=(cls,value,placeholder)=>{const el=document.createElement("input");el.className=cls;el.value=value??"";if(placeholder)el.placeholder=placeholder;return el};
 
   item.appendChild(label("搜索或输入产品"));
-  const name=input("product-link-name",String(data.productName||""),"输入产品名称搜索，或直接手动输入");
+  const name=input("product-link-name",String(data.productName||""),"输入产品名称、编号或原成本搜索，或直接手动输入");
   name.dataset.productId=String(data.productId||"");
   const searchWrap=document.createElement("div");searchWrap.className="product-link-search-wrap";
   const searchInputRow=document.createElement("div");searchInputRow.className="product-link-search-input-row";
@@ -3725,7 +3750,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
   const input=(cls,value,placeholder)=>{const el=document.createElement("input");el.className=cls;el.value=value??"";if(placeholder)el.placeholder=placeholder;return el};
 
   item.appendChild(label("搜索或输入产品"));
-  const name=input("product-link-name",String(data.productName||""),"输入产品名称搜索，或直接手动输入");
+  const name=input("product-link-name",String(data.productName||""),"输入产品名称、编号或原成本搜索，或直接手动输入");
   name.dataset.productId=String(data.productId||"");
   const searchWrap=document.createElement("div");searchWrap.className="product-link-search-wrap";
   const searchInputRow=document.createElement("div");searchInputRow.className="product-link-search-input-row";
@@ -4412,7 +4437,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
   item.dataset.minimumPrice=String(Number(data.minimumPrice||0));
   item.dataset.importMapped=String(data.productId||"")?"1":"0";
   item.dataset.productOrder=String(order);
-  // V50.9: every visible row has an explicit state. Missing status on a saved/unconfirmed
+  // V51.0: every visible row has an explicit state. Missing status on a saved/unconfirmed
   // row is a draft-safe fallback, never PENDING_IMPORT_LINK.
   item.dataset.inventoryStatus=String(data.importSyncStatus||'DRAFT');
 
@@ -4425,7 +4450,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
   const input=(cls,value,placeholder)=>{const el=document.createElement("input");el.className=cls;el.value=value??"";if(placeholder)el.placeholder=placeholder;return el};
 
   item.appendChild(label("搜索或输入产品"));
-  const name=input("product-link-name",String(data.productName||""),"输入产品名称搜索，或直接手动输入");
+  const name=input("product-link-name",String(data.productName||""),"输入产品名称、编号或原成本搜索，或直接手动输入");
   name.dataset.productId=String(data.productId||"");
   const searchWrap=document.createElement("div");searchWrap.className="product-link-search-wrap";
   const searchInputRow=document.createElement("div");searchInputRow.className="product-link-search-input-row";
@@ -5827,7 +5852,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5090",
+    version:"5100",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6973,7 +6998,7 @@ function reconcileVisibleSalesCardAckV407(items=[],options={}){
     const ctx=productLinkContextV206(type);if(!ctx.date||!ctx.location)return;
     const changedStatuses=new Map();
     salesCardWrappersV239(type).forEach(card=>{
-      // V50.9: Import pending/ACK is evidence for confirmed sales only. While a
+      // V51.0: Import pending/ACK is evidence for confirmed sales only. While a
       // visible card is an unconfirmed/dirty draft, stale background status must
       // not change its state, lock its inputs, or persist into local caches.
       if(salesCardIsEditableDraftV509(card))return;
@@ -8589,7 +8614,7 @@ async function refreshTurnoverEntriesV376(type,{force=false,fast=false}={}){
 }
 function proposedEntriesV376(type){const ctx=turnoverContextV376(type),cached=getTurnoverEntryCacheV376(type,ctx.date,ctx.location),official=officialTurnoverV376(type,ctx.date,ctx.location);const validCached=cached&&Math.abs(entriesSumV376(cached.entries)-official)<=0.005?cached.entries:null;return normalizeTurnoverEntriesClientV376(validCached||fallbackTurnoverEntriesV376(type,ctx.date,ctx.location))}
 async function confirmTurnoverCloudAfterTimeoutV395(localRow,expectedEntries=null){
-  // V50.9: a timeout is success only when BOTH authoritative total and the exact
+  // V51.0: a timeout is success only when BOTH authoritative total and the exact
   // TurnoverEntries context reached cloud. This prevents false success with split state.
   try{
     const type=String(localRow?.type||''),date=String(localRow?.date||'');
@@ -8652,7 +8677,7 @@ async function saveTurnoverTotalV376(type,total,notificationMeta={},turnoverEntr
 async function commitTurnoverEntriesV376(type,entries,actionText,notificationMeta={}){
   setTurnoverWriteStateV382(type,true);renderTurnoverComposerV376(type);
   const ctx=turnoverContextV376(type),clean=normalizeTurnoverEntriesClientV376(entries),total=entriesSumV376(clean),before=officialTurnoverV376(type,ctx.date,ctx.location);
-  // V50.9: one foreground request carries total + exact TurnoverEntries. The server
+  // V51.0: one foreground request carries total + exact TurnoverEntries. The server
   // writes detail before publishing the turnover revision, so no device can observe
   // a new total revision with an older detail row.
   const ok=await saveTurnoverTotalV376(type,total,notificationMeta,clean);if(!ok){setTurnoverWriteStateV382(type,false);renderTurnoverComposerV376(type);return false}
@@ -8866,7 +8891,7 @@ function scheduleTurnoverDetailRepairV486(type){
 }
 
 
-// V50.9: fetch only turnover detail contexts that are BOTH changed and currently
+// V51.0: fetch only turnover detail contexts that are BOTH changed and currently
 // visible. This runs in parallel with the month fetch and commits before "已同步".
 async function syncTurnoverDetailsForChangesV509(changes){
   const list=Array.isArray(changes)?changes.filter(x=>x&&x.kind==='turnover'):[];
@@ -9075,12 +9100,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5090'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5100'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5090')issues.push(`Frontend / API 版本不一致（Frontend 5090 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5100')issues.push(`Frontend / API 版本不一致（Frontend 5100 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5090';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5100';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){

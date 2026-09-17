@@ -1229,7 +1229,7 @@ async function loadFromSheet(options = {}) {
               const canContextDeltaV456=salesCardRevisionChangedV444&&deltaCompleteV456&&deltaChangesV456.some(x=>x&&x.kind==='card');
               const cardPromiseV454=salesCardRevisionChangedV444?(canContextDeltaV456?syncChangedSalesCardContextsV456(deltaChangesV456,cloudCard):fetchAllSalesCardsAtomicV449(Number(options.cardTimeoutMs||15000))):Promise.resolve(null);
               const monthPromiseV454=needsMonthRefreshV454?loadMonthCloudShared(month,Number(options.timeoutMs||15000)):Promise.resolve(null);
-              // V50.9: turnover total + TurnoverEntries are published under the same
+              // V51.0: turnover total + TurnoverEntries are published under the same
               // revision. If the visible context is touched, fetch that tiny detail row
               // in parallel with the month so total/detail paint together.
               const turnoverDetailPromiseV509=(cloudTurn!==localTurn&&typeof window.syncTurnoverDetailsForChangesV509==='function')?window.syncTurnoverDetailsForChangesV509(deltaChangesV456):Promise.resolve(null);
