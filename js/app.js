@@ -2520,34 +2520,6 @@ function importProductSearchMatchesV510(record,searchableValue,queryValue){
   }
   return unorderedImportProductMatchV214(searchableValue,queryValue);
 }
-
-// V52.1: local-only English aliases for Sales/Fair/Live product search.
-// IMPORTANT: this function uses only the already-loaded productName; it makes no
-// network request and does not touch sync/save/delete/calculation paths.
-const IMPORT_PRODUCT_ENGLISH_ALIASES_V521=[
-  [/[黄楊杨]/u,'Buxus Boxwood'],
-  [/凌珊/u,'Bluebell'],
-  [/罗汉松/u,'Podocarpus'],
-  [/李氏樱桃/u,'Lee Cherry Sakura'],
-  [/水梅/u,'Jeliti Anting Puteri Water Jasmine'],
-  [/酸豆/u,'Asam Jawa'],
-  [/寿娘子/u,'Premna Sancang Bebuas'],
-  [/三角梅/u,'Bougainvillea'],
-  [/(七里香|九里香)/u,'Murraya'],
-  [/仙丹/u,'Ixora'],
-  [/系鱼川/u,'Itoigawa Itoigawa Shimpaku Juniperus'],
-  [/真柏/u,'Juniperus'],
-  [/福建茶/u,'Ho Kian Tea Fujian Tea Fukien Tea']
-];
-function importProductEnglishAliasesV521(record){
-  const name=String(record?.productName||record?.name||'');
-  if(!name)return '';
-  const aliases=[];
-  for(const [pattern,words] of IMPORT_PRODUCT_ENGLISH_ALIASES_V521){
-    if(pattern.test(name))aliases.push(words);
-  }
-  return aliases.join(' ');
-}
 function isDateLikeCorruptedNumberV214(value){
   if(typeof value!=="string")return false;
   const text=value.trim();
@@ -2902,7 +2874,6 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
         const searchable=[
           ...(compatibleImportProductIdsV437(record)),
           record.productName,
-          importProductEnglishAliasesV521(record),
           record.importNumber,
           record.currency,
           record.unitPrice,
