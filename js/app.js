@@ -2541,6 +2541,8 @@ function buildCloudImportProductRecordsV214(data){
   const imports=Array.isArray(data?.imports)?data.imports:[];
   const batches=Array.isArray(data?.batches)?data.batches:[];
   const products=Array.isArray(data?.products)?data.products:[];
+  const productLanguageMeta=(data?.settings?.productLanguageMetaV262&&typeof data.settings.productLanguageMetaV262==="object")
+    ?data.settings.productLanguageMetaV262:{};
 
   const productById=new Map(products.map(product=>[String(product?.id||""),product]));
   const productByName=new Map(products.map(product=>[
@@ -2638,12 +2640,17 @@ function buildCloudImportProductRecordsV214(data){
         source?.shippingRate??source?.fixedShippingRate??source?.overseasShippingRate
       )||0;
 
+    const resolvedProductId=String(product?.id||source?.productId||"");
+    const languageMeta=productLanguageMeta[String(resolvedProductId||"").toUpperCase()]||{};
+    const englishName=String(languageMeta?.englishName||product?.englishName||source?.englishName||"").trim();
+
     records.push({
       id:String(source?.id||key),
       // V46.0: prefer the current Products ID. Old cached/import PZ IDs still
       // match by exact product name, then are upgraded before a card is saved.
-      productId:String(product?.id||source?.productId||""),
+      productId:resolvedProductId,
       productName,
+      englishName,
       importNumber,
       unitPrice,
       currency,
@@ -2874,6 +2881,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
         const searchable=[
           ...(compatibleImportProductIdsV437(record)),
           record.productName,
+          record.englishName,
           record.importNumber,
           record.currency,
           record.unitPrice,
