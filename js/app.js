@@ -2520,6 +2520,34 @@ function importProductSearchMatchesV510(record,searchableValue,queryValue){
   }
   return unorderedImportProductMatchV214(searchableValue,queryValue);
 }
+
+// V52.1: local-only English aliases for Sales/Fair/Live product search.
+// IMPORTANT: this function uses only the already-loaded productName; it makes no
+// network request and does not touch sync/save/delete/calculation paths.
+const IMPORT_PRODUCT_ENGLISH_ALIASES_V521=[
+  [/[黄楊杨]/u,'Buxus Boxwood'],
+  [/凌珊/u,'Bluebell'],
+  [/罗汉松/u,'Podocarpus'],
+  [/李氏樱桃/u,'Lee Cherry Sakura'],
+  [/水梅/u,'Jeliti Anting Puteri Water Jasmine'],
+  [/酸豆/u,'Asam Jawa'],
+  [/寿娘子/u,'Premna Sancang Bebuas'],
+  [/三角梅/u,'Bougainvillea'],
+  [/(七里香|九里香)/u,'Murraya'],
+  [/仙丹/u,'Ixora'],
+  [/系鱼川/u,'Itoigawa Itoigawa Shimpaku Juniperus'],
+  [/真柏/u,'Juniperus'],
+  [/福建茶/u,'Ho Kian Tea Fujian Tea Fukien Tea']
+];
+function importProductEnglishAliasesV521(record){
+  const name=String(record?.productName||record?.name||'');
+  if(!name)return '';
+  const aliases=[];
+  for(const [pattern,words] of IMPORT_PRODUCT_ENGLISH_ALIASES_V521){
+    if(pattern.test(name))aliases.push(words);
+  }
+  return aliases.join(' ');
+}
 function isDateLikeCorruptedNumberV214(value){
   if(typeof value!=="string")return false;
   const text=value.trim();
@@ -2541,8 +2569,6 @@ function buildCloudImportProductRecordsV214(data){
   const imports=Array.isArray(data?.imports)?data.imports:[];
   const batches=Array.isArray(data?.batches)?data.batches:[];
   const products=Array.isArray(data?.products)?data.products:[];
-  const productLanguageMeta=(data?.settings?.productLanguageMetaV262&&typeof data.settings.productLanguageMetaV262==="object")
-    ?data.settings.productLanguageMetaV262:{};
 
   const productById=new Map(products.map(product=>[String(product?.id||""),product]));
   const productByName=new Map(products.map(product=>[
@@ -2640,17 +2666,12 @@ function buildCloudImportProductRecordsV214(data){
         source?.shippingRate??source?.fixedShippingRate??source?.overseasShippingRate
       )||0;
 
-    const resolvedProductId=String(product?.id||source?.productId||"");
-    const languageMeta=productLanguageMeta[String(resolvedProductId||"").toUpperCase()]||{};
-    const englishName=String(languageMeta?.englishName||product?.englishName||source?.englishName||"").trim();
-
     records.push({
       id:String(source?.id||key),
       // V46.0: prefer the current Products ID. Old cached/import PZ IDs still
       // match by exact product name, then are upgraded before a card is saved.
-      productId:resolvedProductId,
+      productId:String(product?.id||source?.productId||""),
       productName,
-      englishName,
       importNumber,
       unitPrice,
       currency,
@@ -2881,7 +2902,7 @@ function setupImportProductSearchV214(item,nameInput,resultsBox,closeButton){
         const searchable=[
           ...(compatibleImportProductIdsV437(record)),
           record.productName,
-          record.englishName,
+          importProductEnglishAliasesV521(record),
           record.importNumber,
           record.currency,
           record.unitPrice,
