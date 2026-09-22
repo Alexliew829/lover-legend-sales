@@ -397,30 +397,14 @@ function commitAllSalesCardsAtomicV449(allLinks,verifiedRevisionV452=0){
 
 function syncContextLabelV456(change){
   const type=String(change&&change.type||'');const kind=String(change&&change.kind||'');const loc=String(change&&change.location||'').trim();
-  // V52.0: name Sales Card contexts explicitly so card synchronization cannot
-  // be mistaken for turnover synchronization. This changes display text only.
-  if(kind==='card'){
-    if(type==='daily')return `${/balakong/i.test(loc)?'Balakong':'Belimbing'} Sales Card`;
-    if(type==='fair')return loc?`Fair Sales Card · ${loc}`:'Fair Sales Card';
-    if(type==='live')return loc?`Live Sales Card · ${loc}`:'Live Sales Card';
-    return 'Sales Card';
-  }
+  // V50.2: a Fair Sales Card sync is a card operation, not a Fair turnover/location label.
+  if(type==='fair'&&kind==='card')return 'Fair Sales Card';
   if(type==='fair')return loc?`Fair · ${loc}`:'Fair';
   if(type==='live')return loc?`Live · ${loc}`:'Live';
   if(type==='daily')return `${/balakong/i.test(loc)?'Balakong':'Belimbing'} Sales`;
   return '云端资料';
 }
-// V52.0 status precision: the journal may contain several older changes since
-// this device last checked. All entries are still consumed by the existing sync
-// path, but the status names only the newest revision received for each data kind.
-// Entries written by one batch share a revision, so genuine multi-context updates
-// at that revision remain visible together.
-function latestSyncChangesForStatusV520(changes){
-  const list=(Array.isArray(changes)?changes:[]).filter(Boolean);const newest={};
-  list.forEach(x=>{const kind=String(x.kind||'other'),rev=Math.max(0,Number(x.revision||0));if(newest[kind]===undefined||rev>newest[kind])newest[kind]=rev});
-  return list.filter(x=>Math.max(0,Number(x.revision||0))===newest[String(x.kind||'other')]);
-}
-function syncChangesLabelV456(changes){const labels=[...new Set(latestSyncChangesForStatusV520(changes).map(syncContextLabelV456).filter(Boolean))];return labels.length===1?labels[0]:labels.length>1?`${labels.slice(0,2).join(' / ')}${labels.length>2?' 等':''}`:'云端资料'}
+function syncChangesLabelV456(changes){const labels=[...new Set((Array.isArray(changes)?changes:[]).map(syncContextLabelV456).filter(Boolean))];return labels.length===1?labels[0]:labels.length>1?`${labels.slice(0,2).join(' / ')}${labels.length>2?' 等':''}`:'云端资料'}
 async function checkCloudRevisionShared(timeoutMs = REVISION_CHECK_TIMEOUT_MS) {
   if (revisionCheckPromise) return revisionCheckPromise;
   const local=getPrioritySyncLocalV315();
@@ -474,7 +458,7 @@ async function syncChangedSalesCardContextsV456(changes,cloudCardRevision){
   }
   return results;
 }
-if(typeof window!=='undefined'){window.syncContextLabelV456=syncContextLabelV456;window.latestSyncChangesForStatusV520=latestSyncChangesForStatusV520;window.syncChangesLabelV456=syncChangesLabelV456;}
+if(typeof window!=='undefined'){window.syncContextLabelV456=syncContextLabelV456;window.syncChangesLabelV456=syncChangesLabelV456;}
 
 // V50.2: V50.2 remains the sync authority. These helpers only consume the
 // already-returned V50.2 change journal; they add no polling and no extra cloud read.
