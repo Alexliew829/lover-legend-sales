@@ -397,14 +397,30 @@ function commitAllSalesCardsAtomicV449(allLinks,verifiedRevisionV452=0){
 
 function syncContextLabelV456(change){
   const type=String(change&&change.type||'');const kind=String(change&&change.kind||'');const loc=String(change&&change.location||'').trim();
-  // V50.2: a Fair Sales Card sync is a card operation, not a Fair turnover/location label.
-  if(type==='fair'&&kind==='card')return 'Fair Sales Card';
+  // V52.0: name Sales Card contexts explicitly so card synchronization cannot
+  // be mistaken for turnover synchronization. This changes display text only.
+  if(kind==='card'){
+    if(type==='daily')return `${/balakong/i.test(loc)?'Balakong':'Belimbing'} Sales Card`;
+    if(type==='fair')return loc?`Fair Sales Card · ${loc}`:'Fair Sales Card';
+    if(type==='live')return loc?`Live Sales Card · ${loc}`:'Live Sales Card';
+    return 'Sales Card';
+  }
   if(type==='fair')return loc?`Fair · ${loc}`:'Fair';
   if(type==='live')return loc?`Live · ${loc}`:'Live';
   if(type==='daily')return `${/balakong/i.test(loc)?'Balakong':'Belimbing'} Sales`;
   return '云端资料';
 }
-function syncChangesLabelV456(changes){const labels=[...new Set((Array.isArray(changes)?changes:[]).map(syncContextLabelV456).filter(Boolean))];return labels.length===1?labels[0]:labels.length>1?`${labels.slice(0,2).join(' / ')}${labels.length>2?' 等':''}`:'云端资料'}
+// V52.0 status precision: the journal may contain several older changes since
+// this device last checked. All entries are still consumed by the existing sync
+// path, but the status names only the newest revision received for each data kind.
+// Entries written by one batch share a revision, so genuine multi-context updates
+// at that revision remain visible together.
+function latestSyncChangesForStatusV520(changes){
+  const list=(Array.isArray(changes)?changes:[]).filter(Boolean);const newest={};
+  list.forEach(x=>{const kind=String(x.kind||'other'),rev=Math.max(0,Number(x.revision||0));if(newest[kind]===undefined||rev>newest[kind])newest[kind]=rev});
+  return list.filter(x=>Math.max(0,Number(x.revision||0))===newest[String(x.kind||'other')]);
+}
+function syncChangesLabelV456(changes){const labels=[...new Set(latestSyncChangesForStatusV520(changes).map(syncContextLabelV456).filter(Boolean))];return labels.length===1?labels[0]:labels.length>1?`${labels.slice(0,2).join(' / ')}${labels.length>2?' 等':''}`:'云端资料'}
 async function checkCloudRevisionShared(timeoutMs = REVISION_CHECK_TIMEOUT_MS) {
   if (revisionCheckPromise) return revisionCheckPromise;
   const local=getPrioritySyncLocalV315();
@@ -458,7 +474,7 @@ async function syncChangedSalesCardContextsV456(changes,cloudCardRevision){
   }
   return results;
 }
-if(typeof window!=='undefined'){window.syncContextLabelV456=syncContextLabelV456;window.syncChangesLabelV456=syncChangesLabelV456;}
+if(typeof window!=='undefined'){window.syncContextLabelV456=syncContextLabelV456;window.latestSyncChangesForStatusV520=latestSyncChangesForStatusV520;window.syncChangesLabelV456=syncChangesLabelV456;}
 
 // V50.2: V50.2 remains the sync authority. These helpers only consume the
 // already-returned V50.2 change journal; they add no polling and no extra cloud read.
@@ -808,9 +824,14 @@ function setSync(text, good = false, error = false) {
   const nodes=syncStatusNodesV457();
   if(!nodes.length)return;
 
+  // V52.1: a successful global revision check cannot acknowledge a separate
+  // Sales Card draft still waiting in the durable local queue. Keep the card
+  // warning visible until that exact draft receives a matching cloud ACK.
+  const pendingCardV521=typeof readSalesDraftPendingV314==='function'&&Object.keys(readSalesDraftPendingV314()||{}).length>0;
+
   // V46.0: Home keeps the original status row. Sales/Fair/Live show the same
   // state compactly beside Company / Location / Host. Report and More show none.
-  if(good&&String(text||'')==='已同步'&&typeof window!=='undefined'&&typeof window.cloudAtomicSyncPendingV448==='function'&&window.cloudAtomicSyncPendingV448()){
+  if(good&&!pendingCardV521&&String(text||'')==='已同步'&&typeof window!=='undefined'&&typeof window.cloudAtomicSyncPendingV448==='function'&&window.cloudAtomicSyncPendingV448()){
     writeSyncStatusV457('🟡 云端新资料同步中…','wait');
     return;
   }
@@ -819,7 +840,7 @@ function setSync(text, good = false, error = false) {
     writeSyncStatusV457('🔴 '+text,'error');
     return;
   }
-  writeSyncStatusV457((good?'🟢 ':'🟡 ')+text,good?'good':'wait');
+  writeSyncStatusV457(good&&pendingCardV521?'🔴 草稿已安全保存 · 云端待同步':(good?'🟢 ':'🟡 ')+text,good&&pendingCardV521?'error':good?'good':'wait');
   if(good){
     // V46.0: a confirmed sync is terminal for the current retry cycle.
     // Cancel stale retry timers so the page does not keep issuing background
@@ -834,7 +855,8 @@ function setSync(text, good = false, error = false) {
 
 
 function markCloudCheckPending(text = "本机资料已显示 · 云端后台同步中") {
-  writeSyncStatusV457("🟡 "+text,"wait");
+  const pendingCardV521=typeof readSalesDraftPendingV314==='function'&&Object.keys(readSalesDraftPendingV314()||{}).length>0;
+  writeSyncStatusV457(pendingCardV521?'🔴 草稿已安全保存 · 云端待同步':"🟡 "+text,pendingCardV521?'error':"wait");
 }
 
 // V29.9: best-effort immediate cloud dispatch for mobile saves.

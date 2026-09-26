@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5180",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5210",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5180";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5210";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5853,7 +5853,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5180",
+    version:"5210",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6329,6 +6329,57 @@ function scheduleCompleteSalesCardReconcileV425(type,date,location){
   setTimeout(()=>reconcileCompleteSalesCardContextV425(type,date,location),120);
 }
 
+// V52.1: a draft can reach Apps Script even when its reply times out. Read
+// the exact context only after an ambiguous failure; accept it as saved only
+// when every submitted editable field and deletion matches the cloud.
+function salesCardRetryableReplyV521(error){return /超时|timeout|context 已有其他设备的新修改/i.test(String(error?.message||error))}
+function salesCardSameSubmittedLinksV521(items,deletedIds,cloud,allowConfirmed=false){
+  const submitted=Array.isArray(items)?items:[];
+  const active=(Array.isArray(cloud)?cloud:[]).filter(x=>!['deleted','cancelled'].includes(String(x?.status||'active').toLowerCase()));
+  if(!submitted.length)return null;
+  const txns=new Set(submitted.map(x=>String(x?.transactionId||'').trim()));
+  if(txns.has('')||submitted.some(x=>!String(x?.linkId||'').trim()))return null;
+  const ids=new Set(submitted.map(x=>String(x.linkId).trim()));
+  if(ids.size!==submitted.length)return null;
+  const targeted=active.filter(x=>txns.has(String(x?.transactionId||'').trim()));
+  if(targeted.length!==submitted.length)return null;
+  const byId=new Map(targeted.map(x=>[String(x?.linkId||'').trim(),x]));
+  if(byId.size!==targeted.length||(Array.isArray(deletedIds)?deletedIds:[]).some(id=>active.some(x=>String(x?.linkId||'')===String(id))))return null;
+  const numbers=['productOrder','quantity','unitPrice','actualPrice','localDelivery','extraFee','commissionRate'];
+  for(const local of submitted){
+    const remote=byId.get(String(local.linkId).trim());if(!remote)return null;
+    if(String(local.transactionId).trim()!==String(remote.transactionId||'').trim()||
+       String(local.productName||'').trim()!==String(remote.productName||'').trim()||
+       String(local.remark||'').trim()!==String(remote.remark||'').trim()||
+       (String(local.productId||'').trim()&&String(local.productId).trim()!==String(remote.productId||'').trim())||
+       numbers.some(field=>!Number.isFinite(Number(remote[field]))||Math.abs(Number(local[field]||0)-Number(remote[field]||0))>0.005))return null;
+    if(!allowConfirmed&&local.confirmedOnce!==true&&(remote.confirmedOnce===true||salesCardStatusIsConfirmedV322(remote.importSyncStatus)))return null;
+  }
+  return targeted;
+}
+async function verifySalesCardWriteV521(entry,allowConfirmed=false){
+  const cloud=await jsonp({action:'getSalesProductLinks',type:entry.type,date:entry.date,location:entry.location},{timeoutMs:12000});
+  if(!cloud?.ok||!Array.isArray(cloud.links)||cloud.salesCardRevision===undefined)return null;
+  const links=salesCardSameSubmittedLinksV521(entry.items,entry.deletedLinkIds,cloud.links,allowConfirmed);
+  if(!links)return null;
+  if(cloud.dataRevision!==undefined)applyLocalDataRevision(cloud.dataRevision);
+  const priority=getPrioritySyncLocalV315();
+  setPrioritySyncLocalV315({...priority,salesCardRevision:Number(cloud.salesCardRevision||0),at:Date.now()});
+  markSalesCardContextVerifiedV451(entry.type,entry.date,entry.location,Number(cloud.salesCardRevision||0));
+  return {ok:true,links,salesCardRevision:cloud.salesCardRevision,recoveredAfterTimeoutV521:true};
+}
+async function saveOrVerifySalesDraftV521(entry){
+  try{
+    return await window.saveSalesProductLinksApiV241(entry.items,'draft',Number(entry.restoreGeneration||0),String(entry.clientDeviceId||''),Number(entry.clientSequence||0),Array.isArray(entry.deletedLinkIds)?entry.deletedLinkIds:[],entry.baseSalesCardRevision);
+  }catch(error){
+    if(!salesCardRetryableReplyV521(error))throw error;
+    let recovered=null;
+    try{recovered=await verifySalesCardWriteV521(entry)}catch(_){}
+    if(!recovered)throw error;
+    return recovered;
+  }
+}
+
 async function syncQueuedSalesDraftV314(key,expectedToken=''){
   if(SALES_DRAFT_INFLIGHT_V314.has(key))return SALES_DRAFT_INFLIGHT_V314.get(key);
   const all=readSalesDraftPendingV314(),entry=all[key];
@@ -6336,7 +6387,7 @@ async function syncQueuedSalesDraftV314(key,expectedToken=''){
   if(expectedToken&&String(entry.token||'')!==String(expectedToken))return {ok:true,stale:true};
   const p=(async()=>{
     try{
-      const result=await window.saveSalesProductLinksApiV241(entry.items,'draft',Number(entry.restoreGeneration||0),String(entry.clientDeviceId||''),Number(entry.clientSequence||0),Array.isArray(entry.deletedLinkIds)?entry.deletedLinkIds:[],entry.baseSalesCardRevision);
+      const result=await saveOrVerifySalesDraftV521(entry);
       const latest=readSalesDraftPendingV314()[key];
       if(latest&&String(latest.token||'')===String(entry.token||'')){
         removeSalesDraftPendingV314(key,entry.token);
@@ -6376,10 +6427,10 @@ async function flushSalesDraftBeforeConfirmV314(type,date,location){
   const inflight=SALES_DRAFT_INFLIGHT_V314.get(key);if(inflight){try{await inflight}catch(_){}}
   const current=readSalesDraftPendingV314()[key];
   if(current){
-    let result=await window.saveSalesProductLinksApiV241(current.items,'draft',Number(current.restoreGeneration||0),String(current.clientDeviceId||''),Number(current.clientSequence||0),Array.isArray(current.deletedLinkIds)?current.deletedLinkIds:[],current.baseSalesCardRevision);
+    let result=await saveOrVerifySalesDraftV521(current);
     if(result?.staleMutation&&Array.isArray(current.deletedLinkIds)&&current.deletedLinkIds.length){
       const retryMutation=nextClientMutationV344();
-      result=await window.saveSalesProductLinksApiV241(current.items,'draft',Number(current.restoreGeneration||0),String(retryMutation.clientDeviceId||''),Number(retryMutation.clientSequence||0),current.deletedLinkIds,current.baseSalesCardRevision);
+      result=await saveOrVerifySalesDraftV521({...current,clientDeviceId:String(retryMutation.clientDeviceId||''),clientSequence:Number(retryMutation.clientSequence||0)});
       if(result?.staleMutation)throw new Error('删除产品同步遇到较新的云端版本，请再次保存草稿');
     }
     removeSalesDraftPendingV314(key,current.token);
@@ -6422,7 +6473,9 @@ async function validateSalesInventoryAvailabilityV325(type,items,saveMode='draft
   if(!lastInventoryError&&(!Array.isArray(records)||!records.length))lastInventoryError=new Error('进口系统资料不完整');
   if(lastInventoryError){
     const err=lastInventoryError;
-    alert('⚠️ 无法核对 Import 最新库存，销售卡未保存。\n\n'+String(err?.message||err)+'\n\n请稍后再试，避免超卖。');
+    const causes=Array.isArray(err?.errors)?err.errors:[err];
+    const reason=[...new Set(causes.map(x=>String(x?.message||x||'库存核对失败')).filter(Boolean))].join('；');
+    alert('⚠️ 无法核对 Import 最新库存，销售卡未保存。\n\n'+(reason||'库存核对失败')+'\n\n请稍后再试，避免超卖。');
     return false;
   }
   const byId=new Map(),byName=new Map();
@@ -6542,6 +6595,20 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
     try{
       result=await window.saveSalesProductLinksApiV241(items,'confirm',typeof getLocalRestoreGenerationV347==='function'?getLocalRestoreGenerationV347():0,String(mutationV350.clientDeviceId||''),Number(mutationV350.clientSequence||0),deletedLinkIdsV350);
     }catch(confirmErrorV515){
+      // If a timed-out draft committed, its new card revision may make the
+      // subsequent confirmation look like another device's edit. Only an
+      // identical authoritative card may refresh the revision and retry once.
+      if(/context 已有其他设备的新修改/i.test(String(confirmErrorV515?.message||confirmErrorV515))){
+        let checkedV521=null;
+        try{checkedV521=await verifySalesCardWriteV521({type,date:ctx.date,location:ctx.location,items,deletedLinkIds:deletedLinkIdsV350},true)}catch(_){}
+        if(!checkedV521)throw confirmErrorV515;
+        const alreadyConfirmedV521=checkedV521.links.every(x=>x.confirmedOnce===true||salesCardStatusIsConfirmedV322(x.importSyncStatus));
+        if(alreadyConfirmedV521)result=checkedV521;
+        else{
+          const retryV521=nextClientMutationV344();
+          result=await window.saveSalesProductLinksApiV241(items,'confirm',typeof getLocalRestoreGenerationV347==='function'?getLocalRestoreGenerationV347():0,String(retryV521.clientDeviceId||''),Number(retryV521.clientSequence||0),deletedLinkIdsV350);
+        }
+      }else{
       // V51.5: Apps Script may finish after the browser's response timer. Only
       // on a real timeout, verify the authoritative cloud card before showing
       // failure. Normal confirmation keeps exactly the same single request.
@@ -6561,6 +6628,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
       }
       if(!recoveredLinksV515.length)throw confirmErrorV515;
       result={ok:true,links:recoveredLinksV515,recoveredAfterTimeoutV515:true};
+      }
     }
     if(result?.staleMutation&&deletedLinkIdsV350.length){
       const retryMutationV351=nextClientMutationV344();
@@ -7365,7 +7433,7 @@ syncQueuedSalesDraftV314=async function(key,expectedToken=''){
   if(older){try{await older}catch(_){}const latest=readSalesDraftPendingV314()[key];if(!latest)return{ok:true,skipped:true};if(expectedToken&&String(latest.token)!==String(expectedToken))return{ok:true,stale:true};return syncQueuedSalesDraftV314(key,latest.token)}
   const entry=readSalesDraftPendingV314()[key];if(!entry)return{ok:true,skipped:true};if(expectedToken&&String(entry.token)!==String(expectedToken))return{ok:true,stale:true};
   const task=(async()=>{try{
-    const result=await window.saveSalesProductLinksApiV241(entry.items,'draft',Number(entry.restoreGeneration||0),String(entry.clientDeviceId||''),Number(entry.clientSequence||0),Array.isArray(entry.deletedLinkIds)?entry.deletedLinkIds:[],entry.baseSalesCardRevision),latest=readSalesDraftPendingV314()[key];
+    const result=await saveOrVerifySalesDraftV521(entry),latest=readSalesDraftPendingV314()[key];
     if(latest&&String(latest.token)===String(entry.token)){
       const deletedIds=Array.isArray(entry.deletedLinkIds)?entry.deletedLinkIds:[];
       if(result?.staleMutation&&deletedIds.length){
@@ -9217,12 +9285,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5180'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5210'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5180')issues.push(`Frontend / API 版本不一致（Frontend 5180 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5210')issues.push(`Frontend / API 版本不一致（Frontend 5210 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5180';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5210';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
