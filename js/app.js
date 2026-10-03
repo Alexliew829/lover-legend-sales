@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5250",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5260",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5250";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5260";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5886,7 +5886,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5250",
+    version:"5260",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6379,7 +6379,7 @@ function scheduleCompleteSalesCardReconcileV425(type,date,location){
   setTimeout(()=>reconcileCompleteSalesCardContextV425(type,date,location),120);
 }
 
-// V52.5: a draft can reach Apps Script even when its reply times out. Read
+// V52.6: a draft can reach Apps Script even when its reply times out. Read
 // the exact context only after an ambiguous failure; accept it as saved only
 // when every submitted editable field and deletion matches the cloud.
 function salesCardRetryableReplyV521(error){return /超时|timeout|context 已有其他设备的新修改/i.test(String(error?.message||error))}
@@ -6929,6 +6929,7 @@ renderProductProfitSummaryV216=function(type,allLinks){
 let inventoryPendingCacheV250=[];
 let inventoryPendingLoadingV250=null;
 let inventoryPendingLastAtV250=0;
+let inventoryPendingSessionScannedV526=false;
 
 function inventoryPendingDaysOldV250(date){
   const iso=displayToISO(String(date||""));if(!/^\d{4}-\d{2}-\d{2}$/.test(iso))return 0;
@@ -7094,6 +7095,7 @@ async function refreshInventoryPendingV250(force=false){
       const list=await loadPendingInventorySalesCardsV250();
       inventoryPendingCacheV250=normalizePendingInventoryItemsV263(list);
       inventoryPendingLastAtV250=Date.now();
+      inventoryPendingSessionScannedV526=true;
       reconcileVisibleSalesCardAckV407(inventoryPendingCacheV250,{pendingFeedOnly:true});
       if(typeof loadSalesInventoryAckStatusV408==='function'){
         const visible=[...document.querySelectorAll('.product-link-item[data-saved="1"]')].map(x=>String(x.dataset.linkId||'')).filter(Boolean);
@@ -7178,7 +7180,7 @@ window.reconcileVisibleSalesCardAckV407=reconcileVisibleSalesCardAckV407;
 
 // V29.9: Sales-side inventory confirmation removed. Import is the only inventory authority.
 
-// V52.5: background diagnostics/reminders must never compete with the initial
+// V52.6: background diagnostics/reminders must never compete with the initial
 // business-data sync, a user-requested Backup, or precise Sales Card navigation.
 // Only optional read-only jobs use this queue; save/update/delete paths are unchanged.
 let SALES_OPTIONAL_CLOUD_READ_TAIL_V524=Promise.resolve();
@@ -7299,7 +7301,7 @@ async function openPendingInventorySalesCardV250(raw){
       const iso=displayToISO(item.date);
       setDateControl("fairStart",iso);
       setDateControl("fairEnd",iso);
-      // V52.5: a remote Fair context may not exist on this device yet. Setting
+      // V52.6: a remote Fair context may not exist on this device yet. Setting
       // the input value programmatically does not fire the user's change event,
       // so explicitly establish the editor before loading/highlighting the card.
       if(typeof updateFairPageMode==="function")updateFairPageMode();
@@ -7325,26 +7327,31 @@ async function openPendingInventorySalesCardV250(raw){
     return false;
   }finally{
     SALES_PRECISE_CARD_NAV_V524=false;
-    setTimeout(()=>runOptionalCloudReadV524('inventory-after-navigation',()=>refreshInventoryPendingV250(true)).catch(()=>{}),1000);
+    setTimeout(()=>renderInventoryPendingGlobalV250(),0);
   }
 }
 window.openPendingInventorySalesCardV250=openPendingInventorySalesCardV250;
 
-// Always refresh global pending status when Live / Fair page opens.
+// V52.6: page switching renders the session cache immediately. The first
+// business-page visit may perform one cloud scan; later page switches never
+// repeat the same optional read. Save/confirm/Import-resume refreshes remain.
+let inventoryPendingPageScanQueuedV526=false;
 const _showPageV249=showPage;
 showPage=function(name,el){
   if(SALES_CONFIRMATION_IN_FLIGHT_V407&&!confirm('销售确认仍在同步中。现在切换页面可能无法立即知道确认结果。\n\n建议等待销售卡显示确认成功。仍要切换页面？'))return false;
   const result=_showPageV249(name,el);
   if(result===false)return false;
   if((name==="sales"||name==="live"||name==="fair")&&!SALES_PRECISE_CARD_NAV_V524){
-    setTimeout(()=>runOptionalCloudReadV524('inventory-page-open',()=>refreshInventoryPendingV250(true)).catch(()=>{}),50);
+    renderInventoryPendingGlobalV250();
+    if(!inventoryPendingSessionScannedV526&&!inventoryPendingPageScanQueuedV526){
+      inventoryPendingPageScanQueuedV526=true;
+      setTimeout(()=>runOptionalCloudReadV524('inventory-page-first-open',()=>refreshInventoryPendingV250(true))
+        .catch(()=>{}).finally(()=>{inventoryPendingPageScanQueuedV526=false}),1200);
+    }
   }
   return result;
 };
 window.showPage=showPage;
-
-// Cross-day reminder also initializes shortly after startup.
-scheduleOptionalCloudReadAfterInitialV524('inventory-startup',()=>refreshInventoryPendingV250(true),500);
 
 // V29.9: after the user processes inventory in the separate Import tab/app,
 // returning to Sales should refresh the compact reminder automatically.
@@ -8026,6 +8033,12 @@ async function refreshFairLocationHistoryCloudV358(options={}){
 }
 window.refreshFairLocationHistoryCloudV358=refreshFairLocationHistoryCloudV358;
 
+// V52.6: the authoritative main sync already contains Fair turnover rows.
+// Publish those row-backed locations locally without another startup request.
+window.addEventListener('lover-sales-initial-sync-complete',()=>{
+  try{renderFairLocationOptions()}catch(_){}
+});
+
 async function selectFairLocationAtomicV525(rawLocation,{forceCloud=true}={}){
   const input=document.getElementById('fairLocation');
   const loc=canonicalLocation(String(rawLocation||''));
@@ -8101,8 +8114,6 @@ installFairLiveParityV356=function(){const r=_installFairLiveParityV358();const 
 const _showPageV358=showPage;
 showPage=function(name,el){const r=_showPageV358(name,el);if(r===false)return false;if(name==='fair'){bindFairLocationDropdownV358();runOptionalCloudReadV524('fair-location-open',()=>refreshFairLocationHistoryCloudV358()).catch(()=>{})}return r};
 window.showPage=showPage;
-
-scheduleOptionalCloudReadAfterInitialV524('fair-location-startup',()=>refreshFairLocationHistoryCloudV358({force:true}),700);
 
 // After authoritative Fair save, refresh shared history so this device also
 // reflects the canonical cloud spelling/status immediately.
@@ -8613,7 +8624,7 @@ function ensureDraftReminderReturnButtonV429(){
   let btn=document.getElementById('salesDraftReturnV429');
   if(!btn){
     btn=document.createElement('button');btn.type='button';btn.id='salesDraftReturnV429';btn.className='sales-draft-return-v429';
-    btn.addEventListener('click',()=>openUnconfirmedDraftListV429(true));document.body.appendChild(btn);
+    btn.addEventListener('click',()=>openUnconfirmedDraftListV429(false));document.body.appendChild(btn);
   }
   const count=unconfirmedDraftReminderItemsV429.length;
   btn.textContent=`← 未处理销售卡（${count}）`;btn.hidden=!count;
@@ -8652,13 +8663,16 @@ async function latestUnconfirmedDraftsV429(force=false){
   unconfirmedDraftReminderItemsV429=collectUnconfirmedDraftsV369(links);
   ensureDraftReminderReturnButtonV429();return unconfirmedDraftReminderItemsV429;
 }
-async function openUnconfirmedDraftListV429(force=true){
-  const drafts=await latestUnconfirmedDraftsV429(force);
+async function openUnconfirmedDraftListV429(force=false){
+  const drafts=!force&&unconfirmedDraftReminderItemsV429.length
+    ?unconfirmedDraftReminderItemsV429
+    :await latestUnconfirmedDraftsV429(force);
   if(!drafts.length){removeDraftReminderUiV429();const btn=document.getElementById('salesDraftReturnV429');if(btn)btn.hidden=true;showToast('✅ 没有尚未确认的销售卡');return}
   renderUnconfirmedDraftListV429(drafts);
 }
 window.openUnconfirmedDraftListV429=openUnconfirmedDraftListV429;
-async function checkUnconfirmedDraftReminderV369(){
+let unconfirmedDraftReminderCloudQueuedV526=false;
+async function checkUnconfirmedDraftReminderV369(allowCloudFallback=false){
   const today=localDayISO369(),state=readDraftReminderStateV369();
   if(String(state.lastReminderDay||'')===today)return;
   // One successful authoritative reminder scan per open session is enough.
@@ -8668,7 +8682,10 @@ async function checkUnconfirmedDraftReminderV369(){
   unconfirmedDraftReminderCheckingV441=true;
   let links=null;
   try{
-    if(typeof loadAllSalesProductLinksV203==='function')links=await loadAllSalesProductLinksV203({force:true,maxAgeMs:0});
+    if(typeof readTrustedAllSalesCardsSnapshotV526==='function')links=readTrustedAllSalesCardsSnapshotV526();
+    if(!Array.isArray(links)&&!allowCloudFallback)return {deferred:true};
+    if(!Array.isArray(links)&&typeof loadAllSalesProductLinksV203==='function')links=await loadAllSalesProductLinksV203({force:true,maxAgeMs:0});
+    if(!Array.isArray(links))return {deferred:true};
     unconfirmedDraftReminderCheckedDayV524=today;
     const drafts=collectUnconfirmedDraftsV369(links);
     if(!drafts.length)return;
@@ -8676,15 +8693,27 @@ async function checkUnconfirmedDraftReminderV369(){
     // V46.0: only the explicit X button dismisses today's reminder. Leaving,
     // selecting a card, or tapping the backdrop does not mark it as seen.
     renderUnconfirmedDraftListV429(drafts);
-  }catch(_){return}
+  }catch(_){return {deferred:true}}
   finally{unconfirmedDraftReminderCheckingV441=false}
 }
 window.checkUnconfirmedDraftReminderV369=checkUnconfirmedDraftReminderV369;
-scheduleOptionalCloudReadAfterInitialV524('draft-reminder-startup',()=>checkUnconfirmedDraftReminderV369(),900);
-document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden)setTimeout(()=>runOptionalCloudReadV524('draft-reminder-visible',()=>checkUnconfirmedDraftReminderV369()).catch(()=>{}),300);
-});
-window.addEventListener('focus',()=>setTimeout(()=>runOptionalCloudReadV524('draft-reminder-focus',()=>checkUnconfirmedDraftReminderV369()).catch(()=>{}),300));
+function queueDraftReminderCloudFallbackV526(delay=2500){
+  if(unconfirmedDraftReminderCloudQueuedV526||unconfirmedDraftReminderCheckedDayV524===localDayISO369())return;
+  unconfirmedDraftReminderCloudQueuedV526=true;
+  setTimeout(()=>runOptionalCloudReadV524('draft-reminder-cloud-fallback',()=>checkUnconfirmedDraftReminderV369(true))
+    .catch(()=>{}).finally(()=>{unconfirmedDraftReminderCloudQueuedV526=false}),Math.max(0,Number(delay||0)));
+}
+function startDraftReminderV526(){
+  setTimeout(async()=>{
+    const result=await checkUnconfirmedDraftReminderV369(false);
+    const cloudSafe=typeof cloudRevisionSafeForWriteV449==='function'&&cloudRevisionSafeForWriteV449();
+    if(result?.deferred&&cloudSafe)queueDraftReminderCloudFallbackV526();
+  },120);
+}
+if(typeof isInitialCloudSyncFinished==='function'&&isInitialCloudSyncFinished())startDraftReminderV526();
+else window.addEventListener('lover-sales-initial-sync-complete',startDraftReminderV526,{once:true});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&unconfirmedDraftReminderCheckedDayV524!==localDayISO369())startDraftReminderV526()});
+window.addEventListener('focus',()=>{if(unconfirmedDraftReminderCheckedDayV524!==localDayISO369())startDraftReminderV526()});
 
 
 /* ================= V39.9 Import -> associated Sales card deep link =================
@@ -9441,7 +9470,7 @@ function isConfirmedSyncTextV466(text){return /已同步\s*$/.test(String(text||
 function recoverSystemHealthAfterConfirmedSyncV466(text){
   if(!isConfirmedSyncTextV466(text))return;
   systemConfirmedSyncAtV466=Date.now();
-  if(systemHealthStateV442?.source==='transport-timeout'){
+  if(!systemHealthStateV442?.checked||systemHealthStateV442?.source==='transport-timeout'){
     systemHealthStateV442={level:'normal',issues:[],checked:true,data:systemHealthStateV442.data||null,expanded:false,source:'confirmed-sync'};
     renderSystemHealthV442();
   }
@@ -9486,12 +9515,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5250'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5260'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5250')issues.push(`Frontend / API 版本不一致（Frontend 5250 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5260')issues.push(`Frontend / API 版本不一致（Frontend 5260 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5250';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5260';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -9509,8 +9538,6 @@ async function runSystemHealthCheckV442(userTriggered=false){
   }finally{if(refresh){refresh.disabled=false;refresh.textContent='重新检查';}}
 }
 window.toggleSystemHealthDetailsV442=toggleSystemHealthDetailsV442;window.runSystemHealthCheckV442=runSystemHealthCheckV442;
-scheduleOptionalCloudReadAfterInitialV524('system-health-startup',()=>runSystemHealthCheckV442(false),1500);
-
 
 /* ================= V50.2 minimal Sales Card UX fixes (V50.2 baseline) =================
    Built directly on V50.2. Do not change the V50.2 revision/sync cadence.

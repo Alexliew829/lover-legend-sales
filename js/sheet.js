@@ -190,6 +190,35 @@ function setCloudRevisionConfirmedV449(value){
 function cloudRevisionSafeForWriteV449(){return CLOUD_REVISION_CONFIRMED_V449===true&&!CLOUD_ATOMIC_SYNC_PENDING_V448;}
 if(typeof window!=='undefined')window.cloudRevisionSafeForWriteV449=cloudRevisionSafeForWriteV449;
 
+const FULL_SALES_CARD_SNAPSHOT_KEY_V526='lover_full_sales_card_snapshot_v526';
+function markFullSalesCardSnapshotV526(revision){
+  const rev=Number(revision||0);
+  try{localStorage.setItem(FULL_SALES_CARD_SNAPSHOT_KEY_V526,JSON.stringify({salesCardRevision:rev,at:Date.now()}))}catch(_){}
+}
+function readTrustedAllSalesCardsSnapshotV526(){
+  try{
+    if(!cloudRevisionSafeForWriteV449())return null;
+    const priority=getPrioritySyncLocalV315()||{};
+    if(!Object.prototype.hasOwnProperty.call(priority,'salesCardRevision'))return null;
+    const revision=Number(priority.salesCardRevision||0);
+    if(Array.isArray(allSalesProductLinksCacheV216?.links))return allSalesProductLinksCacheV216.links;
+
+    const marker=JSON.parse(localStorage.getItem(FULL_SALES_CARD_SNAPSHOT_KEY_V526)||'{}');
+    if(Number(marker?.salesCardRevision)!==revision){
+      const profitMarker=JSON.parse(localStorage.getItem('lover_profit_snapshot_meta_v496')||'{}');
+      if(Number(profitMarker?.salesCardRevision)!==revision)return null;
+      const profitDays=readViewCacheMapV237(PROFIT_CACHE_KEY_V237);
+      const profitLinks=Object.values(profitDays||{}).flatMap(rec=>Array.isArray(rec?.links)?rec.links:[]);
+      return typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(profitLinks):profitLinks;
+    }
+
+    const contexts=readSalesCardPersistentCacheV232();
+    const links=Object.values(contexts||{}).flatMap(rec=>Array.isArray(rec?.links)?rec.links:[]);
+    return typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(links):links;
+  }catch(_){return null}
+}
+if(typeof window!=='undefined')window.readTrustedAllSalesCardsSnapshotV526=readTrustedAllSalesCardsSnapshotV526;
+
 function hasLocalSalesDraftRiskV449(){
   // V46.0: only a card that is actively being edited in the DOM blocks an
   // authoritative cloud commit. Durable pending drafts are reconciled against
@@ -375,6 +404,7 @@ function commitAllSalesCardsAtomicV449(allLinks,verifiedRevisionV452=0){
   // V46.0 atomic authority: card caches and every profit cache are rebuilt
   // from this exact same cloud snapshot before any visible repaint.
   rebuildProfitCachesFromAuthoritativeCardsV453(links);
+  markFullSalesCardSnapshotV526(verifiedRevisionV452);
   try{
     if(typeof renderSelectedDayGrandV362==='function'){['daily','fair','live'].forEach(t=>renderSelectedDayGrandV362(t));}
   }catch(_){}
