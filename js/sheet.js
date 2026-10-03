@@ -1650,7 +1650,7 @@ async function saveSalesProductLinksV206(items, saveMode="confirm", restoreGener
   const hasExpectedV450=hasOverrideV452||Object.prototype.hasOwnProperty.call(priorityV450||{},'salesCardRevision');
   const expectedSalesCardRevisionV450=hasOverrideV452?Number(expectedSalesCardRevisionOverrideV452||0):(hasExpectedV450?Number(priorityV450.salesCardRevision||0):'');
   const json = await jsonp({ action:"saveSalesProductLinks", itemsJson:JSON.stringify(items||[]), deletedLinkIdsJson:JSON.stringify(Array.isArray(deletedLinkIds)?deletedLinkIds:[]), saveMode:String(saveMode||"confirm"), restoreGeneration, clientDeviceId, clientSequence, expectedSalesCardRevision:expectedSalesCardRevisionV450 }, { timeoutMs:30000 });
-  if (!json.ok) throw new Error(json.message || "盆栽资料保存失败");
+  if (!json?.ok){const errorV527=new Error(json?.message||"盆栽资料保存失败");errorV527.cloudRejectedV527=Boolean(json&&json.ok===false);throw errorV527;}
   if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
   if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
   const first=Array.isArray(items)&&items.length?items[0]:null;
@@ -1844,6 +1844,7 @@ async function loadSalesProductLinksV206(type,date,location,options={}) {
       const p=getPrioritySyncLocalV315();
       setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()});
       if(typeof markSalesCardContextVerifiedV451==='function')markSalesCardContextVerifiedV451(type,date,location,Number(json.salesCardRevision||0));
+      if(typeof resolveSalesConfirmationFromCloudV527==='function')resolveSalesConfirmationFromCloudV527(type,date,location,links);
     }
     return links;
   })().finally(()=>salesProductLinksPendingV216.delete(key));
