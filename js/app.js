@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5240",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5250",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5240";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5250";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5886,7 +5886,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5240",
+    version:"5250",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6379,7 +6379,7 @@ function scheduleCompleteSalesCardReconcileV425(type,date,location){
   setTimeout(()=>reconcileCompleteSalesCardContextV425(type,date,location),120);
 }
 
-// V52.4: a draft can reach Apps Script even when its reply times out. Read
+// V52.5: a draft can reach Apps Script even when its reply times out. Read
 // the exact context only after an ambiguous failure; accept it as saved only
 // when every submitted editable field and deletion matches the cloud.
 function salesCardRetryableReplyV521(error){return /超时|timeout|context 已有其他设备的新修改/i.test(String(error?.message||error))}
@@ -7178,7 +7178,7 @@ window.reconcileVisibleSalesCardAckV407=reconcileVisibleSalesCardAckV407;
 
 // V29.9: Sales-side inventory confirmation removed. Import is the only inventory authority.
 
-// V52.4: background diagnostics/reminders must never compete with the initial
+// V52.5: background diagnostics/reminders must never compete with the initial
 // business-data sync, a user-requested Backup, or precise Sales Card navigation.
 // Only optional read-only jobs use this queue; save/update/delete paths are unchanged.
 let SALES_OPTIONAL_CLOUD_READ_TAIL_V524=Promise.resolve();
@@ -7203,6 +7203,72 @@ function scheduleOptionalCloudReadAfterInitialV524(name,task,delay=0){
   if(typeof isInitialCloudSyncFinished==='function'&&isInitialCloudSyncFinished())start();
   else window.addEventListener('lover-sales-initial-sync-complete',start,{once:true});
 }
+
+const SALES_EXACT_CONTEXT_SEQ_V525={daily:0,fair:0,live:0};
+async function loadExactSalesCardContextV525(type,{forceCloud=true,renderWhenOpen=true}={}){
+  if(!['daily','fair','live'].includes(String(type||'')))return null;
+  const ctx=productLinkContextV206(type);
+  if(!ctx.date||!String(ctx.location||'').trim())return null;
+  if(typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238(type)){
+    return typeof getCachedSalesProductLinksV216==='function'?getCachedSalesProductLinksV216(type,ctx.date,ctx.location):null;
+  }
+  const seq=++SALES_EXACT_CONTEXT_SEQ_V525[type];
+  const contextKey=salesCardContextKeyV245(type,ctx.date,ctx.location);
+  const pre=productLinkPreV208(type),body=document.getElementById(pre+'ProductLinkBody');
+  const open=!!body&&!body.classList.contains('hidden');
+  if(open&&renderWhenOpen&&typeof renderProductLinksLoadingV231==='function')renderProductLinksLoadingV231(type);
+  try{
+    if(typeof waitForCoreCloudSyncV524==='function')await waitForCoreCloudSyncV524();
+    const pendingKey=typeof salesDraftPendingKeyV314==='function'?salesDraftPendingKeyV314(type,ctx.date,ctx.location):'';
+    const pending=pendingKey&&typeof readSalesDraftPendingV314==='function'?readSalesDraftPendingV314()[pendingKey]:null;
+    let links;
+    if(pending&&Array.isArray(pending.items)){
+      links=pending.items;
+      if(typeof syncQueuedSalesDraftV314==='function')setTimeout(()=>syncQueuedSalesDraftV314(pendingKey,String(pending.token||'')).catch(()=>{}),0);
+    }else if(forceCloud&&typeof loadSalesProductLinksV206==='function'){
+      links=await loadSalesProductLinksV206(type,ctx.date,ctx.location,{force:true,maxAgeMs:0,timeoutMs:25000});
+    }else{
+      links=await loadProductLinksIntoEditorV206(type);
+    }
+    if(seq!==SALES_EXACT_CONTEXT_SEQ_V525[type])return null;
+    const current=productLinkContextV206(type);
+    if(salesCardContextKeyV245(type,current.date,current.location)!==contextKey)return null;
+    const safe=typeof filterDeletedSalesLinksV350==='function'?filterDeletedSalesLinksV350(type,ctx.date,ctx.location,Array.isArray(links)?links:[]):(Array.isArray(links)?links:[]);
+    const final=typeof captureSalesCardFinalStatesV431==='function'?captureSalesCardFinalStatesV431(type,ctx.date,ctx.location,safe):safe;
+    if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,final);
+    if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,final);
+    if(open&&renderWhenOpen&&typeof renderProductLinksEditorV206==='function'){
+      renderProductLinksEditorV206(type,final);
+      if(typeof applyCloudDraftStatusesV322==='function')applyCloudDraftStatusesV322(type,final);
+    }
+    return final;
+  }catch(e){
+    if(seq!==SALES_EXACT_CONTEXT_SEQ_V525[type])return null;
+    if(open&&renderWhenOpen){
+      const wrap=document.getElementById(pre+'ProductItems');
+      if(wrap)wrap.innerHTML=`<button type="button" class="secondary-btn" onclick="loadExactSalesCardContextV525('${type}',{forceCloud:true,renderWhenOpen:true})">销售卡读取失败 · 点击重试</button>`;
+    }
+    return null;
+  }
+}
+window.loadExactSalesCardContextV525=loadExactSalesCardContextV525;
+
+function scheduleExactContextSelectionV525(type){
+  setTimeout(()=>loadExactSalesCardContextV525(type,{forceCloud:true,renderWhenOpen:true}).catch(()=>{}),0);
+}
+function installExactContextSelectionV525(){
+  [
+    ['company','daily'],['saleDate','daily'],
+    ['fairLocation','fair'],['fairStart','fair'],
+    ['liveHost','live'],['liveDate','live']
+  ].forEach(([id,type])=>{
+    const el=document.getElementById(id);
+    if(!el||el.dataset.exactContextV525==='1')return;
+    el.dataset.exactContextV525='1';
+    el.addEventListener('change',()=>scheduleExactContextSelectionV525(type));
+  });
+}
+setTimeout(installExactContextSelectionV525,0);
 
 async function openPendingInventorySalesCardV250(raw){
   const item=typeof raw==="string"?JSON.parse(raw):raw;if(!item)return;
@@ -7233,8 +7299,13 @@ async function openPendingInventorySalesCardV250(raw){
       const iso=displayToISO(item.date);
       setDateControl("fairStart",iso);
       setDateControl("fairEnd",iso);
+      // V52.5: a remote Fair context may not exist on this device yet. Setting
+      // the input value programmatically does not fire the user's change event,
+      // so explicitly establish the editor before loading/highlighting the card.
+      if(typeof updateFairPageMode==="function")updateFairPageMode();
+      if(typeof updateFairSingleAmountV353==="function")updateFairSingleAmountV353();
       if(typeof syncFairInputs==="function")syncFairInputs();
-      if(typeof syncFairProductDatesV203==="function")syncFairProductDatesV203();
+      if(typeof syncFairProductDatesV203==="function")syncFairProductDatesV203(true);
       const sel=document.getElementById("fairProductDate");if(sel)sel.value=item.date;
     }
 
@@ -7243,7 +7314,7 @@ async function openPendingInventorySalesCardV250(raw){
       body.classList.remove("hidden");if(box)box.classList.remove("product-link-collapsed");
       const toggle=box?.querySelector(".product-link-toggle");if(toggle)toggle.setAttribute("aria-expanded","true");
     }
-    const loaded=await loadProductLinksIntoEditorV206(type);
+    const loaded=await loadExactSalesCardContextV525(type,{forceCloud:true,renderWhenOpen:true});
     if(loaded===null){alert('对应销售卡读取超时，尚未跳转。资料没有被修改，请稍后再点一次。');return false}
     const target={transactionId:targetTransactionId,linkId:String(item.linkId||'')};
     for(const waitMs of [0,120,350,700,1200]){
@@ -7934,16 +8005,43 @@ setTimeout(()=>{installFairLiveParityV356();if(document.getElementById('page-fai
    legacy session date ranges are never applied to the active editor.
 */
 let fairLocationDeletedKeysCloudV358=new Set();
-async function refreshFairLocationHistoryCloudV358(){
-  try{
-    const r=await loadFairSessionsFromSheetV281();
-    fairSessionsCloudV281=Array.isArray(r?.sessions)?r.sessions:[];
-    fairLocationDeletedKeysCloudV358=new Set(Array.isArray(r?.deletedKeys)?r.deletedKeys.map(String):[]);
-    renderFairLocationOptions();
-    return fairSessionsCloudV281;
-  }catch(e){console.warn('Fair location history cloud sync failed',e);return fairSessionsCloudV281}
+let fairLocationHistoryPromiseV525=null;
+let fairLocationHistoryLoadedAtV525=0;
+async function refreshFairLocationHistoryCloudV358(options={}){
+  const force=options&&options.force===true;
+  if(!force&&fairLocationHistoryLoadedAtV525&&Date.now()-fairLocationHistoryLoadedAtV525<300000)return fairSessionsCloudV281;
+  if(fairLocationHistoryPromiseV525)return fairLocationHistoryPromiseV525;
+  fairLocationHistoryPromiseV525=(async()=>{
+    try{
+      const r=await loadFairSessionsFromSheetV281();
+      fairSessionsCloudV281=Array.isArray(r?.sessions)?r.sessions:[];
+      fairLocationDeletedKeysCloudV358=new Set(Array.isArray(r?.deletedKeys)?r.deletedKeys.map(String):[]);
+      fairLocationHistoryLoadedAtV525=Date.now();
+      renderFairLocationOptions();
+      return fairSessionsCloudV281;
+    }catch(e){console.warn('Fair location history cloud sync failed',e);return fairSessionsCloudV281}
+    finally{fairLocationHistoryPromiseV525=null}
+  })();
+  return fairLocationHistoryPromiseV525;
 }
 window.refreshFairLocationHistoryCloudV358=refreshFairLocationHistoryCloudV358;
+
+async function selectFairLocationAtomicV525(rawLocation,{forceCloud=true}={}){
+  const input=document.getElementById('fairLocation');
+  const loc=canonicalLocation(String(rawLocation||''));
+  if(!input||!loc)return false;
+  input.value=loc;
+  if(typeof saveFairLocation==='function')saveFairLocation(loc);
+  if(typeof updateFairPageMode==='function')updateFairPageMode();
+  if(typeof updateFairSingleAmountV353==='function')updateFairSingleAmountV353();
+  if(typeof syncFairInputs==='function')syncFairInputs();
+  if(typeof syncFairProductDatesV203==='function')syncFairProductDatesV203(true);
+  if(typeof renderFairDailySummary==='function')renderFairDailySummary();
+  if(typeof renderFairMonthlyList==='function')renderFairMonthlyList();
+  const loaded=await loadExactSalesCardContextV525('fair',{forceCloud,renderWhenOpen:true});
+  return loaded!==null;
+}
+window.selectFairLocationAtomicV525=selectFairLocationAtomicV525;
 
 collectFairLocations=function(){
   const merged=[];
@@ -7967,7 +8065,7 @@ renderFairLocationHistoryV309=function(){
     const row=document.createElement('div');row.className='fair-location-history-row-v309';
     const choose=document.createElement('button');choose.type='button';choose.className='fair-location-history-choose-v309';choose.textContent=loc;
     choose.addEventListener('pointerdown',e=>e.preventDefault());
-    choose.addEventListener('click',()=>{const input=document.getElementById('fairLocation');if(input)input.value=canonicalLocation(loc);updateFairPageMode();updateFairSingleAmountV353();refreshProductLinkContextV210('fair');panel.classList.add('hidden');input?.blur();});
+    choose.addEventListener('click',()=>{panel.classList.add('hidden');selectFairLocationAtomicV525(loc,{forceCloud:true}).catch(()=>{});document.getElementById('fairLocation')?.blur();});
     const del=document.createElement('button');del.type='button';del.className='fair-location-history-delete-v309';del.setAttribute('aria-label',`删除 ${loc}`);del.textContent='×';
     del.addEventListener('pointerdown',e=>e.preventDefault());
     del.addEventListener('click',async e=>{e.preventDefault();e.stopPropagation();if(!confirm(`确定从历史地点删除「${loc}」？\n\n只删除地点选项，不会删除旧营业额、销售卡或利润资料。`))return;
@@ -8001,8 +8099,10 @@ function bindFairLocationDropdownV358(){
 const _installFairLiveParityV358=installFairLiveParityV356;
 installFairLiveParityV356=function(){const r=_installFairLiveParityV358();const input=document.getElementById('fairLocation');if(input){delete input.dataset.v358History;delete input.dataset.v359History;}bindFairLocationDropdownV358();return r};
 const _showPageV358=showPage;
-showPage=function(name,el){const r=_showPageV358(name,el);if(r===false)return false;if(name==='fair'){bindFairLocationDropdownV358();refreshFairLocationHistoryCloudV358()}return r};
+showPage=function(name,el){const r=_showPageV358(name,el);if(r===false)return false;if(name==='fair'){bindFairLocationDropdownV358();runOptionalCloudReadV524('fair-location-open',()=>refreshFairLocationHistoryCloudV358()).catch(()=>{})}return r};
 window.showPage=showPage;
+
+scheduleOptionalCloudReadAfterInitialV524('fair-location-startup',()=>refreshFairLocationHistoryCloudV358({force:true}),700);
 
 // After authoritative Fair save, refresh shared history so this device also
 // reflects the canonical cloud spelling/status immediately.
@@ -9386,12 +9486,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5240'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5250'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5240')issues.push(`Frontend / API 版本不一致（Frontend 5240 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5250')issues.push(`Frontend / API 版本不一致（Frontend 5250 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5240';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5250';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){

@@ -1795,7 +1795,7 @@ async function loadSalesProductLinksV206(type,date,location,options={}) {
   if(!options.force&&cached&&Date.now()-cached.at<maxAge)return cached.links;
   if(salesProductLinksPendingV216.has(key))return salesProductLinksPendingV216.get(key);
   const pending=(async()=>{
-    const json=await jsonp({action:"getSalesProductLinks",type,date,location},{timeoutMs:12000});
+    const json=await jsonp({action:"getSalesProductLinks",type,date,location},{timeoutMs:Number(options.timeoutMs||12000)});
     if(!json.ok)throw new Error(json.message||"读取盆栽关联资料失败");
     const links=setCachedSalesProductLinksV216(type,date,location,Array.isArray(json.links)?json.links:[]);
     // V46.0 exact-context request is card+profit authority for this context.
