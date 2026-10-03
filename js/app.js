@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5220",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5230",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5220";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5230";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5884,7 +5884,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5220",
+    version:"5230",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6366,7 +6366,7 @@ function scheduleCompleteSalesCardReconcileV425(type,date,location){
   setTimeout(()=>reconcileCompleteSalesCardContextV425(type,date,location),120);
 }
 
-// V52.2: a draft can reach Apps Script even when its reply times out. Read
+// V52.3: a draft can reach Apps Script even when its reply times out. Read
 // the exact context only after an ambiguous failure; accept it as saved only
 // when every submitted editable field and deletion matches the cloud.
 function salesCardRetryableReplyV521(error){return /超时|timeout|context 已有其他设备的新修改/i.test(String(error?.message||error))}
@@ -7168,9 +7168,14 @@ window.reconcileVisibleSalesCardAckV407=reconcileVisibleSalesCardAckV407;
 async function openPendingInventorySalesCardV250(raw){
   const item=typeof raw==="string"?JSON.parse(raw):raw;if(!item)return;
   const type=String(item.type||"").toLowerCase();
+  const targetTransactionId=String(item.transactionId||item.txn||item.saleId||"").trim();
+  if(!['daily','fair','live'].includes(type)||!targetTransactionId){alert('无法识别这张销售卡，请重新打开未处理销售卡清单。');return false}
+  const before=productLinkContextV206(type);
+  const changingContext=String(before.date||'')!==String(item.date||'')||String(before.location||'').trim().toLowerCase()!==String(item.location||'').trim().toLowerCase();
+  if(changingContext&&typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238(type)&&!confirmDiscardSalesCardChangesV238(type))return false;
   const page=type==="daily"?"sales":type;
   const nav=document.querySelector(`.nav-item[data-page="${page}"]`);
-  if(nav)showPage(page,nav);
+  if(nav&&showPage(page,nav)===false)return false;
   await new Promise(r=>setTimeout(r,0));
 
   if(type==="daily"){
@@ -7197,10 +7202,13 @@ async function openPendingInventorySalesCardV250(raw){
     const toggle=box?.querySelector(".product-link-toggle");if(toggle)toggle.setAttribute("aria-expanded","true");
   }
   await loadProductLinksIntoEditorV206(type);
-  setTimeout(()=>{
-    const card=salesCardWrappersV239(type).find(c=>String(c.dataset.transactionId||"")===String(item.transactionId||""));
-    if(card)card.scrollIntoView({behavior:"smooth",block:"center"});
-  },100);
+  const target={transactionId:targetTransactionId,linkId:String(item.linkId||'')};
+  for(const waitMs of [0,120,350,700]){
+    if(waitMs)await new Promise(resolve=>setTimeout(resolve,waitMs));
+    if(highlightAssociatedSalesCardV370(type,target))return true;
+  }
+  alert('已经打开对应日期和地点，但暂时找不到该销售卡。请重新打开未处理销售卡清单再试。');
+  return false;
 }
 window.openPendingInventorySalesCardV250=openPendingInventorySalesCardV250;
 
@@ -8428,7 +8436,7 @@ function collectUnconfirmedDraftsV369(allLinks){
     const type=String(x?.type||''),date=String(x?.date||''),location=String(x?.location||'').trim();
     const txn=String(x?.transactionId||x?.saleId||x?.linkId||'').trim()||[type,date,location].join('|');
     const key=[type,date,location.toLowerCase(),txn].join('|');
-    let g=groups.get(key);if(!g){g={key,type,date,location,txn,total:0,updatedMs:0};groups.set(key,g)}
+    let g=groups.get(key);if(!g){g={key,type,date,location,txn,transactionId:txn,total:0,updatedMs:0};groups.set(key,g)}
     g.total+=Number(x?.actualPrice||0);
     g.updatedMs=Math.max(g.updatedMs,Number(localSavedAt||0),parseSalesDraftTimestampV369(x?.updatedAt||x?.createdAt));
   };
@@ -9322,12 +9330,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5220'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5230'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5220')issues.push(`Frontend / API 版本不一致（Frontend 5220 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5230')issues.push(`Frontend / API 版本不一致（Frontend 5230 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5220';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5230';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
