@@ -160,20 +160,6 @@ function salesCardContextNeedsVerifyV451(type,date,location){
   return Number(all[salesCardContextVerifyKeyV451(type,date,location)]||0)!==rev;
 }
 if(typeof window!=="undefined"){window.markSalesCardContextVerifiedV451=markSalesCardContextVerifiedV451;window.salesCardContextNeedsVerifyV451=salesCardContextNeedsVerifyV451;}
-async function checkPriorityRevisionV315(timeoutMs=8000){return jsonp({action:"priorityRevisionV315"},{timeoutMs});}
-async function refreshVisibleSalesCardsAfterCloudRevisionV444(){
-  const types=['daily','fair','live'];
-  const tasks=[];
-  for(const type of types){
-    try{
-      if(typeof productLinkBoxIsOpenV210==='function'&&productLinkBoxIsOpenV210(type)&&typeof loadProductLinksIntoEditorV206==='function'){
-        tasks.push(Promise.resolve(loadProductLinksIntoEditorV206(type)));
-      }
-    }catch(_){}
-  }
-  if(tasks.length)await Promise.allSettled(tasks);
-}
-
 // V46.0 authoritative cross-device refresh. When the Sales Card revision changes,
 // fetch ONE complete active Sales Card snapshot from cloud. Do not clear any
 // local card cache before that request succeeds. The snapshot is committed in
@@ -1648,23 +1634,6 @@ async function syncPendingRows() {
   }
 }
 
-async function saveSalesProductLinkV203(payload) {
-  const safePayload={...(payload||{})};
-  if(!String(safePayload.linkId||'').trim()){
-    const tx=String(safePayload.transactionId||'').trim().replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80),order=Math.max(1,Number(safePayload.productOrder||1));
-    safePayload.linkId=tx?('spl_v514_'+tx+'_'+order):('spl_v514_'+Date.now()+'_'+Math.random().toString(36).slice(2,10));
-    if(payload&&typeof payload==='object')payload.linkId=safePayload.linkId;
-  }
-  const json = await jsonp({
-    action: "saveSalesProductLink",
-    ...safePayload
-  }, { timeoutMs: 20000 });
-  if (!json.ok) throw new Error(json.message || "盆栽资料保存失败");
-  if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
-  if(json.salesCardRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()})}
-  return json.link || null;
-}
-
 async function loadPendingInventorySalesCardsV250() {
   const json = await jsonp({ action:"getPendingInventorySalesCardsV250", _:Date.now() }, { timeoutMs:10000 });
   if (!json.ok) throw new Error(json.message || "读取库存待处理记录失败");
@@ -1836,11 +1805,6 @@ function getCachedSalesProductLinksV216(type,date,location){
     return persistent;
   }
   return null;
-}
-function getSessionSalesProductLinksCacheV244(type,date,location){
-  const rec=salesProductLinksCacheV216.get(salesProductLinksCacheKeyV216(type,date,location));
-  if(!rec||rec.source==="persistent")return null;
-  return Array.isArray(rec.links)?rec.links:null;
 }
 function setCachedSalesProductLinksV216(type,date,location,links){
   const safe=typeof dedupeAuthoritativeSalesLinksV354==="function"?dedupeAuthoritativeSalesLinksV354(links):(Array.isArray(links)?links:[]);
@@ -2075,19 +2039,6 @@ function saveFairBatchToSheet(location, records, foregroundSave=false, turnoverE
   return task;
 }
 
-async function saveFairSingleToSheet(date, location, amount, clientUpdatedAt = "") {
-  return saveFairBatchToSheet(location, [{
-    date,
-    amount,
-    clientUpdatedAt
-  }]);
-}
-
-async function saveFairToSheet(location, records) {
-  return saveFairBatchToSheet(location, records);
-}
-
-
 async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientDeviceId="", clientSequence=0, baseCloudUpdatedAt="", foregroundSave=false, restoreGeneration=getLocalRestoreGenerationV347(), notificationMeta={}, turnoverEntries=null) {
   const json = await jsonp({
     action: "saveLive",
@@ -2109,27 +2060,6 @@ async function saveLiveToSheet(date, host, amount, clientUpdatedAt = "", clientD
   Promise.resolve(loadSalesChangeLogFromSheetV200("live",date,{force:true})).catch(()=>{});
   const row=json.row||null;if(row&&json.turnoverEntriesRecord)row.turnoverEntriesRecord=json.turnoverEntriesRecord;
   return row;
-}
-
-async function saveCommissionSettingsToSheet(settings, targetMonth = "") {
-  return runSettingsWrite(async () => {
-    const json = await jsonp({
-      action: "saveCommissionSettings",
-      rate1: settings.rate1,
-      rate2: settings.rate2,
-      rate3: settings.rate3,
-      liveHostRates: JSON.stringify(settings.liveHostRates || {}),
-      liveHosts: JSON.stringify(settings.liveHosts || {}),
-      inactiveLiveHosts: JSON.stringify(settings.inactiveLiveHosts || {}),
-      liveRateSchedules: JSON.stringify(settings.liveRateSchedules || []),
-      fairRevision: Number(settings.fairRevision || 0),
-      liveRevision: Number(settings.liveRevision || 0),
-      targetMonth: targetMonth || ""
-    }, { timeoutMs: 20000 });
-    if (!json.ok) throw new Error(json.message || "佣金设置储存失败");
-    applyLocalDataRevision(json.dataRevision);
-    return json.commissionSettings || null;
-  });
 }
 
 async function saveCommissionFastRequest_(action, settings, targetMonth = "") {
@@ -2171,13 +2101,6 @@ async function saveLiveCommissionSettingsToSheet(settings, targetMonth = "") {
   return runSettingsWrite(() =>
     saveCommissionFastRequest_("saveLiveCommissionFast", settings, targetMonth)
   );
-}
-
-async function resetCommissionSettingsInSheet() {
-  const json = await jsonp({ action: "resetCommissionSettings" });
-  if (!json.ok) throw new Error(json.message || "恢复默认值失败");
-  applyLocalDataRevision(json.dataRevision);
-  return json.commissionSettings || null;
 }
 
 setInterval(() => {
@@ -2249,40 +2172,6 @@ async function continueRestoreJobV234(jobId){
 }
 
 
-async function loadAccessSettingsFromSheet() {
-  const json = await jsonp({ action: "loadAccessSettings" });
-  if (!json.ok) throw new Error(json.message || "读取密码设置失败");
-  return json.accessSettings || null;
-}
-
-async function saveAccessSettingsToSheet(settings) {
-  return runSettingsWrite(async () => {
-    const json = await jsonp({
-      action: "saveAccessSettings",
-      accessPasswordHash: settings.accessPasswordHash,
-      accessPasswordHint: settings.accessPasswordHint,
-      expectedAccessRevision:Number(settings.accessRevision||0)
-    }, { timeoutMs: 20000 });
-    if (!json.ok) throw new Error(json.message || "密码设置同步失败");
-    return json.accessSettings || null;
-  });
-}
-
-
-async function verifyAccessBackendVersion() {
-  const json = await jsonp({
-    action: "accessVersion"
-  });
-
-  if (!json.ok ||
-      json.accessSettingsSupported !== true) {
-    throw new Error(
-      "Google Apps Script 密码功能未部署"
-    );
-  }
-
-  return json;
-}
 // V29.9 stable API alias: UI save function must never shadow the transport function.
 async function deleteSalesTransactionV256(saleId){
   // V46.0: deletion has no revision override argument. Always use this device's

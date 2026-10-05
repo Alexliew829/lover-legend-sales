@@ -132,7 +132,6 @@ function showPage(name,el){
   // V29.9: page switching never waits for or triggers cloud sync.
   // Periodic/background sync is handled separately.
 }
-function rowKey(r){const location=r.type==="live"?normalizeLiveHostKey(r.location||""):normalizeFairLocationKey(r.location||"");const company=r.type==="daily"?canonicalDailyCompanyKeyV518(r.company||r.location||""):r.type==="fair"?"fair":r.company;return [r.type,r.date,company,location].join("|")}
 function dedupeRows(list){const m=new Map();list.forEach(r=>{const k=rowKey(r),old=m.get(k),fresh=String(r.clientUpdatedAt||r.updatedAt||""),oldFresh=String(old?.clientUpdatedAt||old?.updatedAt||"");if(!old||fresh>=oldFresh)m.set(k,r)});return [...m.values()]}
 function upsertLocalRow(n){rows=dedupeRows([...rows,n])}
 function getDailyAmount(d,c){const f=rows.find(r=>r.type==="daily"&&r.date===d&&r.company===c);return f?Number(f.amount||0):0}
@@ -378,7 +377,6 @@ function toggleTop3(id,btn){
     scheduleHistoricalHighsCheckV331();
   }
 }
-function fairLocationsThisMonth(){const map=new Map();rows.filter(r=>r.type==="fair"&&sameMonth(r.date)&&Number(r.amount)>0).forEach(r=>{const name=canonicalLocation(r.location||"Fair"),key=normalizeFairLocationKey(name);if(!key)return;const prev=map.get(key);if(!prev||displayToISO(r.date)>=displayToISO(prev.date))map.set(key,{name,date:r.date})});return [...map.values()].map(x=>x.name).sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"}))}
 function fairByLocation(){const map=new Map();rows.filter(r=>r.type==="fair"&&sameMonth(r.date)&&Number(r.amount)>0).forEach(r=>{const name=canonicalLocation(r.location||"Fair"),key=normalizeFairLocationKey(name);if(!key)return;const prev=map.get(key)||{name,date:"",amount:0};prev.amount+=Number(r.amount||0);if(!prev.date||displayToISO(r.date)>=displayToISO(prev.date)){prev.name=name;prev.date=r.date}map.set(key,prev)});const out={};map.forEach(v=>out[v.name]=v.amount);return out}
 // V42.3: click a Home Fair location to expand its newest month, plus the
 // immediately preceding month only when that location has records in it.
@@ -415,13 +413,6 @@ let fairHomeProfitIndexV423=new Map();
 let fairHomeProfitVerifyTimerV423=null;
 let fairHomeHistoryRowsCacheV423=new Map();
 let fairHomeCombinedRateCacheV423=null;
-function fairCommissionRateForMonthV423(month){
-  const monthTotal=dedupeRows(rows).filter(r=>r.type==="fair"&&displayToISO(r.date).slice(0,7)===month).reduce((sum,r)=>sum+Number(r.amount||0),0);
-  const settings=getCommissionSettingsForMonth(month);
-  if(monthTotal>=100000)return Number(settings.rate3||0)/100;
-  if(monthTotal>=50000)return Number(settings.rate2||0)/100;
-  return Number(settings.rate1||0)/100;
-}
 function fairLocationHistoryRowsV423(locationKey){
   if(fairHomeHistoryRowsCacheV423.has(locationKey))return fairHomeHistoryRowsCacheV423.get(locationKey);
   const map=new Map();
@@ -602,12 +593,6 @@ function dashboardDateTypeAmount(type){
 function hasDashboardDateTypeRecord(type){
   const date=selectedDashboardDateDisplay();
   return rows.some(r=>r.type===type&&r.date===date);
-}
-
-function dashboardDateLabel(){
-  return selectedDashboardDateISO()===todayISO()
-    ?"今天"
-    :selectedDashboardDateDisplay();
 }
 
 function renderTodayCompanyStatus(){
@@ -962,17 +947,6 @@ function queueLiveCommissionRetry(settings,targetMonth){
         setSync("Live 佣金等待云端同步",false,true);
       });
   },3500);
-}
-
-function loadCachedCommissionSettings(){
-  try{
-    const cached=JSON.parse(
-      localStorage.getItem("lover_commission_settings_cache")||"null"
-    );
-    if(cached)commissionSettings=normalizeCommissionSettings(cached);
-  }catch(e){
-    commissionSettings={...DEFAULT_COMMISSION_SETTINGS};
-  }
 }
 
 function loadCommissionSettingsForm(){
@@ -1356,12 +1330,6 @@ function renderCompanyDailyV186(company){
  el.innerHTML=`<div class="company-daily-list">${rows2.map(x=>`<div><span>${x.date}</span><b>${money(x.amount)}</b></div>`).join("")}</div>`;
 }
 function toggleCompanyDailyV186(company){companyDailyOpenV186[company]=!companyDailyOpenV186[company];renderCompanyDailyV186(company);}
-function renderDashboard(){const bt=totalBy("daily","balakong","today"),blt=totalBy("daily","belimbing","today"),ft=totalBy("fair","","today"),bm=totalBy("daily","balakong","month"),blm=totalBy("daily","belimbing","month"),fm=totalBy("fair","","month"),by=totalBy("daily","balakong","year"),bly=totalBy("daily","belimbing","year"),fy=totalBy("fair","","year");document.getElementById("balakongMonth").textContent=money(bm);document.getElementById("belimbingMonth").textContent=money(blm);renderFairLocationList();document.getElementById("fairMonthTotal").textContent=money(fm);renderFairCommission(fm);document.getElementById("monthGrandTotal").textContent=money(bm+blm+fm);document.getElementById("balakongYearTotal").textContent=money(by);document.getElementById("belimbingYearTotal").textContent=money(bly);document.getElementById("fairYearTotal").textContent=money(fy);document.getElementById("yearGrandTotal").textContent=money(by+bly+fy);renderTodayCompanyStatus()}
-
-
-function sortReportRows(list){const rank=r=>r.type==="daily"&&r.company==="balakong"?0:r.type==="daily"&&r.company==="belimbing"?1:2;return [...list].sort((a,b)=>rank(a)-rank(b)||canonicalLocation(a.location).localeCompare(canonicalLocation(b.location))||displayToISO(a.date).localeCompare(displayToISO(b.date)))}
-function renderTable(){const s=sortReportRows(dedupeRows(rows).filter(r=>sameMonth(r.date)&&Number(r.amount)>0));document.getElementById("recordTable").innerHTML=s.map(r=>`<tr><td>${r.date}</td><td>${r.type==="fair"?"Fair":"每日"}</td><td>${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}</td><td>${r.location||"-"}</td><td>${money(r.amount)}</td></tr>`).join("")||'<tr><td colspan="5" style="text-align:center;">这个月份还没有记录</td></tr>'}
-function renderAll(){rows=dedupeRows(rows);renderDashboard();renderBusinessTop3();renderTable();updateDailyInputFromSelectedDate();renderFairLocationOptions();updateFairPageMode();renderFairMonthlyList();renderFairDailySummary();renderFairPageTop3();renderLiveDailySummary();renderLiveMonthlyList();renderLivePageTop3()}
 function setDailyTurnoverSaveButtonV382(state){
   const btn=document.getElementById('dailyTurnoverSaveBtnV382');if(!btn)return;
   if(!btn.dataset.idleText)btn.dataset.idleText=btn.textContent;
@@ -1618,11 +1586,9 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
     if(msg){msg.textContent="⚠️ 尚未写入云端，已保留待同步资料";msg.classList.remove("hidden");setTimeout(()=>msg.classList.add("hidden"),5000);}
   }
 }
-function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5290",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5300",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
-function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
   const m=selectedMonth(),closed=systemState.closedMonths.includes(m),history=m!==systemState.currentMonth;
@@ -1638,7 +1604,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5290";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5300";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3090,12 +3056,6 @@ function productLinkContextV206(type){
   return{pre,date,location};
 }
 function productLinkPreV208(type){return type==="live"?"live":type==="daily"?"daily":"fair";}
-function ensureProductLinkFirstCardV208(type){
-  const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
-  if(!wrap)return false;
-  if(!wrap.querySelector('.product-link-item'))addProductLinkItemV209(type);
-  return true;
-}
 function toggleProductLinkBoxV206(type){
   const pre=productLinkPreV208(type),box=document.getElementById(pre+"ProductLinkBox"),body=document.getElementById(pre+"ProductLinkBody");
   if(!box||!body)return;
@@ -3167,92 +3127,6 @@ function recalcProductLinkProfitV211(item){
   if(profitEl)profitEl.value=formatAmount(profit);
   if(marginEl)marginEl.value=Number.isFinite(margin)?margin.toFixed(2)+'%':'0.00%';
 }
-function buildProductLinkItemV209(type,id,data={}){
-  const live=type==="live",linkId=String(data.linkId||""),saved=!!linkId,qty=Math.max(1,Number(data.quantity||1));
-  const item=document.createElement("div");
-  item.className="product-link-item";
-  item.dataset.productLinkItem=String(id);
-  item.dataset.linkId=linkId;
-  item.dataset.saved=saved?"1":"0";
-  item.dataset.dirty="0";
-  item.dataset.minimumPrice=String(Number(data.minimumPrice||0));
-  item.dataset.importMapped=String(data.productId||"")?"1":"0";
-
-  const head=document.createElement("div");head.className="product-link-item-head";
-  const title=document.createElement("b");title.textContent=saved?"已保存":"";
-  if(saved)title.className="product-link-saved-tag";
-  head.append(title);item.appendChild(head);
-
-  const label=(text)=>{const el=document.createElement("label");el.textContent=text;return el};
-  const input=(cls,value,placeholder)=>{const el=document.createElement("input");el.className=cls;el.value=value??"";if(placeholder)el.placeholder=placeholder;return el};
-
-  item.appendChild(label("搜索或输入产品"));
-  const name=input("product-link-name",String(data.productName||""),"输入产品名称、编号或原成本搜索，或直接手动输入");
-  name.dataset.productId=String(data.productId||"");
-  const searchWrap=document.createElement("div");searchWrap.className="product-link-search-wrap";
-  const searchInputRow=document.createElement("div");searchInputRow.className="product-link-search-input-row";
-  searchInputRow.appendChild(name);
-  const searchClose=document.createElement("button");searchClose.type="button";searchClose.className="product-link-search-close";searchClose.textContent="×";searchClose.setAttribute("aria-label","收起产品列表");
-  searchInputRow.appendChild(searchClose);
-  searchWrap.appendChild(searchInputRow);
-  const searchResults=document.createElement("div");searchResults.className="product-link-search-results";searchResults.hidden=true;
-  searchWrap.appendChild(searchResults);
-  item.appendChild(searchWrap);
-  setupImportProductSearchV214(item,name,searchResults,searchClose);
-
-  const grid1=document.createElement("div");grid1.className="product-link-grid";
-  const qWrap=document.createElement("div");qWrap.appendChild(label("数量"));
-  const q=input("product-link-qty qty-input-no-spinner",String(qty));q.type="number";q.min="1";q.step="1";q.inputMode="numeric";qWrap.appendChild(q);
-  const cWrap=document.createElement("div");cWrap.appendChild(label("平均成本"));
-  const c=input("product-link-avg-cost money-input",formatAmount(Number(data.averageCost||0)));c.inputMode="decimal";cWrap.appendChild(c);
-  grid1.append(qWrap,cWrap);item.appendChild(grid1);
-
-  const grid2=document.createElement("div");grid2.className="product-link-grid";
-  const pWrap=document.createElement("div");pWrap.appendChild(label("实际售价"));
-  const p=input("product-link-price money-input",formatAmount(Number(data.actualPrice||0)));p.inputMode="decimal";pWrap.appendChild(p);
-  const minWarn=document.createElement("div");minWarn.className="product-link-minimum-warning";minWarn.hidden=true;pWrap.appendChild(minWarn);
-  const rateWrap=document.createElement("div");rateWrap.appendChild(label(live?"主播佣金 %":"Fair 佣金 %"));
-  const defaultRate=data.commissionRate!==undefined&&data.commissionRate!==null&&data.commissionRate!==""?Number(data.commissionRate):productLinkDefaultCommissionRateV211(type);
-  const rate=input("product-link-commission-rate",Number(defaultRate||0).toFixed(2));rate.type="text";rate.inputMode="decimal";rateWrap.appendChild(rate);
-  const rateHint=document.createElement("div");rateHint.className="product-link-commission-hint";rateHint.innerHTML='<span></span><b class="product-link-commission-amount">RM0.00</b>';rateWrap.appendChild(rateHint);
-  grid2.append(pWrap,rateWrap);item.appendChild(grid2);
-
-  const grid3=document.createElement("div");grid3.className="product-link-grid";
-  const dWrap=document.createElement("div");dWrap.appendChild(label("本地运费"));
-  const d=input("product-link-delivery money-input",formatAmount(Number(data.localDelivery||0)));d.inputMode="decimal";d.dataset.manual=(saved||Number(data.localDelivery||0)>0)?"1":"0";d.addEventListener("input",()=>{d.dataset.manual="1";recalcProductLinkProfitV211(item)});dWrap.appendChild(d);
-  const eWrap=document.createElement("div");eWrap.appendChild(label("附加费用 花盆/苔藓"));
-  const e=input("product-link-extra money-input",formatAmount(Number(data.extraFee||0)));e.inputMode="decimal";eWrap.appendChild(e);
-  grid3.append(dWrap,eWrap);item.appendChild(grid3);
-
-  const grid4=document.createElement("div");grid4.className="product-link-grid product-link-profit-grid";
-  const profitWrap=document.createElement("div");profitWrap.appendChild(label("利润"));
-  const profit=input("product-link-profit money-input","0.00");profit.readOnly=true;profit.tabIndex=-1;profitWrap.appendChild(profit);
-  const marginWrap=document.createElement("div");marginWrap.appendChild(label("利润率"));
-  const margin=input("product-link-profit-rate","0.00%");margin.readOnly=true;margin.tabIndex=-1;marginWrap.appendChild(margin);
-  grid4.append(profitWrap,marginWrap);item.appendChild(grid4);
-
-  item.appendChild(label("备注（顾客网络名字或电话号码）"));
-  const remark=input("product-link-remark",String(data.remark||""),"顾客名字、电话或其他讯息");remark.maxLength=100;item.appendChild(remark);
-  const remove=document.createElement("button");remove.type="button";remove.className="product-link-remove-btn product-link-remove-bottom";remove.textContent="删除销售卡";remove.addEventListener("click",()=>removeProductLinkItemV206(type,id));item.appendChild(remove);
-
-  const recalc=()=>recalcProductLinkProfitV211(item);
-  q.addEventListener("input",recalc);c.addEventListener("input",recalc);rate.addEventListener("input",recalc);e.addEventListener("input",recalc);
-  p.addEventListener("input",()=>{applyLiveDeliveryDefaultItemV206(p);updateProductLinkMinimumWarningV214(item);recalc()});
-  [name,q,c,p,rate,d,e,remark].forEach(el=>el.addEventListener("input",()=>markSalesCardDirtyV238(item)));
-  [c,p,d,e].forEach(el=>el.addEventListener("blur",()=>{el.value=formatAmount(toAmount(el.value||0));recalc();}));
-  rate.addEventListener("blur",()=>{const n=Math.max(0,Number(String(rate.value||"0").replace(/[^0-9.\-]/g,""))||0);rate.value=n.toFixed(2);recalc();});
-  setTimeout(()=>{updateProductLinkMinimumWarningV214(item);recalc()},0);
-  return item;
-}
-function addProductLinkItemV209(type,data={}){
-  const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
-  if(!wrap){console.error("V29.9 product item container missing",type);return false}
-  const id=++productLinkItemSeqV206;
-  const item=buildProductLinkItemV209(type,id,data);
-  wrap.appendChild(item);
-  return true;
-}
-function addProductLinkItemV206(type,data={}){return addProductLinkItemV209(type,data)}
 // Explicit globals keep both legacy and V29.9 button bindings reliable.
 window.addProductLinkItemV206=addProductLinkItemV206;
 window.addProductLinkItemV209=addProductLinkItemV209;
@@ -3267,7 +3141,6 @@ async function removeProductLinkItemV206(type,id){
   }else el.remove();
   if(wrap&&!wrap.children.length)addProductLinkItemV209(type);
 }
-function applyLiveDeliveryDefaultItemV206(priceInput){const item=priceInput?.closest('.product-link-item'),d=item?.querySelector('.product-link-delivery');if(!d||d.dataset.manual==='1')return;d.value=formatAmount(liveDeliveryDefaultV203(toAmount(priceInput.value||0)));}
 function fairDefaultProductDateV277(dates){
   const list=Array.isArray(dates)?dates.filter(Boolean):[];
   if(!list.length)return "";
@@ -3304,37 +3177,6 @@ function handleFairProductDateChangeV342(){
   return true;
 }
 window.handleFairProductDateChangeV342=handleFairProductDateChangeV342;
-function collectProductLinksV206(type){
-  const {pre,date,location}=productLinkContextV206(type),wrap=document.getElementById(pre+"ProductItems"),items=[...(wrap?.querySelectorAll('.product-link-item')||[])];
-  return items.map(item=>{
-    let linkId=String(item.dataset.linkId||"");
-    const productName=String(item.querySelector('.product-link-name')?.value||"").trim(),actualPrice=toAmount(item.querySelector('.product-link-price')?.value||0),remark=String(item.querySelector('.product-link-remark')?.value||"").trim();
-    if(!linkId&&(productName||actualPrice||remark)){linkId="spl_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,10);item.dataset.linkId=linkId;}
-    const quantity=Math.max(0,Number(item.querySelector('.product-link-qty')?.value||0)),averageCost=toAmount(item.querySelector('.product-link-avg-cost')?.value||0),commissionRate=Math.max(0,Number(item.querySelector('.product-link-commission-rate')?.value||0)),localDelivery=toAmount(item.querySelector('.product-link-delivery')?.value||0),extraFee=toAmount(item.querySelector('.product-link-extra')?.value||0);
-    const commissionAmount=actualPrice*commissionRate/100,profit=actualPrice-commissionAmount-(averageCost*quantity)-localDelivery-extraFee,profitRate=actualPrice>0?profit/actualPrice*100:0;
-    const productId=String(item.querySelector(".product-link-name")?.dataset.productId||"");const minimumPrice=Math.max(0,Number(item.dataset.minimumPrice||0));return{linkId,type,date,location,productId,productName,quantity,averageCost,minimumPrice,actualPrice,commissionRate,commissionAmount,localDelivery,extraFee,profit,profitRate,remark};
-  }).filter(x=>x.linkId||x.productName||x.actualPrice||x.remark);
-}
-function renderProductLinksEditorV206(type,links){const {pre}=productLinkContextV206(type),wrap=document.getElementById(pre+"ProductItems");if(!wrap)return;wrap.innerHTML="";const list=Array.isArray(links)?links:[];if(list.length)list.forEach(x=>addProductLinkItemV209(type,x));else addProductLinkItemV209(type);}
-function clearUnsavedSalesCardEditorsV224(){
-  ["live","fair","daily"].forEach(type=>{
-    const pre=productLinkPreV208(type);
-    const wrap=document.getElementById(pre+"ProductItems");
-    if(!wrap)return;
-
-    const cards=[...wrap.querySelectorAll(".product-link-item")];
-    cards.forEach(card=>{
-      const linkId=String(card.dataset.linkId||"").trim();
-      if(!linkId)card.remove();
-    });
-
-    // 已保存销售卡保留；另加一张空白销售卡，方便 Refresh 后马上继续输入。
-    addProductLinkItemV209(type);
-
-    // 不收起销售卡、不切换页面、不改变当天利润开关。
-    if(type==="fair")syncFairProductDatesV203();
-  });
-}
 window.clearUnsavedSalesCardEditorsV224=clearUnsavedSalesCardEditorsV224;
 
 function productLinkBoxIsOpenV210(type){
@@ -3382,55 +3224,6 @@ function salesCardCloudFingerprintV445(links){
   }));
   safe.sort((a,b)=>String(a.transactionId).localeCompare(String(b.transactionId))||a.productOrder-b.productOrder||String(a.linkId).localeCompare(String(b.linkId)));
   return JSON.stringify(safe);
-}
-async function verifyCachedSalesCardContextV445(type,date,location,contextKey,cachedSnapshot){
-  const verifySeq=(SALES_CARD_VERIFY_SEQ_V445[type]||0)+1;
-  SALES_CARD_VERIFY_SEQ_V445[type]=verifySeq;
-  SALES_CARD_VERIFY_PENDING_V445[type]=contextKey;
-  setSync('销售卡核对中...');
-  try{
-    const pendingKey=salesDraftPendingKeyV314(type,date,location);
-    const pending=readSalesDraftPendingV314()[pendingKey];
-    if(pending){
-      setSync('本机销售卡待云端同步');
-      setTimeout(()=>syncQueuedSalesDraftV314(pendingKey,String(pending.token||'')).catch(()=>{}),0);
-      return cachedSnapshot;
-    }
-    let cloudRaw;
-    try{cloudRaw=await loadSalesProductLinksV206(type,date,location,{force:true,maxAgeMs:0});}
-    catch(firstError){await new Promise(resolve=>setTimeout(resolve,350));cloudRaw=await loadSalesProductLinksV206(type,date,location,{force:true,maxAgeMs:0});}
-    const filtered=filterDeletedSalesLinksV350(type,date,location,cloudRaw);
-    const deduped=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(filtered):filtered;
-    pruneSalesCardFinalStatesV447(type,date,location,deduped);
-    const cloud=captureSalesCardFinalStatesV431(type,date,location,deduped);
-    const current=productLinkContextV206(type);
-    const currentKey=salesCardContextKeyV245(type,current.date,current.location);
-    const stillCurrent=SALES_CARD_VERIFY_SEQ_V445[type]===verifySeq&&currentKey===contextKey;
-    const dirty=typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238(type);
-    if(stillCurrent&&!dirty){
-      const changed=salesCardCloudFingerprintV445(cachedSnapshot)!==salesCardCloudFingerprintV445(cloud);
-      if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,date,location,cloud);
-      if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,date,location,cloud);
-      if(changed&&!productImportSearchIsActiveV226(type))renderProductLinksEditorV206(type,cloud);
-      applyCloudDraftStatusesV322(type,cloud);
-    }
-    if(stillCurrent){
-      if(dirty){
-        setSync('销售卡有未保存修改');
-      }else{
-        if(SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-        setSync('已同步',true);
-      }
-    }
-    return cloud;
-  }catch(e){
-    const current=productLinkContextV206(type);
-    const currentKey=salesCardContextKeyV245(type,current.date,current.location);
-    if(SALES_CARD_VERIFY_SEQ_V445[type]===verifySeq&&currentKey===contextKey)setSync('销售卡云端核对失败',false,true);
-    return null;
-  }finally{
-    if(SALES_CARD_VERIFY_SEQ_V445[type]===verifySeq&&SALES_CARD_VERIFY_PENDING_V445[type]===contextKey)SALES_CARD_VERIFY_PENDING_V445[type]='';
-  }
 }
 // V36.0: invalidate any cloud read that began before a local delete/save acknowledgement.
 function invalidateSalesCardLoadRequestsV351(type){
@@ -3580,24 +3373,6 @@ async function loadProductLinksIntoEditorV206(type){
     return null;
   }
 }
-async function saveProductLinksV206(type){
-  const items=collectProductLinksV206(type);if(!items.length){alert("请至少输入一张销售卡；如果这次没有销售卡，可以保持收起，不需要保存。");return null}
-  const first=items[0];if(!first.date||!first.location){alert(type==="live"?"请先选择日期和主播":type==="fair"?"请先选择 Fair 日期和地点":"请先选择日期");return null}
-  for(const x of items){if(!x.productName){alert("每一张销售卡都需要填写产品名称。");return null}if(!Number.isFinite(Number(x.quantity))||Number(x.quantity)<=0){alert("每一张销售卡数量必须大于 0。");return null}}
-  const official=dedupeRows(rows).filter(r=>r.type===type&&r.date===first.date&&(type==="live"?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(first.location):normalizeFairLocationKey(r.location)===normalizeFairLocationKey(first.location))).reduce((m,r)=>Math.max(m,Number(r.amount||0)),0);
-  const batchTotal=items.reduce((s,x)=>s+Number(x.actualPrice||0),0);if(official>0&&batchTotal>official+0.005){alert(`盆栽实际售价合计 RM${formatAmount(batchTotal)} 已超过当天营业额 RM${formatAmount(official)}。`);return null}
-  try{
-    setSync("销售卡同步中...");
-    const result=await saveSalesProductLinksV206(items);
-    renderProductLinksEditorV206(type,result?.links||[]);
-    setSync("销售卡已保存",true);
-    alert("销售卡保存成功。\n\n如有库存变动，请到 Import Cost System 处理。");
-    if(typeof refreshInventoryPendingV250==="function")runOptionalCloudReadV524('inventory-after-card-save',()=>refreshInventoryPendingV250(true)).catch(()=>{});
-    if(result?.warning)alert(result.warning);
-    return result;
-  }
-  catch(e){alert("销售卡保存失败："+(e.message||e));setSync("销售卡同步失败",false,true);return null}
-}
 
 
 /* ================= V29.9 multi-product Sales Card ================= */
@@ -3625,94 +3400,7 @@ function clearSalesCardTransactionDirtyV239(card){
 function salesCardProductsV239(card){
   return [...(card?.querySelectorAll(".product-link-item")||[])];
 }
-function salesCardSharedValuesV239(card){
-  return{
-    commissionRate:Math.max(0,Number(String(card.querySelector(".sales-card-commission-rate-v239")?.value||"0").replace(/[^0-9.\-]/g,""))||0),
-    deliveryTotal:Math.max(0,toAmount(card.querySelector(".sales-card-delivery-total-v239")?.value||0)),
-    extraTotal:Math.max(0,toAmount(card.querySelector(".sales-card-extra-total-v239")?.value||0)),
-    remark:String(card.querySelector(".sales-card-remark-v239")?.value||"").trim()
-  };
-}
-function salesCardAutoDeliveryForItemV239(item){
-  const card=item?.closest?.(".sales-card-transaction-v239");
-  // V50.2: only Live auto-generates 木架＋本地运费. Sales / Fair stay manual.
-  if(String(card?.dataset?.type||"").toLowerCase()!=="live")return 0;
-  const price=toAmount(item.querySelector(".product-link-price")?.value||0);
-  const qty=Math.max(1,Number(item.querySelector(".product-link-qty")?.value||1));
-  return liveDeliveryDefaultV203(price)*qty;
-}
-function allocateSalesCardSharedCostsV239(card){
-  const products=salesCardProductsV239(card);
-  const shared=salesCardSharedValuesV239(card);
-  const prices=products.map(x=>Math.max(0,toAmount(x.querySelector(".product-link-price")?.value||0)));
-  const defaults=products.map(salesCardAutoDeliveryForItemV239);
-  const priceTotal=prices.reduce((a,b)=>a+b,0);
-  const defaultDeliveryTotal=defaults.reduce((a,b)=>a+b,0);
-  const deliveryManual=card.dataset.deliveryManual==="1";
-
-  return products.map((item,i)=>{
-    let delivery=defaults[i];
-    if(deliveryManual){
-      const denom=defaultDeliveryTotal>0?defaultDeliveryTotal:priceTotal;
-      const weight=denom>0?(defaultDeliveryTotal>0?defaults[i]/denom:prices[i]/denom):(products.length?1/products.length:0);
-      delivery=shared.deliveryTotal*weight;
-    }
-    const extraWeight=priceTotal>0?prices[i]/priceTotal:(products.length?1/products.length:0);
-    const extra=shared.extraTotal*extraWeight;
-    const commission=prices[i]*shared.commissionRate/100;
-    return{delivery,extra,commission,price:prices[i],commissionRate:shared.commissionRate};
-  });
-}
-function recalcSalesCardTransactionV239(card){
-  if(!card)return;
-  const products=salesCardProductsV239(card);
-  if(card.dataset.deliveryManual!=="1"){
-    const autoTotal=products.reduce((s,x)=>s+salesCardAutoDeliveryForItemV239(x),0);
-    const d=card.querySelector(".sales-card-delivery-total-v239");
-    if(d)d.value=formatAmount(autoTotal);
-  }
-  const alloc=allocateSalesCardSharedCostsV239(card);
-  let totalPrice=0,totalCost=0,totalProfit=0,totalCommission=0,totalDelivery=0,totalExtra=0;
-  products.forEach((item,i)=>{
-    const qty=Math.max(0,Number(item.querySelector(".product-link-qty")?.value||0));
-    const avgCost=toAmount(item.querySelector(".product-link-avg-cost")?.value||0);
-    const cost=avgCost*qty,price=alloc[i]?.price||0;
-    const profit=price-(alloc[i]?.commission||0)-cost-(alloc[i]?.delivery||0)-(alloc[i]?.extra||0);
-    const rate=price>0?profit/price*100:0;
-    totalPrice+=price;totalCost+=cost;totalProfit+=profit;totalCommission+=(alloc[i]?.commission||0);totalDelivery+=(alloc[i]?.delivery||0);totalExtra+=(alloc[i]?.extra||0);
-    item.dataset.allocatedDelivery=String(alloc[i]?.delivery||0);
-    item.dataset.allocatedExtra=String(alloc[i]?.extra||0);
-    const profitEl=item.querySelector(".product-link-profit");
-    const rateEl=item.querySelector(".product-link-profit-rate");
-    const shipEl=item.querySelector(".product-item-auto-delivery-v239");
-    if(profitEl)profitEl.textContent=formatAmount(profit);
-    if(rateEl)rateEl.textContent=(Number.isFinite(rate)?rate:0).toFixed(2)+"%";
-    if(shipEl)shipEl.textContent="运费 "+formatAmount(alloc[i]?.delivery||0);
-  });
-  const rate=totalPrice>0?totalProfit/totalPrice*100:0;
-  const set=(sel,val)=>{const el=card.querySelector(sel);if(el)el.textContent=val};
-  set(".sales-card-price-total-v239","RM"+formatAmount(totalPrice));
-  // V35.0: displayed total cost uses the same complete cost basis as profit.
-  // Profit itself is intentionally unchanged to avoid double-deducting fees.
-  set(".sales-card-cost-total-v239","RM"+formatAmount(totalCost+totalDelivery+totalExtra+totalCommission));
-  set(".sales-card-commission-amount-v239","RM"+formatAmount(totalCommission));
-  set(".sales-card-profit-total-v239","RM"+formatAmount(totalProfit));
-  set(".sales-card-profit-rate-v239",(Number.isFinite(rate)?rate:0).toFixed(2)+"%");
-  const official=dedupeRows(rows).filter(r=>{
-    const ctx=productLinkContextV206(card.dataset.type);
-    if(r.type!==card.dataset.type||r.date!==ctx.date)return false;
-    return card.dataset.type==="daily"?r.company===(String(ctx.location||'').toLowerCase().includes('balakong')?'balakong':'belimbing'):card.dataset.type==="live"?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(ctx.location):normalizeFairLocationKey(r.location)===normalizeFairLocationKey(ctx.location);
-  }).reduce((m,r)=>Math.max(m,Number(r.amount||0)),0);
-  const warn=card.querySelector(".sales-card-total-warning-v239");
-  if(warn){
-    warn.hidden=!(official>0&&totalPrice>official+0.005);
-    warn.textContent=warn.hidden?"":`这张销售卡售价合计 RM${formatAmount(totalPrice)} 已超过当天营业额 RM${formatAmount(official)}`;
-  }
-}
-
-
 // V29.9 Live 木架等级
-const LIVE_CRATE_V269=[["0","自取0"],["20","A20"],["50","B50"],["80","C80"],["120","D120"],["150","E150"],["180","F180"]];
 function liveCrateRateForPriceV461(price){
   const value=Math.max(0,Number(price||0));
   if(value<300)return 20;
@@ -3722,90 +3410,8 @@ function liveCrateRateForPriceV461(price){
   if(value<5000)return 150;
   return 180;
 }
-function createLiveCrateV269(price=0){
- const s=document.createElement("select");
- s.className="live-crate-v269";
- LIVE_CRATE_V269.forEach(x=>{let o=document.createElement("option");o.value=x[0];o.textContent=x[1];s.appendChild(o)});
- s.value=String(liveCrateRateForPriceV461(price));
- s.dataset.manual="0";
- return s;
-}
 function getLiveCrateV269(item){
  return Number(item?.querySelector(".live-crate-v269")?.value||0);
-}
-function buildProductSubItemV239(type,card,data={},order=1){
-  const id=++productLinkItemSeqV206;
-  const linkId=String(data.linkId||""),saved=!!linkId,qty=Math.max(1,Number(data.quantity||1));
-  const item=document.createElement("div");
-  item.className="product-link-item product-link-subitem-v239";
-  item.dataset.productLinkItem=String(id);
-  item.dataset.linkId=linkId;
-  item.dataset.saved=saved?"1":"0";
-  item.dataset.dirty="0";
-  item.dataset.minimumPrice=String(Number(data.minimumPrice||0));
-  item.dataset.importMapped=String(data.productId||"")?"1":"0";
-  item.dataset.productOrder=String(order);
-  item.dataset.inventoryStatus=String(data.importSyncStatus||"PENDING_IMPORT_LINK");
-
-  const head=document.createElement("div");head.className="product-subitem-head-v239";
-  const title=document.createElement("b");title.className="product-subitem-title-v239";title.textContent=`产品 ${order}`;
-  const remove=document.createElement("button");remove.type="button";remove.className="product-subitem-remove-v239";remove.textContent="删除产品";
-  head.append(title,remove);item.appendChild(head);
-
-  const label=(text)=>{const el=document.createElement("label");el.textContent=text;return el};
-  const input=(cls,value,placeholder)=>{const el=document.createElement("input");el.className=cls;el.value=value??"";if(placeholder)el.placeholder=placeholder;return el};
-
-  item.appendChild(label("搜索或输入产品"));
-  const name=input("product-link-name",String(data.productName||""),"输入产品名称、编号或原成本搜索，或直接手动输入");
-  name.dataset.productId=String(data.productId||"");
-  const searchWrap=document.createElement("div");searchWrap.className="product-link-search-wrap";
-  const searchInputRow=document.createElement("div");searchInputRow.className="product-link-search-input-row";
-  searchInputRow.appendChild(name);
-  const searchClose=document.createElement("button");searchClose.type="button";searchClose.className="product-link-search-close";searchClose.textContent="×";searchClose.setAttribute("aria-label","收起产品列表");
-  searchInputRow.appendChild(searchClose);searchWrap.appendChild(searchInputRow);
-  const searchResults=document.createElement("div");searchResults.className="product-link-search-results";searchResults.hidden=true;
-  searchWrap.appendChild(searchResults);item.appendChild(searchWrap);
-  setupImportProductSearchV214(item,name,searchResults,searchClose);
-
-  const grid=document.createElement("div");grid.className="product-subitem-grid-v239";
-  const qWrap=document.createElement("div");qWrap.appendChild(label("数量"));
-  const q=input("product-link-qty qty-input-no-spinner",String(qty));q.type="number";q.min="1";q.step="1";q.inputMode="numeric";qWrap.appendChild(q);
-  const cWrap=document.createElement("div");cWrap.appendChild(label("平均成本"));
-  const c=input("product-link-avg-cost money-input",formatAmount(Number(data.averageCost||0)));c.inputMode="decimal";cWrap.appendChild(c);
-  const pWrap=document.createElement("div");pWrap.appendChild(label("这棵售价"));
-  const p=input("product-link-price money-input",formatAmount(Number(data.actualPrice||0)));p.inputMode="decimal";pWrap.appendChild(p);
-  const minWarn=document.createElement("div");minWarn.className="product-link-minimum-warning";minWarn.hidden=true;pWrap.appendChild(minWarn);
-  grid.append(qWrap,cWrap,pWrap);item.appendChild(grid);
-
-  const result=document.createElement("div");result.className="product-subitem-result-v239";
-  const crate=document.createElement("span");crate.className="live-crate-wrap-v269";
-  if(String(type).toLowerCase()==="live"){crate.innerHTML="木架等级 ";crate.appendChild(createLiveCrateV269(Number(data.actualPrice||0)));}
-  const ship=document.createElement("span");ship.className="product-item-auto-delivery-v239";ship.textContent="运费 0.00";
-  const profit=document.createElement("span");profit.innerHTML='利润 <b class="product-link-profit">0.00</b>';
-  const rate=document.createElement("span");rate.innerHTML='利润率 <b class="product-link-profit-rate">0.00%</b>';
-  if(String(type).toLowerCase()==="live") result.append(crate,ship,profit,rate); else result.append(ship,profit,rate);
-  item.appendChild(result);
-
-  const onEdit=()=>{markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)};
-  [name,q,c,p].forEach(el=>el.addEventListener("input",onEdit));
-  const legacyLiveCrateV461=item.querySelector(".live-crate-v269");
-  legacyLiveCrateV461?.addEventListener("change",()=>{legacyLiveCrateV461.dataset.manual="1";onEdit()});
-  if(String(type).toLowerCase()==="live")p.addEventListener("input",()=>{
-    if(legacyLiveCrateV461&&legacyLiveCrateV461.dataset.manual!=="1")legacyLiveCrateV461.value=String(liveCrateRateForPriceV461(toAmount(p.value||0)));
-  });
-  [c,p].forEach(el=>el.addEventListener("blur",()=>{
-    el.value=formatAmount(toAmount(el.value||0));
-    // V29.9: blur fires before the Save button click. Re-mark the card dirty here so
-    // a late initialization/render timer can never erase the user's first price edit.
-    markSalesCardDirtyV238(item);
-    markSalesCardTransactionDirtyV239(card);
-    recalcSalesCardTransactionV239(card);
-  }));
-  p.addEventListener("input",()=>updateProductLinkMinimumWarningV214(item));
-  p.addEventListener("change",()=>{markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)});
-  bindSingleTapDeleteProductV254(remove,()=>removeProductFromTransactionV239(type,card,item));
-  setTimeout(()=>{updateProductLinkMinimumWarningV214(item);recalcSalesCardTransactionV239(card)},0);
-  return item;
 }
 
 function renumberTransactionProductsV239(card){
@@ -3899,23 +3505,6 @@ async function removeProductFromTransactionV239(type,card,item){
   markSalesCardTransactionDirtyV239(card);
   card.dataset.productRemovedV259="1";
   recalcSalesCardTransactionV239(card);
-}
-
-function salesCardWriteReadyV449(){
-  // V46.0: do not freeze unrelated work while cloud sync is slow. Existing
-  // devices carry a last-known Sales Card revision on every save/delete and
-  // Code.gs rejects stale writes atomically. Only a device with no known card
-  // revision at all is held during a positively detected cloud refresh.
-  try{
-    const p=typeof getPrioritySyncLocalV315==='function'?getPrioritySyncLocalV315():{};
-    if(Object.prototype.hasOwnProperty.call(p||{},'salesCardRevision'))return true;
-  }catch(_){}
-  return !(typeof window!=='undefined'&&typeof window.cloudAtomicSyncPendingV448==='function'&&window.cloudAtomicSyncPendingV448());
-}
-function requireSalesCardWriteReadyV449(){
-  if(salesCardWriteReadyV449())return true;
-  alert('云端最新版本尚未确认，暂时不能保存、确认或删除销售卡。\n\n系统会继续后台重试；显示「已同步」后再保存，避免旧资料覆盖其他设备的新资料。');
-  return false;
 }
 
 async function deleteSalesCardTransactionV239(type,txnId){
@@ -4117,87 +3706,6 @@ function applyCloudDraftStatusesV322(type,savedLinks){
 }
 window.salesCardIsConfirmedV322=salesCardIsConfirmedV322;
 
-function buildSalesCardTransactionV239(type,dataList=[]){
-  const list=Array.isArray(dataList)&&dataList.length?dataList:[{}];
-  const seed=list[0]||{},txnId=salesCardTxnIdV239(seed);
-  const card=document.createElement("section");
-  card.className="sales-card-transaction-v239";
-  card.dataset.transactionId=txnId;
-  card.dataset.type=type;
-  card.dataset.dirty="0";
-  card.dataset.deliveryManual="0";
-
-  const header=document.createElement("div");header.className="sales-card-header-v239";
-  const title=document.createElement("b");title.textContent=list.some(x=>x.linkId)?"已保存销售卡":"新销售卡";
-  const amountGroup=document.createElement("span");amountGroup.className="sales-card-header-amounts-v427";
-  const total=document.createElement("b");total.className="sales-card-price-total-v239";total.textContent="RM0.00";
-  const grand=document.createElement("b");grand.className="sales-card-grand-total-v427";grand.hidden=true;grand.textContent="卡总数：RM0.00";
-  amountGroup.append(total,grand);header.append(title,amountGroup);card.appendChild(header);
-
-  // V29.9: Sales only reminds. Inventory confirmation is handled in Import Cost System.
-  const inventoryBox=document.createElement("div");inventoryBox.className="sales-card-inventory-v249";inventoryBox.hidden=true;
-  const renderInventoryStatus=()=>{inventoryBox.hidden=true;inventoryBox.innerHTML="";};
-  card.appendChild(inventoryBox);
-  card._renderInventoryStatusV249=renderInventoryStatus;
-
-  const products=document.createElement("div");products.className="sales-card-products-v239";card.appendChild(products);
-  list.sort((a,b)=>Number(a.productOrder||0)-Number(b.productOrder||0)).forEach((x,i)=>products.appendChild(buildProductSubItemV239(type,card,x,i+1)));
-  setTimeout(()=>{if(card._renderInventoryStatusV249)card._renderInventoryStatusV249()},0);
-
-  const add=document.createElement("button");add.type="button";add.className="secondary-btn sales-card-add-product-v239";add.textContent="＋ 新增产品";
-  add.addEventListener("click",()=>addProductToTransactionV239(type,txnId,{}));card.appendChild(add);
-
-  const shared=document.createElement("div");shared.className="sales-card-shared-v239";
-  const make=(labelText,cls,value,readonly=false)=>{
-    const w=document.createElement("div"),lab=document.createElement("label"),inp=document.createElement("input");
-    lab.textContent=labelText;inp.className=cls;inp.value=value;inp.inputMode="decimal";if(readonly)inp.readOnly=true;w.append(lab,inp);return{w,inp};
-  };
-  const defaultRate=seed.commissionRate!==undefined&&seed.commissionRate!==null?Number(seed.commissionRate):productLinkDefaultCommissionRateV211(type);
-  const commission=make(type==="live"?"主播佣金 %":type==="fair"?"Fair 佣金 %":"门市佣金 %","sales-card-commission-rate-v239",Number(type==="daily"?0:(defaultRate||0)).toFixed(2));
-  if(type==="daily"){commission.w.classList.add("hidden");commission.inp.value="0.00";}
-  const delivery=make("本地运费总数","sales-card-delivery-total-v239",formatAmount(list.reduce((s,x)=>s+Number(x.localDelivery||0),0)));
-  const extra=make("附加费用 花盆/苔藓","sales-card-extra-total-v239",formatAmount(list.reduce((s,x)=>s+Number(x.extraFee||0),0)));
-  shared.append(commission.w,delivery.w,extra.w);card.appendChild(shared);
-
-  const commissionHint=document.createElement("div");commissionHint.className="sales-card-commission-hint-v239";commissionHint.innerHTML='佣金一次计算：<b class="sales-card-commission-amount-v239">RM0.00</b>';card.appendChild(commissionHint);
-
-  const summary=document.createElement("div");summary.className="sales-card-summary-v239";
-  summary.innerHTML='<div><span>总成本</span><b class="sales-card-cost-total-v239">RM0.00</b></div><div><span>总利润</span><b class="sales-card-profit-total-v239">RM0.00</b></div><div><span>整体利润率</span><b class="sales-card-profit-rate-v239">0.00%</b></div>';
-  card.appendChild(summary);
-
-  const warn=document.createElement("div");warn.className="sales-card-total-warning-v239";warn.hidden=true;card.appendChild(warn);
-
-  const rlab=document.createElement("label");rlab.textContent="备注（顾客网络名字或电话号码）";card.appendChild(rlab);
-  const remark=document.createElement("input");remark.className="sales-card-remark-v239";remark.maxLength=100;remark.placeholder="顾客名字、电话或其他讯息";remark.value=String(list.find(x=>String(x.remark||"").trim())?.remark||"");card.appendChild(remark);
-
-  const actions=document.createElement("div");actions.className="sales-card-actions-v405";
-  const saveDraft=document.createElement("button");saveDraft.type="button";saveDraft.className="secondary-btn sales-card-draft-btn-v405";saveDraft.textContent="💾 保存草稿";saveDraft.addEventListener("click",()=>saveSingleSalesCardV405(type,txnId,"draft",saveDraft));
-  const confirmSale=document.createElement("button");confirmSale.type="button";confirmSale.className="secondary-btn sales-card-confirm-btn-v405";confirmSale.textContent="✅ 确认销售";confirmSale.addEventListener("click",()=>saveSingleSalesCardV405(type,txnId,"confirm",confirmSale));
-  actions.append(saveDraft,confirmSale);card.appendChild(actions);
-
-  const remove=document.createElement("button");remove.type="button";remove.className="product-link-remove-btn product-link-remove-bottom";remove.textContent="删除销售卡";
-  remove.addEventListener("click",()=>deleteSalesCardTransactionV239(type,txnId));card.appendChild(remove);
-
-  const sharedEdit=()=>{markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)};
-  commission.inp.addEventListener("input",sharedEdit);
-  delivery.inp.addEventListener("input",()=>{card.dataset.deliveryManual="1";sharedEdit()});
-  extra.inp.addEventListener("input",sharedEdit);
-  remark.addEventListener("input",()=>markSalesCardTransactionDirtyV239(card));
-  [delivery.inp,extra.inp].forEach(x=>x.addEventListener("blur",()=>{x.value=formatAmount(toAmount(x.value||0));recalcSalesCardTransactionV239(card)}));
-  commission.inp.addEventListener("blur",()=>{commission.inp.value=(Math.max(0,Number(commission.inp.value)||0)).toFixed(2);recalcSalesCardTransactionV239(card)});
-
-  // Existing saved rows may contain the exact auto sum; only mark manual when different.
-  const autoSum=list.reduce((s,x)=>s+liveDeliveryDefaultV203(Number(x.actualPrice||0)),0);
-  const savedDelivery=list.reduce((s,x)=>s+Number(x.localDelivery||0),0);
-  card.dataset.deliveryManual=(list.some(x=>x.linkId)&&Math.abs(savedDelivery-autoSum)>0.01)?"1":"0";
-  setTimeout(()=>{
-    // V29.9: initialization may finish after a very fast first edit.
-    // Only clear the initial state when no user edit has marked the card dirty.
-    if(card.dataset.dirty!=="1"&&card.dataset.productRemovedV259!=="1")clearSalesCardTransactionDirtyV239(card);
-    recalcSalesCardTransactionV239(card);
-  },0);
-  return card;
-}
 
 function addProductLinkItemV209(type,data={}){
   const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
@@ -4224,74 +3732,7 @@ function renderProductLinksEditorV206(type,links){
   groups.forEach(items=>wrap.appendChild(buildSalesCardTransactionV239(type,items)));
 }
 
-function collectProductLinksV206(type){
-  const {pre,date,location}=productLinkContextV206(type),wrap=document.getElementById(pre+"ProductItems");
-  const result=[];
-  salesCardWrappersV239(type).forEach(card=>{
-    normalizeDraftProductOrdersV503(card);
-    const txnId=String(card.dataset.transactionId||salesCardTxnIdV239());
-    const shared=salesCardSharedValuesV239(card);
-    const products=salesCardProductsV239(card);
-    const alloc=allocateSalesCardSharedCostsV239(card);
-    products.forEach((item,i)=>{
-      let linkId=String(item.dataset.linkId||"");
-      const productName=String(item.querySelector(".product-link-name")?.value||"").trim();
-      const actualPrice=toAmount(item.querySelector(".product-link-price")?.value||0);
-      if(!linkId&&(productName||actualPrice||shared.remark)){linkId="spl_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,10);item.dataset.linkId=linkId}
-      const quantity=Math.max(0,Number(item.querySelector(".product-link-qty")?.value||0));
-      const averageCost=toAmount(item.querySelector(".product-link-avg-cost")?.value||0);
-      const productId=String(item.querySelector(".product-link-name")?.dataset.productId||"");
-      const minimumPrice=Math.max(0,Number(item.dataset.minimumPrice||0));
-      const localDelivery=alloc[i]?.delivery||0,extraFee=alloc[i]?.extra||0,commissionRate=shared.commissionRate;
-      const commissionAmount=actualPrice*commissionRate/100;
-      const profit=actualPrice-commissionAmount-(averageCost*quantity)-localDelivery-extraFee;
-      const profitRate=actualPrice>0?profit/actualPrice*100:0;
-      if(linkId||productName||actualPrice||shared.remark)result.push({
-        linkId,type,date,location,transactionId:txnId,productOrder:i+1,
-        productId,productName,quantity,averageCost,minimumPrice,actualPrice,
-        commissionRate,commissionAmount,localDelivery,extraFee,profit,profitRate,remark:shared.remark,importSyncStatus:String(item.dataset.inventoryStatus||card.dataset.inventoryStatus||"PENDING_IMPORT_LINK")
-      });
-    });
-  });
-  return result;
-}
 
-async function saveProductLinksV206(type){
-  const items=collectProductLinksV206(type);
-  if(!items.length){alert("请至少输入一张销售卡；如果这次没有销售卡，可以保持收起，不需要保存。");return null}
-  const first=items[0];if(!first.date||!first.location){alert(type==="live"?"请先选择日期和主播":type==="fair"?"请先选择 Fair 日期和地点":"请先选择日期");return null}
-  for(const x of items){
-    if(!x.productName){alert("每一个产品都需要填写产品名称。");return null}
-    if(!Number.isFinite(Number(x.quantity))||Number(x.quantity)<=0){alert("每一个产品数量必须大于 0。");return null}
-    if(!Number.isFinite(Number(x.unitPrice))||Number(x.unitPrice)<=0){
-      alert(`产品${Number(x.productOrder||0)||""} 售价必须大于 RM0.00，无法保存销售卡。`);
-      return null;
-    }
-  }
-
-  // Every transaction card may contain multiple products; each card's product prices form that card total.
-  const cards=salesCardWrappersV239(type);
-  for(const card of cards){
-    const products=salesCardProductsV239(card);
-    const saleTotal=products.reduce((s,x)=>s+toAmount(x.querySelector(".product-link-price")?.value||0),0);
-    if(saleTotal<=0&&products.some(x=>String(x.querySelector(".product-link-name")?.value||"").trim())){
-      if(!confirm("这张销售卡售价合计为 RM0.00，确定仍然保存？"))return null;
-    }
-  }
-
-  const official=dedupeRows(rows).filter(r=>r.type===type&&r.date===first.date&&(type==="live"?normalizeLiveHostKey(r.location)===normalizeLiveHostKey(first.location):normalizeFairLocationKey(r.location)===normalizeFairLocationKey(first.location))).reduce((m,r)=>Math.max(m,Number(r.amount||0)),0);
-  const batchTotal=items.reduce((s,x)=>s+Number(x.actualPrice||0),0);
-  if(official>0&&batchTotal>official+0.005){alert(`所有销售卡售价合计 RM${formatAmount(batchTotal)} 已超过当天营业额 RM${formatAmount(official)}。`);return null}
-  try{
-    setSync("销售卡同步中...");
-    const result=await saveSalesProductLinksV206(items);
-    renderProductLinksEditorV206(type,result?.links||[]);
-    setSync("销售卡已保存",true);
-    alert("销售卡保存成功。");
-    if(result?.warning)alert(result.warning);
-    return result;
-  }catch(e){alert("销售卡保存失败："+(e.message||e));setSync("销售卡同步失败",false,true);return null}
-}
 
 function clearUnsavedSalesCardEditorsV224(){
   ["live","fair"].forEach(type=>{
@@ -4309,25 +3750,7 @@ window.clearUnsavedSalesCardEditorsV224=clearUnsavedSalesCardEditorsV224;
 
 
 
-/* ================= V29.9 Sales Card unit-price + stable optimistic UI ================= */
-const LIVE_OPTIMISTIC_LOCKS_V240=new Map();
-
-function liveOptimisticKeyV240(date,host){
-  return String(date||"")+"|"+normalizeLiveHostKey(String(host||""));
-}
-function setLiveOptimisticLockV240(date,host,amount){
-  LIVE_OPTIMISTIC_LOCKS_V240.set(liveOptimisticKeyV240(date,host),{amount:Number(amount||0),at:Date.now()});
-}
-function getLiveOptimisticLockV240(date,host){
-  const x=LIVE_OPTIMISTIC_LOCKS_V240.get(liveOptimisticKeyV240(date,host));
-  if(!x)return null;
-  if(Date.now()-Number(x.at||0)>15000){LIVE_OPTIMISTIC_LOCKS_V240.delete(liveOptimisticKeyV240(date,host));return null}
-  return x;
-}
-function clearLiveOptimisticLockV240(date,host){
-  LIVE_OPTIMISTIC_LOCKS_V240.delete(liveOptimisticKeyV240(date,host));
-}
-
+/* ================= V29.9 Sales Card unit-price ================= */
 function salesCardUnitPriceV240(item){
   return Math.max(0,toAmount(item?.querySelector(".product-link-price")?.value||0));
 }
@@ -4792,37 +4215,6 @@ async function saveProductLinksV206(type){
   }
 }
 
-async function saveLiveSales(){
-  if(!ensureWritableSelection())return;
-  const dateEl=document.getElementById("liveDate"),hostInput=document.getElementById("liveHost"),amountEl=document.getElementById("liveSales");
-  const d=isoToDisplay(dateEl.value);let host=selectedLiveHost();const amount=toAmount(amountEl.value);
-  if(!host){alert("请输入主播名字");return}
-  if(!d){alert("请选择日期");return}
-  const restored=reactivateLiveHostIfNeeded(host);host=restored.host;hostInput.value=host;
-  saveLiveHost(host);saveLastLiveSession(host,dateEl.value);
-  const now=new Date().toISOString(),localRow={type:"live",date:d,company:"live",location:host,amount,updatedAt:now,clientUpdatedAt:now};
-  setLiveOptimisticLockV240(d,host,amount);
-  if(amount<=0)rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));else upsertLocalRow(localRow);
-  addPendingRow(localRow);amountEl.value=formatAmount(amount);renderAll();amountEl.value=formatAmount(amount);showTempMsg("liveSaveMsg");
-  try{
-    setSync("已储存，正在后台同步...");
-    const saved=await saveLiveToSheet(d,host,amount,now);
-    const lock=getLiveOptimisticLockV240(d,host);
-    if(lock){
-      const finalRow=saved&&Number(saved.amount)>0?{...saved,amount:lock.amount}:localRow;
-      if(lock.amount<=0)rows=rows.filter(r=>rowKey(r)!==rowKey(localRow));else upsertLocalRow(finalRow);
-      amountEl.value=formatAmount(lock.amount);
-    }else if(saved&&Number(saved.amount)>0)upsertLocalRow(saved);
-    clearPendingRowIfVersionV343(localRow);renderAll();
-    const lock2=getLiveOptimisticLockV240(d,host);if(lock2)amountEl.value=formatAmount(lock2.amount);
-    clearLiveOptimisticLockV240(d,host);setSync("已同步",true);
-  }catch(e){
-    const lock=getLiveOptimisticLockV240(d,host);if(lock)amountEl.value=formatAmount(lock.amount);
-    if(typeof setPendingRetrySyncStatus==="function")setPendingRetrySyncStatus();else setSync("同步暂未完成",false,true);
-  }
-}
-
-
 /* ================= V32.6 Home on-demand today total profit =================
    Deliberately NOT part of startup / priority sync. Turnover + sales-card
    revisions remain foreground priority. Profit is queried only when opened. */
@@ -5114,10 +4506,6 @@ function homeCardMetricsByPeriodV433(links,period,kind="total"){
   },{profit:0,cardSales:0});
 }
 
-function monthGrandProfitV295(month){
-  return homeCardMetricsByPeriodV433(monthGrandProfitLinksV295,month).profit;
-}
-
 function monthGrandHistoryRowsV223(){
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
   return buildMonthlySummary()
@@ -5190,24 +4578,6 @@ const yearBreakdownOpenV224={balakong:false,belimbing:false,fair:false,live:fals
 const yearBreakdownLoadingV224={balakong:false,belimbing:false,fair:false,live:false,total:false};
 let yearBreakdownLinksV286=[];
 
-function yearBreakdownProfitV286(kind,key){
-  const isYear=kind==="total";
-  return (yearBreakdownLinksV286||[]).reduce((sum,x)=>{
-    if(["deleted","cancelled"].includes(String(x.status||"active").toLowerCase()))return sum;
-    const date=String(x.date||"");
-    const iso=/^\d{4}-\d{2}-\d{2}$/.test(date)?date:displayToISO(date);
-    if(!iso)return sum;
-    const rowKey=isYear?iso.slice(0,4):iso.slice(0,7);
-    if(rowKey!==key)return sum;
-    const type=String(x.type||"").toLowerCase();
-    if(kind==="balakong"&&(type!=="daily"||!String(x.location||'').toLowerCase().includes('balakong')))return sum;
-    if(kind==="belimbing"&&(type!=="daily"||String(x.location||'Belimbing').toLowerCase().includes('balakong')))return sum;
-    if(kind==="fair"&&type!=="fair")return sum;
-    if(kind==="live"&&type!=="live")return sum;
-    const profit=Number(x.profit);
-    return sum+(Number.isFinite(profit)?profit:0);
-  },0);
-}
 function yearBreakdownRowsV224(kind){
   const selected=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
   const yearState=typeof window.getYearDataStateV528==="function"?window.getYearDataStateV528(selected):{complete:true};
@@ -5858,11 +5228,6 @@ function setBackupRestoreStateV234(state){
   renderBackupRestoreStatusV234(value);
   return value;
 }
-function clearBackupRestoreStateV234(){
-  localStorage.removeItem(BACKUP_RESTORE_STATE_KEY_V234);
-  renderBackupRestoreStatusV234(null);
-}
-
 // V42.3: the persisted Restore job remains authoritative through the final
 // verification stage. The in-memory flag can briefly be false while polling,
 // so navigation/refresh protection must also inspect this durable state.
@@ -5903,7 +5268,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5290",
+    version:"5300",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6258,64 +5623,6 @@ function removeSalesDraftPendingV314(key,token=''){
   if(token&&String(cur.token||'')!==String(token||''))return;
   delete all[key];writeSalesDraftPendingV314(all);
 }
-function markDraftSavedLocallyV314(type,ctx,dirty,items,dirtyIds){
-  const old=(typeof getSalesCardPersistentCacheV232==='function'?getSalesCardPersistentCacheV232(type,ctx.date,ctx.location):[])||[];
-  const oldByTxn=new Map();
-  old.forEach(x=>{const tx=String(x.transactionId||'');if(!tx)return;if(!oldByTxn.has(tx))oldByTxn.set(tx,[]);oldByTxn.get(tx).push(x)});
-  const cardByTxn=new Map(dirty.map(c=>[String(c.dataset.transactionId||''),c]));
-  const local=items.map(x=>{
-    const tx=String(x.transactionId||''),card=cardByTxn.get(tx),prev=oldByTxn.get(tx)||[];
-    const activeDraft=!!card&&salesCardIsEditableDraftV509(card);
-    const wasConfirmed=!activeDraft&&(salesCardIsConfirmedV322(card)||prev.some(r=>r.confirmedOnce===true||salesCardStatusIsConfirmedV322(r.importSyncStatus)));
-    if(wasConfirmed&&card)card.dataset.confirmedOnceV401='1';
-    else if(activeDraft&&card)card.dataset.confirmedOnceV401='0';
-    const prior=prev.find(r=>String(r.linkId||'')&&String(r.linkId||'')===String(x.linkId||''));
-    let status='DRAFT';
-    if(wasConfirmed){
-      // V42.3: preserve each already-confirmed row, but a NEW product added to an
-      // already-confirmed card is immediately shown as pending Import inventory.
-      // This prevents the whole card from visually falling back to "尚未确认销售".
-      if(!prior)status='PENDING_IMPORT_LINK';
-      else{
-        const oldStatus=String(prior.importSyncStatus||'');
-        const sameProduct=String(prior.productId||'')===String(x.productId||'')&&String(prior.productName||'')===String(x.productName||'');
-        const qtyChanged=Number(prior.quantity||0)!==Number(x.quantity||0);
-        if(oldStatus==='NON_INVENTORY'&&!x.productId)status='NON_INVENTORY';
-        else if(oldStatus==='PENDING_IMPORT_LINK')status='PENDING_IMPORT_LINK';
-        else if(oldStatus==='INVENTORY_CONFIRMED'&&sameProduct&&!qtyChanged)status='INVENTORY_CONFIRMED';
-        else status='PENDING_IMPORT_LINK';
-      }
-    }
-    return {...x,importSyncStatus:status,confirmedOnce:wasConfirmed};
-  });
-  const merged=[...old.filter(x=>!dirtyIds.has(String(x.transactionId||''))),...local];
-  if(typeof setCachedSalesProductLinksV216==='function')setCachedSalesProductLinksV216(type,ctx.date,ctx.location,merged);
-  if(typeof setSalesCardPersistentCacheV232==='function')setSalesCardPersistentCacheV232(type,ctx.date,ctx.location,merged);
-  if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,ctx.date,ctx.location,merged);
-  refreshProfitAggregateCachesV321(local,[...dirtyIds]);
-  const byTxn=new Map();local.forEach(x=>{const tx=String(x.transactionId||'');if(!byTxn.has(tx))byTxn.set(tx,[]);byTxn.get(tx).push(x)});
-  dirty.forEach(card=>{
-    normalizeDraftProductOrdersV503(card);
-    clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;
-    const tx=String(card.dataset.transactionId||''),rows=byTxn.get(tx)||[];
-    if(rows.some(r=>salesCardStatusIsConfirmedV322(r.importSyncStatus)))card.dataset.confirmedOnceV401='1';
-    const hasPending=rows.some(r=>String(r.importSyncStatus||'')==='PENDING_IMPORT_LINK');
-    const allDone=rows.length&&rows.every(r=>['INVENTORY_CONFIRMED','NON_INVENTORY'].includes(String(r.importSyncStatus||'')));
-    card.dataset.inventoryStatus=hasPending?'PENDING_IMPORT_LINK':allDone?'INVENTORY_CONFIRMED':(salesCardIsConfirmedV322(card)?'PENDING_IMPORT_LINK':'DRAFT');
-    const rowByLink=new Map(rows.map(r=>[String(r.linkId||''),r]));
-    card.querySelectorAll('.product-link-item').forEach(i=>{
-      i.dataset.saved='1';i.dataset.dirty='0';
-      const rec=rowByLink.get(String(i.dataset.linkId||''));
-      if(rec)i.dataset.inventoryStatus=String(rec.importSyncStatus||'');
-      else if(salesCardIsConfirmedV322(card))i.dataset.inventoryStatus='PENDING_IMPORT_LINK';
-    });
-    const tag=card.querySelector('.sales-card-header-v239 b:first-child');if(tag)tag.textContent='已保存销售卡';
-    if(card._renderSalesStateV317)card._renderSalesStateV317();updateSalesCardDeleteLockV322(card);
-  });
-  renumberSavedSalesCardsV241(type);refreshConfirmSaleButtonV322(type);
-  return merged;
-}
-
 // V42.4: a single-card Draft response contains only the transaction that was
 // saved. Merge that acknowledgement into the exact date/location cache instead
 // of treating it as the complete card list. Confirmed cards are immutable and
@@ -7068,10 +6375,6 @@ function inventoryPendingTimeV325(item){
   const m=raw.match(/(?:T|\s)(\d{1,2}):(\d{2})/);return m?`${m[1].padStart(2,"0")}:${m[2]}`:"";
 }
 
-function inventoryPendingProductTextV250(item){
-  return `${String(item?.productName||"未命名产品")} ${Math.max(1,Number(item?.quantity||1))}棵`;
-}
-
 function copyInventoryProductNameV262(name,el){
   const text=String(name||"").trim();if(!text)return;
   const original=el?.textContent||text;
@@ -7279,12 +6582,6 @@ function runOptionalCloudReadV524(name,task){
   return result;
 }
 window.runOptionalCloudReadV524=runOptionalCloudReadV524;
-function scheduleOptionalCloudReadAfterInitialV524(name,task,delay=0){
-  const start=()=>setTimeout(()=>runOptionalCloudReadV524(name,task).catch(()=>{}),Math.max(0,Number(delay||0)));
-  if(typeof isInitialCloudSyncFinished==='function'&&isInitialCloudSyncFinished())start();
-  else window.addEventListener('lover-sales-initial-sync-complete',start,{once:true});
-}
-
 const SALES_EXACT_CONTEXT_SEQ_V525={daily:0,fair:0,live:0};
 async function loadExactSalesCardContextV525(type,{forceCloud=true,renderWhenOpen=true}={}){
   if(!['daily','fair','live'].includes(String(type||'')))return null;
@@ -7512,7 +6809,6 @@ renderAll=function(){const r=_renderAllV270.apply(this,arguments);setTimeout(ref
 /* ================= V29.9 Sales / Fair / Live 营业利润汇总 ================= */
 const profitRollupOpenV285={daily:false,fair:false,live:false};
 function profitRollupPanelV285(type){return document.getElementById(type+'ProfitRollupV285')}
-function displayDateFromIsoV285(iso){const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}-${m[2]}-${m[1]}`:String(iso||'')}
 function dateKeyV285(display){const m=String(display||'').match(/^(\d{2})-(\d{2})-(\d{4})$/);return m?`${m[3]}${m[2]}${m[1]}`:''}
 function selectedMonthDisplayV285(){const v=document.getElementById('monthPicker')?.value||monthISO();return String(v||'').slice(5,7)+'-'+String(v||'').slice(0,4)}
 function rowTurnoverV285(type,name,start,end){
@@ -8932,7 +8228,6 @@ window.addEventListener('lover-sales-pending-cloud-confirmed-v439',event=>{
 });
 function readTurnoverEntryPendingV376(){try{const x=JSON.parse(localStorage.getItem(TURNOVER_ENTRY_PENDING_KEY_V376)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return{}}}
 function writeTurnoverEntryPendingV376(x){try{localStorage.setItem(TURNOVER_ENTRY_PENDING_KEY_V376,JSON.stringify(x||{}))}catch(_){}}
-function rememberTurnoverEntryPendingV376(type,date,location,entries,total){const p=readTurnoverEntryPendingV376(),key=turnoverContextKeyV376(type,date,location);p[key]={type,date,location,entries:normalizeTurnoverEntriesClientV376(entries),total:Number(total||0),savedAt:Date.now()};writeTurnoverEntryPendingV376(p)}
 function clearTurnoverEntryPendingV376(type,date,location){const p=readTurnoverEntryPendingV376(),key=turnoverContextKeyV376(type,date,location);if(p[key]){delete p[key];writeTurnoverEntryPendingV376(p)}}
 const turnoverEntryMemoryV376=new Map();
 const turnoverEntryLoadTokenV376={daily:0,fair:0,live:0};
@@ -9600,12 +8895,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5290'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5300'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5290')issues.push(`Frontend / API 版本不一致（Frontend 5290 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5300')issues.push(`Frontend / API 版本不一致（Frontend 5300 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5290';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5300';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
