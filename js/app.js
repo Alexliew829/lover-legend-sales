@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5270",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5280",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5270";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5280";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5209,6 +5209,9 @@ function yearBreakdownProfitV286(kind,key){
   },0);
 }
 function yearBreakdownRowsV224(kind){
+  const selected=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
+  const yearState=typeof window.getYearDataStateV528==="function"?window.getYearDataStateV528(selected):{complete:true};
+  if(!yearState.complete)return[];
   if(kind==="total"){
     const byYear=new Map();
     buildMonthlySummary().forEach(item=>{
@@ -5235,7 +5238,10 @@ function renderYearBreakdownV224(kind){
   if(box)box.classList.toggle("year-breakdown-expanded-v290",!!yearBreakdownOpenV224[kind]);
   if(!yearBreakdownOpenV224[kind]){panel.classList.add("hidden");panel.innerHTML="";if(arrow)arrow.textContent="▼";return;}
   const list=yearBreakdownRowsV224(kind);panel.classList.remove("hidden");if(arrow)arrow.textContent="▲";
-  if(yearBreakdownLoadingV224[kind]&&!list.length){panel.innerHTML='<div class="sub">正在读取年度资料...</div>';return;}
+  const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
+  const state=typeof window.getYearDataStateV528==="function"?window.getYearDataStateV528(year):{complete:true};
+  if((yearBreakdownLoadingV224[kind]||state.loading)&&!list.length){panel.innerHTML='<div class="sub">正在读取完整年度资料...</div>';return;}
+  if(!state.complete){panel.innerHTML=`<div class="sub">${state.error?'年度资料读取失败，请重新检查':'年度资料尚未完整载入'}</div>`;return;}
   panel.innerHTML=list.length?yearBreakdownTableV286(list,kind):'<div class="sub">还没有月份营业额记录</div>';
 }
 function renderAllYearBreakdownsV224(){Object.keys(yearBreakdownOpenV224).forEach(renderYearBreakdownV224);}
@@ -5266,11 +5272,22 @@ function renderDashboard(){
   document.getElementById("liveCommissionTotal").textContent=money(liveCommission);
   document.getElementById("monthGrandTotal").textContent=money(bm+blm+fm+lm); 
   renderMonthGrandHistoryV223();
-  document.getElementById("balakongYearTotal").textContent=money(by);
-  document.getElementById("belimbingYearTotal").textContent=money(bly);
-  document.getElementById("fairYearTotal").textContent=money(fy);
-  document.getElementById("liveYearTotal").textContent=money(ly);
-  document.getElementById("yearGrandTotal").textContent=money(by+bly+fy+ly);
+  const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");
+  const yearState=typeof window.getYearDataStateV528==="function"?window.getYearDataStateV528(year):{complete:true,current:true,loading:false,error:null};
+  const yearValue=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=yearState.complete?money(value):"—";};
+  yearValue("balakongYearTotal",by);
+  yearValue("belimbingYearTotal",bly);
+  yearValue("fairYearTotal",fy);
+  yearValue("liveYearTotal",ly);
+  yearValue("yearGrandTotal",by+bly+fy+ly);
+  const yearStatus=document.getElementById("yearTotalsStatusV528");
+  if(yearStatus){
+    if(yearState.loading)yearStatus.textContent=yearState.complete?"显示上次完整年度资料 · 后台更新中":"正在后台读取完整年度资料…";
+    else if(yearState.error)yearStatus.textContent=yearState.complete?"显示上次完整年度资料 · 更新失败，可重新检查":"年度资料读取失败 · 请点重新检查";
+    else if(yearState.current)yearStatus.textContent=`${year} 年度资料已完整同步`;
+    else if(yearState.complete)yearStatus.textContent="显示上次完整年度资料 · 等待后台核对";
+    else yearStatus.textContent="年度资料尚未完整载入 · 本月资料可正常操作";
+  }
   renderAllYearBreakdownsV224();
   renderTodayCompanyStatus();
   renderBusinessTop3();
@@ -5886,7 +5903,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5270",
+    version:"5280",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6379,11 +6396,11 @@ function scheduleCompleteSalesCardReconcileV425(type,date,location){
   setTimeout(()=>reconcileCompleteSalesCardContextV425(type,date,location),120);
 }
 
-// V52.7: a draft can reach Apps Script even when its reply times out. Read
+// V52.8: a draft can reach Apps Script even when its reply times out. Read
 // the exact context only after an ambiguous failure; accept it as saved only
 // when every submitted editable field and deletion matches the cloud.
 function salesCardRetryableReplyV521(error){return /超时|timeout|context 已有其他设备的新修改/i.test(String(error?.message||error))}
-// V52.7: persist the exact submitted card before sending confirmation. A lost
+// V52.8: persist the exact submitted card before sending confirmation. A lost
 // response is not a rejection. Never resend an unresolved confirmation.
 const SALES_CONFIRM_JOURNAL_V527='lover_sales_confirm_journal_v527';
 function readSalesConfirmJournalV527(){
@@ -7241,7 +7258,7 @@ window.reconcileVisibleSalesCardAckV407=reconcileVisibleSalesCardAckV407;
 
 // V29.9: Sales-side inventory confirmation removed. Import is the only inventory authority.
 
-// V52.7: background diagnostics/reminders must never compete with the initial
+// V52.8: background diagnostics/reminders must never compete with the initial
 // business-data sync, a user-requested Backup, or precise Sales Card navigation.
 // Only optional read-only jobs use this queue; save/update/delete paths are unchanged.
 let SALES_OPTIONAL_CLOUD_READ_TAIL_V524=Promise.resolve();
@@ -7362,7 +7379,7 @@ async function openPendingInventorySalesCardV250(raw){
       const iso=displayToISO(item.date);
       setDateControl("fairStart",iso);
       setDateControl("fairEnd",iso);
-      // V52.7: a remote Fair context may not exist on this device yet. Setting
+      // V52.8: a remote Fair context may not exist on this device yet. Setting
       // the input value programmatically does not fire the user's change event,
       // so explicitly establish the editor before loading/highlighting the card.
       if(typeof updateFairPageMode==="function")updateFairPageMode();
@@ -7393,7 +7410,7 @@ async function openPendingInventorySalesCardV250(raw){
 }
 window.openPendingInventorySalesCardV250=openPendingInventorySalesCardV250;
 
-// V52.7: page switching renders the session cache immediately. The first
+// V52.8: page switching renders the session cache immediately. The first
 // business-page visit may perform one cloud scan; later page switches never
 // repeat the same optional read. Save/confirm/Import-resume refreshes remain.
 let inventoryPendingPageScanQueuedV526=false;
@@ -8096,7 +8113,7 @@ async function refreshFairLocationHistoryCloudV358(options={}){
 }
 window.refreshFairLocationHistoryCloudV358=refreshFairLocationHistoryCloudV358;
 
-// V52.7: the authoritative main sync already contains Fair turnover rows.
+// V52.8: the authoritative main sync already contains Fair turnover rows.
 // Publish those row-backed locations locally without another startup request.
 window.addEventListener('lover-sales-initial-sync-complete',()=>{
   try{renderFairLocationOptions()}catch(_){}
@@ -9577,13 +9594,17 @@ async function runSystemHealthCheckV442(userTriggered=false){
   const refresh=document.getElementById('systemHealthRefreshV442');
   if(refresh?.disabled)return;
   if(refresh){refresh.disabled=true;refresh.textContent='检查中…';}
+  if(userTriggered&&typeof loadYearInBackground==='function'){
+    const year=String(document.getElementById('yearPicker')?.value||selectedYear()||'');
+    if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
+  }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5270'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5280'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5270')issues.push(`Frontend / API 版本不一致（Frontend 5270 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5280')issues.push(`Frontend / API 版本不一致（Frontend 5280 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5270';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5280';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){

@@ -15,6 +15,9 @@ let settingsWritePromise = null;
 let settingsWriteDepth = 0;
 let yearLoadPromises = new Map();
 let loadedCloudYears = new Set();
+let completeCachedYearsV528 = new Set();
+const yearLoadErrorsV528 = new Map();
+const yearRefreshTimersV528 = new Map();
 const localRowMutationAt = new Map();
 const fairWriteQueuesV343 = new Map();
 const CLIENT_DEVICE_KEY_V344="lover_sales_client_device_v344";
@@ -23,6 +26,8 @@ const RESTORE_GENERATION_KEY_V347="lover_restore_generation_v347";
 function getLocalRestoreGenerationV347(){try{return Math.max(0,Number(localStorage.getItem(RESTORE_GENERATION_KEY_V347)||0))}catch(_){return 0}}
 function clearStaleRestoreQueuesV347(){
   pendingRows=[];
+  completeCachedYearsV528.clear();
+  loadedCloudYears.clear();
   try{localStorage.removeItem("lover_pending_rows");localStorage.removeItem("lover_sales_draft_pending_v314");localStorage.removeItem(LOCAL_DATA_CACHE_KEY);localStorage.removeItem("lover_daily_profit_cache_v237");localStorage.removeItem("lover_sales_change_log_cache_v237")}catch(_){}
 }
 function applyRestoreGenerationV347(value){
@@ -624,7 +629,10 @@ function readLocalDataCacheRaw() {
 function loadLocalDataCache() {
   try {
     const raw = readLocalDataCacheRaw();
-    if (!raw) return false;
+    if (!raw) {
+      completeCachedYearsV528.clear();
+      return false;
+    }
 
     const cached = JSON.parse(raw);
     if (!cached || !Array.isArray(cached.rows)) {
@@ -633,6 +641,11 @@ function loadLocalDataCache() {
     }
 
     rows = cached.rows;
+    completeCachedYearsV528 = new Set(
+      (Array.isArray(cached.completeYearsV528) ? cached.completeYearsV528 : [])
+        .map(String)
+        .filter(year => /^\d{4}$/.test(year))
+    );
     applyLocalDataRevision(cached.dataRevision);
 
     if (
@@ -661,6 +674,7 @@ function loadLocalDataCache() {
     // V29.9: damaged/partial cache must never trap startup.
     try { localStorage.removeItem(LOCAL_DATA_CACHE_KEY); } catch (e) {}
     rows = [];
+    completeCachedYearsV528.clear();
     return false;
   }
 }
@@ -701,6 +715,7 @@ function saveLocalDataCache(
               : null
           ),
         dataRevision: getLocalDataRevision(),
+        completeYearsV528: [...completeCachedYearsV528],
         savedAt: Date.now()
       })
     );
@@ -1090,11 +1105,54 @@ function mergeCloudYearRows(year, cloudRows, requestStartedAt = 0) {
   rows = [...keep, ...mergeCloudRowsSafely(localForYear, cloudRows, pendingForYear, requestStartedAt)];
 }
 
+// V52.8: month rows and full-year rows are different data scopes. The Home
+// annual cards may only publish a number after a complete year snapshot has
+// been loaded. A cached complete snapshot stays visible while it is refreshed.
+function getYearDataStateV528(year) {
+  const y = /^\d{4}$/.test(String(year || "")) ? String(year) : new Date().getFullYear().toString();
+  const failure = yearLoadErrorsV528.get(y) || null;
+  return {
+    year: y,
+    complete: completeCachedYearsV528.has(y),
+    current: loadedCloudYears.has(y),
+    loading: yearLoadPromises.has(y),
+    error: failure ? failure.error : null
+  };
+}
+
+function repaintYearDataStateV528() {
+  try { if (typeof renderDashboard === "function") renderDashboard(); } catch (_) {}
+}
+
+function scheduleYearRefreshV528(year, delay = 1800) {
+  const y = /^\d{4}$/.test(String(year || "")) ? String(year) : new Date().getFullYear().toString();
+  const failure = yearLoadErrorsV528.get(y) || null;
+  if (failure && Date.now() - Number(failure.at || 0) < 60000) return;
+  if (loadedCloudYears.has(y) || yearLoadPromises.has(y) || yearRefreshTimersV528.has(y)) return;
+  const timer = setTimeout(() => {
+    yearRefreshTimersV528.delete(y);
+    if (typeof document !== "undefined" && document.hidden) return;
+    loadPendingRows();
+    if (pendingRows.length || pendingSyncRunning || cloudLoadPromise || isSettingsWriteRunning()) {
+      scheduleYearRefreshV528(y, 2200);
+      return;
+    }
+    loadYearInBackground(y).catch(() => {});
+  }, Math.max(0, Number(delay) || 0));
+  yearRefreshTimersV528.set(y, timer);
+}
+
+if (typeof window !== "undefined") {
+  window.getYearDataStateV528 = getYearDataStateV528;
+  window.scheduleYearRefreshV528 = scheduleYearRefreshV528;
+}
+
 async function loadYearInBackground(year) {
   const y = /^\d{4}$/.test(String(year || "")) ? String(year) : new Date().getFullYear().toString();
   if (loadedCloudYears.has(y)) return { ok:true, year:y, cached:true };
   if (yearLoadPromises.has(y)) return yearLoadPromises.get(y);
 
+  yearLoadErrorsV528.delete(y);
   const task = (async () => {
     const requestStartedAt = Date.now();
     if (isSettingsWriteRunning()) {
@@ -1116,6 +1174,9 @@ async function loadYearInBackground(year) {
         else if (typeof applyCommissionSettings === "function") applyCommissionSettings(json.commissionSettings);
       }
       if (json.accessSettings && typeof applyAccessPasswordSettings === "function") applyAccessPasswordSettings(json.accessSettings);
+      completeCachedYearsV528.add(y);
+      loadedCloudYears.add(y);
+      saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
       renderHomeFirst();
       scheduleDeferredFullRender(0);
       // V29.9: if Fair is currently open, repaint its date inputs from the
@@ -1124,19 +1185,19 @@ async function loadYearInBackground(year) {
       if (fairPageActive && !fairDraftDirtyBeforeCloud && typeof refreshFairInputsFromRows === "function") {
         refreshFairInputsFromRows(true);
       }
-      saveLocalDataCache(json.commissionSettings || null, json.accessSettings || null);
-      loadedCloudYears.add(y);
-      setSync("已同步", true);
       return { ok:true, year:y, rows:(json.rows || []).length };
     } catch (err) {
       console.warn("Full-year background refresh failed", err);
+      yearLoadErrorsV528.set(y, { error:err, at:Date.now() });
       return { ok:false, year:y, error:err };
     }
   })().finally(() => {
     yearLoadPromises.delete(y);
+    repaintYearDataStateV528();
   });
 
   yearLoadPromises.set(y, task);
+  repaintYearDataStateV528();
   return task;
 }
 
@@ -1473,6 +1534,10 @@ async function loadFromSheet(options = {}) {
     return await cloudLoadPromise;
   } finally {
     cloudLoadPromise = null;
+    if (completedSuccessfully) {
+      const year = ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7)).slice(0, 4);
+      scheduleYearRefreshV528(year, 1800);
+    }
     if (!initialCloudSyncFinished) {
       initialCloudSyncFinished = true;
       window.dispatchEvent(new CustomEvent("lover-sales-initial-sync-complete", {
