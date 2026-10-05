@@ -29,6 +29,14 @@
     if (typeof loadFromSheet !== "function") return { ok:false, error:new Error("同步模块尚未载入") };
 
     const manual = reason === "pull-down";
+    const auxiliaryReadRunning =
+      (typeof window.isSalesProfitReadRunningV529 === "function" && window.isSalesProfitReadRunningV529()) ||
+      (typeof window.isYearDataReadRunningV529 === "function" && window.isYearDataReadRunningV529());
+    // V52.9: an automatic 10-second probe must not start over a profit/year read.
+    // Manual pull and foreground resume remain available and keep their priority.
+    if (reason === "interval" && auxiliaryReadRunning) {
+      return { ok:true, skipped:true, auxiliaryReadRunning:true };
+    }
 
     // 手动下拉刷新必须在现有同步结束后，再执行一次真正的强制云端读取。
     // 自动触发则直接共用正在执行的 Promise，避免重复请求。
@@ -123,7 +131,7 @@
   async function registerAndCheckForUpdates() {
     if (!("serviceWorker" in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register("./sw.js?v=52.8", { updateViaCache: "none" });
+      const registration = await navigator.serviceWorker.register("./sw.js?v=52.9", { updateViaCache: "none" });
       await registration.update();
       await activateWaitingWorker(registration);
       registration.addEventListener("updatefound", () => {

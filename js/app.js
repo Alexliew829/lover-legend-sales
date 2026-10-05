@@ -1620,7 +1620,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
 }
 function exportCSV(scope="month"){let csv="\uFEFF公司,日期,类别,地点,营业额\n";const selected=sortReportRows(dedupeRows(rows).filter(r=>(scope==="year"?sameYear(r.date):sameMonth(r.date))&&Number(r.amount)>0));selected.forEach(r=>{csv+=`"${r.type==="fair"?"Fair":(companyNames[r.company]||r.company)}",${r.date},"${r.type==="fair"?"Fair":"每日"}","${r.location||""}",${Number(r.amount).toFixed(2)}\n`});downloadFile(`Lover_Sales_${scope==="year"?selectedYear():selectedMonth()}.csv`,csv,"text/csv;charset=utf-8;")}
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5280",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5290",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function isSelectedMonthWritable(){return true}
 function ensureWritableSelection(){return true}
@@ -1638,7 +1638,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5280";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5290";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5285,8 +5285,8 @@ function renderDashboard(){
     if(yearState.loading)yearStatus.textContent=yearState.complete?"显示上次完整年度资料 · 后台更新中":"正在后台读取完整年度资料…";
     else if(yearState.error)yearStatus.textContent=yearState.complete?"显示上次完整年度资料 · 更新失败，可重新检查":"年度资料读取失败 · 请点重新检查";
     else if(yearState.current)yearStatus.textContent=`${year} 年度资料已完整同步`;
-    else if(yearState.complete)yearStatus.textContent="显示上次完整年度资料 · 等待后台核对";
-    else yearStatus.textContent="年度资料尚未完整载入 · 本月资料可正常操作";
+    else if(yearState.complete)yearStatus.textContent="显示上次完整年度资料 · 点击年度卡更新";
+    else yearStatus.textContent="年度资料按需读取 · 点击任一年度卡载入";
   }
   renderAllYearBreakdownsV224();
   renderTodayCompanyStatus();
@@ -5903,7 +5903,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5280",
+    version:"5290",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -6396,11 +6396,11 @@ function scheduleCompleteSalesCardReconcileV425(type,date,location){
   setTimeout(()=>reconcileCompleteSalesCardContextV425(type,date,location),120);
 }
 
-// V52.8: a draft can reach Apps Script even when its reply times out. Read
+// V52.9: a draft can reach Apps Script even when its reply times out. Read
 // the exact context only after an ambiguous failure; accept it as saved only
 // when every submitted editable field and deletion matches the cloud.
 function salesCardRetryableReplyV521(error){return /超时|timeout|context 已有其他设备的新修改/i.test(String(error?.message||error))}
-// V52.8: persist the exact submitted card before sending confirmation. A lost
+// V52.9: persist the exact submitted card before sending confirmation. A lost
 // response is not a rejection. Never resend an unresolved confirmation.
 const SALES_CONFIRM_JOURNAL_V527='lover_sales_confirm_journal_v527';
 function readSalesConfirmJournalV527(){
@@ -7258,7 +7258,7 @@ window.reconcileVisibleSalesCardAckV407=reconcileVisibleSalesCardAckV407;
 
 // V29.9: Sales-side inventory confirmation removed. Import is the only inventory authority.
 
-// V52.8: background diagnostics/reminders must never compete with the initial
+// V52.9: background diagnostics/reminders must never compete with the initial
 // business-data sync, a user-requested Backup, or precise Sales Card navigation.
 // Only optional read-only jobs use this queue; save/update/delete paths are unchanged.
 let SALES_OPTIONAL_CLOUD_READ_TAIL_V524=Promise.resolve();
@@ -7278,6 +7278,7 @@ function runOptionalCloudReadV524(name,task){
   SALES_OPTIONAL_CLOUD_READ_TAIL_V524=result.catch(()=>{});
   return result;
 }
+window.runOptionalCloudReadV524=runOptionalCloudReadV524;
 function scheduleOptionalCloudReadAfterInitialV524(name,task,delay=0){
   const start=()=>setTimeout(()=>runOptionalCloudReadV524(name,task).catch(()=>{}),Math.max(0,Number(delay||0)));
   if(typeof isInitialCloudSyncFinished==='function'&&isInitialCloudSyncFinished())start();
@@ -7379,7 +7380,7 @@ async function openPendingInventorySalesCardV250(raw){
       const iso=displayToISO(item.date);
       setDateControl("fairStart",iso);
       setDateControl("fairEnd",iso);
-      // V52.8: a remote Fair context may not exist on this device yet. Setting
+      // V52.9: a remote Fair context may not exist on this device yet. Setting
       // the input value programmatically does not fire the user's change event,
       // so explicitly establish the editor before loading/highlighting the card.
       if(typeof updateFairPageMode==="function")updateFairPageMode();
@@ -7410,7 +7411,7 @@ async function openPendingInventorySalesCardV250(raw){
 }
 window.openPendingInventorySalesCardV250=openPendingInventorySalesCardV250;
 
-// V52.8: page switching renders the session cache immediately. The first
+// V52.9: page switching renders the session cache immediately. The first
 // business-page visit may perform one cloud scan; later page switches never
 // repeat the same optional read. Save/confirm/Import-resume refreshes remain.
 let inventoryPendingPageScanQueuedV526=false;
@@ -8113,7 +8114,7 @@ async function refreshFairLocationHistoryCloudV358(options={}){
 }
 window.refreshFairLocationHistoryCloudV358=refreshFairLocationHistoryCloudV358;
 
-// V52.8: the authoritative main sync already contains Fair turnover rows.
+// V52.9: the authoritative main sync already contains Fair turnover rows.
 // Publish those row-backed locations locally without another startup request.
 window.addEventListener('lover-sales-initial-sync-complete',()=>{
   try{renderFairLocationOptions()}catch(_){}
@@ -9599,12 +9600,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5280'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5290'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5280')issues.push(`Frontend / API 版本不一致（Frontend 5280 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5290')issues.push(`Frontend / API 版本不一致（Frontend 5290 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5280';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5290';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -9668,7 +9669,9 @@ function profitSnapshotMetaV496(){try{const x=JSON.parse(localStorage.getItem(PR
 function writeProfitSnapshotMetaV496(revision){try{localStorage.setItem(PROFIT_SNAPSHOT_META_KEY_V496,JSON.stringify({salesCardRevision:Number(revision||0),at:Date.now()}))}catch(_){}}
 function knownSalesCardRevisionV496(){try{return Number((typeof getPrioritySyncLocalV315==='function'?getPrioritySyncLocalV315():{})?.salesCardRevision||0)}catch(_){return 0}}
 function mainSyncBusyV496(){
-  try{return (typeof syncStatusNodesV457==='function'?syncStatusNodesV457():[]).some(n=>/后台检查中|同步中|云端新资料|等待后台检查/.test(String(n?.textContent||'')))}catch(_){return false}
+  // V52.9: status text can remain on “后台检查中” after the actual request has
+  // ended. Only a real core request may defer profit, otherwise profit can starve.
+  try{return Boolean(typeof getActiveCloudLoadPromise==='function'&&getActiveCloudLoadPromise())}catch(_){return false}
 }
 function profitExpectedDatesV496(type,month){
   return [...new Set(dedupeRows(rows).filter(r=>String(r.type||'')===String(type||'')&&displayToISO(String(r.date||'')).slice(0,7)===String(month||'')&&Number(r.amount||0)>0).map(r=>String(r.date||'')))];
@@ -9718,7 +9721,9 @@ async function runSilentProfitRefreshV496(reason='background'){
   if(!profitSnapshotNeedsRefreshV496()||mainSyncBusyV496())return null;
   silentProfitRefreshPendingV496=(async()=>{
     try{
-      const json=await jsonp({action:'getAllSalesProductLinks'},{timeoutMs:15000});
+      const read=()=>jsonp({action:'getAllSalesProductLinks'},{timeoutMs:15000});
+      const json=typeof runOptionalCloudReadV524==='function'?await runOptionalCloudReadV524('profit-'+reason,read):await read();
+      if(!json)return null;
       if(!json?.ok)throw new Error(json?.message||'利润资料读取失败');
       const clean=publishSilentProfitSnapshotV496(json.links,Number(json.salesCardRevision||knownSalesCardRevisionV496()));
       repaintProfitViewsV496();
@@ -9738,6 +9743,7 @@ function scheduleSilentProfitRefreshV496(reason='background',delay=1800){
   },Math.max(500,Number(delay||0)));
 }
 window.scheduleSilentProfitRefreshV496=scheduleSilentProfitRefreshV496;
+window.isSalesProfitReadRunningV529=()=>Boolean(silentProfitRefreshPendingV496);
 
 renderSelectedDayGrandV362=async function(type){
   const date=selectedDayDateV362(type),token=++selectedDayGrandTokenV362[type],sales=selectedDayTurnoverV362(type,date);
@@ -9803,7 +9809,9 @@ async function runSilentProfitRefreshV501(reason='historical-cache',force=false)
   if(mainSyncBusyV496())return null;
   silentProfitRefreshPendingV496=(async()=>{
     try{
-      const json=await jsonp({action:'getAllSalesProductLinks'},{timeoutMs:15000});
+      const read=()=>jsonp({action:'getAllSalesProductLinks'},{timeoutMs:15000});
+      const json=typeof runOptionalCloudReadV524==='function'?await runOptionalCloudReadV524('profit-'+reason,read):await read();
+      if(!json)return null;
       if(!json?.ok)throw new Error(json?.message||'利润资料读取失败');
       const clean=publishSilentProfitSnapshotV496(json.links,Number(json.salesCardRevision||knownSalesCardRevisionV496()));
       repaintProfitViewsV496();

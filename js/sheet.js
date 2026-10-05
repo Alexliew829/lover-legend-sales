@@ -17,7 +17,6 @@ let yearLoadPromises = new Map();
 let loadedCloudYears = new Set();
 let completeCachedYearsV528 = new Set();
 const yearLoadErrorsV528 = new Map();
-const yearRefreshTimersV528 = new Map();
 const localRowMutationAt = new Map();
 const fairWriteQueuesV343 = new Map();
 const CLIENT_DEVICE_KEY_V344="lover_sales_client_device_v344";
@@ -1105,7 +1104,7 @@ function mergeCloudYearRows(year, cloudRows, requestStartedAt = 0) {
   rows = [...keep, ...mergeCloudRowsSafely(localForYear, cloudRows, pendingForYear, requestStartedAt)];
 }
 
-// V52.8: month rows and full-year rows are different data scopes. The Home
+// V52.9: month rows and full-year rows are different data scopes. The Home
 // annual cards may only publish a number after a complete year snapshot has
 // been loaded. A cached complete snapshot stays visible while it is refreshed.
 function getYearDataStateV528(year) {
@@ -1124,27 +1123,9 @@ function repaintYearDataStateV528() {
   try { if (typeof renderDashboard === "function") renderDashboard(); } catch (_) {}
 }
 
-function scheduleYearRefreshV528(year, delay = 1800) {
-  const y = /^\d{4}$/.test(String(year || "")) ? String(year) : new Date().getFullYear().toString();
-  const failure = yearLoadErrorsV528.get(y) || null;
-  if (failure && Date.now() - Number(failure.at || 0) < 60000) return;
-  if (loadedCloudYears.has(y) || yearLoadPromises.has(y) || yearRefreshTimersV528.has(y)) return;
-  const timer = setTimeout(() => {
-    yearRefreshTimersV528.delete(y);
-    if (typeof document !== "undefined" && document.hidden) return;
-    loadPendingRows();
-    if (pendingRows.length || pendingSyncRunning || cloudLoadPromise || isSettingsWriteRunning()) {
-      scheduleYearRefreshV528(y, 2200);
-      return;
-    }
-    loadYearInBackground(y).catch(() => {});
-  }, Math.max(0, Number(delay) || 0));
-  yearRefreshTimersV528.set(y, timer);
-}
-
 if (typeof window !== "undefined") {
   window.getYearDataStateV528 = getYearDataStateV528;
-  window.scheduleYearRefreshV528 = scheduleYearRefreshV528;
+  window.isYearDataReadRunningV529 = () => yearLoadPromises.size > 0;
 }
 
 async function loadYearInBackground(year) {
@@ -1534,10 +1515,6 @@ async function loadFromSheet(options = {}) {
     return await cloudLoadPromise;
   } finally {
     cloudLoadPromise = null;
-    if (completedSuccessfully) {
-      const year = ((typeof selectedMonth === "function" && selectedMonth()) || new Date().toISOString().slice(0, 7)).slice(0, 4);
-      scheduleYearRefreshV528(year, 1800);
-    }
     if (!initialCloudSyncFinished) {
       initialCloudSyncFinished = true;
       window.dispatchEvent(new CustomEvent("lover-sales-initial-sync-complete", {
