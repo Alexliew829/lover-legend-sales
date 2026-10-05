@@ -1938,8 +1938,8 @@ async function loadSalesChangeLogFromSheetV200(type, date, options={}) {
   return json;
 }
 
-async function loadAllSalesChangeLogsV236() {
-  const json = await jsonp({ action:"getAllSalesChangeLogs" }, { timeoutMs:30000 });
+async function loadAllSalesChangeLogsV236(options={}) {
+  const json = await jsonp({ action:"getAllSalesChangeLogs" }, { timeoutMs:Number(options.timeoutMs||30000) });
   if (!json.ok) throw new Error(json.message || "读取新增 / 修改历史失败");
   return Array.isArray(json.logs) ? json.logs : [];
 }
@@ -1977,8 +1977,8 @@ async function saveFairSessionToSheetV281(location,start,end){
   applyFairSessionRevisionV514(json.fairSessionRevision);
   return json;
 }
-async function loadFairSessionsFromSheetV281(){
-  const json=await jsonp({action:"getFairSessionsV281"});
+async function loadFairSessionsFromSheetV281(options={}){
+  const json=await jsonp({action:"getFairSessionsV281"},{timeoutMs:Number(options.timeoutMs||15000)});
   if(!json.ok)throw new Error(json.message||"读取 Fair 活动资料失败");
   if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
   applyFairSessionRevisionV514(json.fairSessionRevision);
@@ -2238,8 +2238,8 @@ async function getTurnoverContextFromSheetV509(type,date,location,timeoutMs=8000
 }
 window.getTurnoverTotalFromSheetV504=getTurnoverTotalFromSheetV504;
 window.getTurnoverContextFromSheetV509=getTurnoverContextFromSheetV509;
-async function loadAllTurnoverEntriesV376(){
-  const json=await jsonp({action:'getAllTurnoverEntriesV376'},{timeoutMs:30000});
+async function loadAllTurnoverEntriesV376(options={}){
+  const json=await jsonp({action:'getAllTurnoverEntriesV376'},{timeoutMs:Number(options.timeoutMs||30000)});
   if(!json.ok)throw new Error(json.message||'读取营业额明细失败');
   return Array.isArray(json.records)?json.records:[];
 }

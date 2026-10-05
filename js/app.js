@@ -1587,7 +1587,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 }
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5300",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5310",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
@@ -1604,7 +1604,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5300";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5310";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -4485,6 +4485,20 @@ async function saveLiveSales(){
 let monthGrandHistoryOpenV223=false;
 let monthGrandHistoryLoadingV223=false;
 let monthGrandProfitLinksV295=[];
+let monthGrandProfitReadyV531=false;
+let yearBreakdownProfitReadyV531=false;
+function seedHomeAggregateProfitFromTrustedCacheV531(){
+  try{
+    const cached=typeof window.readTrustedAllSalesCardsSnapshotV526==='function'?window.readTrustedAllSalesCardsSnapshotV526():null;
+    if(!Array.isArray(cached))return false;
+    const clean=typeof dedupeAuthoritativeSalesLinksV354==='function'?dedupeAuthoritativeSalesLinksV354(cached):cached;
+    monthGrandProfitLinksV295=clean;
+    yearBreakdownLinksV286=clean;
+    monthGrandProfitReadyV531=true;
+    yearBreakdownProfitReadyV531=true;
+    return true;
+  }catch(_){return false}
+}
 
 function homeCardMetricsByPeriodV433(links,period,kind="total"){
   return (links||[]).reduce((totals,x)=>{
@@ -4525,6 +4539,7 @@ function renderMonthGrandHistoryV223(){
   const arrow=document.getElementById("monthGrandHistoryArrow");
   if(!panel)return;
 
+  if(monthGrandHistoryOpenV223&&!monthGrandProfitReadyV531)seedHomeAggregateProfitFromTrustedCacheV531();
   if(!monthGrandHistoryOpenV223){
     panel.classList.add("hidden");
     panel.innerHTML="";
@@ -4545,8 +4560,9 @@ function renderMonthGrandHistoryV223(){
     return;
   }
 
+  const profitReady=monthGrandProfitReadyV531;
   panel.innerHTML=list.length
-    ?`<div class="month-grand-profit-table-v295"><div class="month-grand-profit-head-v295"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${list.map(x=>{const rate=Number(x.cardSales||0)>0?Number(x.profit||0)/Number(x.cardSales||0)*100:0;return `<div class="month-grand-profit-row-v295"><span>${x.label}</span><b>${money(x.amount)}</b><b>${money(x.profit)}</b><b>${rate.toFixed(2)}%</b></div>`}).join("")}<div class="month-grand-profit-row-v295 month-grand-profit-total-v295"><span>总数</span><b>${money(grandSales)}</b><b>${money(grandProfit)}</b><b>${grandRate.toFixed(2)}%</b></div></div>`
+    ?`<div class="month-grand-profit-table-v295"><div class="month-grand-profit-head-v295"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${list.map(x=>{const rate=Number(x.cardSales||0)>0?Number(x.profit||0)/Number(x.cardSales||0)*100:0;return `<div class="month-grand-profit-row-v295"><span>${x.label}</span><b>${money(x.amount)}</b><b>${profitReady?money(x.profit):'—'}</b><b>${profitReady?rate.toFixed(2)+'%':'—'}</b></div>`}).join("")}<div class="month-grand-profit-row-v295 month-grand-profit-total-v295"><span>总数</span><b>${money(grandSales)}</b><b>${profitReady?money(grandProfit):'—'}</b><b>${profitReady?grandRate.toFixed(2)+'%':'—'}</b></div></div>`
     :'<div class="sub">还没有月份营业额记录</div>';
 }
 
@@ -4561,7 +4577,7 @@ async function toggleMonthGrandHistoryV223(){
   try{
     const tasks=[];
     if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))tasks.push(loadYearInBackground(year));
-    if(typeof loadAllSalesProductLinksV203==="function")tasks.push(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000}).then(x=>{monthGrandProfitLinksV295=Array.isArray(x)?x:[]}));
+    if(typeof loadAllSalesProductLinksV203==="function")tasks.push(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000}).then(x=>{monthGrandProfitLinksV295=Array.isArray(x)?x:[];monthGrandProfitReadyV531=true}));
     await Promise.all(tasks);
   }catch(e){
     console.warn("Month turnover/profit history load skipped:",e);
@@ -4599,8 +4615,9 @@ function yearBreakdownRowsV224(kind){
 }
 function yearBreakdownTableV286(list,kind){
   const grandSales=list.reduce((s,x)=>s+Number(x.amount||0),0),grandProfit=list.reduce((s,x)=>s+Number(x.profit||0),0),grandCardSales=list.reduce((s,x)=>s+Number(x.cardSales||0),0),grandRate=grandCardSales>0?grandProfit/grandCardSales*100:0;
-  const rowsHtml=list.map(x=>{const sales=Number(x.amount||0),profit=Number(x.profit||0),denominator=Number(x.cardSales||0),rate=denominator>0?profit/denominator*100:0;const label=kind==="total"?String(x.year||x.month):String(x.month).slice(5,7)+"-"+String(x.month).slice(0,4);return `<div class="year-profit-row-v286"><span>${label}</span><b>${money(sales)}</b><b>${money(profit)}</b><b>${rate.toFixed(2)}%</b></div>`}).join("");
-  return `<div class="year-profit-table-v286"><div class="year-profit-head-v286"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${rowsHtml}<div class="year-profit-row-v286 year-profit-total-v286"><span>总数</span><b>${money(grandSales)}</b><b>${money(grandProfit)}</b><b>${grandRate.toFixed(2)}%</b></div></div>`;
+  const profitReady=yearBreakdownProfitReadyV531;
+  const rowsHtml=list.map(x=>{const sales=Number(x.amount||0),profit=Number(x.profit||0),denominator=Number(x.cardSales||0),rate=denominator>0?profit/denominator*100:0;const label=kind==="total"?String(x.year||x.month):String(x.month).slice(5,7)+"-"+String(x.month).slice(0,4);return `<div class="year-profit-row-v286"><span>${label}</span><b>${money(sales)}</b><b>${profitReady?money(profit):'—'}</b><b>${profitReady?rate.toFixed(2)+'%':'—'}</b></div>`}).join("");
+  return `<div class="year-profit-table-v286"><div class="year-profit-head-v286"><span>日期</span><span>营业额</span><span>利润</span><span>利润率</span></div>${rowsHtml}<div class="year-profit-row-v286 year-profit-total-v286"><span>总数</span><b>${money(grandSales)}</b><b>${profitReady?money(grandProfit):'—'}</b><b>${profitReady?grandRate.toFixed(2)+'%':'—'}</b></div></div>`;
 }
 function renderYearBreakdownV224(kind){
   const panel=document.getElementById("yearBreakdown-"+kind),arrow=document.getElementById("yearBreakdownArrow-"+kind);if(!panel)return;
@@ -4616,12 +4633,14 @@ function renderYearBreakdownV224(kind){
 }
 function renderAllYearBreakdownsV224(){Object.keys(yearBreakdownOpenV224).forEach(renderYearBreakdownV224);}
 async function toggleYearBreakdownV224(kind){
-  if(!(kind in yearBreakdownOpenV224))return;yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
+  if(!(kind in yearBreakdownOpenV224))return;yearBreakdownOpenV224[kind]=!yearBreakdownOpenV224[kind];
+  if(yearBreakdownOpenV224[kind]&&!yearBreakdownProfitReadyV531)seedHomeAggregateProfitFromTrustedCacheV531();
+  renderYearBreakdownV224(kind);if(!yearBreakdownOpenV224[kind])return;
   const year=String(document.getElementById("yearPicker")?.value||selectedYear()||"");yearBreakdownLoadingV224[kind]=true;renderYearBreakdownV224(kind);
   try{
     const tasks=[];
     if(typeof loadYearInBackground==="function"&&/^\d{4}$/.test(year))tasks.push(loadYearInBackground(year));
-    if(typeof loadAllSalesProductLinksV203==="function")tasks.push(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000}).then(x=>{yearBreakdownLinksV286=Array.isArray(x)?x:[]}));
+    if(typeof loadAllSalesProductLinksV203==="function")tasks.push(loadAllSalesProductLinksV203({force:false,maxAgeMs:120000}).then(x=>{yearBreakdownLinksV286=Array.isArray(x)?x:[];yearBreakdownProfitReadyV531=true}));
     await Promise.all(tasks);
   }catch(e){console.warn("Year breakdown load skipped:",kind,e)}finally{yearBreakdownLoadingV224[kind]=false;renderYearBreakdownV224(kind)}
 }
@@ -5268,7 +5287,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5300",
+    version:"5310",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5300,15 +5319,20 @@ async function backupAllData(){
       await new Promise(resolve=>setTimeout(resolve,350));
       payload.productLinks=await loadAllSalesProductLinksV203({force:true,maxAgeMs:0,timeoutMs:45000});
     }
-    setBackupRestoreStateV234({type:"backup",status:"running",message:"正在读取新增 / 修改历史..."});
-    payload.salesChangeLogs=await loadAllSalesChangeLogsV236();
-    setBackupRestoreStateV234({type:'backup',status:'running',message:'正在读取 Fair / Live 营业额明细...'});
-    payload.turnoverEntries=typeof loadAllTurnoverEntriesV376==='function'?await loadAllTurnoverEntriesV376():[];
-    payload.fairSessions=await refreshFairSessionsV281({applyLatest:false});
+    setBackupRestoreStateV234({type:"backup",status:"running",message:"正在并行读取新增 / 修改历史、Fair / Live 营业额明细..."});
+    const [changeLogsV531,turnoverEntriesV531,fairSessionsResultV531]=await Promise.all([
+      loadAllSalesChangeLogsV236({timeoutMs:60000}),
+      typeof loadAllTurnoverEntriesV376==='function'?loadAllTurnoverEntriesV376({timeoutMs:60000}):Promise.resolve([]),
+      typeof loadFairSessionsFromSheetV281==='function'?loadFairSessionsFromSheetV281({timeoutMs:45000}).catch(()=>({sessions:Array.isArray(fairSessionsCloudV281)?fairSessionsCloudV281:[]})):Promise.resolve({sessions:Array.isArray(fairSessionsCloudV281)?fairSessionsCloudV281:[]})
+    ]);
+    payload.salesChangeLogs=changeLogsV531;
+    payload.turnoverEntries=turnoverEntriesV531;
+    payload.fairSessions=Array.isArray(fairSessionsResultV531?.sessions)?fairSessionsResultV531.sessions:[];
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true,turnoverEntries:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    downloadFile(`Lover_Legend_Sales_V37_6_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V53.1').trim().replace(/[^A-Za-z0-9._-]/g,'_');
+    downloadFile(`Lover_Legend_Sales_${runtimeVersionV531}_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
     setSync("Backup 已完成",true);
@@ -6574,7 +6598,12 @@ async function waitForCoreCloudSyncV524(){
 function runOptionalCloudReadV524(name,task){
   const run=async()=>{
     await waitForCoreCloudSyncV524();
-    if(SALES_USER_CRITICAL_READS_V524>0||SALES_PRECISE_CARD_NAV_V524)return null;
+    // V53.1: optional diagnostics/profit/inventory reads are disposable work.
+    // Never let them enter Apps Script while a user save/update/delete is active.
+    // Core mutation code and its ACK/verification path remain unchanged.
+    const turnoverBusy=Object.values(turnoverWriteStateV382||{}).some(Boolean);
+    const salesCardBusy=!!salesCardWriteBusyV456?.busy||window.SALES_MUTATION_LOCK_V450===true;
+    if(SALES_USER_CRITICAL_READS_V524>0||SALES_PRECISE_CARD_NAV_V524||turnoverBusy||salesCardBusy)return null;
     return task();
   };
   const result=SALES_OPTIONAL_CLOUD_READ_TAIL_V524.catch(()=>{}).then(run);
@@ -8895,12 +8924,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5300'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5310'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5300')issues.push(`Frontend / API 版本不一致（Frontend 5300 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5310')issues.push(`Frontend / API 版本不一致（Frontend 5310 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5300';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5310';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -8964,9 +8993,14 @@ function profitSnapshotMetaV496(){try{const x=JSON.parse(localStorage.getItem(PR
 function writeProfitSnapshotMetaV496(revision){try{localStorage.setItem(PROFIT_SNAPSHOT_META_KEY_V496,JSON.stringify({salesCardRevision:Number(revision||0),at:Date.now()}))}catch(_){}}
 function knownSalesCardRevisionV496(){try{return Number((typeof getPrioritySyncLocalV315==='function'?getPrioritySyncLocalV315():{})?.salesCardRevision||0)}catch(_){return 0}}
 function mainSyncBusyV496(){
-  // V52.9: status text can remain on “后台检查中” after the actual request has
-  // ended. Only a real core request may defer profit, otherwise profit can starve.
-  try{return Boolean(typeof getActiveCloudLoadPromise==='function'&&getActiveCloudLoadPromise())}catch(_){return false}
+  // V53.1: profit is auxiliary. Do not let a full profit read overlap any
+  // user save/update/delete. This removes avoidable Apps Script contention.
+  try{
+    if(typeof getActiveCloudLoadPromise==='function'&&getActiveCloudLoadPromise())return true;
+    if(Object.values(turnoverWriteStateV382||{}).some(Boolean))return true;
+    if(salesCardWriteBusyV456?.busy||window.SALES_MUTATION_LOCK_V450===true)return true;
+    return false;
+  }catch(_){return false}
 }
 function profitExpectedDatesV496(type,month){
   return [...new Set(dedupeRows(rows).filter(r=>String(r.type||'')===String(type||'')&&displayToISO(String(r.date||'')).slice(0,7)===String(month||'')&&Number(r.amount||0)>0).map(r=>String(r.date||'')))];
@@ -9010,6 +9044,8 @@ function repaintProfitViewsV496(){
   try{renderFairMonthlyList()}catch(_){ }
   try{renderLiveMonthlyList()}catch(_){ }
   try{if(typeof homeTodayProfitOpenV318!=='undefined'&&homeTodayProfitOpenV318){const d=homeTodayProfitDateV318(),c=homeTodayProfitCachedLinksV318(d);if(Array.isArray(c))renderHomeTodayProfitV318(c,d)}}catch(_){ }
+  try{if(monthGrandHistoryOpenV223)renderMonthGrandHistoryV223()}catch(_){ }
+  try{if(Object.values(yearBreakdownOpenV224||{}).some(Boolean))renderAllYearBreakdownsV224()}catch(_){ }
 }
 async function runSilentProfitRefreshV496(reason='background'){
   if(silentProfitRefreshPendingV496)return silentProfitRefreshPendingV496;
@@ -9094,6 +9130,11 @@ publishSilentProfitSnapshotV496=function(links,revision){
   const groups=new Map();
   clean.forEach(x=>{if(!x?.type||!x?.date)return;const k=String(x.type)+'|'+String(x.date);if(!groups.has(k))groups.set(k,{type:String(x.type),date:String(x.date),links:[]});groups.get(k).links.push(x)});
   groups.forEach(g=>{try{setDailyProfitCacheV237(g.type,g.date,g.links)}catch(_){}});
+  // V53.1: one profit snapshot feeds daily, monthly and yearly Home views.
+  monthGrandProfitLinksV295=clean;
+  yearBreakdownLinksV286=clean;
+  monthGrandProfitReadyV531=true;
+  yearBreakdownProfitReadyV531=true;
   writeProfitSnapshotMetaV496(revision||knownSalesCardRevisionV496());
   return clean;
 };
