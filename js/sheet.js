@@ -1127,8 +1127,28 @@ async function loadYearInBackground(year) {
     }
 
     try {
-      const json = await jsonp({ action: "loadYear", year: y }, { timeoutMs: 20000 });
-      if (!json.ok) throw new Error(json.message || "读取全年资料失败");
+      // V53.4: Apps Script can cold-start on a full-year scan. Retry once in the
+      // background before declaring the annual snapshot unavailable. A previously
+      // complete cached year stays visible throughout this refresh.
+      let json = null;
+      let yearReadError = null;
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          json = await jsonp(
+            { action: "loadYear", year: y },
+            { timeoutMs: attempt === 1 ? 20000 : 25000 }
+          );
+          if (!json || !json.ok) throw new Error((json && json.message) || "读取全年资料失败");
+          yearReadError = null;
+          break;
+        } catch (err) {
+          yearReadError = err;
+          if (attempt === 1) {
+            await salesSyncDelay(1200);
+          }
+        }
+      }
+      if (yearReadError || !json) throw (yearReadError || new Error("读取全年资料失败"));
       const fairDraftDirtyBeforeCloud = typeof fairInputsHaveUnsavedChanges === "function"
         ? fairInputsHaveUnsavedChanges()
         : false;
@@ -1174,10 +1194,6 @@ function getActiveCloudLoadPromise() {
 
 function isInitialCloudSyncFinished() {
   return initialCloudSyncFinished;
-}
-
-function waitForInitialCloudSync() {
-  return initialCloudSyncPromise || cloudLoadPromise || Promise.resolve();
 }
 
 function salesSyncDelay(ms) {

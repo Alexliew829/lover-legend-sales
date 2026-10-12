@@ -1587,7 +1587,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 }
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5310",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5340",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
@@ -1604,7 +1604,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5310";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5340";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -3085,17 +3085,7 @@ function toggleProductLinkBoxV206(type){
     Promise.resolve(loadProductLinksIntoEditorV206(type)).catch(()=>{});
   }
 }
-function liveDeliveryDefaultV203(price){
-  const n=Math.max(0,Number(price||0));
-  if(n<=0)return 0;
-  // V50.2: match Import V21.5 木架＋本地运费 A–F exactly.
-  if(n<300)return 20;
-  if(n<=500)return 50;
-  if(n<=1000)return 80;
-  if(n<=2000)return 120;
-  if(n<5000)return 150;
-  return 180;
-}
+
 function fairMonthlyTotalForProductCardV220(){
   const ctx=productLinkContextV206("fair");
   const date=String(ctx.date||"");
@@ -3706,17 +3696,6 @@ function applyCloudDraftStatusesV322(type,savedLinks){
 }
 window.salesCardIsConfirmedV322=salesCardIsConfirmedV322;
 
-
-function addProductLinkItemV209(type,data={}){
-  const pre=productLinkPreV208(type),wrap=document.getElementById(pre+"ProductItems");
-  if(!wrap){console.error("V29.9 sales card container missing",type);return false}
-  const card=buildSalesCardTransactionV239(type,[data||{}]);
-  wrap.appendChild(card);
-  return true;
-}
-function addProductLinkItemV206(type,data={}){return addProductLinkItemV209(type,data)}
-window.addProductLinkItemV206=addProductLinkItemV206;
-window.addProductLinkItemV209=addProductLinkItemV209;
 
 function renderProductLinksEditorV206(type,links){
   const {pre}=productLinkContextV206(type),wrap=document.getElementById(pre+"ProductItems");if(!wrap)return;
@@ -5231,6 +5210,13 @@ function renderRemoteRestoreMaintenanceV345(active,message=""){
 }
 async function checkRemoteRestoreMaintenanceV345(){
   if(restoreLeaveProtectionActiveV409()){renderRemoteRestoreMaintenanceV345(false);forceRestorePageV410();return}
+  // V53.4 CLEAN: this is an optional cross-device safety probe, not business data.
+  // Never let it compete with startup/resume sync or user save/update/delete requests.
+  if(typeof document!=="undefined"&&document.hidden)return;
+  const coreBusy=typeof getActiveCloudLoadPromise==='function'&&getActiveCloudLoadPromise();
+  const turnoverBusy=Object.values(turnoverWriteStateV382||{}).some(Boolean);
+  const salesCardBusy=!!salesCardWriteBusyV456?.busy||window.SALES_MUTATION_LOCK_V450===true;
+  if(coreBusy||turnoverBusy||salesCardBusy)return;
   try{
     const status=await jsonp({action:"maintenanceStatusV345"},{timeoutMs:7000});
     if(status&&status.restoreGeneration!==undefined&&typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(status.restoreGeneration);
@@ -5287,7 +5273,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5310",
+    version:"5340",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5331,7 +5317,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true,turnoverEntries:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V53.1').trim().replace(/[^A-Za-z0-9._-]/g,'_');
+    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V53.4').trim().replace(/[^A-Za-z0-9._-]/g,'_');
     downloadFile(`Lover_Legend_Sales_${runtimeVersionV531}_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
@@ -5484,8 +5470,9 @@ setTimeout(async()=>{
   }
   resumeRestoreStatusV234();
 },800);
-setTimeout(checkRemoteRestoreMaintenanceV345,1200);
-setInterval(checkRemoteRestoreMaintenanceV345,5000);
+setTimeout(checkRemoteRestoreMaintenanceV345,1500);
+// V53.4 CLEAN: 15s is sufficient for remote Restore safety and cuts idle Apps Script probes by 67%.
+setInterval(checkRemoteRestoreMaintenanceV345,15000);
 
 let lastObservedSystemMonth=monthISO();setInterval(()=>{const nowMonth=monthISO();if(nowMonth!==lastObservedSystemMonth){lastObservedSystemMonth=nowMonth;systemState.currentMonth=nowMonth;document.getElementById("monthPicker").value=nowMonth;document.getElementById("yearPicker").value=nowMonth.slice(0,4);renderAll();updateReadOnlyMode();loadFromSheet({force:true})}},60000);
 
@@ -8426,8 +8413,34 @@ async function awaitTurnoverWriteOrVerifyV516(writePromise,localRow,expectedEntr
   const finalV516=await outcomeV516;if(finalV516.ok)return finalV516.value;throw finalV516.error;
 }
 async function fastSyncVisibleTurnoverContextV516(){
-  // Revision-probe fallback: update only the visible turnover context. Other
-  // cloud data remains on the existing protected selective-sync path.
+  // V53.4: if the tiny Revision probe times out while Home is visible, refresh
+  // only the visible month turnover snapshot. Do not advance Global Revision
+  // here because Sales Card / other cloud state has not been verified.
+  const homeActive=!!document.getElementById('page-home')?.classList.contains('active');
+  if(homeActive&&typeof loadMonthCloudShared==='function'&&typeof mergeCloudMonthRows==='function'){
+    const month=(typeof selectedMonth==='function'&&selectedMonth())||new Date().toISOString().slice(0,7);
+    const requestStartedAt=Date.now();
+    const signature=()=>rows.filter(r=>{try{return rowMonthKey(r)===month}catch(_){return false}})
+      .map(r=>`${syncKey(r)}@${Number(r.amount||0).toFixed(2)}@${String(r.updatedAt||'')}`).sort().join('|');
+    const before=signature();
+    const json=await loadMonthCloudShared(month,6000);
+    if(!json||!json.ok)return null;
+    try{loadPendingRows()}catch(_){}
+    try{reconcilePendingRowsFromCloudV329(json.rows||[])}catch(_){}
+    mergeCloudMonthRows(month,json.rows||[],requestStartedAt);
+    if(json.systemState&&typeof applySystemState==='function')applySystemState(json.systemState);
+    if(json.commissionSettings){
+      if(typeof applyCloudCommissionSettings==='function')applyCloudCommissionSettings(json.commissionSettings);
+      else if(typeof applyCommissionSettings==='function')applyCommissionSettings(json.commissionSettings);
+    }
+    if(json.accessSettings&&typeof applyAccessPasswordSettings==='function')applyAccessPasswordSettings(json.accessSettings);
+    saveLocalDataCache(json.commissionSettings||null,json.accessSettings||null);
+    try{renderHomeFirst()}catch(_){}
+    try{scheduleDeferredFullRender(0)}catch(_){}
+    return{ok:true,type:'home-month',month,updated:before!==signature()};
+  }
+
+  // Existing Sales / Fair / Live fallback remains exact-context only.
   let type='';
   if(document.getElementById('page-sales')?.classList.contains('active'))type='daily';
   else if(document.getElementById('page-fair')?.classList.contains('active'))type='fair';
@@ -8924,12 +8937,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5310'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5340'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5310')issues.push(`Frontend / API 版本不一致（Frontend 5310 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5340')issues.push(`Frontend / API 版本不一致（Frontend 5340 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5310';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5340';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -9271,3 +9284,133 @@ function replaceProfitAggregateContextV507(type,date,location,links){
 }
 replaceProfitAggregateContextV457=replaceProfitAggregateContextV507;
 window.replaceProfitAggregateContextV457=replaceProfitAggregateContextV507;
+
+
+/* ================= V53.4 Fair current-location restore =================
+   Scope is intentionally UI/context-only:
+   - a non-empty typed location immediately unlocks the Fair editor;
+   - only an authoritative successful Fair turnover write marks the location as current;
+   - the latest cloud-confirmed Fair turnover row is the cross-device source of truth;
+   - localStorage is only a fast fallback while the main cloud sync is still loading.
+   No save API, turnover formula, Sales Card, Inventory ACK, retry cadence or polling frequency changes.
+*/
+const FAIR_CURRENT_LOCATION_KEY_V532='lover_fair_current_location_v532';
+let fairLocationUserDirtyV532=false;
+
+function fairUpdatedAtMsV532(value){
+  const raw=String(value||'').trim();
+  if(!raw)return 0;
+  const native=Date.parse(raw);
+  if(Number.isFinite(native))return native;
+  const m=raw.match(/^(\d{2})-(\d{2})-(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  if(!m)return 0;
+  return Date.UTC(Number(m[3]),Number(m[2])-1,Number(m[1]),Number(m[4]||0),Number(m[5]||0),Number(m[6]||0));
+}
+function latestCloudConfirmedFairLocationV532(){
+  let best=null,bestAt=-1;
+  (Array.isArray(rows)?rows:[]).forEach(r=>{
+    if(String(r?.type||'').toLowerCase()!=='fair')return;
+    const loc=canonicalLocation(String(r?.location||''));
+    if(!loc)return;
+    const at=fairUpdatedAtMsV532(r?.updatedAt||r?.clientUpdatedAt||'');
+    if(at>bestAt){bestAt=at;best=loc;}
+  });
+  return best||'';
+}
+function savedFairCurrentLocationV532(){
+  try{return canonicalLocation(localStorage.getItem(FAIR_CURRENT_LOCATION_KEY_V532)||'')}catch(_){return''}
+}
+function markFairCurrentLocationV532(location){
+  const loc=canonicalLocation(String(location||''));
+  if(!loc)return'';
+  try{localStorage.setItem(FAIR_CURRENT_LOCATION_KEY_V532,loc)}catch(_){}
+  if(typeof saveFairLocation==='function')saveFairLocation(loc);
+  fairLocationUserDirtyV532=false;
+  return loc;
+}
+function preferredFairCurrentLocationV532(){
+  const fromRows=latestCloudConfirmedFairLocationV532();
+  if(fromRows)return fromRows;
+  const fromLocal=savedFairCurrentLocationV532();
+  if(fromLocal)return fromLocal;
+  const session=(Array.isArray(fairSessionsCloudV281)?fairSessionsCloudV281:[]).slice().sort((a,b)=>fairUpdatedAtMsV532(b?.updatedAt)-fairUpdatedAtMsV532(a?.updatedAt))[0];
+  return canonicalLocation(String(session?.location||''));
+}
+function renderFairContextV532(){
+  if(typeof updateFairPageMode==='function')updateFairPageMode();
+  if(typeof updateFairSingleAmountV353==='function')updateFairSingleAmountV353();
+  if(typeof syncFairInputs==='function')syncFairInputs();
+  if(typeof syncFairProductDatesV203==='function')syncFairProductDatesV203(true);
+  if(typeof renderTurnoverComposerV376==='function')renderTurnoverComposerV376('fair');
+  if(typeof renderFairDailySummary==='function')renderFairDailySummary();
+  if(typeof renderFairMonthlyList==='function')renderFairMonthlyList();
+}
+function restoreFairCurrentLocationV532({force=false}={}){
+  const input=document.getElementById('fairLocation');
+  if(!input||fairLocationUserDirtyV532)return false;
+  const wanted=preferredFairCurrentLocationV532();
+  if(!wanted){renderFairContextV532();return false;}
+  const current=canonicalLocation(String(input.value||''));
+  if(force||!current||normalizeFairLocationKey(current)!==normalizeFairLocationKey(wanted))input.value=wanted;
+  renderFairContextV532();
+  if(typeof refreshProductLinkContextV210==='function')refreshProductLinkContextV210('fair');
+  return true;
+}
+function bindFairLocationImmediateModeV532(){
+  const input=document.getElementById('fairLocation');
+  if(!input||input.dataset.v532ImmediateMode==='1')return;
+  input.dataset.v532ImmediateMode='1';
+  const refresh=e=>{
+    if(e?.isTrusted)fairLocationUserDirtyV532=true;
+    // V53.4: existence of text, not membership in old-history, controls edit mode.
+    if(typeof updateFairPageMode==='function')updateFairPageMode();
+    if(typeof updateFairSingleAmountV353==='function')updateFairSingleAmountV353();
+    if(typeof renderTurnoverComposerV376==='function')renderTurnoverComposerV376('fair');
+  };
+  input.addEventListener('input',refresh);
+  input.addEventListener('change',refresh);
+  input.addEventListener('blur',()=>{
+    const loc=canonicalLocation(String(input.value||''));
+    if(loc)input.value=loc;
+    refresh();
+  });
+}
+
+// Mark current Fair location only after the authoritative turnover commit succeeds.
+const _commitTurnoverEntriesV532=commitTurnoverEntriesV376;
+commitTurnoverEntriesV376=async function(type,entries,actionText,notificationMeta={}){
+  const result=await _commitTurnoverEntriesV532(type,entries,actionText,notificationMeta);
+  if(result===true&&type==='fair'){
+    const loc=markFairCurrentLocationV532(fairSelectedLocationV353());
+    if(loc)renderFairContextV532();
+  }
+  return result;
+};
+window.commitTurnoverEntriesV376=commitTurnoverEntriesV376;
+
+// Every Fair entry restores the last cloud-confirmed location without another full sync.
+const _showPageV532=showPage;
+showPage=function(name,el){
+  const result=_showPageV532(name,el);if(result===false)return false;
+  if(name==='fair'){
+    bindFairLocationImmediateModeV532();
+    restoreFairCurrentLocationV532({force:true});
+  }
+  return result;
+};
+window.showPage=showPage;
+
+// Main cross-device sync is authoritative. If a newer Fair row arrives while this
+// device has no unsaved typed location, immediately move the Fair context to it.
+window.addEventListener('lover-sales-initial-sync-complete',()=>{
+  if(fairLocationUserDirtyV532)return;
+  const latest=latestCloudConfirmedFairLocationV532();
+  if(latest)markFairCurrentLocationV532(latest);
+  bindFairLocationImmediateModeV532();
+  restoreFairCurrentLocationV532({force:true});
+});
+
+setTimeout(()=>{
+  bindFairLocationImmediateModeV532();
+  if(!fairLocationUserDirtyV532)restoreFairCurrentLocationV532({force:false});
+},0);
