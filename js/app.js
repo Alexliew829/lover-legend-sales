@@ -1587,7 +1587,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 }
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5340",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5350",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
@@ -1604,7 +1604,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5340";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5350";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -4773,7 +4773,8 @@ async function loadDailyTotalsMonth(month){
     if(!json||!json.ok)throw new Error((json&&json.message)||"读取失败");
     if(typeof loadPendingRows==="function")loadPendingRows();
     mergeCloudMonthRows(month,json.rows||[],started);
-    if(json.dataRevision&&typeof applyLocalDataRevision==="function")applyLocalDataRevision(json.dataRevision);
+    // V53.5: an explicitly opened historical month is a partial dataset.
+    // Keep it in cache, but never advance the global revision from this read.
     if(typeof saveLocalDataCache==="function")saveLocalDataCache(json.commissionSettings||null,json.accessSettings||null);
     renderDailyTotals();
     if(status)status.textContent="已载入";
@@ -5210,7 +5211,7 @@ function renderRemoteRestoreMaintenanceV345(active,message=""){
 }
 async function checkRemoteRestoreMaintenanceV345(){
   if(restoreLeaveProtectionActiveV409()){renderRemoteRestoreMaintenanceV345(false);forceRestorePageV410();return}
-  // V53.4 CLEAN: this is an optional cross-device safety probe, not business data.
+  // V53.5 CLEAN: this is an optional cross-device safety probe, not business data.
   // Never let it compete with startup/resume sync or user save/update/delete requests.
   if(typeof document!=="undefined"&&document.hidden)return;
   const coreBusy=typeof getActiveCloudLoadPromise==='function'&&getActiveCloudLoadPromise();
@@ -5273,7 +5274,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5340",
+    version:"5350",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5317,7 +5318,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true,turnoverEntries:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V53.4').trim().replace(/[^A-Za-z0-9._-]/g,'_');
+    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V53.5').trim().replace(/[^A-Za-z0-9._-]/g,'_');
     downloadFile(`Lover_Legend_Sales_${runtimeVersionV531}_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
@@ -5471,7 +5472,7 @@ setTimeout(async()=>{
   resumeRestoreStatusV234();
 },800);
 setTimeout(checkRemoteRestoreMaintenanceV345,1500);
-// V53.4 CLEAN: 15s is sufficient for remote Restore safety and cuts idle Apps Script probes by 67%.
+// V53.5 CLEAN: 15s is sufficient for remote Restore safety and cuts idle Apps Script probes by 67%.
 setInterval(checkRemoteRestoreMaintenanceV345,15000);
 
 let lastObservedSystemMonth=monthISO();setInterval(()=>{const nowMonth=monthISO();if(nowMonth!==lastObservedSystemMonth){lastObservedSystemMonth=nowMonth;systemState.currentMonth=nowMonth;document.getElementById("monthPicker").value=nowMonth;document.getElementById("yearPicker").value=nowMonth.slice(0,4);renderAll();updateReadOnlyMode();loadFromSheet({force:true})}},60000);
@@ -8413,7 +8414,7 @@ async function awaitTurnoverWriteOrVerifyV516(writePromise,localRow,expectedEntr
   const finalV516=await outcomeV516;if(finalV516.ok)return finalV516.value;throw finalV516.error;
 }
 async function fastSyncVisibleTurnoverContextV516(){
-  // V53.4: if the tiny Revision probe times out while Home is visible, refresh
+  // V53.5: if the tiny Revision probe times out while Home is visible, refresh
   // only the visible month turnover snapshot. Do not advance Global Revision
   // here because Sales Card / other cloud state has not been verified.
   const homeActive=!!document.getElementById('page-home')?.classList.contains('active');
@@ -8937,12 +8938,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5340'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5350'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5340')issues.push(`Frontend / API 版本不一致（Frontend 5340 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5350')issues.push(`Frontend / API 版本不一致（Frontend 5350 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5340';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5350';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -9286,7 +9287,7 @@ replaceProfitAggregateContextV457=replaceProfitAggregateContextV507;
 window.replaceProfitAggregateContextV457=replaceProfitAggregateContextV507;
 
 
-/* ================= V53.4 Fair current-location restore =================
+/* ================= V53.5 Fair current-location restore =================
    Scope is intentionally UI/context-only:
    - a non-empty typed location immediately unlocks the Fair editor;
    - only an authoritative successful Fair turnover write marks the location as current;
@@ -9362,7 +9363,7 @@ function bindFairLocationImmediateModeV532(){
   input.dataset.v532ImmediateMode='1';
   const refresh=e=>{
     if(e?.isTrusted)fairLocationUserDirtyV532=true;
-    // V53.4: existence of text, not membership in old-history, controls edit mode.
+    // V53.5: existence of text, not membership in old-history, controls edit mode.
     if(typeof updateFairPageMode==='function')updateFairPageMode();
     if(typeof updateFairSingleAmountV353==='function')updateFairSingleAmountV353();
     if(typeof renderTurnoverComposerV376==='function')renderTurnoverComposerV376('fair');

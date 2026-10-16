@@ -1861,10 +1861,10 @@ async function loadSalesProductLinksV206(type,date,location,options={}) {
         refreshProfitAggregateCachesV321(links,txns);
       }
     }
-    if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
+    // V53.5: exact-context Sales Card reads are authoritative only for this card.
+    // They must not advance global or aggregate Sales Card revision, otherwise another
+    // context changed on another device can be skipped by the next global revision gate.
     if(json.salesCardRevision!==undefined){
-      const p=getPrioritySyncLocalV315();
-      setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()});
       if(typeof markSalesCardContextVerifiedV451==='function')markSalesCardContextVerifiedV451(type,date,location,Number(json.salesCardRevision||0));
       if(typeof resolveSalesConfirmationFromCloudV527==='function')resolveSalesConfirmationFromCloudV527(type,date,location,links);
     }
@@ -1928,7 +1928,9 @@ async function loadAllSalesProductLinksV203(options={}) {
     // now atomically publishes BOTH Sales Card caches and all profit caches.
     if(typeof commitAllSalesCardsAtomicV449==='function')commitAllSalesCardsAtomicV449(links,Number(json.salesCardRevision||0));
     else allSalesProductLinksCacheV216={links,at:Date.now()};
-    if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
+    // V53.5: this is a complete Sales Card snapshot, so Sales Card revision is safe
+    // to advance. It is still not a complete turnover/global snapshot, so dataRevision
+    // is deliberately left untouched.
     if(json.salesCardRevision!==undefined){
       const p=getPrioritySyncLocalV315();
       setPrioritySyncLocalV315({...p,salesCardRevision:Number(json.salesCardRevision||0),at:Date.now()});
@@ -1996,7 +1998,8 @@ async function saveFairSessionToSheetV281(location,start,end){
 async function loadFairSessionsFromSheetV281(options={}){
   const json=await jsonp({action:"getFairSessionsV281"},{timeoutMs:Number(options.timeoutMs||15000)});
   if(!json.ok)throw new Error(json.message||"读取 Fair 活动资料失败");
-  if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
+  // V53.5: Fair session/history is metadata only. Never let this partial read
+  // acknowledge the global business-data revision.
   applyFairSessionRevisionV514(json.fairSessionRevision);
   return json;
 }
@@ -2248,8 +2251,8 @@ async function getTurnoverTotalFromSheetV504(type,date,location){
 async function getTurnoverContextFromSheetV509(type,date,location,timeoutMs=8000){
   const json=await jsonp({action:'getTurnoverContextV509',type,date,location},{timeoutMs:Number(timeoutMs||8000)});
   if(!json.ok)throw new Error(json.message||'确认营业额资料失败');
-  if(json.dataRevision!==undefined)applyLocalDataRevision(json.dataRevision);
-  if(json.turnoverRevision!==undefined){const p=getPrioritySyncLocalV315();setPrioritySyncLocalV315({...p,turnoverRevision:Number(json.turnoverRevision||0),at:Date.now()})}
+  // V53.5: one date/location is authoritative only for that exact turnover context.
+  // Do not advance global/turnover aggregate revisions from a partial read.
   return json.record||null;
 }
 window.getTurnoverTotalFromSheetV504=getTurnoverTotalFromSheetV504;
