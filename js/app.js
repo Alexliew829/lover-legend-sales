@@ -1584,7 +1584,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 }
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5450",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5460",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
@@ -1601,7 +1601,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5450";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5460";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2352,7 +2352,7 @@ function renderLiveMonthlyList(){
 }
 
 
-/* ================= V54.5 Annual-history UI state ================= */
+/* ================= V54.6 Annual-history UI state ================= */
 let fairYearModeOpenV541=false;
 let liveYearModeOpenV541=false;
 function fairMonthTitleTextV541(){
@@ -2399,7 +2399,7 @@ function closeLiveYearHistoryV541(){
   if(btn)btn.textContent='全年记录'; syncAnnualHistoryTitlesV541();
 }
 
-/* ================= V54.5 Fair / Live history analytics ================= */
+/* ================= V54.6 Fair / Live history analytics ================= */
 let fairAnalyticsCacheV536=null;
 let fairAnalyticsLoadingV536=false;
 let liveYearAnalyticsCacheV536=new Map();
@@ -2411,29 +2411,62 @@ let liveYearAnalyticsRevisionV539=new Map();
 const FAIR_ANALYTICS_CACHE_KEY_V539='lover_fair_analytics_cache_v539';
 const LIVE_YEAR_ANALYTICS_CACHE_KEY_V539='lover_live_year_analytics_cache_v539';
 function turnoverRevisionNowV539(){try{return Number(getPrioritySyncLocalV315()?.turnoverRevision||0)}catch(_){return 0}}
-function readPersistentAnalyticsV539(key,subKey=''){
+// V54.6: annual analytics cache is independent from the open/closed UI state.
+// A cache may be rendered immediately even before the current revision is known;
+// once revisions are known, only a real revision mismatch triggers a background refresh.
+function readPersistentAnalyticsEntryV546(key,subKey=''){
   try{
     const box=JSON.parse(localStorage.getItem(key)||'null');
     if(!box||typeof box!=='object')return null;
-    const rev=turnoverRevisionNowV539();
-    if(rev<=0||Number(box.turnoverRevision||0)!==rev)return null;
-    if(subKey){const item=box.items&&box.items[subKey];return item&&item.data?item.data:null}
-    const sessionRev=Number(typeof fairSessionRevisionV514!=='undefined'?fairSessionRevisionV514:0);
-    if(Number(box.fairSessionRevision||0)!==sessionRev)return null;
-    return box.data||null;
+    if(subKey){
+      const item=box.items&&box.items[subKey];
+      if(!item||!item.data)return null;
+      return {
+        data:item.data,
+        turnoverRevision:Number(item.turnoverRevision??box.turnoverRevision??0),
+        fairSessionRevision:item.fairSessionRevision===undefined?null:Number(item.fairSessionRevision),
+        at:Number(item.at||0)
+      };
+    }
+    if(!box.data)return null;
+    return {
+      data:box.data,
+      turnoverRevision:Number(box.turnoverRevision||0),
+      fairSessionRevision:box.fairSessionRevision===undefined?null:Number(box.fairSessionRevision),
+      at:Number(box.at||0)
+    };
   }catch(_){return null}
+}
+function readPersistentAnalyticsV539(key,subKey=''){
+  const entry=readPersistentAnalyticsEntryV546(key,subKey);
+  if(!entry)return null;
+  const rev=turnoverRevisionNowV539();
+  if(rev>0&&entry.turnoverRevision>0&&entry.turnoverRevision!==rev)return null;
+  if(!subKey&&typeof fairSessionRevisionKnownV514!=='undefined'&&fairSessionRevisionKnownV514){
+    const sessionRev=Number(typeof fairSessionRevisionV514!=='undefined'?fairSessionRevisionV514:0);
+    if(entry.fairSessionRevision!==null&&entry.fairSessionRevision!==sessionRev)return null;
+  }
+  return entry.data;
 }
 function writePersistentAnalyticsV539(key,data,subKey=''){
   try{
     const rev=turnoverRevisionNowV539();
-    if(rev<=0)return;
     if(subKey){
       const old=JSON.parse(localStorage.getItem(key)||'null');
-      const box=old&&typeof old==='object'&&Number(old.turnoverRevision||0)===rev?old:{turnoverRevision:rev,items:{}};
+      const box=old&&typeof old==='object'?old:{items:{}};
       if(!box.items||typeof box.items!=='object')box.items={};
-      box.items[subKey]={data,at:Date.now()};
+      box.turnoverRevision=rev;
+      box.items[subKey]={data,at:Date.now(),turnoverRevision:rev};
       localStorage.setItem(key,JSON.stringify(box));
-    }else localStorage.setItem(key,JSON.stringify({turnoverRevision:rev,fairSessionRevision:Number(typeof fairSessionRevisionV514!=='undefined'?fairSessionRevisionV514:0),data,at:Date.now()}));
+    }else{
+      const sessionKnown=typeof fairSessionRevisionKnownV514!=='undefined'&&fairSessionRevisionKnownV514;
+      localStorage.setItem(key,JSON.stringify({
+        turnoverRevision:rev,
+        fairSessionRevision:sessionKnown?Number(fairSessionRevisionV514||0):null,
+        data,
+        at:Date.now()
+      }));
+    }
   }catch(_){}
 }
 function performanceBandV536(value,best){
@@ -2557,13 +2590,57 @@ async function toggleFairAllHistoryV536(){
   if(monthly)monthly.classList.toggle('hidden',opening);if(rollup)rollup.classList.toggle('hidden',opening);
   syncAnnualHistoryTitlesV541();
   if(!opening)return;
-  const year=fairAnnualYearV545(),currentTurnoverRevV539=turnoverRevisionNowV539(),currentSessionRevV539=Number(typeof fairSessionRevisionV514!=='undefined'?fairSessionRevisionV514:0);
-  if(fairAnalyticsCacheV536&&(fairAnalyticsCacheYearV545!==year||fairAnalyticsCacheRevisionV539!==currentTurnoverRevV539||fairAnalyticsSessionRevisionV539!==currentSessionRevV539))fairAnalyticsCacheV536=null;
-  if(!fairAnalyticsCacheV536){const cached=readPersistentAnalyticsV539(FAIR_ANALYTICS_CACHE_KEY_V539);if(cached&&String(cached.year||'')===year){fairAnalyticsCacheV536=cached;fairAnalyticsCacheYearV545=year;fairAnalyticsCacheRevisionV539=currentTurnoverRevV539;fairAnalyticsSessionRevisionV539=currentSessionRevV539}}
-  if(fairAnalyticsCacheV536){renderFairAnalyticsV536(fairAnalyticsCacheV536);syncAnnualHistoryTitlesV541();return}
+
+  const year=fairAnnualYearV545();
+  const currentTurnoverRevV539=turnoverRevisionNowV539();
+  const currentSessionRevV539=Number(typeof fairSessionRevisionV514!=='undefined'?fairSessionRevisionV514:0);
+  const sessionKnownV546=typeof fairSessionRevisionKnownV514!=='undefined'&&fairSessionRevisionKnownV514;
+
+  // V54.6: first paint a valid same-year memory/persistent cache immediately.
+  // Closing the panel or leaving Fair never destroys this data cache.
+  if(fairAnalyticsCacheV536&&fairAnalyticsCacheYearV545!==year){
+    fairAnalyticsCacheV536=null;
+    fairAnalyticsCacheRevisionV539=-1;
+    fairAnalyticsSessionRevisionV539=-1;
+  }
+  if(!fairAnalyticsCacheV536){
+    const entry=readPersistentAnalyticsEntryV546(FAIR_ANALYTICS_CACHE_KEY_V539);
+    if(entry&&entry.data&&String(entry.data.year||'')===year){
+      fairAnalyticsCacheV536=entry.data;
+      fairAnalyticsCacheYearV545=year;
+      fairAnalyticsCacheRevisionV539=Number(entry.turnoverRevision||0);
+      fairAnalyticsSessionRevisionV539=entry.fairSessionRevision===null?-1:Number(entry.fairSessionRevision);
+    }
+  }
+
+  let hasCachedV546=Boolean(fairAnalyticsCacheV536);
+  if(hasCachedV546){
+    renderFairAnalyticsV536(fairAnalyticsCacheV536);
+    syncAnnualHistoryTitlesV541();
+  }
+
+  const turnoverChangedV546=hasCachedV546&&currentTurnoverRevV539>0&&fairAnalyticsCacheRevisionV539>0&&fairAnalyticsCacheRevisionV539!==currentTurnoverRevV539;
+  const sessionChangedV546=hasCachedV546&&sessionKnownV546&&fairAnalyticsSessionRevisionV539>=0&&fairAnalyticsSessionRevisionV539!==currentSessionRevV539;
+  if(hasCachedV546&&!turnoverChangedV546&&!sessionChangedV546)return;
   if(fairAnalyticsLoadingV536)return;
-  fairAnalyticsLoadingV536=true;panel.innerHTML='<div class="sub">正在读取 Fair 全年记录…</div>';
-  try{const data=await loadFairAnalyticsV536(year);fairAnalyticsCacheV536=data;fairAnalyticsCacheYearV545=year;fairAnalyticsCacheRevisionV539=turnoverRevisionNowV539();fairAnalyticsSessionRevisionV539=Number(typeof fairSessionRevisionV514!=='undefined'?fairSessionRevisionV514:0);writePersistentAnalyticsV539(FAIR_ANALYTICS_CACHE_KEY_V539,data);renderFairAnalyticsV536(data)}catch(e){panel.innerHTML=`<div class="sub">读取失败：${escapeChangeLogHtmlV200(e.message||e)}</div>`}finally{fairAnalyticsLoadingV536=false;syncAnnualHistoryTitlesV541()}
+
+  fairAnalyticsLoadingV536=true;
+  if(!hasCachedV546)panel.innerHTML='<div class="sub">正在读取 Fair 全年记录…</div>';
+  try{
+    const data=await loadFairAnalyticsV536(year);
+    fairAnalyticsCacheV536=data;
+    fairAnalyticsCacheYearV545=year;
+    fairAnalyticsCacheRevisionV539=turnoverRevisionNowV539();
+    fairAnalyticsSessionRevisionV539=(typeof fairSessionRevisionKnownV514!=='undefined'&&fairSessionRevisionKnownV514)?Number(fairSessionRevisionV514||0):-1;
+    writePersistentAnalyticsV539(FAIR_ANALYTICS_CACHE_KEY_V539,data);
+    if(fairYearModeOpenV541&&fairAnnualYearV545()===year)renderFairAnalyticsV536(data);
+  }catch(e){
+    if(!hasCachedV546)panel.innerHTML=`<div class="sub">读取失败：${escapeChangeLogHtmlV200(e.message||e)}</div>`;
+    else console.warn('Fair 全年记录后台更新失败，继续显示缓存',e);
+  }finally{
+    fairAnalyticsLoadingV536=false;
+    syncAnnualHistoryTitlesV541();
+  }
 }
 window.toggleFairAllHistoryV536=toggleFairAllHistoryV536;
 function renderLiveYearAnalyticsV536(data,host,year){
@@ -2586,15 +2663,43 @@ async function showLiveYearHistoryV536(){
   if(!host){alert('请先选择主播');return}if(!/^\d{4}$/.test(year)){alert('请输入正确年份');return}
   liveYearModeOpenV541=true;
   panel.classList.remove('hidden');if(monthly)monthly.classList.add('hidden');if(rollup)rollup.classList.add('hidden');if(btn)btn.textContent='收起全年记录';syncAnnualHistoryTitlesV541();
+
   const key=normalizeLiveHostKey(host)+'|'+year,currentTurnoverRevV539=turnoverRevisionNowV539();
+  let data=liveYearAnalyticsCacheV536.get(key)||null;
+  let cachedRevisionV546=Number(liveYearAnalyticsRevisionV539.get(key)||0);
+
+  // V54.6: persistent yearly cache is reusable even before startup sync has
+  // learned the current revision. Revision mismatch only triggers background refresh.
+  if(!data){
+    const entry=readPersistentAnalyticsEntryV546(LIVE_YEAR_ANALYTICS_CACHE_KEY_V539,key);
+    if(entry&&entry.data){
+      data=entry.data;
+      cachedRevisionV546=Number(entry.turnoverRevision||0);
+      liveYearAnalyticsCacheV536.set(key,data);
+      liveYearAnalyticsRevisionV539.set(key,cachedRevisionV546);
+    }
+  }
+
+  const hasCachedV546=Boolean(data);
+  if(hasCachedV546){
+    renderLiveYearAnalyticsV536(data,host,year);
+    syncAnnualHistoryTitlesV541();
+  }
+  const turnoverChangedV546=hasCachedV546&&currentTurnoverRevV539>0&&cachedRevisionV546>0&&cachedRevisionV546!==currentTurnoverRevV539;
+  if(hasCachedV546&&!turnoverChangedV546)return;
+
+  if(!hasCachedV546)panel.innerHTML='<div class="sub">正在读取主播全年记录…</div>';
   try{
-    let data=liveYearAnalyticsCacheV536.get(key);
-    if(data&&Number(liveYearAnalyticsRevisionV539.get(key))!==currentTurnoverRevV539){liveYearAnalyticsCacheV536.delete(key);data=null}
-    if(!data){data=readPersistentAnalyticsV539(LIVE_YEAR_ANALYTICS_CACHE_KEY_V539,key);if(data){liveYearAnalyticsCacheV536.set(key,data);liveYearAnalyticsRevisionV539.set(key,currentTurnoverRevV539)}}
-    if(data){renderLiveYearAnalyticsV536(data,host,year);syncAnnualHistoryTitlesV541();return}
-    panel.innerHTML='<div class="sub">正在读取主播全年记录…</div>';
-    data=await loadLiveYearAnalyticsV536(host,year);liveYearAnalyticsCacheV536.set(key,data);liveYearAnalyticsRevisionV539.set(key,turnoverRevisionNowV539());writePersistentAnalyticsV539(LIVE_YEAR_ANALYTICS_CACHE_KEY_V539,data,key);renderLiveYearAnalyticsV536(data,host,year)
-  }catch(e){panel.innerHTML=`<div class="sub">读取失败：${escapeChangeLogHtmlV200(e.message||e)}</div>`}finally{syncAnnualHistoryTitlesV541()}
+    data=await loadLiveYearAnalyticsV536(host,year);
+    const freshRevisionV546=turnoverRevisionNowV539();
+    liveYearAnalyticsCacheV536.set(key,data);
+    liveYearAnalyticsRevisionV539.set(key,freshRevisionV546);
+    writePersistentAnalyticsV539(LIVE_YEAR_ANALYTICS_CACHE_KEY_V539,data,key);
+    if(liveYearModeOpenV541&&selectedLiveHost()===host&&liveAnnualYearV545()===year)renderLiveYearAnalyticsV536(data,host,year);
+  }catch(e){
+    if(!hasCachedV546)panel.innerHTML=`<div class="sub">读取失败：${escapeChangeLogHtmlV200(e.message||e)}</div>`;
+    else console.warn('Live 全年记录后台更新失败，继续显示缓存',e);
+  }finally{syncAnnualHistoryTitlesV541()}
 }
 window.showLiveYearHistoryV536=showLiveYearHistoryV536;
 
@@ -5537,7 +5642,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5450",
+    version:"5460",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5581,7 +5686,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true,turnoverEntries:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V54.5').trim().replace(/[^A-Za-z0-9._-]/g,'_');
+    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V54.6').trim().replace(/[^A-Za-z0-9._-]/g,'_');
     downloadFile(`Lover_Legend_Sales_${runtimeVersionV531}_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
@@ -9211,12 +9316,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5450'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5460'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5450')issues.push(`Frontend / API 版本不一致（Frontend 5450 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5460')issues.push(`Frontend / API 版本不一致（Frontend 5460 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5450';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5460';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -9690,7 +9795,7 @@ setTimeout(()=>{
 },0);
 
 
-// V54.5: annual history is page-local UI state. Leaving the page collapses it
+// V54.6: annual history is page-local UI state. Leaving the page collapses it
 // without clearing the authoritative cache or triggering any cloud request.
 const _showPageV541=showPage;
 showPage=function(name,el){
