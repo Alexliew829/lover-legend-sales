@@ -1,0 +1,21 @@
+V53.7
+- Home historical Fair expansion now follows the selected Home month only; no newest-month bleed-through.
+- Cross-device turnover conflict guard: a newer authoritative turnover change can retire an older pending write so deleted/updated data is not resurrected.
+- Clears auxiliary turnover-entry cache when a newer authoritative deletion supersedes stale local pending data.
+- Fair all-history UI simplified: one performance color per location, Date Range totals, green Best Fair / Best Day markers, daily rows retain revenue/profit/margin without per-day red/yellow colors.
+- Fair all-history mode now hides the monthly list and uses a dedicated title.
+- Live yearly history typography enlarged; removed duplicate monthly-summary block and replaced it with one table total row; best month label uses green marker.
+
+Lover Legend Sales V53.7 / Build 5370
+
+V53.6
+- 修复 Fair 历史月份 Partial Cache 被误判为完整月份的问题。
+- 新增 Fair 全部历史分析：地点排名、Date Range 分组、最佳 Fair、最佳单日、地点累计总数。
+- Fair 列表新增 🟢好 / 🟡普通 / 🔴差 的直观表现标记。
+- 新增 Live 主播全年查询：全年汇总、最佳月份、最佳单日、按月展开。
+- 所有历史分析读取均为 on-demand，不增加常驻后台请求。
+- 保留 V53.5 作为 Fair 大改版前明确回退基准。
+
+V53.5
+- False Green Sync 修复：局部/辅助读取不再推进全局 Revision。
+- 只有 authoritative 数据真正应用后才允许显示已同步。
