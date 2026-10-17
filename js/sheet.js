@@ -772,6 +772,58 @@ function reconcilePendingRowsFromCloudV329(cloudRows) {
   return before - pendingRows.length;
 }
 
+// V53.7: if another device made a newer authoritative turnover change for the
+// same context, an older positive pending row must not be allowed to resurrect
+// data that the cloud has since changed or deleted.  We only discard the retry
+// when the change journal proves the remote mutation happened after this local
+// pending mutation; otherwise the offline work is preserved.
+function pendingMutationTimeV537(row){
+  const raw=String(row&& (row.clientUpdatedAt||row.updatedAt) ||'');
+  const parsed=Date.parse(raw);return Number.isFinite(parsed)?parsed:0;
+}
+function turnoverChangeMatchesPendingV537(change,row){
+  if(!change||String(change.kind||'')!=='turnover'||String(change.type||'')!==String(row.type||''))return false;
+  if(String(change.date||'')!==String(row.date||''))return false;
+  const type=String(row.type||'');
+  if(type==='daily'){
+    const a=String(change.location||'').toLowerCase().includes('balakong')?'balakong':'belimbing';
+    const b=String(row.company||row.location||'').toLowerCase().includes('balakong')?'balakong':'belimbing';
+    return a===b;
+  }
+  const norm=type==='live'?(typeof normalizeLiveHostKey==='function'?normalizeLiveHostKey:(x=>String(x||'').trim().toLowerCase())):(typeof normalizeFairLocationKey==='function'?normalizeFairLocationKey:(x=>String(x||'').trim().toLowerCase()));
+  return norm(change.location)===norm(row.location);
+}
+function reconcileSupersededPendingRowsV537(cloudRows,changes,month){
+  loadPendingRows();
+  if(!pendingRows.length||!Array.isArray(cloudRows)||!Array.isArray(changes))return 0;
+  const cloudByKey=new Map();cloudRows.forEach(row=>cloudByKey.set(syncKey(row),row));
+  const turnoverChanges=changes.filter(x=>x&&String(x.kind||'')==='turnover');
+  if(!turnoverChanges.length)return 0;
+  const removed=[];const before=pendingRows.length;
+  pendingRows=pendingRows.filter(pending=>{
+    if(rowMonthKey(pending)!==month)return true;
+    const localAt=pendingMutationTimeV537(pending);if(!localAt)return true;
+    const newer=turnoverChanges.filter(c=>turnoverChangeMatchesPendingV537(c,pending)&&Number(c.at||0)>=localAt-1500).sort((a,b)=>Number(b.at||0)-Number(a.at||0))[0];
+    if(!newer)return true;
+    const cloud=cloudByKey.get(syncKey(pending));
+    const same=cloud&&Math.abs(Number(cloud.amount||0)-Number(pending.amount||0))<=0.005;
+    if(same)return true; // normal acknowledgement reconciliation handles this.
+    removed.push({pending,change:newer,cloud:cloud||null});
+    try{localRowMutationAt.delete(syncKey(pending))}catch(_){ }
+    return false;
+  });
+  if(pendingRows.length!==before)savePendingRows();
+  for(const item of removed){
+    try{
+      if(!item.cloud&&typeof window!=='undefined'&&typeof window.clearAuthoritativeDeletedTurnoverCacheV537==='function'){
+        const p=item.pending;const loc=String(p.type||'')==='daily'?(String(p.company||'').toLowerCase().includes('balakong')?'Balakong':'Belimbing'):p.location;
+        window.clearAuthoritativeDeletedTurnoverCacheV537(p.type,p.date,loc);
+      }
+    }catch(_){ }
+  }
+  return removed.length;
+}
+
 // V39.9: pending rows are durable retry instructions, not proof that the cloud
 // is missing data. Before retrying any write, verify every pending row against
 // the authoritative month that owns that row. This removes "ghost pending"
@@ -1153,6 +1205,7 @@ async function loadYearInBackground(year) {
         ? fairInputsHaveUnsavedChanges()
         : false;
       loadPendingRows();
+      reconcileSupersededPendingRowsV537(json.rows || [],deltaChangesForUiV491,month);
       reconcilePendingRowsFromCloudV329(json.rows || []);
       mergeCloudYearRows(y, json.rows || [], requestStartedAt);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
