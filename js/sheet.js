@@ -772,7 +772,7 @@ function reconcilePendingRowsFromCloudV329(cloudRows) {
   return before - pendingRows.length;
 }
 
-// V54.3: if another device made a newer authoritative turnover change for the
+// V54.4: if another device made a newer authoritative turnover change for the
 // same context, an older positive pending row must not be allowed to resurrect
 // data that the cloud has since changed or deleted.  We only discard the retry
 // when the change journal proves the remote mutation happened after this local

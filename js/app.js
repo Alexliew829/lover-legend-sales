@@ -1584,7 +1584,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 }
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5430",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5440",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
@@ -1601,7 +1601,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5430";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5440";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2347,7 +2347,7 @@ function renderLiveMonthlyList(){
 }
 
 
-/* ================= V54.3 Annual-history UI state ================= */
+/* ================= V54.4 Annual-history UI state ================= */
 let fairYearModeOpenV541=false;
 let liveYearModeOpenV541=false;
 function fairMonthTitleTextV541(){
@@ -2382,7 +2382,7 @@ function closeLiveYearHistoryV541(){
   if(btn)btn.textContent='全年记录'; syncAnnualHistoryTitlesV541();
 }
 
-/* ================= V54.3 Fair / Live history analytics ================= */
+/* ================= V54.4 Fair / Live history analytics ================= */
 let fairAnalyticsCacheV536=null;
 let fairAnalyticsLoadingV536=false;
 let liveYearAnalyticsCacheV536=new Map();
@@ -2557,7 +2557,7 @@ function renderLiveYearAnalyticsV536(data,host,year){
   const monthList=[...months.values()].sort((a,b)=>a.month.localeCompare(b.month)),bestMonth=monthList.reduce((a,b)=>!a||b.sales>a.sales?b:a,null),margin=total>0?totalProfit/total*100:0;
   panel.innerHTML=`<div class="history-summary-v536 live-year-summary-v537"><strong>${escapeChangeLogHtmlV200(host)} · ${year} 全年记录</strong><div class="location-metrics-v538 live-year-metrics-v540"><span>营业额</span><b>${money(total)}</b><span>利润</span><b>${money(totalProfit)}</b><span>利润率</span><b>${margin.toFixed(2)}%</b><span>佣金</span><b>${money(totalCommission)}</b></div></div>`+monthList.map(g=>{
     const gm=g.sales>0?g.profit/g.sales*100:0,rates=[...new Set(g.rows.map(r=>Number(r.rate||0).toFixed(2).replace(/\.00$/,'')).filter(Boolean))],commissionLabel=rates.length===1?`佣金 ${rates[0]}%`:'佣金';
-    const rowsHtml=[...g.rows].sort((a,b)=>isoDayV536(a.date).localeCompare(isoDayV536(b.date))).map(r=>{const m=Number(r.amount||0)>0?Number(r.profit||0)/Number(r.amount||0)*100:0,isBest=bestDay&&String(r.date)===String(bestDay.date)&&Number(r.amount||0)===Number(bestDay.amount||0);return `<div class="month-profit-row-v294 live-profit-row-v294 live-year-row-v539"><span class="${isBest?'best-live-day-v539':''}">${shortDayMonthV297(r.date)}${isBest?'<i>&nbsp;🟢</i>':''}</span><strong>${money(r.amount)}</strong><strong class="live-commission-value-v297">${money(r.commission)}</strong><strong class="profit-value-v294">${money(r.profit)}</strong><strong class="profit-rate-v294">${m.toFixed(2)}%</strong></div>`}).join('');
+    const rowsHtml=[...g.rows].sort((a,b)=>isoDayV536(a.date).localeCompare(isoDayV536(b.date))).map(r=>{const m=Number(r.amount||0)>0?Number(r.profit||0)/Number(r.amount||0)*100:0,isBest=bestDay&&String(r.date)===String(bestDay.date)&&Number(r.amount||0)===Number(bestDay.amount||0);return `<div class="month-profit-row-v294 live-profit-row-v294 live-year-row-v539"><span class="${isBest?'best-live-day-v539':''}">${shortDayMonthV297(r.date)}</span><strong>${money(r.amount)}</strong><strong class="live-commission-value-v297">${money(r.commission)}</strong><strong class="profit-value-v294">${money(r.profit)}</strong><strong class="profit-rate-v294">${m.toFixed(2)}%</strong></div>`}).join('');
     return `<details class="history-range-v536 live-year-range-v537"><summary><span>${g.month.slice(5,7)}-${g.month.slice(0,4)}${g===bestMonth?' · 最佳月份 🟢':''}</span><b>${money(g.sales)}</b></summary><div class="live-sales-group month-profit-group-v294 live-year-month-card-v542"><div class="live-sales-group-title"><span>${escapeChangeLogHtmlV200(host)}</span></div><div class="month-profit-row-v294 live-profit-row-v294 live-profit-head-v297 live-year-head-v539"><span>日期</span><span>营业额</span><span>${commissionLabel}</span><span>利润</span><span>利润率</span></div>${rowsHtml}<div class="month-profit-row-v294 live-profit-row-v294 month-profit-total-v294 live-year-total-v539"><span>总数</span><strong>${money(g.sales)}</strong><strong class="live-commission-value-v297">${money(g.commission)}</strong><strong class="profit-value-v294">${money(g.profit)}</strong><strong class="profit-rate-v294">${gm.toFixed(2)}%</strong></div></div></details>`;
   }).join('');
 }
@@ -5519,7 +5519,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5430",
+    version:"5440",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5563,7 +5563,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true,turnoverEntries:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V54.3').trim().replace(/[^A-Za-z0-9._-]/g,'_');
+    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V54.4').trim().replace(/[^A-Za-z0-9._-]/g,'_');
     downloadFile(`Lover_Legend_Sales_${runtimeVersionV531}_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
@@ -9193,12 +9193,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5430'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5440'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5430')issues.push(`Frontend / API 版本不一致（Frontend 5430 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5440')issues.push(`Frontend / API 版本不一致（Frontend 5440 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5430';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5440';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -9672,7 +9672,7 @@ setTimeout(()=>{
 },0);
 
 
-// V54.3: annual history is page-local UI state. Leaving the page collapses it
+// V54.4: annual history is page-local UI state. Leaving the page collapses it
 // without clearing the authoritative cache or triggering any cloud request.
 const _showPageV541=showPage;
 showPage=function(name,el){
