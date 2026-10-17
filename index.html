@@ -8,10 +8,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Lover Sales</title>
-<link rel="manifest" href="manifest.json?v=53.5">
+<link rel="manifest" href="manifest.json?v=53.6">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="style.css?v=53.5">
+<link rel="stylesheet" href="style.css?v=53.6">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
@@ -355,6 +355,10 @@ document.addEventListener("DOMContentLoaded",renderLastNotificationDispatchStatu
 
 document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegisteredPushStatus(window.LoverSalesOneSignal),1200));
 </script>
+
+<style>
+.history-action-v536{width:auto!important;margin:0!important;padding:8px 12px!important;font-size:14px!important;white-space:nowrap}.history-live-tools-v536{display:flex;gap:6px;align-items:center}.history-live-tools-v536 input{width:82px;margin:0;padding:8px}.history-panel-v536{margin:10px 0 14px}.history-summary-v536,.history-location-title-v536,.history-location-total-v536{background:#f6f8f6;border:1px solid #dfe6df;border-radius:12px;padding:10px;margin:8px 0;display:grid;gap:6px}.history-summary-v536 span,.history-location-total-v536 span{font-size:13px;color:#555}.history-location-title-v536>div{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.history-location-title-v536>div:last-child{display:grid;grid-template-columns:auto 1fr auto 1fr auto 1fr;width:100%;font-size:13px;gap:4px 8px}.history-range-v536{border:1px solid #e1e5e1;border-radius:10px;margin:8px 0;overflow:hidden}.history-range-v536 summary{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:10px;background:#fafafa;cursor:pointer}.history-head-v536,.history-row-v536,.history-total-v536{display:grid;grid-template-columns:1.25fr 1fr 1fr .8fr .85fr;gap:6px;align-items:center;padding:7px 9px;font-size:12px}.history-head-v536{font-weight:700;background:#f5f5f5}.history-row-v536:nth-child(even){background:#fcfcfc}.history-total-v536{font-weight:700;border-top:1px solid #ddd}.perf-good-v536,.perf-mid-v536,.perf-low-v536{font-style:normal;font-weight:700;font-size:12px;white-space:nowrap}.perf-good-v536{color:#148a3a}.perf-mid-v536{color:#9a7200}.perf-low-v536{color:#b93535}.month-record-group-title .perf-good-v536,.month-record-group-title .perf-mid-v536,.month-record-group-title .perf-low-v536,.month-record-row .perf-good-v536,.month-record-row .perf-mid-v536,.month-record-row .perf-low-v536{margin-left:6px}.live-year-grid-v536{display:grid;grid-template-columns:1.2fr 1fr 1fr .8fr 1fr;gap:6px;padding:8px;font-size:12px}.live-year-grid-v536>div{font-weight:700}.history-location-v536{margin:14px 0 18px}@media(max-width:520px){.record-title-row{align-items:center}.history-live-tools-v536 input{width:72px}.history-head-v536,.history-row-v536,.history-total-v536{grid-template-columns:1.15fr .9fr .9fr .75fr .8fr;font-size:11px;padding:6px}.history-location-title-v536>div:last-child{grid-template-columns:auto 1fr auto 1fr}.history-location-title-v536>div:last-child span:nth-of-type(3),.history-location-title-v536>div:last-child b:nth-of-type(3){display:none}.live-year-grid-v536{font-size:11px;grid-template-columns:1.1fr .9fr .9fr .8fr .9fr}}
+</style>
 </head>
 <body>
 <script>window.LOVER_API_URL="https://script.google.com/macros/s/AKfycby1OwDIiVf5quXKiD9AG8s2ppM942sLFdJSfyePp--yZtDjYY8jBtkOYLwD9c3WiC_KNw/exec";</script>
@@ -362,7 +366,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V53.5</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V53.6</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -684,7 +688,9 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div class="card">
     <div class="record-title-row">
       <h2 id="fairMonthlyTitle">本月销售记录</h2>
+      <button type="button" id="fairAllHistoryBtnV536" class="secondary-btn history-action-v536" onclick="toggleFairAllHistoryV536()">查看全部记录</button>
     </div>
+    <div id="fairAllHistoryPanelV536" class="history-panel-v536 hidden"></div>
     <div id="fairMonthlyList"></div>
     <div id="fairMonthlyRollupV365" class="monthly-rollup-v365 monthly-rollup-v368">
       <div class="monthly-rollup-row-v365 monthly-rollup-row-v368">
@@ -765,7 +771,9 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div class="card">
     <div class="record-title-row">
       <h2 id="liveMonthlyTitle">本月销售记录</h2>
+      <div class="history-live-tools-v536"><input id="liveHistoryYearV536" type="number" min="2020" max="2099" inputmode="numeric" value="2026" aria-label="Live 全年查询年份"><button type="button" class="secondary-btn history-action-v536" onclick="showLiveYearHistoryV536()">查看全年</button></div>
     </div>
+    <div id="liveYearHistoryPanelV536" class="history-panel-v536 hidden"></div>
     <div id="liveMonthlyList"></div>
     <div id="liveMonthlyRollupV365" class="monthly-rollup-v365 monthly-rollup-v368">
       <div class="monthly-rollup-row-v365 monthly-rollup-row-v368">
@@ -832,7 +840,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V53.5 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V53.6 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -906,7 +914,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <div class="card system-info-card-v442">
   <h2>系统资料 / System Information</h2>
   <div class="system-info-grid-v442">
-    <div><span>版本</span><b>V53.5</b></div>
+    <div><span>版本</span><b>V53.6</b></div>
     <div><span>API版本</span><b id="systemInfoApiV442">检查中…</b></div>
     <div><span>Revision（上次 → 当前）</span><b>910 → 930</b></div>
     <div><span>储存方式</span><b>Google Sheet 自动同步</b></div>
@@ -958,10 +966,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=53.5",
-      "js/sheet.js?v=53.5",
-      "js/app.js?v=53.5",
-      "js/update.js?v=53.5"
+      "js/utils.js?v=53.6",
+      "js/sheet.js?v=53.6",
+      "js/app.js?v=53.6",
+      "js/update.js?v=53.6"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");

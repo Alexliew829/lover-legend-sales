@@ -1435,6 +1435,7 @@ async function loadFromSheet(options = {}) {
         commitAllSalesCardsAtomicV449(prefetchedAllSalesCardsV449,Number(observedPriorityRevisionV447?.salesCardRevision||0));
       }
       mergeCloudMonthRows(month, json.rows || [], requestStartedAt);
+      try{if(typeof window.markAuthoritativeMonthLoadedV536==='function')window.markAuthoritativeMonthLoadedV536(month)}catch(_){}
       applyLocalDataRevision(json.dataRevision);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
       if (json.commissionSettings) {
@@ -1993,6 +1994,16 @@ async function saveFairSessionToSheetV281(location,start,end){
   if(!json.ok)throw new Error(json.message||"Fair 活动资料储存失败");
   applyLocalDataRevision(json.dataRevision);
   applyFairSessionRevisionV514(json.fairSessionRevision);
+  return json;
+}
+async function loadFairAnalyticsV536(){
+  const json=await jsonp({action:"getFairAnalyticsV536"},{timeoutMs:30000});
+  if(!json||!json.ok)throw new Error((json&&json.message)||"Fair 全部记录读取失败");
+  return json;
+}
+async function loadLiveYearAnalyticsV536(host,year){
+  const json=await jsonp({action:"getLiveYearAnalyticsV536",host,year},{timeoutMs:30000});
+  if(!json||!json.ok)throw new Error((json&&json.message)||"Live 全年记录读取失败");
   return json;
 }
 async function loadFairSessionsFromSheetV281(options={}){
