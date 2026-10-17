@@ -362,7 +362,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 .fair-ranking-v537{display:grid;gap:8px;margin:8px 0 14px}.fair-ranking-row-v537{display:grid;grid-template-columns:minmax(180px,1.5fr) auto repeat(3,minmax(105px,auto));gap:8px;align-items:center;padding:10px 12px;border:1px solid #dfe6df;border-radius:10px;background:#fff}.fair-ranking-row-v537 span{font-size:13px}.fair-best-strip-v537{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;padding:9px 10px;margin:8px 0;border:1px solid #dfe6df;border-radius:10px;background:#fbfdfb;font-size:13px}.live-year-summary-v537 strong{font-size:18px}.live-year-summary-v537 span{font-size:14px}.live-year-range-v537 summary{font-size:16px}.live-year-grid-v536{font-size:14px;line-height:1.45}.live-year-grid-v536>strong{border-top:1px solid #ddd;padding-top:7px;margin-top:3px}.history-row-v536 em:empty{min-height:1em}
 @media(max-width:720px){.fair-ranking-row-v537{grid-template-columns:1fr auto}.fair-ranking-row-v537 span{grid-column:span 1}.fair-best-strip-v537{grid-template-columns:auto 1fr}.fair-best-strip-v537 em{grid-column:2}.live-year-grid-v536{font-size:13px}}
 
-/* V53.8 Fair / Live annual history layout */
+/* V53.9 Fair / Live annual history layout */
 .fair-ranking-v537{display:grid;gap:7px;margin:8px 0 14px}
 .fair-ranking-row-v537{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;text-align:left;padding:10px 12px;border:1px solid #dfe6df;border-radius:10px;background:#fff;color:#111;cursor:pointer}
 .fair-ranking-row-v537 b{min-width:0;overflow-wrap:anywhere}.fair-ranking-row-v537 strong{white-space:nowrap}.fair-ranking-row-v537 em{white-space:nowrap}
@@ -374,6 +374,11 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 .live-year-summary-v537 strong{font-size:18px}.live-year-summary-v537 span{font-size:14px}.live-year-range-v537 summary{font-size:16px}.live-year-grid-v536{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr .9fr;gap:7px;padding:10px 12px;font-size:15px;line-height:1.5}.live-year-grid-v536>div{font-weight:700}.live-year-grid-v536>strong{border-top:1px solid #ddd;padding-top:7px;margin-top:3px}.live-year-grid-v536>b{text-align:right}
 @media(max-width:720px){.fair-ranking-row-v537{grid-template-columns:minmax(0,1fr) auto}.fair-ranking-row-v537 strong{grid-column:1/3;padding-left:0}.history-location-summary-v538{grid-template-columns:minmax(0,1fr) auto}.history-location-summary-v538 b{grid-column:1/3}.location-metrics-v538{grid-template-columns:auto 1fr!important}.history-head-v536,.history-row-v536,.history-total-v536{font-size:11px;grid-template-columns:1.2fr .9fr .9fr .75fr 1fr;padding:6px}.live-year-grid-v536{font-size:13px;grid-template-columns:1.1fr .9fr .9fr .9fr .8fr;padding:8px}}
 
+
+/* V53.9 history clarity */
+#fairHistoryDetailV539{margin-top:10px}.history-location-detail-v539{border:1px solid #dfe6df;border-radius:12px;background:#fff;overflow:hidden;scroll-margin-top:90px}.history-location-grand-v539{display:grid;grid-template-columns:1.2fr 1fr 1fr .8fr;gap:8px;padding:10px 12px;background:#fff5d9;border-top:1px solid #e7c56c;font-weight:800;color:#b30000}.history-head-v536,.history-row-v536,.history-total-v536{grid-template-columns:1.25fr 1fr 1fr .8fr}.best-fair-day-v539{color:#148a3a;font-weight:800}.best-fair-day-v539 i,.best-live-day-v539 i{font-style:normal}.fair-session-card-v539 .fair-location-title-v298{align-items:center}.fair-session-card-v539 .fair-location-title-v298 b{font-size:13px;color:#555}.fair-location-month-total-v539{display:grid;grid-template-columns:1.15fr repeat(3,1fr);gap:8px;align-items:center;padding:10px 12px;margin:8px 0 14px;border:1px solid #e7c56c;border-radius:10px;background:#fff5d9;color:#b30000}.fair-location-month-total-v539 span{font-size:13px}.fair-location-month-total-v539 b{font-size:16px}.live-year-range-v537{margin:8px 0}.live-year-head-v539,.live-year-row-v539,.live-year-total-v539{font-size:15px}.best-live-day-v539{color:#148a3a;font-weight:800}.live-year-total-v539{font-size:17px!important;color:#b30000;background:#f7faf7;font-weight:900}.live-year-total-v539 strong{color:#b30000!important;font-size:17px!important}.live-year-total-v539 span{color:#111;font-size:16px;font-weight:900}
+@media(max-width:720px){.history-location-grand-v539{grid-template-columns:1fr 1fr;font-size:12px}.fair-location-month-total-v539{grid-template-columns:1fr 1fr}.live-year-head-v539,.live-year-row-v539{font-size:12px}.live-year-total-v539,.live-year-total-v539 strong{font-size:14px!important}.best-live-day-v539 i{display:none}}
+
 </style>
 </head>
 <body>
@@ -382,7 +387,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V53.8</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V53.9</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -856,7 +861,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V53.8 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V53.9 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -930,7 +935,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <div class="card system-info-card-v442">
   <h2>系统资料 / System Information</h2>
   <div class="system-info-grid-v442">
-    <div><span>版本</span><b>V53.8</b></div>
+    <div><span>版本</span><b>V53.9</b></div>
     <div><span>API版本</span><b id="systemInfoApiV442">检查中…</b></div>
     <div><span>Revision（上次 → 当前）</span><b>910 → 930</b></div>
     <div><span>储存方式</span><b>Google Sheet 自动同步</b></div>
