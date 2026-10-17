@@ -772,7 +772,7 @@ function reconcilePendingRowsFromCloudV329(cloudRows) {
   return before - pendingRows.length;
 }
 
-// V54.4: if another device made a newer authoritative turnover change for the
+// V54.5: if another device made a newer authoritative turnover change for the
 // same context, an older positive pending row must not be allowed to resurrect
 // data that the cloud has since changed or deleted.  We only discard the retry
 // when the change journal proves the remote mutation happened after this local
@@ -2049,8 +2049,8 @@ async function saveFairSessionToSheetV281(location,start,end){
   applyFairSessionRevisionV514(json.fairSessionRevision);
   return json;
 }
-async function loadFairAnalyticsV536(){
-  const json=await jsonp({action:"getFairAnalyticsV536"},{timeoutMs:30000});
+async function loadFairAnalyticsV536(year){
+  const json=await jsonp({action:"getFairAnalyticsV536",year:String(year||"")},{timeoutMs:30000});
   if(!json||!json.ok)throw new Error((json&&json.message)||"Fair 全部记录读取失败");
   return json;
 }

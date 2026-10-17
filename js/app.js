@@ -1584,7 +1584,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 }
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],commissionSnapshots:{},dataVersion:"5440",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5450",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
@@ -1601,7 +1601,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5440";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5450";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -1614,12 +1614,19 @@ async function monthClose(){
 async function yearClose(){
   const y=selectedYear(),now=new Date(),cy=String(now.getFullYear());
   if(y!==cy){alert("年底结算只能执行系统当前年份："+cy);return}
-  if(now.getMonth()!==11||now.getDate()!==31){alert("年底结算只能在 12 月 31 日执行。\n全年资料在年底前必须继续保留。");return}
-  if(!confirm(`准备进行 ${y} 年底结算。\n\n⚠️ 这是全年唯一允许清除年度营运资料的功能。\n\n请先确认：\n• 已完成 Backup 完整备份\n• 已导出全年 Excel\n• 已核对 Sales / Fair / Live / Commission / 关联盆栽 / 成本 / 利润 / 备注\n\n月底结算不会删除资料；只有年底结算会清除 ${y} 年度营运记录。\n\n确定继续？`))return;
+  if(now.getMonth()!==11||now.getDate()!==31){alert("年底结算只能在 12 月 31 日执行。\n全年原始资料会持续保留。 ");return}
+  if(Array.isArray(systemState.closedYears)&&systemState.closedYears.includes(y)){alert(y+" 已经完成年底结算。\nSales / Fair / Live 历史资料仍完整保留，可继续查询。 ");return}
+  if(!confirm(`准备进行 ${y} 年底结算。\n\n强烈建议先完成 Backup 完整备份，并导出全年 Excel 核对。\n\n结算后：\n• 不删除任何 Sales / Fair / Live 原始记录\n• 不删除 Commission、关联盆栽、成本、利润或备注\n• ${y} 会被标记为“年度已结算”\n• 旧年度资料仍可继续查询、报表、Backup 与 Restore\n• 新年度会依系统日期自然进入新的年度累计\n\n确定继续？`))return;
   const phrase=prompt(`最后确认：请输入 YEAR END ${y}`);
   if(String(phrase||"").trim()!==`YEAR END ${y}`){alert("确认文字不正确，已取消。");return}
-  try{setSync("正在执行年底结算...");const result=await closeYearInSheet(y);applySystemState(result.systemState);await loadFromSheet({force:true});renderAll();setSync("年底结算已完成",true);alert(`${y} 年底结算完成。请妥善保存结算前 Backup 与全年 Excel。`)}
-  catch(e){alert("年底结算失败："+e.message);setSync("年底结算失败",false,true)}
+  try{
+    setSync("正在执行年底结算...");
+    const result=await closeYearInSheet(y);
+    applySystemState(result.systemState);
+    renderAll();
+    setSync("年底结算已完成",true);
+    alert(`${y} 年底结算完成。\n全年历史资料没有被删除，仍可继续查询。`)
+  }catch(e){alert("年底结算失败："+e.message);setSync("年底结算失败",false,true)}
 }
 function initializeCurrentMonth(){
   const current=monthISO();
@@ -1942,8 +1949,6 @@ function updateLiveInputFromSelectedDate(){
   const resultEl=document.getElementById("liveDateResult");
   if(!dateEl||!amountEl||!resultEl)return;
   const d=isoToDisplay(dateEl.value);
-  const historyYearV536=document.getElementById("liveHistoryYearV536");
-  if(historyYearV536&&document.activeElement!==historyYearV536&&/^\d{4}-\d{2}-\d{2}$/.test(String(dateEl.value||"")))historyYearV536.value=String(dateEl.value).slice(0,4);
   const host=selectedLiveHost();
   const amount=host?getLiveAmount(d,host):0;
   // V35.0: background render/sync must never overwrite an unsaved amount.
@@ -2347,7 +2352,7 @@ function renderLiveMonthlyList(){
 }
 
 
-/* ================= V54.4 Annual-history UI state ================= */
+/* ================= V54.5 Annual-history UI state ================= */
 let fairYearModeOpenV541=false;
 let liveYearModeOpenV541=false;
 function fairMonthTitleTextV541(){
@@ -2358,12 +2363,24 @@ function liveMonthTitleTextV541(){
   const month=getLiveSelectedMonth();
   return /^\d{4}-\d{2}$/.test(month)?`${month.slice(5,7)}-${month.slice(0,4)} 销售记录`:'本月销售记录';
 }
+function fairAnnualYearV545(){
+  const month=monthFromDateControl('fairStart');
+  if(/^\d{4}-\d{2}$/.test(month))return month.slice(0,4);
+  const fallback=selectedMonth();
+  return /^\d{4}-\d{2}$/.test(fallback)?fallback.slice(0,4):String(new Date().getFullYear());
+}
+function liveAnnualYearV545(){
+  const month=getLiveSelectedMonth();
+  if(/^\d{4}-\d{2}$/.test(month))return month.slice(0,4);
+  const fallback=selectedMonth();
+  return /^\d{4}-\d{2}$/.test(fallback)?fallback.slice(0,4):String(new Date().getFullYear());
+}
 function syncAnnualHistoryTitlesV541(){
   const fairTitle=document.getElementById('fairMonthlyTitle');
   if(fairTitle)fairTitle.textContent=fairYearModeOpenV541?'Fair 全年记录':fairMonthTitleTextV541();
   const liveTitle=document.getElementById('liveMonthlyTitle');
-  const liveYear=String(document.getElementById('liveHistoryYearV536')?.value||'').trim();
-  if(liveTitle)liveTitle.textContent=liveYearModeOpenV541&&/^\d{4}$/.test(liveYear)?`${liveYear} 全年记录`:liveMonthTitleTextV541();
+  const liveYear=liveAnnualYearV545();
+  if(liveTitle)liveTitle.textContent=liveYearModeOpenV541?`${liveYear} 全年记录`:liveMonthTitleTextV541();
 }
 function closeFairYearHistoryV541(){
   if(!fairYearModeOpenV541)return;
@@ -2382,13 +2399,14 @@ function closeLiveYearHistoryV541(){
   if(btn)btn.textContent='全年记录'; syncAnnualHistoryTitlesV541();
 }
 
-/* ================= V54.4 Fair / Live history analytics ================= */
+/* ================= V54.5 Fair / Live history analytics ================= */
 let fairAnalyticsCacheV536=null;
 let fairAnalyticsLoadingV536=false;
 let liveYearAnalyticsCacheV536=new Map();
 let fairAnalyticsViewDataV539=null;
 let fairAnalyticsCacheRevisionV539=-1;
 let fairAnalyticsSessionRevisionV539=-1;
+let fairAnalyticsCacheYearV545='';
 let liveYearAnalyticsRevisionV539=new Map();
 const FAIR_ANALYTICS_CACHE_KEY_V539='lover_fair_analytics_cache_v539';
 const LIVE_YEAR_ANALYTICS_CACHE_KEY_V539='lover_live_year_analytics_cache_v539';
@@ -2539,13 +2557,13 @@ async function toggleFairAllHistoryV536(){
   if(monthly)monthly.classList.toggle('hidden',opening);if(rollup)rollup.classList.toggle('hidden',opening);
   syncAnnualHistoryTitlesV541();
   if(!opening)return;
-  const currentTurnoverRevV539=turnoverRevisionNowV539(),currentSessionRevV539=Number(typeof fairSessionRevisionV514!=='undefined'?fairSessionRevisionV514:0);
-  if(fairAnalyticsCacheV536&&(fairAnalyticsCacheRevisionV539!==currentTurnoverRevV539||fairAnalyticsSessionRevisionV539!==currentSessionRevV539))fairAnalyticsCacheV536=null;
-  if(!fairAnalyticsCacheV536){const cached=readPersistentAnalyticsV539(FAIR_ANALYTICS_CACHE_KEY_V539);if(cached){fairAnalyticsCacheV536=cached;fairAnalyticsCacheRevisionV539=currentTurnoverRevV539;fairAnalyticsSessionRevisionV539=currentSessionRevV539}}
+  const year=fairAnnualYearV545(),currentTurnoverRevV539=turnoverRevisionNowV539(),currentSessionRevV539=Number(typeof fairSessionRevisionV514!=='undefined'?fairSessionRevisionV514:0);
+  if(fairAnalyticsCacheV536&&(fairAnalyticsCacheYearV545!==year||fairAnalyticsCacheRevisionV539!==currentTurnoverRevV539||fairAnalyticsSessionRevisionV539!==currentSessionRevV539))fairAnalyticsCacheV536=null;
+  if(!fairAnalyticsCacheV536){const cached=readPersistentAnalyticsV539(FAIR_ANALYTICS_CACHE_KEY_V539);if(cached&&String(cached.year||'')===year){fairAnalyticsCacheV536=cached;fairAnalyticsCacheYearV545=year;fairAnalyticsCacheRevisionV539=currentTurnoverRevV539;fairAnalyticsSessionRevisionV539=currentSessionRevV539}}
   if(fairAnalyticsCacheV536){renderFairAnalyticsV536(fairAnalyticsCacheV536);syncAnnualHistoryTitlesV541();return}
   if(fairAnalyticsLoadingV536)return;
   fairAnalyticsLoadingV536=true;panel.innerHTML='<div class="sub">正在读取 Fair 全年记录…</div>';
-  try{const data=await loadFairAnalyticsV536();fairAnalyticsCacheV536=data;fairAnalyticsCacheRevisionV539=turnoverRevisionNowV539();fairAnalyticsSessionRevisionV539=Number(typeof fairSessionRevisionV514!=='undefined'?fairSessionRevisionV514:0);writePersistentAnalyticsV539(FAIR_ANALYTICS_CACHE_KEY_V539,data);renderFairAnalyticsV536(data)}catch(e){panel.innerHTML=`<div class="sub">读取失败：${escapeChangeLogHtmlV200(e.message||e)}</div>`}finally{fairAnalyticsLoadingV536=false;syncAnnualHistoryTitlesV541()}
+  try{const data=await loadFairAnalyticsV536(year);fairAnalyticsCacheV536=data;fairAnalyticsCacheYearV545=year;fairAnalyticsCacheRevisionV539=turnoverRevisionNowV539();fairAnalyticsSessionRevisionV539=Number(typeof fairSessionRevisionV514!=='undefined'?fairSessionRevisionV514:0);writePersistentAnalyticsV539(FAIR_ANALYTICS_CACHE_KEY_V539,data);renderFairAnalyticsV536(data)}catch(e){panel.innerHTML=`<div class="sub">读取失败：${escapeChangeLogHtmlV200(e.message||e)}</div>`}finally{fairAnalyticsLoadingV536=false;syncAnnualHistoryTitlesV541()}
 }
 window.toggleFairAllHistoryV536=toggleFairAllHistoryV536;
 function renderLiveYearAnalyticsV536(data,host,year){
@@ -2562,7 +2580,7 @@ function renderLiveYearAnalyticsV536(data,host,year){
   }).join('');
 }
 async function showLiveYearHistoryV536(){
-  const host=selectedLiveHost(),year=String(document.getElementById('liveHistoryYearV536')?.value||'').trim(),panel=document.getElementById('liveYearHistoryPanelV536'),btn=document.getElementById('liveYearHistoryBtnV538');if(!panel)return;
+  const host=selectedLiveHost(),year=liveAnnualYearV545(),panel=document.getElementById('liveYearHistoryPanelV536'),btn=document.getElementById('liveYearHistoryBtnV538');if(!panel)return;
   const monthly=document.getElementById('liveMonthlyList'),rollup=document.getElementById('liveMonthlyRollupV365');
   if(liveYearModeOpenV541){closeLiveYearHistoryV541();return}
   if(!host){alert('请先选择主播');return}if(!/^\d{4}$/.test(year)){alert('请输入正确年份');return}
@@ -5519,7 +5537,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5440",
+    version:"5450",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5563,7 +5581,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true,turnoverEntries:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V54.4').trim().replace(/[^A-Za-z0-9._-]/g,'_');
+    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V54.5').trim().replace(/[^A-Za-z0-9._-]/g,'_');
     downloadFile(`Lover_Legend_Sales_${runtimeVersionV531}_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
@@ -9193,12 +9211,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5440'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5450'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5440')issues.push(`Frontend / API 版本不一致（Frontend 5440 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5450')issues.push(`Frontend / API 版本不一致（Frontend 5450 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5440';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5450';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -9672,7 +9690,7 @@ setTimeout(()=>{
 },0);
 
 
-// V54.4: annual history is page-local UI state. Leaving the page collapses it
+// V54.5: annual history is page-local UI state. Leaving the page collapses it
 // without clearing the authoritative cache or triggering any cloud request.
 const _showPageV541=showPage;
 showPage=function(name,el){
