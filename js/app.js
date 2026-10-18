@@ -1584,7 +1584,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 }
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5460",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5470",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
@@ -1601,7 +1601,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5460";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5470";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2352,7 +2352,7 @@ function renderLiveMonthlyList(){
 }
 
 
-/* ================= V54.6 Annual-history UI state ================= */
+/* ================= V54.7 Annual-history UI state ================= */
 let fairYearModeOpenV541=false;
 let liveYearModeOpenV541=false;
 function fairMonthTitleTextV541(){
@@ -2399,7 +2399,7 @@ function closeLiveYearHistoryV541(){
   if(btn)btn.textContent='全年记录'; syncAnnualHistoryTitlesV541();
 }
 
-/* ================= V54.6 Fair / Live history analytics ================= */
+/* ================= V54.7 Fair / Live history analytics ================= */
 let fairAnalyticsCacheV536=null;
 let fairAnalyticsLoadingV536=false;
 let liveYearAnalyticsCacheV536=new Map();
@@ -2411,7 +2411,7 @@ let liveYearAnalyticsRevisionV539=new Map();
 const FAIR_ANALYTICS_CACHE_KEY_V539='lover_fair_analytics_cache_v539';
 const LIVE_YEAR_ANALYTICS_CACHE_KEY_V539='lover_live_year_analytics_cache_v539';
 function turnoverRevisionNowV539(){try{return Number(getPrioritySyncLocalV315()?.turnoverRevision||0)}catch(_){return 0}}
-// V54.6: annual analytics cache is independent from the open/closed UI state.
+// V54.7: annual analytics cache is independent from the open/closed UI state.
 // A cache may be rendered immediately even before the current revision is known;
 // once revisions are known, only a real revision mismatch triggers a background refresh.
 function readPersistentAnalyticsEntryV546(key,subKey=''){
@@ -2596,7 +2596,7 @@ async function toggleFairAllHistoryV536(){
   const currentSessionRevV539=Number(typeof fairSessionRevisionV514!=='undefined'?fairSessionRevisionV514:0);
   const sessionKnownV546=typeof fairSessionRevisionKnownV514!=='undefined'&&fairSessionRevisionKnownV514;
 
-  // V54.6: first paint a valid same-year memory/persistent cache immediately.
+  // V54.7: first paint a valid same-year memory/persistent cache immediately.
   // Closing the panel or leaving Fair never destroys this data cache.
   if(fairAnalyticsCacheV536&&fairAnalyticsCacheYearV545!==year){
     fairAnalyticsCacheV536=null;
@@ -2668,7 +2668,7 @@ async function showLiveYearHistoryV536(){
   let data=liveYearAnalyticsCacheV536.get(key)||null;
   let cachedRevisionV546=Number(liveYearAnalyticsRevisionV539.get(key)||0);
 
-  // V54.6: persistent yearly cache is reusable even before startup sync has
+  // V54.7: persistent yearly cache is reusable even before startup sync has
   // learned the current revision. Revision mismatch only triggers background refresh.
   if(!data){
     const entry=readPersistentAnalyticsEntryV546(LIVE_YEAR_ANALYTICS_CACHE_KEY_V539,key);
@@ -3886,6 +3886,7 @@ async function deleteSalesCardTransactionV239(type,txnId){
     if(typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(type,ctx.date,ctx.location,safe);
     else if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,ctx.date,ctx.location,safe);
     if(typeof invalidateSalesCardLoadRequestsV351==='function')invalidateSalesCardLoadRequestsV351(type);
+    if(typeof patchUnconfirmedDraftReminderAfterDraftAckV547==='function')patchUnconfirmedDraftReminderAfterDraftAckV547({type,date:ctx.date,location:ctx.location,items:[{transactionId:txnId}]},safe);
     const current=productLinkContextV206(type),same=salesCardContextKeyV245(type,current.date,current.location)===salesCardContextKeyV245(type,ctx.date,ctx.location);
     if(same&&!productImportSearchIsActiveV226(type)&&!(typeof hasUnsavedSalesCardChangesV238==='function'&&hasUnsavedSalesCardChangesV238(type))){renderProductLinksEditorV206(type,safe);applyCloudDraftStatusesV322(type,safe);}
     const profitPanelV459=typeof productProfitSummaryPanelV216==='function'?productProfitSummaryPanelV216(type):null;
@@ -5642,7 +5643,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5460",
+    version:"5470",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5686,7 +5687,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true,turnoverEntries:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V54.6').trim().replace(/[^A-Za-z0-9._-]/g,'_');
+    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V54.7').trim().replace(/[^A-Za-z0-9._-]/g,'_');
     downloadFile(`Lover_Legend_Sales_${runtimeVersionV531}_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
@@ -6194,6 +6195,7 @@ async function syncQueuedSalesDraftV314(key,expectedToken=''){
         if(typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(entry.type,entry.date,entry.location,merged);
         else if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(entry.type,entry.date,entry.location,merged);
         refreshProfitAggregateCachesV321(saved,[...new Set(entry.items.map(x=>String(x.transactionId||'')).filter(Boolean))]);
+        patchUnconfirmedDraftReminderAfterDraftAckV547(entry,saved);
         applyCloudDraftStatusesV322(entry.type,merged);
         if(typeof refreshInventoryPendingV250==='function')setTimeout(()=>runOptionalCloudReadV524('inventory-after-draft-ack',()=>refreshInventoryPendingV250(true)).catch(()=>{}),0);
         setSync('已同步',true);
@@ -6453,6 +6455,7 @@ saveProductLinksV206=async function(type,saveMode='confirm',button=null){
     if(typeof replaceProfitAggregateContextV457==='function')replaceProfitAggregateContextV457(type,ctx.date,ctx.location,final);
     else if(typeof mergeDailyProfitContextCacheV237==='function')mergeDailyProfitContextCacheV237(type,ctx.date,ctx.location,final);
     refreshProfitAggregateCachesV321(saved,[...dirtyIds]);
+    patchUnconfirmedDraftReminderAfterDraftAckV547({type,date:ctx.date,location:ctx.location,items},saved);
     const savedByLink=new Map(saved.map(x=>[String(x.linkId||''),x]));
     dirty.forEach(card=>{clearSalesCardTransactionDirtyV239(card);delete card.dataset.productRemovedV259;let cardStatus='';card.querySelectorAll('.product-link-item').forEach(i=>{i.dataset.saved='1';i.dataset.dirty='0';const rec=savedByLink.get(String(i.dataset.linkId||''));if(rec){i.dataset.inventoryStatus=String(rec.importSyncStatus||'');i.dataset.productId=String(rec.productId||'');const cost=i.querySelector('.product-link-avg-cost');if(cost&&rec.averageCost!==undefined)cost.value=formatAmount(Number(rec.averageCost||0));cardStatus=cardStatus||i.dataset.inventoryStatus;}});if(cardStatus)card.dataset.inventoryStatus=cardStatus;if(card._renderSalesStateV317)card._renderSalesStateV317();recalcSalesCardTransactionV239(card);});
     renumberSavedSalesCardsV241(type);dirty.forEach(updateSalesCardDeleteLockV322);refreshConfirmSaleButtonV322(type);if(typeof refreshInventoryPendingV250==='function')setTimeout(()=>runOptionalCloudReadV524('inventory-after-confirm',()=>refreshInventoryPendingV250(true)).catch(()=>{}),0);scheduleCompleteSalesCardReconcileV425(type,ctx.date,ctx.location);setSync('销售已确认',true);alert('销售确认成功。\n\n如有库存变动，请到 Import Cost System 处理。');if(result?.warning)alert(result.warning);return result;
@@ -8426,6 +8429,14 @@ async function latestUnconfirmedDraftsV429(force=false){
   ensureDraftReminderReturnButtonV429();return unconfirmedDraftReminderItemsV429;
 }
 async function openUnconfirmedDraftListV429(force=false){
+  // V54.7: before showing the reminder, rebuild it from the hottest complete
+  // local Sales Card snapshot when available. This prevents an older amount
+  // captured when the draft was first saved (for example RM180) from surviving
+  // after an Update Draft ACK has already changed the same card (for example RM160).
+  if(!force&&typeof peekAllSalesProductLinksCacheV367==='function'){
+    const local=peekAllSalesProductLinksCacheV367(31536000000);
+    if(Array.isArray(local))unconfirmedDraftReminderItemsV429=collectUnconfirmedDraftsV369(local);
+  }
   const drafts=!force&&unconfirmedDraftReminderItemsV429.length
     ?unconfirmedDraftReminderItemsV429
     :await latestUnconfirmedDraftsV429(force);
@@ -8433,6 +8444,28 @@ async function openUnconfirmedDraftListV429(force=false){
   renderUnconfirmedDraftListV429(drafts);
 }
 window.openUnconfirmedDraftListV429=openUnconfirmedDraftListV429;
+// V54.7: patch the in-memory Pending Sales Card reminder immediately after a
+// draft ACK. The reminder is a presentation cache only; it must never retain a
+// first-save amount after the authoritative draft total has changed.
+function patchUnconfirmedDraftReminderAfterDraftAckV547(entry,serverLinks){
+  try{
+    if(!entry)return;
+    const type=String(entry.type||''),date=String(entry.date||''),location=String(entry.location||'').trim().toLowerCase();
+    const txns=new Set((Array.isArray(entry.items)?entry.items:[]).map(x=>String(x?.transactionId||x?.saleId||'').trim()).filter(Boolean));
+    if(!type||!date||!txns.size)return;
+    const sameAffected=g=>String(g?.type||'')===type&&String(g?.date||'')===date&&String(g?.location||'').trim().toLowerCase()===location&&txns.has(String(g?.transactionId||g?.txn||'').trim());
+    const base=(Array.isArray(unconfirmedDraftReminderItemsV429)?unconfirmedDraftReminderItemsV429:[]).filter(g=>!sameAffected(g));
+    const source=Array.isArray(serverLinks)&&serverLinks.length?serverLinks:(Array.isArray(entry.items)?entry.items:[]);
+    const fresh=collectUnconfirmedDraftsV369(source).filter(g=>String(g?.type||'')===type&&String(g?.date||'')===date&&String(g?.location||'').trim().toLowerCase()===location&&txns.has(String(g?.transactionId||g?.txn||'').trim()));
+    unconfirmedDraftReminderItemsV429=[...base,...fresh].sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.type).localeCompare(String(b.type))||String(a.location).localeCompare(String(b.location)));
+    ensureDraftReminderReturnButtonV429();
+    if(document.getElementById('salesDraftListModalV429')){
+      if(unconfirmedDraftReminderItemsV429.length)renderUnconfirmedDraftListV429(unconfirmedDraftReminderItemsV429);
+      else removeDraftReminderUiV429();
+    }
+  }catch(e){console.warn('V54.7 未处理销售卡摘要刷新失败',e)}
+}
+window.patchUnconfirmedDraftReminderAfterDraftAckV547=patchUnconfirmedDraftReminderAfterDraftAckV547;
 let unconfirmedDraftReminderCloudQueuedV526=false;
 async function checkUnconfirmedDraftReminderV369(allowCloudFallback=false){
   const today=localDayISO369(),state=readDraftReminderStateV369();
@@ -9316,12 +9349,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5460'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5470'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5460')issues.push(`Frontend / API 版本不一致（Frontend 5460 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5470')issues.push(`Frontend / API 版本不一致（Frontend 5470 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5460';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5470';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
@@ -9795,7 +9828,7 @@ setTimeout(()=>{
 },0);
 
 
-// V54.6: annual history is page-local UI state. Leaving the page collapses it
+// V54.7: annual history is page-local UI state. Leaving the page collapses it
 // without clearing the authoritative cache or triggering any cloud request.
 const _showPageV541=showPage;
 showPage=function(name,el){
