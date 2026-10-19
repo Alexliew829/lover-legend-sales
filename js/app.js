@@ -1584,7 +1584,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 }
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5470",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5480",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
@@ -1601,7 +1601,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5470";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5480";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -4111,6 +4111,31 @@ function salesCardProductTotalV240(item){
 function productDeliveryInputV240(item){
   return item?.querySelector(".product-link-delivery-v240");
 }
+// V54.8: product shipping / extra inputs display the CURRENT quantity total,
+// while manual edits define a per-unit basis. Example: qty 1 + RM50 shipping
+// becomes RM100 when qty changes to 2. Saved cards preserve their old total by
+// deriving the per-unit basis from saved total / saved quantity.
+function salesCardRememberManualUnitV548(input,qty,value){
+  if(!input)return 0;
+  const q=Math.max(1,Number(qty||1));
+  const total=Math.max(0,Number(value||0));
+  const unit=total/q;
+  input.dataset.unitCostV548=String(unit);
+  return unit;
+}
+function salesCardManualUnitV548(input,qty){
+  if(!input)return 0;
+  const existing=Number(input.dataset.unitCostV548);
+  if(Number.isFinite(existing)&&existing>=0)return existing;
+  return salesCardRememberManualUnitV548(input,qty,toAmount(input.value||0));
+}
+function salesCardScaleManualTotalV548(input,qty){
+  if(!input)return 0;
+  const q=Math.max(1,Number(qty||1));
+  const total=salesCardManualUnitV548(input,q)*q;
+  input.value=formatAmount(total);
+  return total;
+}
 function productAutoDeliveryV240(item){
   const card=item?.closest?.(".sales-card-transaction-v239");
   // V50.2: Sales / Fair never auto-generate delivery; manual input is preserved.
@@ -4313,10 +4338,19 @@ function buildProductSubItemV239(type,card,data={},order=1){
     shipInput=input("product-link-delivery-v240",formatAmount(saved?storedDelivery:0));shipInput.inputMode="decimal";shipInput.dataset.manual="1";ship.appendChild(shipInput);result.appendChild(ship);
   }
 
+  // V54.8: keep a per-unit basis behind the editable shipping total. Live
+  // crate auto-mode keeps its own rate; manual shipping on every channel scales
+  // with quantity exactly like the manual extra fee.
+  if(shipInput){
+    const initialShipTotal=Math.max(0,toAmount(shipInput.value||0));
+    salesCardRememberManualUnitV548(shipInput,qty,initialShipTotal);
+  }
+
   const extraWrap=document.createElement("label");extraWrap.className="product-result-cell-v252 product-extra-inline-v278";
   const extraTitle=document.createElement("small");extraTitle.textContent="附加费用";
   const extraInput=input("product-link-extra-v278",formatAmount(Number(data.extraFee||0)));
   extraInput.inputMode="decimal";extraInput.dataset.manual=saved||Number(data.extraFee||0)>0?"1":"0";
+  salesCardRememberManualUnitV548(extraInput,qty,Math.max(0,toAmount(extraInput.value||0)));
   extraWrap.append(extraTitle,extraInput);result.appendChild(extraWrap);
 
   const profit=document.createElement("span");profit.className="product-result-cell-v252";
@@ -4334,18 +4368,27 @@ function buildProductSubItemV239(type,card,data={},order=1){
   // Quantity changes recalculate an automatic Live crate delivery total.
   // A manually entered delivery remains an explicit product total.
   q.addEventListener("input",()=>{
+    const currentQty=salesCardQtyV240(item);
     if(type==="live"&&shipInput?.dataset.autoCrate==="1"){
       shipInput.dataset.manual="0";
       shipInput.value=formatAmount(productAutoDeliveryV240(item));
-      syncCardDeliveryTotalFromProductsV240(card);
+      salesCardRememberManualUnitV548(shipInput,currentQty,toAmount(shipInput.value||0));
+    }else if(shipInput&&shipInput.dataset.manual==="1"){
+      salesCardScaleManualTotalV548(shipInput,currentQty);
     }
-    // V46.3: keep automatic VND pot/misc cost in step with quantity.
+    syncCardDeliveryTotalFromProductsV240(card);
+
+    // Automatic VND pot/moss keeps its Import per-unit fee. Manual extra fee
+    // follows the same per-unit x quantity rule requested for all Sales Cards.
     const autoExtra=productExtraInputV278(item);
     if(autoExtra&&autoExtra.dataset.manual!=="1"){
       const unitFee=Math.max(0,Number(item.dataset.autoPotMossFeeV267||0));
-      autoExtra.value=formatAmount(unitFee*salesCardQtyV240(item));
-      syncCardExtraTotalFromProductsV278(card);
+      autoExtra.value=formatAmount(unitFee*currentQty);
+      autoExtra.dataset.unitCostV548=String(unitFee);
+    }else if(autoExtra){
+      salesCardScaleManualTotalV548(autoExtra,currentQty);
     }
+    syncCardExtraTotalFromProductsV278(card);
   });
   const onCoreEdit=()=>{markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)};
   [name,q,c,p].forEach(el=>el.addEventListener("input",onCoreEdit));
@@ -4371,10 +4414,18 @@ function buildProductSubItemV239(type,card,data={},order=1){
       recalcSalesCardTransactionV239(card);
     }
   });
-  shipInput.addEventListener("input",()=>{shipInput.dataset.manual="1";shipInput.dataset.autoCrate="0";markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);syncCardDeliveryTotalFromProductsV240(card);recalcSalesCardTransactionV239(card)});
-  shipInput.addEventListener("blur",()=>{shipInput.value=formatAmount(toAmount(shipInput.value||0));syncCardDeliveryTotalFromProductsV240(card);recalcSalesCardTransactionV239(card)});
-  extraInput.addEventListener("input",()=>{extraInput.dataset.manual="1";markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);syncCardExtraTotalFromProductsV278(card);recalcSalesCardTransactionV239(card)});
-  extraInput.addEventListener("blur",()=>{extraInput.value=formatAmount(toAmount(extraInput.value||0));syncCardExtraTotalFromProductsV278(card);recalcSalesCardTransactionV239(card)});
+  shipInput.addEventListener("input",()=>{
+    shipInput.dataset.manual="1";shipInput.dataset.autoCrate="0";
+    salesCardRememberManualUnitV548(shipInput,salesCardQtyV240(item),toAmount(shipInput.value||0));
+    markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);syncCardDeliveryTotalFromProductsV240(card);recalcSalesCardTransactionV239(card)
+  });
+  shipInput.addEventListener("blur",()=>{shipInput.value=formatAmount(toAmount(shipInput.value||0));salesCardRememberManualUnitV548(shipInput,salesCardQtyV240(item),toAmount(shipInput.value||0));syncCardDeliveryTotalFromProductsV240(card);recalcSalesCardTransactionV239(card)});
+  extraInput.addEventListener("input",()=>{
+    extraInput.dataset.manual="1";
+    salesCardRememberManualUnitV548(extraInput,salesCardQtyV240(item),toAmount(extraInput.value||0));
+    markSalesCardDirtyV238(item);markSalesCardTransactionDirtyV239(card);syncCardExtraTotalFromProductsV278(card);recalcSalesCardTransactionV239(card)
+  });
+  extraInput.addEventListener("blur",()=>{extraInput.value=formatAmount(toAmount(extraInput.value||0));salesCardRememberManualUnitV548(extraInput,salesCardQtyV240(item),toAmount(extraInput.value||0));syncCardExtraTotalFromProductsV278(card);recalcSalesCardTransactionV239(card)});
   bindSingleTapDeleteProductV254(remove,()=>removeProductFromTransactionV239(type,card,item));
   setTimeout(()=>{updateProductLinkMinimumWarningV214(item);recalcSalesCardTransactionV239(card)},0);
   return item;
@@ -4443,6 +4494,9 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const commission=make(type==="live"?"主播佣金 %":type==="fair"?"Fair 佣金 %":"佣金 %","sales-card-commission-rate-v239",Number(defaultRate||0).toFixed(2));
   const delivery=make("本地运费总数","sales-card-delivery-total-v239",formatAmount(list.reduce((s,x)=>s+Number(x.localDelivery||0),0)));
   const extra=make("附加费用总数","sales-card-extra-total-v239",formatAmount(list.reduce((s,x)=>s+Number(x.extraFee||0),0)));
+  // V54.8: card totals are derived summaries only. Edit shipping / extra fee at
+  // product level; these two totals update instantly and cannot be typed over.
+  delivery.inp.readOnly=true;delivery.inp.tabIndex=-1;delivery.w.classList.add("sales-card-auto-total-v278");
   extra.inp.readOnly=true;extra.inp.tabIndex=-1;extra.w.classList.add("sales-card-auto-total-v278");
   shared.append(commission.w,delivery.w,extra.w);card.appendChild(shared);
 
@@ -4473,12 +4527,6 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const sharedEdit=()=>{markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card)};
   commission.inp.addEventListener("input",sharedEdit);
   remark.addEventListener("input",()=>markSalesCardTransactionDirtyV239(card));
-  delivery.inp.addEventListener("change",()=>{
-    const target=Math.max(0,toAmount(delivery.inp.value||0));
-    distributeCardDeliveryTotalV240(card,target);
-    markSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card);
-  });
-  delivery.inp.addEventListener("blur",()=>{delivery.inp.value=formatAmount(toAmount(delivery.inp.value||0));});
   commission.inp.addEventListener("blur",()=>{commission.inp.value=(Math.max(0,Number(commission.inp.value)||0)).toFixed(2);recalcSalesCardTransactionV239(card)});
 
   setTimeout(()=>{clearSalesCardTransactionDirtyV239(card);recalcSalesCardTransactionV239(card);if(card._renderSalesStateV317)card._renderSalesStateV317();updateSalesCardDeleteLockV322(card);refreshConfirmSaleButtonV322(type)},0);
@@ -5643,7 +5691,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5470",
+    version:"5480",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5687,7 +5735,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true,turnoverEntries:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V54.7').trim().replace(/[^A-Za-z0-9._-]/g,'_');
+    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V54.8').trim().replace(/[^A-Za-z0-9._-]/g,'_');
     downloadFile(`Lover_Legend_Sales_${runtimeVersionV531}_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
@@ -9349,12 +9397,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5470'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5480'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5470')issues.push(`Frontend / API 版本不一致（Frontend 5470 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5480')issues.push(`Frontend / API 版本不一致（Frontend 5480 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5470';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5480';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
