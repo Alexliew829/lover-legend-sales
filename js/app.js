@@ -1584,7 +1584,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 }
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5480",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5490",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
@@ -1601,7 +1601,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5480";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5490";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -4111,7 +4111,7 @@ function salesCardProductTotalV240(item){
 function productDeliveryInputV240(item){
   return item?.querySelector(".product-link-delivery-v240");
 }
-// V54.8: product shipping / extra inputs display the CURRENT quantity total,
+// V54.9: product shipping / extra inputs are editable per-product fields and display the CURRENT quantity total,
 // while manual edits define a per-unit basis. Example: qty 1 + RM50 shipping
 // becomes RM100 when qty changes to 2. Saved cards preserve their old total by
 // deriving the per-unit basis from saved total / saved quantity.
@@ -4338,7 +4338,7 @@ function buildProductSubItemV239(type,card,data={},order=1){
     shipInput=input("product-link-delivery-v240",formatAmount(saved?storedDelivery:0));shipInput.inputMode="decimal";shipInput.dataset.manual="1";ship.appendChild(shipInput);result.appendChild(ship);
   }
 
-  // V54.8: keep a per-unit basis behind the editable shipping total. Live
+  // V54.9: keep a per-unit basis behind the editable shipping total. Live
   // crate auto-mode keeps its own rate; manual shipping on every channel scales
   // with quantity exactly like the manual extra fee.
   if(shipInput){
@@ -4494,7 +4494,7 @@ function buildSalesCardTransactionV239(type,dataList=[]){
   const commission=make(type==="live"?"主播佣金 %":type==="fair"?"Fair 佣金 %":"佣金 %","sales-card-commission-rate-v239",Number(defaultRate||0).toFixed(2));
   const delivery=make("本地运费总数","sales-card-delivery-total-v239",formatAmount(list.reduce((s,x)=>s+Number(x.localDelivery||0),0)));
   const extra=make("附加费用总数","sales-card-extra-total-v239",formatAmount(list.reduce((s,x)=>s+Number(x.extraFee||0),0)));
-  // V54.8: card totals are derived summaries only. Edit shipping / extra fee at
+  // V54.9: card totals are derived summaries only. Edit shipping / extra fee at
   // product level; these two totals update instantly and cannot be typed over.
   delivery.inp.readOnly=true;delivery.inp.tabIndex=-1;delivery.w.classList.add("sales-card-auto-total-v278");
   extra.inp.readOnly=true;extra.inp.tabIndex=-1;extra.w.classList.add("sales-card-auto-total-v278");
@@ -5691,7 +5691,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5480",
+    version:"5490",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5735,7 +5735,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true,turnoverEntries:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V54.8').trim().replace(/[^A-Za-z0-9._-]/g,'_');
+    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V54.9').trim().replace(/[^A-Za-z0-9._-]/g,'_');
     downloadFile(`Lover_Legend_Sales_${runtimeVersionV531}_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
@@ -9397,12 +9397,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5480'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5490'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5480')issues.push(`Frontend / API 版本不一致（Frontend 5480 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5490')issues.push(`Frontend / API 版本不一致（Frontend 5490 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5480';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5490';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
