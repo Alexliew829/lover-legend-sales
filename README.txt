@@ -1,13 +1,9 @@
-Lover Legend Sales V53.7 / Build 5370
+Lover Legend Sales V55.1 / Build 5510
 
-基准：V53.5（Fair 大改版前稳定回退版本）
-
-V53.7 修改范围：
-1. 修复 Fair 历史月份“部分缓存冒充完整月份”：只有完整 loadMonth 成功后才标记该月份为 authoritative loaded。
-2. Fair 增加“查看全部记录”：按地点累计营业额排名，并用 🟢好 / 🟡普通 / 🔴差 显示表现。
-3. Fair 全部记录按连续销售日期自动分成 Date Range；显示每场总数、最佳 Fair、每日表现、最佳单日（★）和地点累计总数。
-4. Fair 当前月份列表同步显示地点表现及该地点当月每日表现。
-5. Live 增加按主播 + 年份的“查看全年”记录；显示全年营业额、利润、利润率、佣金、最佳月份、最佳单日，并按月展开。
-6. 历史分析为用户主动点击时才读取，不增加后台 polling，不参与保存/新增/修改/删除主路径。
-
-未修改：营业额公式、利润公式、佣金公式、Sales Card、Inventory Pending/ACK、Revision 主同步协议、保存/新增/修改/删除 API、同步轮询频率。
+V55.1 修改范围：
+- 修复 Home「本年度累计」年度资料读取失败。
+- 根因：全年读取成功返回后，前端在 year-scope 路径调用 pending reconciliation 时引用了不存在的 `month` 变量，触发 ReferenceError，导致完整年度资料无法标记为已载入。
+- 修复方式：全年资料按 01-12 月逐月执行 stale pending reconciliation，保留原有跨设备删除保护，不再因未定义变量中断全年载入。
+- Sales / Fair / Live 正常月份读取与保存逻辑不改。
+- V55.0 运费/附加费用输入框等宽 UI 保留。
+- 不修改营业额、成本、利润、利润率、佣金公式；不修改 Sales Card、Pending、Inventory ACK、Global Revision、同步轮询或 Fair/Live 全年缓存规则。

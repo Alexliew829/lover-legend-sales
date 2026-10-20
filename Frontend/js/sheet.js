@@ -772,7 +772,7 @@ function reconcilePendingRowsFromCloudV329(cloudRows) {
   return before - pendingRows.length;
 }
 
-// V53.7: if another device made a newer authoritative turnover change for the
+// V54.7: if another device made a newer authoritative turnover change for the
 // same context, an older positive pending row must not be allowed to resurrect
 // data that the cloud has since changed or deleted.  We only discard the retry
 // when the change journal proves the remote mutation happened after this local
@@ -1205,7 +1205,13 @@ async function loadYearInBackground(year) {
         ? fairInputsHaveUnsavedChanges()
         : false;
       loadPendingRows();
-      reconcileSupersededPendingRowsV537(json.rows || [],deltaChangesForUiV491,month);
+      // V55.1: annual loads have YEAR scope, so there is no single `month` variable here.
+      // Reconcile stale pending turnover safely month-by-month instead of referencing an
+      // undefined identifier that aborts the whole annual load after the cloud responds.
+      for (let m = 1; m <= 12; m += 1) {
+        const monthKeyV551 = y + "-" + String(m).padStart(2, "0");
+        reconcileSupersededPendingRowsV537(json.rows || [], deltaChangesForUiV491, monthKeyV551);
+      }
       reconcilePendingRowsFromCloudV329(json.rows || []);
       mergeCloudYearRows(y, json.rows || [], requestStartedAt);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
@@ -2049,9 +2055,10 @@ async function saveFairSessionToSheetV281(location,start,end){
   applyFairSessionRevisionV514(json.fairSessionRevision);
   return json;
 }
-async function loadFairAnalyticsV536(){
-  const json=await jsonp({action:"getFairAnalyticsV536"},{timeoutMs:30000});
+async function loadFairAnalyticsV536(year){
+  const json=await jsonp({action:"getFairAnalyticsV536",year:String(year||"")},{timeoutMs:30000});
   if(!json||!json.ok)throw new Error((json&&json.message)||"Fair 全部记录读取失败");
+  applyFairSessionRevisionV514(json.fairSessionRevision);
   return json;
 }
 async function loadLiveYearAnalyticsV536(host,year){

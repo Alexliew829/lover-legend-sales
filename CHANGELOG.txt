@@ -1,21 +1,63 @@
-V53.7
-- Home historical Fair expansion now follows the selected Home month only; no newest-month bleed-through.
-- Cross-device turnover conflict guard: a newer authoritative turnover change can retire an older pending write so deleted/updated data is not resurrected.
-- Clears auxiliary turnover-entry cache when a newer authoritative deletion supersedes stale local pending data.
-- Fair all-history UI simplified: one performance color per location, Date Range totals, green Best Fair / Best Day markers, daily rows retain revenue/profit/margin without per-day red/yellow colors.
-- Fair all-history mode now hides the monthly list and uses a dedicated title.
-- Live yearly history typography enlarged; removed duplicate monthly-summary block and replaced it with one table total row; best month label uses green marker.
+V55.1
+- 修复 Home「本年度累计」年度资料读取失败。
+- 修正 loadYearInBackground 年度范围中误用未定义 `month` 变量的问题。
+- 年度读取完成后的 Pending reconciliation 改为按 01-12 月逐月执行，保留 stale pending / 跨设备删除保护。
+- 不改 Sales / Fair / Live 月资料、计算公式、Sales Card、Pending、Inventory ACK、Global Revision 与同步频率。
 
-Lover Legend Sales V53.7 / Build 5370
+V55.0
+- UI-only：产品卡「运费」输入框与「附加费用」输入框改为相同栏宽、相同视觉尺寸。
+- Sales / Fair 的产品费用区统一为四等分栏：运费、附加费用、利润、利润率；手机与电脑排版保持一致。
+- 不修改运费/附加费用计算、数量联动、佣金、保存、Pending、Inventory ACK、Global Revision 或同步逻辑。
 
-V53.6
-- 修复 Fair 历史月份 Partial Cache 被误判为完整月份的问题。
-- 新增 Fair 全部历史分析：地点排名、Date Range 分组、最佳 Fair、最佳单日、地点累计总数。
-- Fair 列表新增 🟢好 / 🟡普通 / 🔴差 的直观表现标记。
-- 新增 Live 主播全年查询：全年汇总、最佳月份、最佳单日、按月展开。
-- 所有历史分析读取均为 on-demand，不增加常驻后台请求。
-- 保留 V53.5 作为 Fair 大改版前明确回退基准。
+V55.0
+- Sales Card：产品卡「运费」改为明确可编辑输入框，视觉与「附加费用」一致。
+- 运费默认 0.00；输入的是单棵/单件基础运费，数量变化时按数量即时联动。
+- 「本地运费总数」「附加费用总数」继续保持只读，由各产品费用 × 数量自动汇总。
+- Belimbing / Balakong 门市佣金维持默认 0% 可修改；Fair / Live 继续沿用各自既有佣金制度。
+- 不修改 Sales Card 保存、确认、Pending、Inventory ACK、Global Revision 与同步流程。
 
-V53.5
-- False Green Sync 修复：局部/辅助读取不再推进全局 Revision。
-- 只有 authoritative 数据真正应用后才允许显示已同步。
+- Sales / Fair / Live：产品级本地运费、附加费用按单棵基础随数量即时成比例更新。
+- 产品运费默认 0.00，可编辑；产品附加费用维持可编辑。
+- 下方「本地运费总数 / 附加费用总数」统一为只读自动汇总。
+- Belimbing / Balakong 门市销售卡佣金默认 0.00 且可修改；Fair / Live 继续使用原佣金制度。
+- 数量或费用改变后，总成本 / 总利润 / 整体利润率即时刷新。
+
+V54.7
+- 修复 Fair 销售卡草稿金额更新后，「销售卡尚未处理」仍显示第一次保存旧金额的问题。
+- Draft ACK 后立即用最新销售卡资料更新 Pending Sales Card reminder；例如 RM180 更新草稿为 RM160 后，提示同步改为 RM160。
+- 打开未处理销售卡清单时，优先使用最新本机完整 Sales Card cache 重建草稿摘要，避免旧提醒缓存继续显示。
+- 确认销售后立即从未处理草稿提醒移除同一交易；删除草稿后也同步清除对应提醒。
+- 不增加额外云端读取，不影响销售卡保存速度、确认销售、Pending、Inventory ACK、Global Revision 或同步频率。
+
+V54.6
+- Fair / Live 全年记录缓存生命周期与 UI 展开状态彻底分离：收起全年记录、切换页面只收起 UI，不清除全年数据缓存。
+- 同一年再次打开全年记录时，优先立即显示内存 / localStorage 的完整缓存；只有无缓存时才显示“正在读取全年记录…”。
+- 启动阶段尚未取得 turnoverRevision 时，不再把有效全年缓存判定为失效；待 revision 已知后，仅真实 revision 不一致才触发后台更新。
+- Fair 全年缓存同时校验 turnoverRevision 与已知的 Fair Session Revision；Fair Session Revision 尚未知时不误判缓存失效。
+- Live 全年持久缓存改为每个“主播 + 年份”独立保存 revision，避免其他主播 / 年份缓存因 revision 更新被整批丢弃。
+- Revision 变化时先显示旧完整缓存，再后台刷新；刷新失败继续保留缓存，不让全年页面变空或重复等待。
+- 不修改正常月份同步、保存、新增、修改、删除、营业额 / 利润 / 利润率 / 佣金公式、Sales Card、Pending、Inventory ACK 或同步轮询频率。
+
+V54.6
+- Fair / Live 全年记录年份统一跟当前月份所属年份绑定，取消 Live 独立年份输入框；Fair 不新增年份选择器。
+- Fair 全年 API 新增 year 参数，并只读取对应年份资料；地点排名、最佳 Fair、Date Range、累计总数均限定在当前年份。
+- Fair 全年缓存增加年份校验；同一年收起再展开继续直接使用 Revision-aware 缓存，年份变化才重新读取。
+- 年底结算改为非破坏式：仅写入 closed_year::<year> 结算标记，不再删除年度月表、Sales Card link、Turnover Entry、Commission snapshot 或任何 Sales / Fair / Live 历史原始资料。
+- System State 新增 closedYears，用于识别已完成年度结算；重复结算会在前端提示并停止。
+- 年底结算提示文字改为明确说明“历史资料完整保留，可继续查询 / 报表 / Backup / Restore”。
+- 保留 V54.4 的 Fair / Live 全年 UI、手机端布局、最佳单日同行圆点、场次分组及页面离开自动收起行为。
+- 不修改营业额 / 利润 / 利润率 / 佣金公式，不修改保存、新增、修改、删除、Revision、Pending、Sales Card、Inventory ACK 或同步频率。
+
+V54.1
+- Fair / Live 全年记录标题改为由全年模式状态统一控制，避免 renderAll / 月份刷新把标题瞬间改回当前月份。
+- 离开 Fair / Live 页面时自动收起全年记录，仅复位 UI，不清缓存、不额外读取云端。
+- Fair 全年排名删除重复的「Fair 全部销售记录」标题，仅保留地点总排名说明。
+- Fair 只有 1 场时不显示「最佳 Fair」与「1 场总数」；2 场以上才比较本场总营业额并显示最佳 Fair / N 场总数。
+- Live 全年五列表格按手机 375–390px 优先重新分配列宽，日期保持 DD-MM，最佳单日绿色同一行，利润率保留安全空间。
+
+V54.0
+- Fair Session metadata 改为 Date Range 锚点而非硬结束边界；同地点连续营业会自动延长原 Fair，避免最后一天被错误拆成新场。
+- Fair「本场总数」改为与多场总数一致的黄色醒目总数卡，营业额 / 利润 / 利润率统一红色加粗。
+- Live 全年摘要改为 Fair 地点详情同款两行四栏布局。
+- Live 全年每日日期改为 DD-MM；最佳单日绿色日期与绿点保持同一行。
+- 修复手机端 Live 全年五列表格数据重叠，优化列宽、字号与间距。

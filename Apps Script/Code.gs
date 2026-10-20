@@ -1,7 +1,7 @@
-// Lover Legend Sales System V53.7
+// Lover Legend Sales System V55.1
 // Built from V51.3, preserving its turnover protection and selective-sync architecture.
 // V53.1 preserves V52.9 synchronization and calculation logic; unreachable frontend remnants were removed only.
-// Build: 5370
+// Build: 5510
 
 
 const DATA_REVISION_PROPERTY_ = "lover_sales_data_revision_v142";
@@ -1457,7 +1457,7 @@ function saveSalesProductLinkV203_(p){
   const productName=String(p.productName||"").trim();if(!productName)throw new Error("产品不能为空");
   const qty=Number(p.quantity||0);if(!Number.isFinite(qty)||qty<=0)throw new Error("盆栽数量必须大于 0");
   const actualPrice=Math.max(0,Number(p.actualPrice||0)),delivery=Math.max(0,Number(p.localDelivery||0)),extra=Math.max(0,Number(p.extraFee||0)),averageCost=Math.max(0,Number(p.averageCost||0)),minimumPrice=Math.max(0,Number(p.minimumPrice||0)),commissionRate=Math.max(0,Number(p.commissionRate||0)),commissionAmount=actualPrice*commissionRate/100,profit=actualPrice-commissionAmount-(averageCost*qty)-delivery-extra,profitRate=actualPrice>0?profit/actualPrice*100:0,remark=String(p.remark||"").trim().slice(0,100),linkId=String(p.linkId||'').trim();
-  if(!linkId)throw new Error('此页面没有单笔销售卡编号，为保护资料已停止保存；请刷新到 V53.7 后再操作。');
+  if(!linkId)throw new Error('此页面没有单笔销售卡编号，为保护资料已停止保存；请刷新到 V55.1 后再操作。');
   const lock=LockService.getScriptLock();lock.waitLock(8000);
   try{
     const sh=getSalesProductLinkSheetV203_(),last=sh.getLastRow(),vals=last>1?sh.getRange(2,1,last-1,26).getValues():[];
@@ -1577,7 +1577,7 @@ function deleteSalesProductLinkV206_(p){
     const row=idx+2,now=new Date(),rowVals=sh.getRange(row,1,1,26).getValues()[0];
     const rowType=normalizeType(String(rowVals[2]||'')),rowDate=rowVals[1] instanceof Date?formatDateForApp(rowVals[1]):String(rowVals[1]||''),rowLocation=String(rowVals[3]||'');
     const currentRevision=getPriorityRevV315_(PRIORITY_CARD_REV_PROP_V315_);
-    if(!hasExpected)throw new Error('此页面没有销售卡版本资料，为保护云端资料已停止删除；请刷新到 V53.7 后再操作。');
+    if(!hasExpected)throw new Error('此页面没有销售卡版本资料，为保护云端资料已停止删除；请刷新到 V55.1 后再操作。');
     if(hasExpected&&expected!==currentRevision&&salesCardRevisionConflictV456_(expected,rowType,rowDate,rowLocation,currentRevision))throw new Error('这张销售卡已有其他设备的新修改，本次删除已停止。请先同步后再操作。');
     const currentImportStatus=String(rowVals[13]||"").trim();
     if(!["DRAFT","DRAFT_INVENTORY_CHANGED"].includes(currentImportStatus))throw new Error("这张销售卡已经确认销售，不能删除");
@@ -1662,7 +1662,7 @@ function saveSalesProductLinksV206_(p){
     if(!hasExpectedSalesCardRevision){
       const existingTxnIds=new Set(vals.filter(r=>sameSalesProductLinkContextV206_(r,type,dateText,location)&&!['deleted','cancelled'].includes(String(r[23]||'active').toLowerCase())).map(r=>String(r[20]||'').trim()).filter(Boolean));
       const changesExisting=explicitDeletedLinkIds.length>0||normalized.some(x=>idMap[x.linkId]||existingTxnIds.has(String(x.transactionId||'').trim()));
-      if(changesExisting)throw new Error('此页面没有销售卡版本资料，为保护云端资料已停止覆盖；请刷新到 V53.7 后再保存。');
+      if(changesExisting)throw new Error('此页面没有销售卡版本资料，为保护云端资料已停止覆盖；请刷新到 V55.1 后再保存。');
     }
     // V36.0: reject an older delayed draft from the same device/context.  This
     // prevents a pre-delete snapshot from recreating a removed product after a
@@ -1960,7 +1960,7 @@ function deleteSalesTransactionV256_(p){
     });
     if(hasConfirmedSale)throw new Error("这张销售卡已经确认销售，不能删除");
     if(!targets.length)return{ok:true,saleId,deleted:0,status:"deleted"};
-    if(!hasExpectedSalesCardRevision)throw new Error('此页面没有销售卡版本资料，为保护云端资料已停止删除；请刷新到 V53.7 后再操作。');
+    if(!hasExpectedSalesCardRevision)throw new Error('此页面没有销售卡版本资料，为保护云端资料已停止删除；请刷新到 V55.1 后再操作。');
     const currentSalesCardRevisionV450=getPriorityRevV315_(PRIORITY_CARD_REV_PROP_V315_);
     const deleteCtxV456=targets.length?vals[targets[0]-2]:null;
     const deleteTypeV456=deleteCtxV456?normalizeType(String(deleteCtxV456[2]||'')):'';
@@ -2707,7 +2707,7 @@ function fastApplyRecordsSafely(records, captureChanges, turnoverContext) {
       records.forEach(record=>{
         const type=normalizeType(String(record.type||'')),dateText=formatDateForApp(record.date),location=type==='daily'?displayCompany(normalizeCompany(String(record.company||'Belimbing'))):type==='live'?canonicalLiveHost(String(record.location||'')):canonicalLocation(String(record.location||''));
         const currentTotal=Math.round(authoritativeTurnoverAmountV376_(type,dateText,location)*100)/100,incomingTotal=Math.round(Number(record.amount||0)*100)/100;
-        if(currentTotal>0.005&&Math.abs(currentTotal-incomingTotal)>0.005)throw new Error('此页面版本没有单笔营业额编号，为保护云端资料已拒绝覆盖；请刷新到 V53.7 后再操作');
+        if(currentTotal>0.005&&Math.abs(currentTotal-incomingTotal)>0.005)throw new Error('此页面版本没有单笔营业额编号，为保护云端资料已拒绝覆盖；请刷新到 V55.1 后再操作');
       });
     }
     const groups = {};
@@ -3251,7 +3251,7 @@ function output(obj, callback) {
 
 
 /* ================= Lover Legend Sales System V18.7 ================= */
-const DATA_VERSION_V8 = "5370";
+const DATA_VERSION_V8 = "5510";
 const RESTORE_PREFIX_V8 = "LL_SALES_RESTORE_V8_";
 
 
@@ -3379,10 +3379,13 @@ function profitSummaryForTypeV536_(type, locationFilter, yearFilter){
   });
   return out;
 }
-function getFairAnalyticsV536_(){
-  const all=loadData(),rows=(Array.isArray(all.rows)?all.rows:[]).filter(r=>normalizeType(String(r.type||''))==='fair'&&Number(r.amount||0)>0),profitMap=profitSummaryForTypeV536_('fair','','');
+function getFairAnalyticsV536_(p){
+  const year=/^\d{4}$/.test(String(p&&p.year||''))?String(p.year):Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy');
+  const all=loadYearDataV96(year),rows=(Array.isArray(all.rows)?all.rows:[]).filter(r=>normalizeType(String(r.type||''))==='fair'&&Number(r.amount||0)>0),profitMap=profitSummaryForTypeV536_('fair','',year);
   const profits=[];Object.keys(profitMap).forEach(k=>{const split=k.lastIndexOf('|'),locationKey=k.slice(0,split),date=k.slice(split+1),sample=rows.find(r=>normalizeFairLocationKey(r.location)===locationKey&&String(r.date||'')===date);profits.push({location:sample?canonicalLocation(sample.location):locationKey,date,profit:Number(profitMap[k]||0)})});
-  return{ok:true,rows,profits};
+  const sessionResult=getFairSessionsV281_();
+  const sessions=(Array.isArray(sessionResult.sessions)?sessionResult.sessions:[]).filter(x=>{const start=String(x.start||''),end=String(x.end||'');return start.slice(0,4)<=year&&end.slice(0,4)>=year});
+  return{ok:true,year,rows,profits,sessions,fairSessionRevision:Number(sessionResult.fairSessionRevision||0)};
 }
 function getLiveYearAnalyticsV536_(p){
   const host=canonicalLiveHost(String(p.host||'')),key=String(host).replace(/\s+/g,'').toLowerCase(),year=/^\d{4}$/.test(String(p.year||''))?String(p.year):Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy');
@@ -3952,7 +3955,7 @@ else if (action === "oneSignalDiagnostics") result = oneSignalDiagnosticsV181_()
     else if (action === "loadMonth") result = loadMonthDataV97(p.month);
     else if (action === "syncBundleV450") result = syncBundleV450_(p.month);
     else if (action === "loadYear") result = loadYearDataV96(p.year);
-    else if (action === "getFairAnalyticsV536") result = getFairAnalyticsV536_();
+    else if (action === "getFairAnalyticsV536") result = getFairAnalyticsV536_(p);
     else if (action === "getLiveYearAnalyticsV536") result = getLiveYearAnalyticsV536_(p);
     else if (action === "historicalHighs") result = historicalHighsV174_();
     else if (action === "getSalesChangeLog") result = getSalesChangeLogV365_(p);
@@ -3995,7 +3998,7 @@ else if (action === "oneSignalDiagnostics") result = oneSignalDiagnosticsV181_()
     else if (action === "saveAccessSettings") result = saveAccessSettingsCloud(p);
     else if (action === "accessVersion") result = {
       ok: true,
-      version: "5370",
+      version: "5510",
       accessSettingsSupported: true
     };
     else if (action === "resetCommissionSettings") result = resetCommissionSettingsCloud();
@@ -4012,7 +4015,7 @@ else if (action === "oneSignalDiagnostics") result = oneSignalDiagnosticsV181_()
     else if (action === "restoreCommit") result = restoreCommitV8(p);
     else if (action === "copyLegacyYearSheetsToMonthlySafely") result = copyLegacyYearSheetsToMonthlySafely();
     else if (action === "deduplicateMonthlySheets") result = deduplicateMonthlySheets();
-    else if (action === "ping") result = { ok:true, message:"Lover Legend Sales API V53.7 running", systemState:getSystemStateV8() };
+    else if (action === "ping") result = { ok:true, message:"Lover Legend Sales API V55.1 running", systemState:getSystemStateV8() };
     else result = { ok:false, message:"Unknown action: " + action };
   } catch (err) { result = { ok:false, message:err.message || String(err) }; }
   return output(result, p.callback);
@@ -4056,19 +4059,22 @@ function getSystemStateV8(){
   cleanupInvalidClosedMonthsV197_();
   const sheet=getSettingsSheet(),last=sheet.getLastRow();
   const values=last>1?sheet.getRange(2,1,last-1,2).getValues():[];
-  const closedMonths=[],commissionSnapshots={};
+  const closedMonths=[],closedYears=[],commissionSnapshots={};
   values.forEach(r=>{
     const key=String(r[0]||"");
     if(key.indexOf("closed_month::")===0){
       const month=key.substring(14);
       if(/^\d{4}-\d{2}$/.test(month))closedMonths.push(month);
+    }else if(key.indexOf("closed_year::")===0){
+      const year=key.substring(13);
+      if(/^\d{4}$/.test(year))closedYears.push(year);
     }else if(key.indexOf("month_commission::")===0){
       const month=key.substring(18);
       try{commissionSnapshots[month]=JSON.parse(String(r[1]||"{}"))}catch(e){}
     }
   });
   const safeClosedMonths=sanitizeClosedMonthsV197_(closedMonths).sort();
-  return{dataVersion:DATA_VERSION_V8,currentMonth:currentMonthV8(),closedMonths:safeClosedMonths,commissionSnapshots,restoreGeneration:getRestoreGenerationV347_()};
+  return{dataVersion:DATA_VERSION_V8,currentMonth:currentMonthV8(),closedMonths:safeClosedMonths,closedYears:[...new Set(closedYears)].sort(),commissionSnapshots,restoreGeneration:getRestoreGenerationV347_()};
 }
 function loadDataV8(){
   const result=loadData();
@@ -4091,15 +4097,18 @@ function closeYearV217_(p){
   if(year!==cy)throw new Error("只能结算系统当前年份 "+cy);if(md!=="12-31")throw new Error("年底结算只能在 12 月 31 日执行");
   const lock=LockService.getScriptLock();lock.waitLock(30000);
   try{
-    const ss=SpreadsheetApp.getActiveSpreadsheet();
-    ss.getSheets().filter(sh=>new RegExp("^"+year+"-\\\\d{2}$").test(sh.getName())).forEach(sh=>ss.deleteSheet(sh));
-    const links=getSalesProductLinkSheetV203_(),last=links.getLastRow();
-    if(last>1){const vals=links.getRange(2,1,last-1,23).getValues(),keep=vals.filter(r=>{const d=r[1] instanceof Date?r[1]:parseDateFromApp(String(r[1]||""));return !d||Utilities.formatDate(d,tz,"yyyy")!==year});links.getRange(2,1,last-1,23).clearContent();if(keep.length)links.getRange(2,1,keep.length,23).setValues(keep)}
-    const entrySheet=getTurnoverEntrySheetV376_(),entryLast=entrySheet.getLastRow();
-    if(entryLast>1){const vals=entrySheet.getRange(2,1,entryLast-1,5).getValues(),keep=vals.filter(r=>{const d=r[1] instanceof Date?r[1]:parseDateFromApp(String(r[1]||''));return !d||Utilities.formatDate(d,tz,'yyyy')!==year});entrySheet.getRange(2,1,entryLast-1,5).clearContent();if(keep.length)entrySheet.getRange(2,1,keep.length,5).setValues(keep)}
-    const settings=getSettingsSheet(),slast=settings.getLastRow();
-    if(slast>1){const vals=settings.getRange(2,1,slast-1,2).getValues(),del=[];vals.forEach((r,i)=>{const k=String(r[0]||"");if(k.indexOf("closed_month::"+year+"-")===0||k.indexOf("month_commission::"+year+"-")===0)del.push(i+2)});del.reverse().forEach(r=>settings.deleteRow(r));formatSettingsSheet(settings)}
-    clearLoadCache();const dataRevision=bumpDataRevision_();return{ok:true,year,dataRevision,systemState:getSystemStateV8()};
+    // V55.0: year-end settlement is NON-DESTRUCTIVE. It records a settlement
+    // marker only. Monthly sheets, Fair/Live/Sales records, Sales Card links,
+    // turnover entries, commission snapshots, costs, profits and notes remain.
+    const settings=getSettingsSheet(),key="closed_year::"+year,last=settings.getLastRow();
+    const vals=last>1?settings.getRange(2,1,last-1,2).getValues():[];
+    const found=vals.findIndex(r=>String(r[0]||"")===key);
+    const stamp=new Date();
+    if(found<0)settings.appendRow([key,stamp]);else settings.getRange(found+2,2).setValue(stamp);
+    formatSettingsSheet(settings);
+    clearLoadCache();
+    const dataRevision=bumpDataRevision_();
+    return{ok:true,year,archived:true,dataDeleted:false,dataRevision,systemState:getSystemStateV8()};
   }finally{lock.releaseLock()}
 }
 
