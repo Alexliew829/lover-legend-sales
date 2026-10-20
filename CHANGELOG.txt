@@ -1,8 +1,7 @@
-V55.1
-- 修复 Home「本年度累计」年度资料读取失败。
-- 修正 loadYearInBackground 年度范围中误用未定义 `month` 变量的问题。
-- 年度读取完成后的 Pending reconciliation 改为按 01-12 月逐月执行，保留 stale pending / 跨设备删除保护。
-- 不改 Sales / Fair / Live 月资料、计算公式、Sales Card、Pending、Inventory ACK、Global Revision 与同步频率。
+V55.2
+- 修复 Home「本年度累计」年度读取失败：loadYearInBackground() 不再引用仅存在于月度同步作用域的 deltaChangesForUiV491。
+- 年度完整快照只执行 reconcilePendingRowsFromCloudV329() 的 ACK 清理；新版 change-journal 防复活保护继续由正常月份同步负责。
+- 不修改 Sales / Fair / Live 月资料、Sales Card、Inventory ACK、Global Revision、佣金、运费与附加费用计算。
 
 V55.0
 - UI-only：产品卡「运费」输入框与「附加费用」输入框改为相同栏宽、相同视觉尺寸。
