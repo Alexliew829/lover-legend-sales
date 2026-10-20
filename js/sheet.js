@@ -1205,13 +1205,12 @@ async function loadYearInBackground(year) {
         ? fairInputsHaveUnsavedChanges()
         : false;
       loadPendingRows();
-      // V55.1: annual loads have YEAR scope, so there is no single `month` variable here.
-      // Reconcile stale pending turnover safely month-by-month instead of referencing an
-      // undefined identifier that aborts the whole annual load after the cloud responds.
-      for (let m = 1; m <= 12; m += 1) {
-        const monthKeyV551 = y + "-" + String(m).padStart(2, "0");
-        reconcileSupersededPendingRowsV537(json.rows || [], deltaChangesForUiV491, monthKeyV551);
-      }
+      // V55.2: a full-year read has no month-scoped revision delta.
+      // Do not call reconcileSupersededPendingRowsV537 here because that helper
+      // requires the current month change journal from loadFromSheet(). Using that
+      // month-only variable in this YEAR-scoped path caused Home annual totals to
+      // fail after the cloud response. Normal month sync keeps the newer-change
+      // protection; the authoritative year snapshot only performs ACK cleanup.
       reconcilePendingRowsFromCloudV329(json.rows || []);
       mergeCloudYearRows(y, json.rows || [], requestStartedAt);
       if (json.systemState && typeof applySystemState === "function") applySystemState(json.systemState);
