@@ -487,6 +487,24 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   outline:2px solid rgba(11,107,43,.18)!important;outline-offset:1px!important;border-color:#79a98a!important;
 }
 
+
+/* V55.5 compact context sync + Fair ranking commission */
+.context-sync-status-v457{font-size:17px!important;line-height:1.2!important;white-space:nowrap!important;font-weight:800!important}
+.fair-ranking-row-v555{display:block!important;padding:11px 12px!important}
+.fair-ranking-title-v555{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
+.fair-ranking-title-v555 b{min-width:0;overflow-wrap:anywhere;font-size:16px;line-height:1.25}
+.fair-ranking-title-v555 em{justify-self:end}
+.fair-ranking-money-v555{display:flex;gap:14px;align-items:center;justify-content:flex-start;margin-top:7px;white-space:nowrap}
+.fair-ranking-money-v555 strong{font-size:18px!important}
+.fair-ranking-money-v555 span{font-size:14px!important;font-weight:800;color:#555}
+@media(max-width:520px){
+  .context-sync-status-v457{font-size:17px!important}
+  .fair-ranking-row-v555{padding:11px 12px!important}
+  .fair-ranking-title-v555 b{font-size:16px}
+  .fair-ranking-money-v555{gap:12px;justify-content:flex-start}
+  .fair-ranking-money-v555 strong{font-size:18px!important}
+  .fair-ranking-money-v555 span{font-size:14px!important}
+}
 </style>
 <style id="v544-best-live-day-inline-fix">
 /* V55.0: best Live day marker is a CSS dot inside the date grid cell.
@@ -530,7 +548,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   .live-year-range-v537 .live-year-row-v539 > span.best-live-day-v539::after{display:none}
 }
 
-/* V55.4: annual-best-day marker also appears in normal Fair / Live month views. */
+/* V55.5: annual-best-day marker also appears in normal Fair / Live month views. */
 .annual-best-day-month-v553{display:inline-flex!important;align-items:center!important;gap:4px!important;white-space:nowrap!important;color:#148a3a!important;font-weight:900!important;width:max-content;max-width:100%}
 .annual-best-day-month-v553::after{content:"";display:inline-block;flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:#32c96a;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
 .year-grand-top5-wrap-v553{grid-column:1/-1;width:100%;margin-top:4px}.year-grand-top5-wrap-v553 .top3-toggle-btn{width:100%}.year-grand-top5-wrap-v553 .top3-panel{margin-top:8px}
@@ -539,7 +557,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 
 
 <style>
-/* V55.4 Fair session commission: compact five-column layout for mobile. */
+/* V55.5 Fair session commission: compact five-column layout for mobile. */
 .fair-profit-row-v554{
   display:grid!important;
   grid-template-columns:18% 22% 20% 23% 17%!important;
@@ -578,7 +596,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V55.4</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V55.5</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -1056,7 +1074,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V55.4 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V55.5 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -1130,7 +1148,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <div class="card system-info-card-v442">
   <h2>系统资料 / System Information</h2>
   <div class="system-info-grid-v442">
-    <div><span>版本</span><b>V55.4</b></div>
+    <div><span>版本</span><b>V55.5</b></div>
     <div><span>API版本</span><b id="systemInfoApiV442">检查中…</b></div>
     <div><span>Revision（上次 → 当前）</span><b>910 → 930</b></div>
     <div><span>储存方式</span><b>Google Sheet 自动同步</b></div>

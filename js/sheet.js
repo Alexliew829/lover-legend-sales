@@ -893,10 +893,18 @@ function syncStatusNodesV457(){
     document.getElementById("liveSyncStatusV457")
   ].filter(Boolean);
 }
+function compactContextSyncTextV555(value,state){
+  const raw=String(value||'');
+  if(/草稿/.test(raw)&&/(待同步|同步中|安全保存)/.test(raw))return '🔴 草稿待同步';
+  if(state==='error')return '🔴 同步失败';
+  if(state==='good')return '🟢 已同步';
+  return '🟡 同步中';
+}
 function writeSyncStatusV457(value,state){
   syncStatusNodesV457().forEach(node=>{
-    node.textContent=value;
-    if(node.classList.contains("context-sync-status-v457")){
+    const isContext=node.classList.contains("context-sync-status-v457");
+    node.textContent=isContext?compactContextSyncTextV555(value,state):value;
+    if(isContext){
       node.classList.toggle("is-good",state==="good");
       node.classList.toggle("is-error",state==="error");
     }
@@ -1205,7 +1213,7 @@ async function loadYearInBackground(year) {
         ? fairInputsHaveUnsavedChanges()
         : false;
       loadPendingRows();
-      // V55.4: a full-year read has no month-scoped revision delta.
+      // V55.5: a full-year read has no month-scoped revision delta.
       // Do not call reconcileSupersededPendingRowsV537 here because that helper
       // requires the current month change journal from loadFromSheet(). Using that
       // month-only variable in this YEAR-scoped path caused Home annual totals to
