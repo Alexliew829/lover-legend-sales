@@ -488,7 +488,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 }
 
 
-/* V55.7 compact context sync + Fair ranking commission */
+/* V55.8 compact context sync + Fair ranking commission */
 .context-sync-status-v457{font-size:17px!important;line-height:1.2!important;white-space:nowrap!important;font-weight:800!important}
 .fair-ranking-row-v555{display:block!important;padding:11px 12px!important}
 .fair-ranking-title-v555{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
@@ -548,7 +548,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   .live-year-range-v537 .live-year-row-v539 > span.best-live-day-v539::after{display:none}
 }
 
-/* V55.7: annual-best-day marker also appears in normal Fair / Live month views. */
+/* V55.8: annual-best-day marker also appears in normal Fair / Live month views. */
 .annual-best-day-month-v553{display:inline-flex!important;align-items:center!important;gap:4px!important;white-space:nowrap!important;color:#148a3a!important;font-weight:900!important;width:max-content;max-width:100%}
 .annual-best-day-month-v553::after{content:"";display:inline-block;flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:#32c96a;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
 .year-grand-top5-wrap-v553{grid-column:1/-1;width:100%;margin-top:4px}.year-grand-top5-wrap-v553 .top3-toggle-btn{width:100%}.year-grand-top5-wrap-v553 .top3-panel{margin-top:8px}
@@ -557,7 +557,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 
 
 <style>
-/* V55.7 Fair session commission: compact five-column layout for mobile. */
+/* V55.8 Fair session commission: compact five-column layout for mobile. */
 .fair-profit-row-v554{
   display:grid!important;
   grid-template-columns:18fr 22fr 20fr 23fr 17fr!important;
@@ -591,7 +591,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 
 
 <style>
-/* V55.7 Fair summary cards: readable 2x2 metrics on desktop and mobile. */
+/* V55.8 Fair summary cards: readable 2x2 metrics on desktop and mobile. */
 .fair-location-summary-v556{padding:12px!important;background:#fff!important}
 .fair-location-summary-head-v556{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;flex-wrap:wrap!important}
 .fair-location-summary-head-v556 strong{font-size:16px!important}
@@ -615,7 +615,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   .fair-total-card-v556{padding:9px!important}
 }
 
-/* V55.7 Fair detail polish: keep rightmost profit-rate inside the card and make session total visually lighter than month total. */
+/* V55.8 Fair detail polish: keep rightmost profit-rate inside the card and make session total visually lighter than month total. */
 .fair-profit-row-v554>*:last-child{padding-right:7px!important;box-sizing:border-box!important}
 .fair-session-card-v539 .month-profit-total-v294{
   background:#fffdf8!important;
@@ -633,6 +633,36 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   .fair-session-card-v539 .month-profit-total-v294{padding-left:8px!important;padding-right:8px!important}
 }
 
+
+
+<style>
+/* V55.8 Fair total alignment + annual-location toggle polish. */
+.fair-session-card-v539 .month-profit-total-v294{
+  grid-template-columns:18fr 22fr 20fr 23fr 17fr!important;
+  gap:3px!important;
+  width:calc(100% + 24px)!important;
+  max-width:none!important;
+  margin:10px -12px -12px!important;
+  padding:10px 12px!important;
+  border-radius:12px!important;
+  box-sizing:border-box!important;
+}
+.fair-session-card-v539 .month-profit-total-v294>*{min-width:0!important;white-space:nowrap!important}
+.fair-session-card-v539 .month-profit-total-v294>*:not(:first-child){text-align:right!important}
+@media(max-width:520px){
+  .fair-session-card-v539 .month-profit-total-v294{
+    grid-template-columns:16fr 23fr 20fr 24fr 17fr!important;
+    gap:1px!important;
+    width:calc(100% + 18px)!important;
+    margin:9px -9px -9px!important;
+    padding:9px 8px!important;
+    border-radius:11px!important;
+  }
+}
+@media(max-width:390px){
+  .fair-session-card-v539 .month-profit-total-v294{grid-template-columns:15fr 23fr 20fr 25fr 17fr!important}
+}
+</style>
 </style>
 
 </head>
@@ -642,7 +672,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V55.7</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V55.8</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -1120,7 +1150,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V55.7 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V55.8 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -1194,7 +1224,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <div class="card system-info-card-v442">
   <h2>系统资料 / System Information</h2>
   <div class="system-info-grid-v442">
-    <div><span>版本</span><b>V55.7</b></div>
+    <div><span>版本</span><b>V55.8</b></div>
     <div><span>API版本</span><b id="systemInfoApiV442">检查中…</b></div>
     <div><span>Revision（上次 → 当前）</span><b>910 → 930</b></div>
     <div><span>储存方式</span><b>Google Sheet 自动同步</b></div>
