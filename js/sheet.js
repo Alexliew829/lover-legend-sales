@@ -1205,7 +1205,7 @@ async function loadYearInBackground(year) {
         ? fairInputsHaveUnsavedChanges()
         : false;
       loadPendingRows();
-      // V55.3: a full-year read has no month-scoped revision delta.
+      // V55.4: a full-year read has no month-scoped revision delta.
       // Do not call reconcileSupersededPendingRowsV537 here because that helper
       // requires the current month change journal from loadFromSheet(). Using that
       // month-only variable in this YEAR-scoped path caused Home annual totals to

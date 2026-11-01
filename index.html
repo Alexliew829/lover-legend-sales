@@ -530,11 +530,45 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   .live-year-range-v537 .live-year-row-v539 > span.best-live-day-v539::after{display:none}
 }
 
-/* V55.3: annual-best-day marker also appears in normal Fair / Live month views. */
+/* V55.4: annual-best-day marker also appears in normal Fair / Live month views. */
 .annual-best-day-month-v553{display:inline-flex!important;align-items:center!important;gap:4px!important;white-space:nowrap!important;color:#148a3a!important;font-weight:900!important;width:max-content;max-width:100%}
 .annual-best-day-month-v553::after{content:"";display:inline-block;flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:#32c96a;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
 .year-grand-top5-wrap-v553{grid-column:1/-1;width:100%;margin-top:4px}.year-grand-top5-wrap-v553 .top3-toggle-btn{width:100%}.year-grand-top5-wrap-v553 .top3-panel{margin-top:8px}
 @media(max-width:360px){.annual-best-day-month-v553::after{width:6px;height:6px}}
+</style>
+
+
+<style>
+/* V55.4 Fair session commission: compact five-column layout for mobile. */
+.fair-profit-row-v554{
+  display:grid!important;
+  grid-template-columns:18% 22% 20% 23% 17%!important;
+  gap:3px!important;
+  align-items:center!important;
+  width:100%!important;
+  box-sizing:border-box!important;
+}
+.fair-profit-row-v554>*{min-width:0!important;white-space:nowrap!important}
+.fair-profit-row-v554>*:not(:first-child){text-align:right!important}
+.fair-profit-head-v554{font-size:12px!important}
+.fair-commission-value-v554{font-weight:800}
+.fair-location-month-total-v554{grid-template-columns:1.1fr repeat(4,1fr)!important}
+@media(max-width:520px){
+  .fair-profit-row-v554{
+    grid-template-columns:16% 23% 20% 24% 17%!important;
+    gap:1px!important;
+    padding:7px 4px!important;
+    font-size:clamp(9.5px,2.65vw,11.5px)!important;
+  }
+  .fair-profit-row-v554>span:first-child{font-size:clamp(9.5px,2.55vw,11px)!important}
+  .fair-profit-row-v554 .best-fair-day-v539{display:inline-flex!important;align-items:center!important;gap:1px!important}
+  .fair-profit-row-v554 .best-fair-day-v539 i{font-size:.68em!important;margin:0!important}
+  .fair-location-month-total-v554{grid-template-columns:1fr 1fr!important;font-size:12px!important}
+}
+@media(max-width:390px){
+  .fair-profit-row-v554{grid-template-columns:15% 23% 20% 25% 17%!important;font-size:9.3px!important;padding-left:2px!important;padding-right:2px!important}
+  .fair-profit-row-v554 .best-fair-day-v539 i{font-size:.58em!important}
+}
 </style>
 
 </head>
@@ -544,7 +578,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V55.3</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V55.4</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -1022,7 +1056,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V55.3 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V55.4 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -1096,7 +1130,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <div class="card system-info-card-v442">
   <h2>系统资料 / System Information</h2>
   <div class="system-info-grid-v442">
-    <div><span>版本</span><b>V55.3</b></div>
+    <div><span>版本</span><b>V55.4</b></div>
     <div><span>API版本</span><b id="systemInfoApiV442">检查中…</b></div>
     <div><span>Revision（上次 → 当前）</span><b>910 → 930</b></div>
     <div><span>储存方式</span><b>Google Sheet 自动同步</b></div>
