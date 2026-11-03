@@ -1584,7 +1584,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 }
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5580",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5590",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
@@ -1601,7 +1601,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5580";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5590";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -5068,7 +5068,7 @@ async function toggleYearBreakdownV224(kind){
 }
 window.toggleYearBreakdownV224=toggleYearBreakdownV224;
 
-/* ================= V55.8 annual combined monthly turnover Top 5 ================= */
+/* ================= V55.9 annual combined monthly turnover Top 5 ================= */
 let yearGrandTop5OpenV553=false;
 function annualCombinedTop5RowsV553(){
   const year=String(document.getElementById('yearPicker')?.value||selectedYear()||'');
@@ -5757,7 +5757,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5580",
+    version:"5590",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5801,7 +5801,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true,turnoverEntries:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V55.8').trim().replace(/[^A-Za-z0-9._-]/g,'_');
+    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V55.9').trim().replace(/[^A-Za-z0-9._-]/g,'_');
     downloadFile(`Lover_Legend_Sales_${runtimeVersionV531}_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
@@ -7351,7 +7351,7 @@ function profitByDayV294(links,type,name,date){
 }
 function marginTextV294(profit,sales){return (sales>0?profit/sales*100:0).toFixed(2)+'%'}
 
-/* ================= V55.8 best annual day marker in normal month view ================= */
+/* ================= V55.9 best annual day marker in normal month view ================= */
 function annualRowsAvailableV553(year){
   const y=String(year||'');
   if(!/^\d{4}$/.test(y))return false;
@@ -9102,15 +9102,29 @@ async function commitTurnoverEntriesV376(type,entries,actionText,notificationMet
   // returns the merged authoritative list. A stale device can never replace
   // entries that were added by another device.
   const ack=await saveTurnoverTotalV376(type,total,notificationMeta,clean);if(!ack?.ok){setTurnoverWriteStateV382(type,false);renderTurnoverComposerV376(type);return false}
-  // Once the atomic cloud context is confirmed (including timeout-confirm), clear
-  // only the proven new-entry draft so it cannot be submitted twice.
+  const authoritative=Array.isArray(ack.entries)?normalizeTurnoverEntriesClientV376(ack.entries):clean;
+  // V55.9: never clear the visible NEW turnover input unless the exact entry ID
+  // and amount are present in the authoritative cloud ACK. This prevents the
+  // dangerous state where RM1,520 disappears locally while the cloud total stays
+  // at RM380 because a stale/old response was accepted as success.
   if(['added_entry','retried_entry'].includes(String(notificationMeta?.action||''))){
-    const input=document.getElementById(turnoverIdsV376(type).input),savedAmount=Math.round(Number(notificationMeta?.amount||0)*100)/100;
-    if(input&&Math.abs(Math.round(toAmount(input.value||0)*100)/100-savedAmount)<=0.005)input.value='';
-    clearTurnoverNewDraftV376(type);
+    const expectedId=String(notificationMeta?.entryId||''),expectedAmount=Math.round(Number(notificationMeta?.amount||0)*100)/100;
+    const ackEntry=authoritative.find(x=>String(x.id||'')===expectedId);
+    const ackTotal=Math.round(entriesSumV376(authoritative)*100)/100;
+    const expectedTotal=Math.round(Number(total||0)*100)/100;
+    const exactEntryConfirmed=!!ackEntry&&Math.abs(Math.round(Number(ackEntry.amount||0)*100)/100-expectedAmount)<=0.005;
+    const exactTotalConfirmed=Math.abs(ackTotal-expectedTotal)<=0.005;
+    if(!exactEntryConfirmed||!exactTotalConfirmed){
+      setTurnoverEntryCacheV376(type,ctx.date,ctx.location,authoritative,'cloud-v559-ack-mismatch');
+      setTurnoverWriteStateV382(type,false);
+      renderTurnoverComposerV376(type);
+      setSync('新增营业额未获云端确认 · 输入金额已保留',true,false);
+      setTimeout(()=>{try{refreshTurnoverEntriesV376(type)}catch(_){}},0);
+      alert('新增营业额尚未获得云端完整确认。为保护资料，输入金额已保留，请重新检查后再试。');
+      return false;
+    }
   }
   clearTurnoverEntryPendingV376(type,ctx.date,ctx.location);
-  const authoritative=Array.isArray(ack.entries)?normalizeTurnoverEntriesClientV376(ack.entries):clean;
   setTurnoverEntryCacheV376(type,ctx.date,ctx.location,authoritative,'cloud-v514-server-merged');renderTurnoverComposerV376(type);
   showTempMsg(type==='daily'?'saveMsg':type==='live'?'liveSaveMsg':'fairSaveMsg');
   // Saving turnover changes the same authoritative total used by every old calculation.
@@ -9527,12 +9541,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5580'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5590'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5580')issues.push(`Frontend / API 版本不一致（Frontend 5580 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5590')issues.push(`Frontend / API 版本不一致（Frontend 5590 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5580';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5590';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
