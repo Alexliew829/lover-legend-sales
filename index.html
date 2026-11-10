@@ -8,10 +8,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Lover Sales</title>
-<link rel="manifest" href="manifest.json?v=56.1">
+<link rel="manifest" href="manifest.json?v=56.2">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="style.css?v=56.1">
+<link rel="stylesheet" href="style.css?v=56.2">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
@@ -488,7 +488,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 }
 
 
-/* V56.1 compact context sync + Fair ranking commission */
+/* V56.2 compact context sync + Fair ranking commission */
 .context-sync-status-v457{font-size:17px!important;line-height:1.2!important;white-space:nowrap!important;font-weight:800!important}
 .fair-ranking-row-v555{display:block!important;padding:11px 12px!important}
 .fair-ranking-title-v555{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
@@ -506,12 +506,14 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   .fair-ranking-money-v555 span{font-size:14px!important}
 }
 
-/* V56.1 Fair annual ranking: rank/status by average daily turnover; show average + Fair days before expanding. */
-.fair-ranking-average-v561{display:flex;gap:14px;align-items:center;justify-content:flex-start;margin-top:6px;white-space:nowrap;color:#42534a}
-.fair-ranking-average-v561 strong{font-size:14px!important;color:#0b6b2b}
-.fair-ranking-average-v561 span{font-size:14px!important;font-weight:800;color:#666}
+/* V56.2 Fair annual ranking: average/day is the primary performance signal. */
+.fair-ranking-average-v561{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;padding:7px 10px;border-radius:9px;white-space:nowrap;font-weight:900;border:1px solid transparent}
+.fair-ranking-average-v561 strong,.fair-ranking-average-v561 span{font-size:14px!important;font-weight:900!important;color:inherit!important}
+.fair-ranking-average-v561.perf-good-v536{color:#0b7a36;background:#edf9f1;border-color:#cdebd7}
+.fair-ranking-average-v561.perf-mid-v536{color:#9a6b00;background:#fff8dc;border-color:#efdda0}
+.fair-ranking-average-v561.perf-low-v536{color:#c62828;background:#fff0f0;border-color:#f0c2c2}
 @media(max-width:520px){
-  .fair-ranking-average-v561{gap:12px}
+  .fair-ranking-average-v561{gap:8px;padding:7px 9px}
   .fair-ranking-average-v561 strong,.fair-ranking-average-v561 span{font-size:14px!important}
 }
 
@@ -558,7 +560,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   .live-year-range-v537 .live-year-row-v539 > span.best-live-day-v539::after{display:none}
 }
 
-/* V56.1: annual-best-day marker also appears in normal Fair / Live month views. */
+/* V56.2: annual-best-day marker also appears in normal Fair / Live month views. */
 .annual-best-day-month-v553{display:inline-flex!important;align-items:center!important;gap:4px!important;white-space:nowrap!important;color:#148a3a!important;font-weight:900!important;width:max-content;max-width:100%}
 .annual-best-day-month-v553::after{content:"";display:inline-block;flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:#32c96a;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
 .year-grand-top5-wrap-v553{grid-column:1/-1;width:100%;margin-top:4px}.year-grand-top5-wrap-v553 .top3-toggle-btn{width:100%}.year-grand-top5-wrap-v553 .top3-panel{margin-top:8px}
@@ -567,7 +569,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 
 
 <style>
-/* V56.1 Fair session commission: compact five-column layout for mobile. */
+/* V56.2 Fair session commission: compact five-column layout for mobile. */
 .fair-profit-row-v554{
   display:grid!important;
   grid-template-columns:18fr 22fr 20fr 23fr 17fr!important;
@@ -601,7 +603,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 
 
 <style>
-/* V56.1 Fair summary cards: readable 2x2 metrics on desktop and mobile. */
+/* V56.2 Fair summary cards: readable 2x2 metrics on desktop and mobile. */
 .fair-location-summary-v556{padding:12px!important;background:#fff!important}
 .fair-location-summary-head-v556{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;flex-wrap:wrap!important}
 .fair-location-summary-head-v556 strong{font-size:16px!important}
@@ -625,7 +627,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   .fair-total-card-v556{padding:9px!important}
 }
 
-/* V56.1 Fair detail polish: keep rightmost profit-rate inside the card and make session total visually lighter than month total. */
+/* V56.2 Fair detail polish: keep rightmost profit-rate inside the card and make session total visually lighter than month total. */
 .fair-profit-row-v554>*:last-child{padding-right:7px!important;box-sizing:border-box!important}
 .fair-session-card-v539 .month-profit-total-v294{
   background:#fffdf8!important;
@@ -646,7 +648,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 
 
 <style>
-/* V56.1 Fair total alignment + annual-location toggle polish. */
+/* V56.2 Fair total alignment + annual-location toggle polish. */
 .fair-session-card-v539 .month-profit-total-v294{
   grid-template-columns:18fr 22fr 20fr 23fr 17fr!important;
   gap:3px!important;
@@ -675,6 +677,14 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 </style>
 </style>
 
+
+<style>
+/* V56.2 normal Fair month: lightweight session-average summary below the horizontal total row. */
+.fair-session-average-v562{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin:7px 2px 0;padding:0 2px;font-size:13px;line-height:1.25;color:#5d695f;white-space:nowrap}
+.fair-session-average-v562 strong{font-size:13px;font-weight:900;color:#2f6f42}
+.fair-session-average-v562 span{font-weight:800;color:#68716b}
+@media(max-width:520px){.fair-session-average-v562{font-size:12px;margin-top:6px}.fair-session-average-v562 strong{font-size:12px}}
+</style>
 </head>
 <body>
 <script>window.LOVER_API_URL="https://script.google.com/macros/s/AKfycby1OwDIiVf5quXKiD9AG8s2ppM942sLFdJSfyePp--yZtDjYY8jBtkOYLwD9c3WiC_KNw/exec";</script>
@@ -682,7 +692,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <header class="top">
   <div class="brand">
     <img src="images/logo.png" class="logo" alt="Lover Legend">
-    <div class="brand-title">Lover Legend<br>Sales <small>V56.1</small></div>
+    <div class="brand-title">Lover Legend<br>Sales <small>V56.2</small></div>
     <img src="images/Logo2.jpg" class="seal" alt="Lover Legend">
   </div>
 </header>
@@ -1160,7 +1170,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
   <div id="notificationDetail" class="notification-detail notification-subscription-id" aria-live="polite"></div>
           <button type="button" id="copySubscriptionIdBtn" class="notification-copy-id-btn" onclick="copyLoverSubscriptionId()" style="display:none;">📋 复制 Subscription ID</button>
   <div id="notificationLastSend" class="notification-last-send">最近通知：尚未测试</div>
-  <div id="notificationRegistered" class="notification-registered">设备登记：V56.1 正在建立真实设备清单…</div>
+  <div id="notificationRegistered" class="notification-registered">设备登记：V56.2 正在建立真实设备清单…</div>
   <button type="button" class="notification-reregister-btn" onclick="forceRegisterLoverSalesSubscription()">🔄 重新登记此设备</button>
   <button id="notificationEnableBtn" type="button" class="notification-enable-btn" onclick="enableLoverSalesNotifications()">🔔 开启销售通知</button>
 </div>
@@ -1234,7 +1244,7 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
 <div class="card system-info-card-v442">
   <h2>系统资料 / System Information</h2>
   <div class="system-info-grid-v442">
-    <div><span>版本</span><b>V56.1</b></div>
+    <div><span>版本</span><b>V56.2</b></div>
     <div><span>API版本</span><b id="systemInfoApiV442">检查中…</b></div>
     <div><span>Revision（上次 → 当前）</span><b>910 → 930</b></div>
     <div><span>储存方式</span><b>Google Sheet 自动同步</b></div>
@@ -1286,10 +1296,10 @@ document.addEventListener("DOMContentLoaded",()=>setTimeout(()=>refreshRegistere
     if(appLoadPromise)return appLoadPromise;
     // Download all business scripts in parallel; async=false preserves execution order.
     appLoadPromise=loadScriptsInOrder([
-      "js/utils.js?v=56.1",
-      "js/sheet.js?v=56.1",
-      "js/app.js?v=56.1",
-      "js/update.js?v=56.1"
+      "js/utils.js?v=56.2",
+      "js/sheet.js?v=56.2",
+      "js/app.js?v=56.2",
+      "js/update.js?v=56.2"
     ]).catch(error=>{
         console.error(error);
         const status=document.getElementById("syncStatus");
