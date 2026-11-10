@@ -3000,13 +3000,13 @@ body{overflow-x:hidden;}
 /* V46.0: while a cloud write is in flight, bottom navigation cannot switch pages. */
 .sales-mutation-lock-v450 .bottom-nav,.turnover-write-lock-v457 .bottom-nav{pointer-events:none;opacity:.62}
 
-/* V56.2: prevent fixed bottom navigation from floating above mobile software keyboards. */
+/* V56.3: prevent fixed bottom navigation from floating above mobile software keyboards. */
 @media (max-width:760px){
   html.keyboard-open-v560 .bottom-nav{display:none!important}
   html.keyboard-open-v560 .sales-draft-return-v429{display:none!important}
 }
 
 
-/* V56.2 Fair average indicators */
+/* V56.3 Fair average indicators */
 .fair-ranking-average-v561{font-weight:900}
 .fair-session-average-v562{box-sizing:border-box}

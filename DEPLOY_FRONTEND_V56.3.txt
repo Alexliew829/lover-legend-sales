@@ -1,0 +1,5 @@
+Lover Legend Sales V56.3 Frontend
+1. 将 Frontend 目录内容完整覆盖 GitHub Pages 项目。
+2. 确认 index.html / update.js / sw.js / manifest / version 均为 V56.3 / 5630。
+3. 强制刷新一次，确保旧 Service Worker 缓存失效。
+4. More / 系统健康检查应显示 Frontend 5630。

@@ -1584,7 +1584,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 }
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5620",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5630",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
@@ -1601,7 +1601,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5620";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5630";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2474,7 +2474,7 @@ function performanceBandV536(value,best){
   const v=Number(value||0),b=Number(best||0);
   if(b<=0)return {cls:'perf-mid-v536',text:'🟡 普通'};
   const ratio=v/b;
-  // V56.2: Fair status uses 60% / 30% of the best average-daily turnover.
+  // V56.3: Fair status uses 60% / 30% of the best average-daily turnover.
   if(ratio>=0.60)return {cls:'perf-good-v536',text:'🟢 好'};
   if(ratio>=0.30)return {cls:'perf-mid-v536',text:'🟡 普通'};
   return {cls:'perf-low-v536',text:'🔴 差'};
@@ -2608,7 +2608,7 @@ function renderFairAnalyticsV536(data){
   const bestLocation=Math.max(...list.map(g=>Number(g.dailyAverage||0)),0);
   fairAnalyticsViewDataV539={list,bestLocation,profitIndex,fairMonthRatesV554};
   fairHistoryOpenKeyV558='';
-  panel.innerHTML=`<div class="history-ranking-note-v541">地点总排名 · 以平均每日营业额为主要比较</div><div class="fair-ranking-v537 fair-ranking-v555">${list.map((g,index)=>{const band=performanceBandV536(g.dailyAverage,bestLocation);return `<button type="button" class="fair-ranking-row-v537 fair-ranking-row-v555" onclick="openFairLocationHistoryV538('${escapeChangeLogHtmlV200(g.key)}')"><span class="fair-ranking-title-v555"><b>${index+1}. ${escapeChangeLogHtmlV200(g.name)}</b><em class="${band.cls}">${band.text}</em></span><span class="fair-ranking-money-v555"><strong>RM${money(g.sales)}</strong><span>佣金 RM${money(g.commission)}</span></span><span class="fair-ranking-average-v561 ${band.cls}"><strong>平均/天 RM${money(g.dailyAverage)}</strong><span>${g.days} 天</span></span></button>`}).join('')}</div><div id="fairHistoryDetailV539"></div>`;
+  panel.innerHTML=`<div class="history-ranking-note-v541">地点总排名 · 以平均每日营业额为主要比较</div><div class="fair-ranking-v537 fair-ranking-v555">${list.map((g,index)=>{const band=performanceBandV536(g.dailyAverage,bestLocation);return `<button type="button" class="fair-ranking-row-v537 fair-ranking-row-v555" onclick="openFairLocationHistoryV538('${escapeChangeLogHtmlV200(g.key)}')"><span class="fair-ranking-title-v555"><b>${index+1}. ${escapeChangeLogHtmlV200(g.name)} <em class="${band.cls}">${band.text}</em></b></span><span class="fair-ranking-money-v555"><strong>RM${money(g.sales)}</strong><span>佣金 RM${money(g.commission)}</span></span><span class="fair-ranking-average-v561 ${band.cls}"><strong>平均/天 RM${money(g.dailyAverage)} · ${g.days}天</strong></span></button>`}).join('')}</div><div id="fairHistoryDetailV539"></div>`;
 }
 async function toggleFairAllHistoryV536(){
   const panel=document.getElementById('fairAllHistoryPanelV536'),btn=document.getElementById('fairAllHistoryBtnV536');if(!panel)return;
@@ -5760,7 +5760,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5620",
+    version:"5630",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5804,7 +5804,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true,turnoverEntries:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V56.2').trim().replace(/[^A-Za-z0-9._-]/g,'_');
+    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V56.3').trim().replace(/[^A-Za-z0-9._-]/g,'_');
     downloadFile(`Lover_Legend_Sales_${runtimeVersionV531}_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
@@ -7459,7 +7459,7 @@ renderFairMonthlyList=function(){
         let rangeSales=0,rangeProfit=0,rangeCards=0;const label=range.startIso===range.endIso?isoToDisplay(range.startIso):`${isoToDisplay(range.startIso)} ～ ${isoToDisplay(range.endIso)}`;
         let rangeCommission=0;
         const rowsHtml=range.rows.map(r=>{const p=profitByDayV294(links,'fair',group.name,r.date),hasCards=hasProfitCardsForContextV501(links,'fair',group.name,r.date),sales=Number(r.amount||0),commission=sales*fairRate;rangeSales+=sales;rangeCommission+=commission;rangeProfit+=p;if(hasCards)rangeCards++;return fairProfitRowV554(r,p,hasCards,fairRate)}).join('');
-        allHtml+=`<div class="month-record-group month-profit-group-v294 fair-session-card-v539"><div class="month-record-group-title fair-location-title-v298"><span>${escapeChangeLogHtmlV200(group.name)}${ranges.length>1?` · Fair ${idx+1}`:''}</span><b>${label}</b></div>${fairProfitHeadV554(`佣金 ${fairRatePct}%`)}${rowsHtml}<div class="month-profit-row-v294 fair-profit-row-v554 month-profit-total-v294"><span>本场总数</span><strong>${money(rangeSales)}</strong><strong class="fair-commission-value-v554">${money(rangeCommission)}</strong><strong class="profit-value-v294">${rangeCards?money(rangeProfit):'--'}</strong><strong class="profit-rate-v294">${rangeCards?marginTextV294(rangeProfit,rangeSales):'--'}</strong></div><div class="fair-session-average-v562"><strong>平均/天 RM${money(rangeSales/Math.max(1,range.rows.length))}</strong><span>· ${Math.max(1,range.rows.length)}天</span></div></div>`;
+        allHtml+=`<div class="month-record-group month-profit-group-v294 fair-session-card-v539"><div class="month-record-group-title fair-location-title-v298"><span>${escapeChangeLogHtmlV200(group.name)}${ranges.length>1?` · Fair ${idx+1}`:''}</span><b>${label}</b></div>${fairProfitHeadV554(`佣金 ${fairRatePct}%`)}${rowsHtml}<div class="fair-session-total-wrap-v563"><div class="month-profit-row-v294 fair-profit-row-v554 month-profit-total-v294"><span>本场总数</span><strong>${money(rangeSales)}</strong><strong class="fair-commission-value-v554">${money(rangeCommission)}</strong><strong class="profit-value-v294">${rangeCards?money(rangeProfit):'--'}</strong><strong class="profit-rate-v294">${rangeCards?marginTextV294(rangeProfit,rangeSales):'--'}</strong></div><div class="fair-session-average-v562"><strong>平均/天 RM${money(rangeSales/Math.max(1,range.rows.length))} · ${Math.max(1,range.rows.length)}天</strong></div></div></div>`;
       });
       if(ranges.length>1)allHtml+=`<div class="fair-location-month-total-v539 fair-total-card-v556"><strong>${ranges.length} 场总数</strong><div class="fair-total-grid-v556"><div><span>营业额</span><b>${money(locationSales)}</b></div><div><span>佣金</span><b>${money(locationSales*fairRate)}</b></div><div><span>利润</span><b>${locationCardCount?money(locationProfit):'--'}</b></div><div><span>利润率</span><b>${locationCardCount?marginTextV294(locationProfit,locationSales):'--'}</b></div></div></div>`;
     });
@@ -9586,12 +9586,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5620'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5630'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5620')issues.push(`Frontend / API 版本不一致（Frontend 5620 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5630')issues.push(`Frontend / API 版本不一致（Frontend 5630 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5620';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5630';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
