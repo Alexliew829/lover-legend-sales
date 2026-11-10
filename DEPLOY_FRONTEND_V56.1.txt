@@ -1,0 +1,8 @@
+Lover Legend Sales V56.1 Frontend
+
+1. 用本包 Frontend 全部文件覆盖 GitHub Pages 对应文件。
+2. 确认 index.html / update.js / sw.js / manifest / version 均为 V56.1 / 5610。
+3. GitHub Pages 部署完成后，手机和电脑强制刷新一次。
+4. More / 系统健康检查应显示 Frontend 5610。
+5. 现场测试：Fair 输入一笔营业额保存后，在另一设备/明细尚未追上时继续新增下一笔，新增不能被静默阻止。
+6. 手机测试：打开任何输入框时底部 Home/Sales/Fair/Live/Report/More 自动隐藏，键盘关闭/离开输入后恢复。

@@ -1584,7 +1584,7 @@ async function saveFairSales(){const fairLocationValue=String(document.getElemen
   }
 }
 const ACTIVE_MONTH_STORAGE_KEY="lover_sales_active_month_v82";
-let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5600",restoreGeneration:0};
+let systemState={currentMonth:monthISO(),closedMonths:[],closedYears:[],commissionSnapshots:{},dataVersion:"5610",restoreGeneration:0};
 function saveActiveMonth(month){if(/^\d{4}-\d{2}$/.test(String(month||"")))localStorage.setItem(ACTIVE_MONTH_STORAGE_KEY,String(month))}
 function ensureWritableSelection(){return true}
 function updateReadOnlyMode(){
@@ -1601,7 +1601,7 @@ function sanitizeClosedMonthsClientV197(months,currentMonth){
   return [...new Set((Array.isArray(months)?months:[]).map(m=>String(m||"")).filter(m=>/^\d{4}-\d{2}$/.test(m)))]
     .filter(m=>m<current||(m===current&&isCurrentLastDay)).sort();
 }
-function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5600";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
+function applySystemState(state){if(state){systemState.currentMonth=state.currentMonth||monthISO();systemState.closedMonths=sanitizeClosedMonthsClientV197(state.closedMonths,systemState.currentMonth);systemState.closedYears=Array.isArray(state.closedYears)?state.closedYears.map(String):[];systemState.commissionSnapshots=state.commissionSnapshots||{};systemState.dataVersion=state.dataVersion||"5610";systemState.restoreGeneration=Math.max(0,Number(state.restoreGeneration||0));if(typeof applyRestoreGenerationV347==='function')applyRestoreGenerationV347(systemState.restoreGeneration)}updateReadOnlyMode()}
 async function monthClose(){
   const m=selectedMonth();
   if(m!==systemState.currentMonth){alert("只能结算系统当前月份："+systemState.currentMonth);return}
@@ -2561,7 +2561,7 @@ function renderFairLocationDetailV539(key){
   const panel=document.getElementById('fairHistoryDetailV539');if(!panel||!fairAnalyticsViewDataV539)return;
   const {list,bestLocation,profitIndex,fairMonthRatesV554}=fairAnalyticsViewDataV539,g=list.find(x=>x.key===key);if(!g){clearFairLocationDetailV558();return}
   fairHistoryOpenKeyV558=key;
-  const band=performanceBandV536(g.sales,bestLocation),bestRange=Math.max(...g.ranges.map(r=>Number(r.sales||0)),0),bestDayRow=[...g.rows].sort((a,b)=>Number(b.amount||0)-Number(a.amount||0))[0]||null;
+  const band=performanceBandV536(Number(g.dailyAverage||0),bestLocation),bestRange=Math.max(...g.ranges.map(r=>Number(r.sales||0)),0),bestDayRow=[...g.rows].sort((a,b)=>Number(b.amount||0)-Number(a.amount||0))[0]||null;
   const ranges=g.ranges.map((range,rangeIndex)=>{
     const rangeLabel=range.startIso===range.endIso?isoToDisplay(range.startIso):`${isoToDisplay(range.startIso)} ～ ${isoToDisplay(range.endIso)}`;
     const isBest=g.ranges.length>1&&Number(range.sales||0)===bestRange;
@@ -2596,16 +2596,19 @@ function renderFairAnalyticsV536(data){
   if(!source.length){panel.innerHTML='<div class="sub">没有 Fair 历史记录</div>';return}
   const groups=new Map();
   source.forEach(r=>{const key=normalizeFairLocationKey(r.location||'Fair'),name=canonicalLocation(r.location||'Fair');if(!groups.has(key))groups.set(key,{key,name,rows:[],sales:0,profit:0,margin:0,ranges:[]});const g=groups.get(key);g.rows.push(r);g.sales+=Number(r.amount||0);g.profit+=Number(profitIndex.get(key+'|'+r.date)||0)});
-  const list=[...groups.values()].sort((a,b)=>b.sales-a.sales);
+  const list=[...groups.values()];
   list.forEach(g=>{
     g.margin=g.sales>0?g.profit/g.sales*100:0;
     g.commission=g.rows.reduce((sum,r)=>sum+Number(r.amount||0)*Number(fairMonthRatesV554?.get(isoDayV536(r.date).slice(0,7))||0),0);
+    g.days=Math.max(1,g.rows.length);
+    g.dailyAverage=g.sales/g.days;
     g.ranges=groupFairRangesV538(g.rows,sessions,g.key).map(range=>{range.sales=range.rows.reduce((a,r)=>a+Number(r.amount||0),0);range.profit=range.rows.reduce((a,r)=>a+Number(profitIndex.get(g.key+'|'+r.date)||0),0);range.margin=range.sales>0?range.profit/range.sales*100:0;return range})
   });
-  const bestLocation=Math.max(...list.map(g=>g.sales),0);
+  list.sort((a,b)=>Number(b.dailyAverage||0)-Number(a.dailyAverage||0)||Number(b.sales||0)-Number(a.sales||0)||String(a.name||'').localeCompare(String(b.name||'')));
+  const bestLocation=Math.max(...list.map(g=>Number(g.dailyAverage||0)),0);
   fairAnalyticsViewDataV539={list,bestLocation,profitIndex,fairMonthRatesV554};
   fairHistoryOpenKeyV558='';
-  panel.innerHTML=`<div class="history-ranking-note-v541">地点总排名 · 以累计营业额为主要比较</div><div class="fair-ranking-v537 fair-ranking-v555">${list.map((g,index)=>{const band=performanceBandV536(g.sales,bestLocation);return `<button type="button" class="fair-ranking-row-v537 fair-ranking-row-v555" onclick="openFairLocationHistoryV538('${escapeChangeLogHtmlV200(g.key)}')"><span class="fair-ranking-title-v555"><b>${index+1}. ${escapeChangeLogHtmlV200(g.name)}</b><em class="${band.cls}">${band.text}</em></span><span class="fair-ranking-money-v555"><strong>RM${money(g.sales)}</strong><span>佣金 RM${money(g.commission)}</span></span></button>`}).join('')}</div><div id="fairHistoryDetailV539"></div>`;
+  panel.innerHTML=`<div class="history-ranking-note-v541">地点总排名 · 以平均每日营业额为主要比较</div><div class="fair-ranking-v537 fair-ranking-v555">${list.map((g,index)=>{const band=performanceBandV536(g.dailyAverage,bestLocation);return `<button type="button" class="fair-ranking-row-v537 fair-ranking-row-v555" onclick="openFairLocationHistoryV538('${escapeChangeLogHtmlV200(g.key)}')"><span class="fair-ranking-title-v555"><b>${index+1}. ${escapeChangeLogHtmlV200(g.name)}</b><em class="${band.cls}">${band.text}</em></span><span class="fair-ranking-money-v555"><strong>RM${money(g.sales)}</strong><span>佣金 RM${money(g.commission)}</span></span><span class="fair-ranking-average-v561"><strong>平均/天 RM${money(g.dailyAverage)}</strong><span>${g.days} 天</span></span></button>`}).join('')}</div><div id="fairHistoryDetailV539"></div>`;
 }
 async function toggleFairAllHistoryV536(){
   const panel=document.getElementById('fairAllHistoryPanelV536'),btn=document.getElementById('fairAllHistoryBtnV536');if(!panel)return;
@@ -5757,7 +5760,7 @@ function renderBackupRestoreStatusV234(state=getBackupRestoreStateV234()){
 function getBackupPayload(){
   return{
     system:"Lover Legend Sales System",
-    version:"5600",
+    version:"5610",
     createdAt:new Date().toISOString(),
     rows:dedupeRows(rows),
     commissionSettings:getCommissionSettings(),
@@ -5801,7 +5804,7 @@ async function backupAllData(){
     payload.backupIncludes={sales:true,fair:true,live:true,commission:true,closedMonths:true,commissionSnapshots:true,productLinks:true,salesChangeLogs:true,fairSessions:true,profitData:true,remarks:true,averageCost:true,minimumPrice:true,deliveryAndExtraFees:true,turnoverEntries:true};
     setBackupRestoreStateV234({type:"backup",status:"running",message:"正在生成 Backup 文件..."});
     const stamp=new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
-    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V56.0').trim().replace(/[^A-Za-z0-9._-]/g,'_');
+    const runtimeVersionV531=String(document.querySelector('.brand-title small')?.textContent||'V56.1').trim().replace(/[^A-Za-z0-9._-]/g,'_');
     downloadFile(`Lover_Legend_Sales_${runtimeVersionV531}_Backup_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
     setBackupRestoreStateV234({type:"backup",status:"success",message:`Backup 完成：营业记录 ${payload.rows.length} 笔，销售卡 ${payload.productLinks.length} 笔，新增/修改历史 ${payload.salesChangeLogs.length} 笔。`});
     setSystemStoredAtV442(SYSTEM_BACKUP_AT_KEY_V442);
@@ -9111,7 +9114,7 @@ async function commitTurnoverEntriesV376(type,entries,actionText,notificationMet
     const expectedId=String(notificationMeta?.entryId||''),expectedAmount=Math.round(Number(notificationMeta?.amount||0)*100)/100;
     const ackEntry=authoritative.find(x=>String(x.id||'')===expectedId);
     const exactEntryConfirmed=!!ackEntry&&Math.abs(Math.round(Number(ackEntry.amount||0)*100)/100-expectedAmount)<=0.005;
-    // V56.0: do NOT require the cloud total to equal this device's pre-save total.
+    // V56.1: do NOT require the cloud total to equal this device's pre-save total.
     // Another Fair phone may have added/deleted a different entry while this request
     // was in flight. The exact entryId + amount is the authoritative proof that THIS
     // user's new turnover was committed; the returned cloud list/total may legitimately
@@ -9144,7 +9147,7 @@ function setTurnoverSaveButtonV382(type,state){
   btn.disabled=false;btn.textContent=btn.dataset.idleText||'储存';
 }
 async function addTurnoverEntryV376(type){
-  // V56.0: a slow auxiliary TurnoverEntries read must never block NEW turnover.
+  // V56.1: a slow auxiliary TurnoverEntries read must never block NEW turnover.
   // The authoritative daily/Fair/Live total remains the save baseline and Code.gs
   // merges the new entryId under one lock. Edit/delete still require exact detail.
   if(turnoverWriteStateV382[type]){
@@ -9205,7 +9208,7 @@ updateLiveInputFromSelectedDate=function(){_updateLiveInputFromSelectedDateV376(
 try{localStorage.removeItem('lover_live_turnover_drafts_v332');localStorage.removeItem('lover_fair_turnover_drafts_v356')}catch(_){}
 ['dailyTurnoverNewV432','fairTurnoverNewV376','liveTurnoverNewV376'].forEach(id=>{const el=document.getElementById(id);if(el){const type=id.startsWith('daily')?'daily':id.startsWith('fair')?'fair':'live';el.addEventListener('input',()=>saveTurnoverNewDraftV376(type,el.value));el.addEventListener('change',()=>saveTurnoverNewDraftV376(type,el.value));el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addTurnoverEntryV376(type)}})}});
 
-/* ================= V56.0 mobile keyboard / bottom navigation =================
+/* ================= V56.1 mobile keyboard / bottom navigation =================
    iOS/Android visual viewports can move position:fixed bottom navigation above
    the software keyboard. Hide the navigation while a mobile form control is
    actively being edited, then restore it after focus leaves / keyboard closes.
@@ -9583,12 +9586,12 @@ async function runSystemHealthCheckV442(userTriggered=false){
     if(/^\d{4}$/.test(year))loadYearInBackground(year).catch(()=>{});
   }
   try{
-    const data=await jsonp({action:'healthV443',clientVersion:'5600'},{timeoutMs:15000});
+    const data=await jsonp({action:'healthV443',clientVersion:'5610'},{timeoutMs:15000});
     if(!data?.ok)throw new Error(data?.message||'系统检查失败');
     const issues=[];
-    if(String(data.apiVersion||'')!=='5600')issues.push(`Frontend / API 版本不一致（Frontend 5600 / API ${data.apiVersion||'未知'}）`);
+    if(String(data.apiVersion||'')!=='5610')issues.push(`Frontend / API 版本不一致（Frontend 5610 / API ${data.apiVersion||'未知'}）`);
     (Array.isArray(data.issues)?data.issues:[]).forEach(x=>issues.push(String(x)));
-    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5600';
+    const severe=Boolean(data.severe)||!data.sheetConnected||String(data.apiVersion||'')!=='5610';
     systemHealthStateV442={level:severe?'error':issues.length?'warning':'normal',issues,checked:true,data,expanded:false};
     renderSystemInformationV442(data);renderSystemHealthV442();
   }catch(e){
